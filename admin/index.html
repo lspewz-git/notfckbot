@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotFckBot Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>NotFckBot <span>Admin</span></h1>
+            <div class="health-indicators">
+                <div class="health-item" id="health-tg">
+                    Telegram: <span class="health-badge">...</span>
+                </div>
+                <div class="health-item" id="health-kp">
+                    Kinopoisk: <span class="health-badge">...</span>
+                </div>
+            </div>
+            <div class="status-badge">System Live</div>
+        </header>
+
+        <section class="stats">
+            <div class="stat-card">
+                <h3>Chats</h3>
+                <p id="chats-count">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>Subscriptions</h3>
+                <p id="subs-count">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>Series</h3>
+                <p id="series-count">-</p>
+            </div>
+        </section>
+
+        <section class="controls">
+            <button id="refresh-btn" class="secondary">🔄 Refresh Data</button>
+            <button id="trigger-btn" class="secondary">🔍 Trigger Update Check</button>
+            <button id="clear-all-btn" class="danger">⚠️ Clear All Data</button>
+        </section>
+
+        <section class="settings-section">
+            <h2>⚙️ Settings</h2>
+            <div class="settings-row">
+                <label for="apikey-input">Kinopoisk API Key</label>
+                <div class="apikey-row">
+                    <input type="password" id="apikey-input" placeholder="Loading current key..." autocomplete="off">
+                    <button id="toggle-apikey" class="secondary icon-btn" title="Show/hide">👁</button>
+                    <button id="save-apikey" class="primary">Save</button>
+                </div>
+                <span id="apikey-status" class="apikey-status"></span>
+            </div>
+        </section>
+
+        <section class="broadcast">
+            <h2>📢 Broadcast Message</h2>
+            <div class="broadcast-box">
+                <textarea id="broadcast-msg" placeholder="Enter message to send to all users..."></textarea>
+                <button id="send-broadcast" class="primary">Send Broadcast</button>
+            </div>
+        </section>
+
+        <section class="logs-container">
+            <h2>📜 Real-time Logs</h2>
+            <div id="logs-viewer" class="logs-viewer">
+                <!-- Logs will appear here -->
+            </div>
+        </section>
+
+        <section class="table-container">
+            <h2>Active Subscriptions</h2>
+            <div class="search-box">
+                <input type="text" id="filter-input" placeholder="Search by chat ID or series title...">
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Chat ID</th>
+                        <th>User Name</th>
+                        <th>Series</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="subs-table-body">
+                    <!-- Data will be populated here -->
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <!-- Modal for Confirmation -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3>Are you absolutely sure?</h3>
+            <p>This action will wipe all subscriptions and series tracking data. This cannot be undone.</p>
+            <div class="modal-actions">
+                <button id="confirm-clear" class="danger">Yes, WIPE EVERYTHING</button>
+                <button id="cancel-clear">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

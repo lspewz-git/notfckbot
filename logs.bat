@@ -1,0 +1,3 @@
+@echo off
+echo Following application logs (Press Ctrl+C to stop)...
+docker-compose logs -f app

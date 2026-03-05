@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.6
+    container_name: series_bot_db
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root_password}
+      MARIADB_DATABASE: ${DB_NAME:-series_bot}
+      MARIADB_USER: ${DB_USER:-bot_user}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-bot_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MARIADB_USER", "-p$$MARIADB_PASSWORD" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: series_bot_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      KINOPOISK_API_KEY: ${KINOPOISK_API_KEY}
+      DB_HOST: db
+      IS_DOCKER: "true"
+      DB_NAME: ${DB_NAME:-series_bot}
+      DB_USER: ${DB_USER:-bot_user}
+      DB_PASSWORD: ${DB_PASSWORD:-bot_password}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  mariadb_data:
