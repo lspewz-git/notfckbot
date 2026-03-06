@@ -1,5 +1,5 @@
 #!/bin/bash
 
 echo "Stopping notfckbot..."
-docker-compose down
+docker compose down
 echo "Bot stopped successfully!"
