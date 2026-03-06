@@ -1,7 +1,7 @@
 const { Telegraf, Markup } = require('telegraf');
-const { searchSeries, getSeriesData, getSeasons } = require('./api/kinopoisk');
+const { searchMulti, getDetails, getSeasonDetails, getRandomMovie } = require('./api/tmdb');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
-const { NOTIFY_LABELS, NOTIFY_LABELS_SHORT, NOTIFY_CYCLE, SERIES_TYPES, getWatchLink } = require('./constants');
+const { NOTIFY_LABELS, NOTIFY_LABELS_SHORT, NOTIFY_CYCLE, getWatchLink } = require('./constants');
 require('dotenv').config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -38,7 +38,11 @@ setInterval(() => {
 }, 10 * 60 * 1000); // Run cleanup every 10 minutes
 
 // Anti-Spam: throttle to 1 request/second per user
+// And track identical rapid commands for auto-blocking
 const lastMessageTimes = {};
+// Store shape: { text: lastCommandStr, count: duplicateCount, lastTime: timestamp }
+const commandTracking = {};
+
 setInterval(() => {
     // FIX: Memory leak — purge old anti-spam entries (older than 1 minute)
     const cutoff = Date.now() - 60_000;
@@ -46,16 +50,25 @@ setInterval(() => {
         if (lastMessageTimes[userId] < cutoff) {
             delete lastMessageTimes[userId];
         }
+        if (commandTracking[userId] && commandTracking[userId].lastTime < cutoff) {
+            delete commandTracking[userId];
+        }
     }
 }, 60_000);
 
 bot.use(async (ctx, next) => {
+    // Determine userId whether it's a message, callback query, inline query, etc.
     const userId = ctx.from ? ctx.from.id : null;
     if (!userId) return next();
 
     const now = Date.now();
     if (now - (lastMessageTimes[userId] || 0) < 1000) {
-        console.log(`[Anti-Spam] Ignoring rapid message from User ${userId}`);
+        console.log(`[Anti-Spam] Global Throttle: Ignoring rapid event from User ${userId}`);
+
+        // If it's a callback query, we should silently answer it to turn off the loading icon
+        if (ctx.callbackQuery) {
+            try { await ctx.answerCbQuery(); } catch (e) { }
+        }
         return;
     }
     lastMessageTimes[userId] = now;
@@ -72,7 +85,7 @@ const mainMenu = (ctx) => {
     }
     return Markup.keyboard([
         ['🔍 Поиск', '📺 Мои подписки'],
-        ['ℹ️ Помощь'],
+        ['🎲 Случайный фильм', 'ℹ️ Помощь'],
     ]).resize();
 };
 
@@ -86,17 +99,110 @@ const getCancelMenu = (ctx) => {
 };
 
 // ============================================================
-// Chat Data Middleware
+// Chat and Global Spam Middleware
 // ============================================================
 
 bot.use(async (ctx, next) => {
-    if (ctx.chat) {
-        const [chatData] = await Chat.findOrCreate({
-            where: { id: ctx.chat.id },
-            defaults: { type: ctx.chat.type },
+    if (ctx.from) {
+        // Track the specific user explicitly, whether they are in a group or private
+        const userId = ctx.from.id;
+        const username = ctx.from.username
+            ? `@${ctx.from.username}`
+            : `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim();
+
+        const [userData] = await Chat.findOrCreate({
+            where: { id: userId },
+            defaults: { type: 'private', username }
         });
+
+        // Always update username if it changed
+        if (userData.username !== username) {
+            await userData.update({ username });
+        }
+
+        const now = Date.now();
+        // Check if user is blocked
+        if (userData.blockedUntil && userData.blockedUntil.getTime() > now) {
+            // Drop silently if blocked to prevent spam
+            return;
+        }
+
         ctx.state = ctx.state || {};
-        ctx.state.chatData = chatData;
+        ctx.state.userData = userData; // Store the personal user record
+
+        // Also ensure the actual group chat exists purely for settings like menu_enabled
+        if (ctx.chat && ctx.chat.id !== userId) {
+            const [chatData] = await Chat.findOrCreate({
+                where: { id: ctx.chat.id },
+                defaults: { type: ctx.chat.type },
+            });
+            ctx.state.chatData = chatData;
+        } else {
+            ctx.state.chatData = userData; // In private chats, user == chat
+        }
+
+        // --- SPAM PROTECTION LOGIC ---
+        // Capture text messages OR callback queries (button clicks)
+        let spamText = null;
+        let spamMsgId = null;
+
+        if (ctx.message && ctx.message.text) {
+            spamText = ctx.message.text;
+            spamMsgId = ctx.message.message_id;
+        } else if (ctx.callbackQuery && ctx.callbackQuery.data) {
+            spamText = `[BTN] ${ctx.callbackQuery.data}`;
+            spamMsgId = ctx.callbackQuery.message ? ctx.callbackQuery.message.message_id : null;
+        }
+
+        if (spamText) {
+            const trk = commandTracking[userId] || { text: '', count: 0, lastTime: 0, msgIds: [] };
+
+            // If they sent the EXACT same text/button within 5 seconds...
+            if (trk.text === spamText && (now - trk.lastTime < 5000)) {
+                trk.count += 1;
+                if (spamMsgId && !trk.msgIds.includes(spamMsgId)) trk.msgIds.push(spamMsgId);
+            } else {
+                trk.text = spamText;
+                trk.count = 1;
+                trk.msgIds = spamMsgId ? [spamMsgId] : [];
+            }
+            trk.lastTime = now;
+            commandTracking[userId] = trk;
+
+            if (trk.count >= 3) {
+                // Auto-block for 5 minutes
+                const blockUntil = new Date(now + 5 * 60 * 1000);
+                await userData.update({ blockedUntil: blockUntil });
+                console.log(`[Anti-Spam] Auto-blocked user ${userId} for spamming: "${spamText}"`);
+
+                // 🧹 Clean up the spammed messages from the chat
+                const chatToClean = ctx.chat ? ctx.chat.id : null;
+                if (chatToClean && trk.msgIds.length > 0) {
+                    for (const mId of trk.msgIds) {
+                        try {
+                            await ctx.telegram.deleteMessage(chatToClean, mId);
+                        } catch (err) {
+                            // Message might already be deleted or bot lacks rights
+                        }
+                    }
+                }
+
+                delete commandTracking[userId];
+                delete userStates[getStateKey(ctx)];
+
+                try {
+                    if (ctx.callbackQuery) {
+                        await ctx.answerCbQuery('🚫 Не спамьте. Вы заблокированы на 5 минут.', { show_alert: true });
+                    } else {
+                        await ctx.reply('🚫 Не спамьте. Вы заблокированы на 5 минут.');
+                    }
+                } catch (e) {
+                    console.error('[Anti-Spam] Failed to send block notice:', e.message);
+                }
+
+                return; // Stop execution
+            }
+        }
     }
     return next();
 });
@@ -121,11 +227,11 @@ const showSearchPage = async (ctx, chatId, page = 0) => {
 
     const messageIds = [];
     for (const item of items) {
-        const year = item.year || 'н/д';
-        const name = item.name || item.alternativeName || item.enName || 'Без названия';
+        const year = (item.release_date || item.first_air_date || '').substring(0, 4) || 'н/д';
+        const name = item.title || item.name || item.original_title || item.original_name || 'Без названия';
         const caption = `<b>${name}</b> (${year})`;
-        const posterUrl = item.poster ? (item.poster.previewUrl || item.poster.url) : null;
-        const keyboard = Markup.inlineKeyboard([[Markup.button.callback('✨ Подписаться', `sub_${item.id}`)]]);
+        const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
+        const keyboard = Markup.inlineKeyboard([[Markup.button.callback('✨ Подписаться', `sub_${item.media_type}_${item.id}`)]]);
 
         let sentMsg;
         if (posterUrl) {
@@ -189,8 +295,8 @@ const sendSubscriptionList = async (ctx) => {
                 await ctx.reply(
                     `📺 ${s.title}\nРежим: ${typeLabel}`,
                     Markup.inlineKeyboard([[
-                        Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${s.kp_id}`),
-                        Markup.button.callback('❌ Отписаться', `unsub_${s.kp_id}`),
+                        Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${s.tmdb_id}`),
+                        Markup.button.callback('❌ Отписаться', `unsub_${s.tmdb_id}`),
                     ]])
                 );
             }
@@ -300,6 +406,46 @@ bot.command('menu_on', async (ctx) => {
     }
 });
 
+const handleRandomMovie = async (ctx) => {
+    setState(ctx, { state: 'idle' });
+    try {
+        const item = await getRandomMovie();
+        if (!item) return ctx.reply('Не удалось найти подходящий фильм. Попробуйте еще раз!', mainMenu(ctx));
+
+        const year = (item.release_date || '').substring(0, 4) || 'н/д';
+        const name = item.title || item.original_title || 'Без названия';
+        const rating = item.vote_average ? `⭐️ ${item.vote_average.toFixed(1)}/10` : '';
+        const caption = `🎲 <b>${name}</b> (${year})\n${rating}\n\n<i>${item.overview || 'Описание отсутствует.'}</i>`;
+        const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
+
+        // Inline keyboard: Add to watchlist OR Watch online directly
+        const watchLink = getWatchLink(name);
+        // Using correct callback format: watchlist_add_movie_{id}
+        const tmdbId = `movie_${item.id}`;
+
+        const keyboard = Markup.inlineKeyboard([
+            [Markup.button.url(`▶️ Смотреть онлайн`, watchLink)],
+            [Markup.button.callback('📌 В список ожидания', `watchlist_add_${tmdbId}`)]
+        ]);
+
+        if (posterUrl) {
+            try {
+                await ctx.replyWithPhoto(posterUrl, { caption, parse_mode: 'HTML', ...keyboard });
+            } catch {
+                await ctx.replyWithHTML(caption, keyboard);
+            }
+        } else {
+            await ctx.replyWithHTML(caption, keyboard);
+        }
+    } catch (error) {
+        console.error('[Bot] Random movie error:', error);
+        await ctx.reply('Ошибка получения случайного фильма.', mainMenu(ctx));
+    }
+};
+
+bot.command('random', handleRandomMovie);
+bot.hears('🎲 Случайный фильм', handleRandomMovie);
+
 const handleCancel = async (ctx) => {
     await clearLastMessages(ctx, ctx.chat.id);
     setState(ctx, { state: 'idle', results: [] });
@@ -322,14 +468,14 @@ bot.action('cancel_search', async (ctx) => {
 
 bot.on('text', async (ctx, next) => {
     const text = ctx.message.text;
-    const BUTTON_TEXTS = ['🔍 Поиск', '📺 Мои подписки', '❌ Отмена', 'ℹ️ Помощь', '❓ Помощь'];
+    const BUTTON_TEXTS = ['🔍 Поиск', '📺 Мои подписки', '❌ Отмена', 'ℹ️ Помощь', '❓ Помощь', '🎲 Случайный фильм'];
     if (BUTTON_TEXTS.includes(text) || text.startsWith('/')) return next();
 
     const state = getState(ctx);
     if (state.state !== 'waiting_for_search') return;
 
     try {
-        const results = await searchSeries(text);
+        const results = await searchMulti(text);
         if (!results || results.length === 0) {
             setState(ctx, { state: 'idle' });
             return ctx.reply('Ничего не найдено 😕', Markup.inlineKeyboard([
@@ -345,64 +491,52 @@ bot.on('text', async (ctx, next) => {
     }
 });
 
-bot.action(/page_(\d+)/, async (ctx) => {
+bot.action(/^page_(\d+)$/, async (ctx) => {
     const page = parseInt(ctx.match[1]);
     await clearLastMessages(ctx, ctx.chat.id);
     await showSearchPage(ctx, ctx.chat.id, page);
     await ctx.answerCbQuery();
 });
 
-bot.action(/sub_(\d+)/, async (ctx) => {
-    const filmId = ctx.match[1];
+bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
+    const mediaType = ctx.match[1];
+    const filmId = ctx.match[2];
+    const tmdbId = `${mediaType}_${filmId}`;
     try {
-        const data = await getSeriesData(filmId);
+        const data = await getDetails(filmId, mediaType);
         if (!data) return ctx.answerCbQuery('Данные не найдены.');
 
-        const isSeries = SERIES_TYPES.includes(data.type);
-
-        if (!isSeries) {
+        if (mediaType === 'movie') {
             // ——— MOVIE: smart release detection ———
-            // Clear search result cards immediately so chat stays clean
             await clearLastMessages(ctx, ctx.chat.id);
             setState(ctx, { lastMessageIds: [] });
 
-            const title = data.name || data.alternativeName || data.enName || 'Без названия';
-            const movieYear = data.year || null;
-            const digitalDate = data.premiere?.digital || null;
-            const watchLink = getWatchLink(filmId);
-            const now = new Date();
-            const currentYear = now.getFullYear();
+            const title = data.title || data.original_title || 'Без названия';
+            const movieYear = data.release_date ? data.release_date.substring(0, 4) : null;
+            const status = data.status; // e.g. 'Released', 'Post Production'
 
-            // A movie is considered "already released" if:
-            //  1. premiere.digital date exists AND it is in the past, OR
-            //  2. No digital date, but the movie year is <= current year (classic/old films)
             let isAlreadyReleased = false;
             let releaseDateLabel = null;
 
-            if (digitalDate) {
-                const releaseDate = new Date(digitalDate);
-                if (!isNaN(releaseDate) && releaseDate <= now) {
+            if (data.release_date) {
+                const releaseDate = new Date(data.release_date);
+                if (!isNaN(releaseDate) && releaseDate <= new Date()) {
                     isAlreadyReleased = true;
                     releaseDateLabel = releaseDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
                 }
             }
-
-            // Fallback for old movies without premiere.digital
-            if (!isAlreadyReleased && movieYear && movieYear <= currentYear) {
-                isAlreadyReleased = true;
-                releaseDateLabel = `${movieYear} г.`;
-            }
+            if (status === 'Released') isAlreadyReleased = true;
 
             if (isAlreadyReleased) {
-                // Film is already out — show sspoisk link directly
+                // Film is already out
+                const watchLink = getWatchLink(title);
                 const keyboard = Markup.inlineKeyboard([
-                    [Markup.button.url(`▶️ Смотреть на sspoisk.ru`, watchLink)],
+                    [Markup.button.url(`▶️ Смотреть онлайн`, watchLink)],
                     [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
                 ]);
                 await ctx.reply(
                     `🎬 <b>${title}</b>${movieYear ? ` (${movieYear})` : ''}\n\n` +
-                    `✅ Фильм уже вышел${releaseDateLabel ? ` — <b>${releaseDateLabel}</b>` : ''}.\n\n` +
-                    `Можешь посмотреть прямо сейчас:`,
+                    `✅ Фильм уже вышел${releaseDateLabel ? ` — <b>${releaseDateLabel}</b>` : ''}.\n`,
                     { parse_mode: 'HTML', ...keyboard }
                 );
                 return ctx.answerCbQuery();
@@ -410,22 +544,20 @@ bot.action(/sub_(\d+)/, async (ctx) => {
 
             // Film is upcoming — offer to add to watchlist
             let comingDateLabel = 'дата не объявлена';
-            if (digitalDate) {
-                comingDateLabel = new Date(digitalDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-            } else if (movieYear && movieYear > currentYear) {
-                comingDateLabel = `ожидается в ${movieYear} г.`;
+            if (data.release_date) {
+                comingDateLabel = new Date(data.release_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
             }
 
             const keyboard = Markup.inlineKeyboard([
-                [Markup.button.callback('📌 В список ожидания', `watchlist_add_${filmId}`)],
+                [Markup.button.callback('📌 В список ожидания', `watchlist_add_${tmdbId}`)],
                 [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
             ]);
 
             await ctx.reply(
                 `🎬 <b>${title}</b>${movieYear ? ` (${movieYear})` : ''}\n\n` +
-                `Это фильм, который ещё не вышел в цифре.\n` +
-                `📅 Цифровой релиз: <b>${comingDateLabel}</b>\n\n` +
-                `Добавить в список ожидания? Как только выйдет — пришлю ссылку.`,
+                `Это фильм, который ещё не вышел.\n` +
+                `📅 Релиз: <b>${comingDateLabel}</b>\n\n` +
+                `Добавить в список ожидания? Как только выйдет — пришлю уведомление.`,
                 { parse_mode: 'HTML', ...keyboard }
             );
             return ctx.answerCbQuery();
@@ -433,24 +565,24 @@ bot.action(/sub_(\d+)/, async (ctx) => {
 
         // ——— TV SERIES: existing subscription flow ———
         const [series] = await Series.findOrCreate({
-            where: { kp_id: filmId },
+            where: { tmdb_id: tmdbId },
             defaults: {
-                title: data.name || data.alternativeName || data.enName || 'Без названия',
+                title: data.name || data.original_name || 'Без названия',
                 last_season: 0,
                 last_episode: 0,
-                poster_url: data.poster ? (data.poster.url || data.poster.previewUrl) : null,
+                poster_url: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
             },
         });
 
-        const currentSub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: series.kp_id } });
+        const currentSub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: series.tmdb_id } });
         if (currentSub) return ctx.answerCbQuery('Вы уже подписаны!', { show_alert: true });
 
         const keyboard = Markup.inlineKeyboard([
             [
-                Markup.button.callback('🔔 Каждую серию', `sub_set_${filmId}_episode`),
-                Markup.button.callback('📦 Весь сезон', `sub_set_${filmId}_season`),
+                Markup.button.callback('🔔 Каждую серию', `sub_set_${tmdbId}_episode`),
+                Markup.button.callback('📦 Весь сезон', `sub_set_${tmdbId}_season`),
             ],
-            [Markup.button.callback('🆕 1-я серия + Сезон', `sub_set_${filmId}_first_and_full`)],
+            [Markup.button.callback('🆕 1-я серия + Сезон', `sub_set_${tmdbId}_first_and_full`)],
             [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
         ]);
 
@@ -462,39 +594,56 @@ bot.action(/sub_(\d+)/, async (ctx) => {
     }
 });
 
-bot.action(/sub_set_(\d+)_(episode|season|first_and_full)/, async (ctx) => {
-    const filmId = ctx.match[1];
+bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx) => {
+    const tmdbId = ctx.match[1];
     const notifyType = ctx.match[2];
     const chatId = ctx.chat.id;
 
     try {
-        const series = await Series.findByPk(filmId);
+        const series = await Series.findByPk(tmdbId);
         if (!series) return ctx.answerCbQuery('Сериал не найден.');
 
         const [subscription, created] = await Subscription.findOrCreate({
-            where: { chatId, seriesId: filmId },
+            where: { chatId, seriesId: tmdbId },
             defaults: { notify_type: notifyType },
         });
         if (!created) await subscription.update({ notify_type: notifyType });
 
         // Initialize the baseline episode tracking on first subscribe
         if (series.last_season === 0) {
-            const seasons = await getSeasons(filmId);
-            if (seasons && seasons.length > 0) {
-                const validSeasons = seasons.filter(s => s.episodes && s.episodes.length > 0);
-                if (validSeasons.length > 0) {
-                    const lastS = validSeasons[validSeasons.length - 1];
-                    const lastE = lastS.episodes[lastS.episodes.length - 1];
-                    await series.update({
-                        last_season: lastS.number,
-                        last_episode: lastE.number,
-                        last_episode_name: lastE.name || lastE.enName || '',
-                    });
-                }
+            const [mediaType, filmId] = tmdbId.split('_');
+            const data = await getDetails(filmId, mediaType);
+            if (data && data.last_episode_to_air) {
+                await series.update({
+                    last_season: data.last_episode_to_air.season_number,
+                    last_episode: data.last_episode_to_air.episode_number,
+                    last_episode_name: data.last_episode_to_air.name || '',
+                });
             }
         }
 
         const typeLabel = NOTIFY_LABELS_SHORT[notifyType] || notifyType;
+
+        // Fetch seasons to find the next episode
+        let nextEpisodeText = "информации о ближайшей серии пока нет";
+        try {
+            const [mediaType, filmId] = tmdbId.split('_');
+            const data = await getDetails(filmId, mediaType);
+
+            if (data) {
+                if (data.status === 'Ended' || data.status === 'Canceled') {
+                    nextEpisodeText = "Сериал завершён/закрыт";
+                } else if (data.next_episode_to_air) {
+                    const nextEp = data.next_episode_to_air;
+                    if (nextEp.air_date) {
+                        const dateStr = new Date(nextEp.air_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                        nextEpisodeText = `Ближайшая серия (${nextEp.season_number} сезон, ${nextEp.episode_number} серия) ожидается <b>${dateStr}</b>`;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[Bot] Failed to get next episode info:', e);
+        }
 
         // FIX: Delete all search result cards (posters + nav) to keep chat clean
         await clearLastMessages(ctx, chatId);
@@ -502,7 +651,7 @@ bot.action(/sub_set_(\d+)_(episode|season|first_and_full)/, async (ctx) => {
 
         await ctx.answerCbQuery('Успешно подписаны! ✅');
         await ctx.editMessageText(
-            `✅ Вы успешно подписались на <b>«${series.title}»</b>\n\n🔔 Режим уведомлений: <b>${typeLabel}</b>`,
+            `✅ Вы успешно подписались на <b>«${series.title}»</b>\n\n🔔 Режим уведомлений: <b>${typeLabel}</b>\n\n📅 ${nextEpisodeText}`,
             { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]]) }
         );
     } catch (error) {
@@ -515,19 +664,20 @@ bot.action(/sub_set_(\d+)_(episode|season|first_and_full)/, async (ctx) => {
 // Watchlist add / remove
 // ============================================================
 
-bot.action(/watchlist_add_(\d+)/, async (ctx) => {
-    const filmId = ctx.match[1];
+bot.action(/^watchlist_add_([a-z0-9_]+)$/, async (ctx) => {
+    const tmdbId = ctx.match[1];
+    const [mediaType, filmId] = tmdbId.split('_');
     try {
-        const data = await getSeriesData(filmId);
+        const data = await getDetails(filmId, mediaType);
         if (!data) return ctx.answerCbQuery('Данные не найдены.');
 
-        const title = data.name || data.alternativeName || data.enName || 'Без названия';
-        const posterUrl = data.poster ? (data.poster.url || data.poster.previewUrl) : null;
-        const digitalDate = data.premiere?.digital || null;
-        const year = data.year || null;
+        const title = data.title || data.original_title || 'Без названия';
+        const posterUrl = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
+        const digitalDate = data.release_date || null;
+        const year = data.release_date ? parseInt(data.release_date.substring(0, 4)) : null;
 
         const [, created] = await Watchlist.findOrCreate({
-            where: { chatId: ctx.chat.id, kp_id: filmId, notified: false },
+            where: { chatId: ctx.chat.id, tmdb_id: tmdbId, notified: false },
             defaults: { title, poster_url: posterUrl, year, premiere_digital: digitalDate }
         });
 
@@ -558,7 +708,7 @@ bot.action(/watchlist_add_(\d+)/, async (ctx) => {
     }
 });
 
-bot.action(/unwatchlist_(\d+)/, async (ctx) => {
+bot.action(/^unwatchlist_(\d+)$/, async (ctx) => {
     const watchlistId = ctx.match[1];
     try {
         await Watchlist.destroy({ where: { id: watchlistId, chatId: ctx.chat.id } });
@@ -577,24 +727,24 @@ bot.action('back_to_results', async (ctx) => {
     await ctx.answerCbQuery();
 });
 
-bot.action(/toggle_notify_(\d+)/, async (ctx) => {
-    const filmId = ctx.match[1];
+bot.action(/^toggle_notify_([a-z0-9_]+)$/, async (ctx) => {
+    const tmdbId = ctx.match[1];
     const chatId = ctx.chat.id;
     try {
-        const sub = await Subscription.findOne({ where: { chatId, seriesId: filmId } });
+        const sub = await Subscription.findOne({ where: { chatId, seriesId: tmdbId } });
         if (!sub) return ctx.answerCbQuery('Подписка не найдена.');
 
         const newType = NOTIFY_CYCLE[sub.notify_type] || 'episode';
         await sub.update({ notify_type: newType });
 
         const typeLabel = NOTIFY_LABELS[newType] || newType;
-        const series = await Series.findByPk(filmId);
+        const series = await Series.findByPk(tmdbId);
 
         await ctx.editMessageText(
             `📺 ${series.title}\nРежим: ${typeLabel}`,
             Markup.inlineKeyboard([[
-                Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${filmId}`),
-                Markup.button.callback('❌ Отписаться', `unsub_${filmId}`),
+                Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${tmdbId}`),
+                Markup.button.callback('❌ Отписаться', `unsub_${tmdbId}`),
             ]])
         );
         await ctx.answerCbQuery('Режим подписки обновлен!');
@@ -604,10 +754,10 @@ bot.action(/toggle_notify_(\d+)/, async (ctx) => {
     }
 });
 
-bot.action(/unsub_(\d+)/, async (ctx) => {
-    const filmId = ctx.match[1];
+bot.action(/^unsub_([a-z0-9_]+)$/, async (ctx) => {
+    const tmdbId = ctx.match[1];
     try {
-        await Subscription.destroy({ where: { chatId: ctx.chat.id, seriesId: filmId } });
+        await Subscription.destroy({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
         await ctx.answerCbQuery('Удалено! ❌');
         await ctx.deleteMessage();
     } catch (error) {
@@ -615,5 +765,19 @@ bot.action(/unsub_(\d+)/, async (ctx) => {
         await ctx.answerCbQuery('Ошибка при отписке.');
     }
 });
+
+// ============================================================
+// Setup Bot Commands Menu (Slash commands highlighting)
+// ============================================================
+bot.telegram.setMyCommands([
+    { command: 'start', description: 'Перезапустить бота' },
+    { command: 'search', description: 'Найти фильм или сериал' },
+    { command: 'subs', description: 'Мои подписки и список ожидания' },
+    { command: 'random', description: 'Случайный фильм на вечер' },
+    { command: 'help', description: 'Как пользоваться ботом' },
+    { command: 'cancel', description: 'Отменить текущее действие' },
+    { command: 'menu_on', description: 'Включить нижнее меню' },
+    { command: 'menu_off', description: 'ОТКЛЮЧИТЬ нижнее меню' },
+]).catch(err => console.error('[Bot] Failed to set commands:', err));
 
 module.exports = bot;

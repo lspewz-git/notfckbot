@@ -19,25 +19,29 @@
                 <div class="health-item" id="health-tg">
                     Telegram: <span class="health-badge">...</span>
                 </div>
-                <div class="health-item" id="health-kp">
-                    Kinopoisk: <span class="health-badge">...</span>
+                <div class="health-item" id="health-tmdb">
+                    TMDB: <span class="health-badge">...</span>
                 </div>
             </div>
             <div class="status-badge">System Live</div>
         </header>
 
         <section class="stats">
-            <div class="stat-card">
+            <div class="stat-card clickable" onclick="openList('chats')">
                 <h3>Chats</h3>
                 <p id="chats-count">-</p>
             </div>
-            <div class="stat-card">
+            <div class="stat-card clickable" onclick="openList('subs')">
                 <h3>Subscriptions</h3>
                 <p id="subs-count">-</p>
             </div>
-            <div class="stat-card">
+            <div class="stat-card clickable" onclick="openList('series')">
                 <h3>Series</h3>
                 <p id="series-count">-</p>
+            </div>
+            <div class="stat-card clickable" onclick="openList('films')">
+                <h3>Films</h3>
+                <p id="films-count">-</p>
             </div>
         </section>
 
@@ -47,10 +51,17 @@
             <button id="clear-all-btn" class="danger">⚠️ Clear All Data</button>
         </section>
 
+        <section class="logs-container">
+            <h2>📜 Real-time Logs</h2>
+            <div id="logs-viewer" class="logs-viewer">
+                <!-- Logs will appear here -->
+            </div>
+        </section>
+
         <section class="settings-section">
             <h2>⚙️ Settings</h2>
             <div class="settings-row">
-                <label for="apikey-input">Kinopoisk API Key</label>
+                <label for="apikey-input">TMDB API Key</label>
                 <div class="apikey-row">
                     <input type="password" id="apikey-input" placeholder="Loading current key..." autocomplete="off">
                     <button id="toggle-apikey" class="secondary icon-btn" title="Show/hide">👁</button>
@@ -68,48 +79,45 @@
             </div>
         </section>
 
-        <section class="logs-container">
-            <h2>📜 Real-time Logs</h2>
-            <div id="logs-viewer" class="logs-viewer">
-                <!-- Logs will appear here -->
-            </div>
-        </section>
 
-        <section class="table-container">
-            <h2>Active Subscriptions</h2>
-            <div class="search-box">
-                <input type="text" id="filter-input" placeholder="Search by chat ID or series title...">
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Chat ID</th>
-                        <th>User Name</th>
-                        <th>Series</th>
-                        <th>Type</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="subs-table-body">
-                    <!-- Data will be populated here -->
-                </tbody>
-            </table>
-        </section>
-    </div>
 
-    <!-- Modal for Confirmation -->
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3>Are you absolutely sure?</h3>
-            <p>This action will wipe all subscriptions and series tracking data. This cannot be undone.</p>
-            <div class="modal-actions">
-                <button id="confirm-clear" class="danger">Yes, WIPE EVERYTHING</button>
-                <button id="cancel-clear">Cancel</button>
+        <!-- Modal for Lists -->
+        <div id="list-modal" class="modal">
+            <div class="modal-content list-modal-content">
+                <div class="modal-header">
+                    <h3 id="list-modal-title">Data List</h3>
+                    <button class="close-btn"
+                        onclick="document.getElementById('list-modal').style.display='none'">✖</button>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="list-filter-input" placeholder="Search in table...">
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead id="list-table-head">
+                            <!-- Headers injected dynamically -->
+                        </thead>
+                        <tbody id="list-table-body">
+                            <!-- Data injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-    <script src="script.js"></script>
+        <!-- Modal for Confirmation -->
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <h3>Are you absolutely sure?</h3>
+                <p>This action will wipe all subscriptions and series tracking data. This cannot be undone.</p>
+                <div class="modal-actions">
+                    <button id="confirm-clear" class="danger">Yes, WIPE EVERYTHING</button>
+                    <button id="cancel-clear">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="script.js"></script>
 </body>
 
 </html>

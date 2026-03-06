@@ -12,9 +12,9 @@ const Watchlist = sequelize.define('Watchlist', {
         autoIncrement: true,
         primaryKey: true
     },
-    // Kinopoisk ID of the movie
-    kp_id: {
-        type: DataTypes.INTEGER,
+    // TMDB ID of the movie
+    tmdb_id: {
+        type: DataTypes.STRING,
         allowNull: false
     },
     title: {

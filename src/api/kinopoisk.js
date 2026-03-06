@@ -12,6 +12,15 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
     config.headers['X-API-KEY'] = process.env.KINOPOISK_API_KEY;
     config.headers['Content-Type'] = 'application/json';
+
+    // Create a safe copy of headers for logging
+    const safeHeaders = { ...config.headers };
+    if (safeHeaders['X-API-KEY'] && safeHeaders['X-API-KEY'].length > 4) {
+        safeHeaders['X-API-KEY'] = '***' + safeHeaders['X-API-KEY'].slice(-4);
+    }
+
+    console.log(`[API Request] ${config.method.toUpperCase()} ${config.baseURL || ''}${config.url} | Params: ${JSON.stringify(config.params || {})} | Headers: ${JSON.stringify(safeHeaders)}`);
+
     return config;
 });
 

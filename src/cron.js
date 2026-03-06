@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
-const { getSeasons, getSeriesData } = require('./api/kinopoisk');
+const { getDetails } = require('./api/tmdb');
 const { NOTIFY_LABELS, getWatchLink } = require('./constants');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
@@ -22,23 +22,27 @@ const formatReleaseDate = (isoString) => {
 const checkSeriesUpdates = async (bot, allSeries) => {
     for (const item of allSeries) {
         try {
-            const seasons = await getSeasons(item.kp_id);
-            if (!seasons || seasons.length === 0) continue;
+            const [mediaType, filmId] = item.tmdb_id.split('_');
+            const data = await getDetails(filmId, mediaType);
+            if (!data) continue;
 
-            const validSeasons = seasons.filter(s => s.episodes && s.episodes.length > 0);
-            if (validSeasons.length === 0) continue;
+            const lastE = data.last_episode_to_air;
+            if (!lastE) continue; // No episodes aired yet
 
-            const lastS = validSeasons[validSeasons.length - 1];
-            const lastE = lastS.episodes[lastS.episodes.length - 1];
-            if (!lastE) continue;
+            const currentSeason = lastE.season_number;
+            const currentEpisode = lastE.episode_number;
 
-            const hasNewSeason = lastS.number > item.last_season;
-            const hasNewEpisode = lastS.number === item.last_season && lastE.number > item.last_episode;
+            const hasNewSeason = currentSeason > item.last_season;
+            const hasNewEpisode = currentSeason === item.last_season && currentEpisode > item.last_episode;
 
             if (!hasNewSeason && !hasNewEpisode) continue;
 
-            console.log(`[Cron] New content for "${item.title}": S${lastS.number}E${lastE.number}`);
-            const epName = lastE.name || lastE.enName || 'Без названия';
+            console.log(`[Cron] New content for "${item.title}": S${currentSeason}E${currentEpisode}`);
+            const epName = lastE.name || 'Без названия';
+
+            const seasonObj = (data.seasons || []).find(s => s.season_number === currentSeason);
+            const targetCount = seasonObj ? seasonObj.episode_count : 0;
+            const isSeasonComplete = targetCount > 0 && currentEpisode >= targetCount;
 
             const chats = item.Chats || [];
             for (const chat of chats) {
@@ -46,28 +50,26 @@ const checkSeriesUpdates = async (bot, allSeries) => {
                     const subscription = chat.Subscription;
                     const notify_type = subscription.notify_type;
 
-                    const episodesLoaded = lastS.episodes ? lastS.episodes.length : 0;
-                    const targetCount = lastS.episodesCount || 0;
-                    const isSeasonComplete = targetCount > 0 && episodesLoaded >= targetCount;
-
                     let shouldNotify = false;
                     let msg = '';
 
+                    const watchLink = getWatchLink(item.title);
+
                     if (notify_type === 'episode') {
                         shouldNotify = true;
-                        msg = `⚡️ Новая серия! <b>${item.title}</b> — Сезон ${lastS.number}, Серия ${lastE.number}: ${epName}`;
+                        msg = `⚡️ Новая серия! <b>${item.title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${epName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
                     } else if (notify_type === 'season') {
                         if (isSeasonComplete) {
                             shouldNotify = true;
-                            msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${item.title}</b>\n📦 Сезон ${lastS.number} полностью доступен (${episodesLoaded} сер.).`;
+                            msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${item.title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
                         }
                     } else if (notify_type === 'first_and_full') {
-                        if (lastE.number === 1) {
+                        if (currentEpisode === 1) {
                             shouldNotify = true;
-                            msg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${item.title}</b>\n🎞 Сезон ${lastS.number}, Серия 1: ${epName}\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
+                            msg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${item.title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${epName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
                         } else if (isSeasonComplete) {
                             shouldNotify = true;
-                            msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${item.title}</b>\n📦 Сезон ${lastS.number} полностью доступен (${episodesLoaded} сер.).`;
+                            msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${item.title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
                         }
                     }
 
@@ -85,12 +87,12 @@ const checkSeriesUpdates = async (bot, allSeries) => {
 
             // Update series state in DB
             await item.update({
-                last_season: lastS.number,
-                last_episode: lastE.number,
+                last_season: currentSeason,
+                last_episode: currentEpisode,
                 last_episode_name: epName
             });
         } catch (err) {
-            console.error(`[Cron] Error checking series ${item.kp_id} ("${item.title}"):`, err.message);
+            console.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"):`, err.message);
         }
     }
 };
@@ -110,51 +112,50 @@ const checkWatchlistReleases = async (bot) => {
 
     const now = new Date();
 
-    // Group by kp_id to batch API calls (multiple users may watch same movie)
+    // Group by tmdb_id to batch API calls (multiple users may watch same movie)
     const byFilm = {};
     for (const entry of entries) {
-        if (!byFilm[entry.kp_id]) byFilm[entry.kp_id] = [];
-        byFilm[entry.kp_id].push(entry);
+        if (!byFilm[entry.tmdb_id]) byFilm[entry.tmdb_id] = [];
+        byFilm[entry.tmdb_id].push(entry);
     }
 
-    for (const [kp_id, filmEntries] of Object.entries(byFilm)) {
+    for (const [tmdb_id, filmEntries] of Object.entries(byFilm)) {
         try {
-            const data = await getSeriesData(kp_id);
+            const [mediaType, filmId] = tmdb_id.split('_');
+            const data = await getDetails(filmId, mediaType);
             if (!data) continue;
 
-            // Extract digital release date from the API response
-            const digitalDate = data.premiere?.digital || null;
-
-            // Update stored date if it changed or was previously null
             const firstEntry = filmEntries[0];
-            if (digitalDate && firstEntry.premiere_digital !== digitalDate) {
-                await Watchlist.update(
-                    { premiere_digital: digitalDate },
-                    { where: { kp_id } }
-                );
+            let isReleased = false;
+            let displayDate = null;
+
+            if (data.status === 'Released') {
+                isReleased = true;
+            } else if (data.release_date) {
+                const releaseDate = new Date(data.release_date);
+                if (!isNaN(releaseDate) && releaseDate <= now) {
+                    isReleased = true;
+                }
+                displayDate = data.release_date;
             }
 
-            // Check if the digital release date has passed
-            if (!digitalDate) {
-                console.log(`[Cron] Movie "${firstEntry.title}" (${kp_id}): no digital date yet.`);
+            if (!isReleased) {
+                console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
                 continue;
             }
 
-            const releaseDate = new Date(digitalDate);
-            if (isNaN(releaseDate.getTime()) || releaseDate > now) continue;
-
             // 🎉 Film is released! Notify all users waiting for it
-            console.log(`[Cron] Movie "${firstEntry.title}" (${kp_id}) is now available digitally!`);
-            const watchLink = getWatchLink(kp_id);
-            const formattedDate = formatReleaseDate(digitalDate);
+            console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
+            const formattedDate = formatReleaseDate(displayDate);
+            const watchLink = getWatchLink(firstEntry.title);
 
             for (const entry of filmEntries) {
                 try {
                     const msg =
                         `🎬 <b>Фильм доступен!</b>\n\n` +
                         `🍿 <b>${entry.title}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
-                        `📅 Дата цифрового релиза: <b>${formattedDate}</b>\n\n` +
-                        `▶️ <a href="${watchLink}">Смотреть на sspoisk.ru</a>`;
+                        `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n\n` +
+                        `▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
 
                     if (entry.poster_url) {
                         await bot.telegram.sendPhoto(entry.Chat.id, entry.poster_url, {
@@ -175,7 +176,7 @@ const checkWatchlistReleases = async (bot) => {
                 await entry.update({ notified: true });
             }
         } catch (err) {
-            console.error(`[Cron] Error checking watchlist movie ${kp_id}:`, err.message);
+            console.error(`[Cron] Error checking watchlist movie ${tmdb_id}:`, err.message);
         }
     }
 };

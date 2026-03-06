@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
-const { Chat, Series, Subscription } = require('./db');
+const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 
 const app = express();
@@ -56,23 +56,38 @@ app.use(express.static(path.join(__dirname, '../admin')));
 
 app.get('/api/stats', async (req, res) => {
     try {
-        const [chatsCount, seriesCount, subsCount] = await Promise.all([
+        const [chatsCount, seriesCount, subsCount, filmsCount] = await Promise.all([
             Chat.count(),
             Series.count(),
             Subscription.count(),
+            Watchlist.count(),
         ]);
-        res.json({ chatsCount, seriesCount, subsCount });
+        res.json({ chatsCount, seriesCount, subsCount, filmsCount });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/api/data', async (req, res) => {
+app.get('/api/data/:type', async (req, res) => {
     try {
-        const subscriptions = await Subscription.findAll({
-            include: [{ model: Chat }, { model: Series }],
-        });
-        res.json(subscriptions);
+        const { type } = req.params;
+        let data = [];
+        if (type === 'subs') {
+            data = await Subscription.findAll({
+                include: [{ model: Chat }, { model: Series }],
+            });
+        } else if (type === 'series') {
+            data = await Series.findAll();
+        } else if (type === 'films') {
+            data = await Watchlist.findAll({
+                include: [{ model: Chat }],
+            });
+        } else if (type === 'chats') {
+            data = await Chat.findAll({
+                order: [['createdAt', 'DESC']]
+            });
+        }
+        res.json(data);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -83,18 +98,18 @@ app.get('/api/logs', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-    const health = { telegram: false, kinopoisk: false };
+    const health = { telegram: false, tmdb: false };
 
-    const [tgResult, kpResult] = await Promise.allSettled([
+    const [tgResult, tmdbResult] = await Promise.allSettled([
         app.get('bot').telegram.getMe(),
-        axios.get('https://api.kinopoisk.dev/v1.4/movie/random', {
-            headers: { 'X-API-KEY': process.env.KINOPOISK_API_KEY },
+        axios.get('https://api.themoviedb.org/3/authentication', {
+            headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
         }),
     ]);
 
     if (tgResult.status === 'fulfilled') health.telegram = true;
-    if (kpResult.status === 'fulfilled' && kpResult.value.status === 200) health.kinopoisk = true;
+    if (tmdbResult.status === 'fulfilled' && tmdbResult.value.status === 200) health.tmdb = true;
 
     res.json(health);
 });
@@ -162,6 +177,36 @@ app.delete('/api/subscription/:chatId/:seriesId', requireAdminToken, async (req,
     }
 });
 
+app.post('/api/chat/:chatId/block', requireAdminToken, async (req, res) => {
+    const { chatId } = req.params;
+    const { minutes } = req.body;
+    try {
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+        const duration = parseInt(minutes, 10) || 5;
+        const blockUntil = new Date(Date.now() + duration * 60 * 1000);
+
+        await chat.update({ blockedUntil: blockUntil });
+        res.json({ success: true, blockedUntil: blockUntil });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/chat/:chatId/unblock', requireAdminToken, async (req, res) => {
+    const { chatId } = req.params;
+    try {
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+        await chat.update({ blockedUntil: null });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Helper to mask an API key: show only first 4 and last 4 chars
 const maskKey = (key) => {
     if (!key || key.length < 10) return '••••••••';
@@ -187,27 +232,27 @@ const updateEnvFile = (key, value) => {
 
 app.get('/api/config', requireAdminToken, (req, res) => {
     res.json({
-        kinopoiskApiKey: maskKey(process.env.KINOPOISK_API_KEY),
+        tmdbApiKey: maskKey(process.env.TMDB_API_KEY),
         adminToken: maskKey(process.env.ADMIN_TOKEN),
     });
 });
 
-// Update KINOPOISK_API_KEY at runtime and persist to .env
+// Update TMDB_API_KEY at runtime and persist to .env
 app.post('/api/config', requireAdminToken, (req, res) => {
-    const { kinopoiskApiKey } = req.body;
+    const { tmdbApiKey } = req.body;
 
-    if (!kinopoiskApiKey || !kinopoiskApiKey.trim()) {
-        return res.status(400).json({ error: 'kinopoiskApiKey is required' });
+    if (!tmdbApiKey || !tmdbApiKey.trim()) {
+        return res.status(400).json({ error: 'tmdbApiKey is required' });
     }
 
-    const newKey = kinopoiskApiKey.trim();
+    const newKey = tmdbApiKey.trim();
     // Update in memory — takes effect immediately for all new API calls
-    process.env.KINOPOISK_API_KEY = newKey;
+    process.env.TMDB_API_KEY = newKey;
     // Persist to .env so it survives restarts
-    updateEnvFile('KINOPOISK_API_KEY', newKey);
+    updateEnvFile('TMDB_API_KEY', newKey);
 
-    console.log('[Admin] KINOPOISK_API_KEY updated successfully.');
-    res.json({ success: true, kinopoiskApiKey: maskKey(newKey) });
+    console.log('[Admin] TMDB_API_KEY updated successfully.');
+    res.json({ success: true, tmdbApiKey: maskKey(newKey) });
 });
 
 app.post('/api/clear-all', requireAdminToken, async (req, res) => {

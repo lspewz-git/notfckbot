@@ -24,13 +24,9 @@ const NOTIFY_CYCLE = {
     first_and_full: 'episode',
 };
 
-/** Series types that count as a TV series (not a movie) */
-const SERIES_TYPES = ['tv-series', 'mini-series', 'animated-series', 'anime'];
+const getWatchLink = (title) => {
+    // HDRezka search URL:
+    return `https://rezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`;
+};
 
-/**
- * Build a sspoisk.ru watch link for a given Kinopoisk ID.
- * kinopoisk.ru → sspoisk.ru (replace "kino" in "kinopoisk")
- */
-const getWatchLink = (kpId) => `https://www.sspoisk.ru/film/${kpId}/`;
-
-module.exports = { NOTIFY_LABELS, NOTIFY_LABELS_SHORT, NOTIFY_CYCLE, SERIES_TYPES, getWatchLink };
+module.exports = { NOTIFY_LABELS, NOTIFY_LABELS_SHORT, NOTIFY_CYCLE, getWatchLink };

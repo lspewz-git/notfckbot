@@ -2,20 +2,17 @@ const API_URL = '/api';
 
 async function fetchData() {
     try {
-        const [statsRes, dataRes, healthRes, logsRes] = await Promise.all([
+        const [statsRes, healthRes, logsRes] = await Promise.all([
             fetch(`${API_URL}/stats`),
-            fetch(`${API_URL}/data`),
             fetch(`${API_URL}/health`),
             fetch(`${API_URL}/logs`)
         ]);
 
         const stats = await statsRes.json();
-        const subs = await dataRes.json();
         const health = await healthRes.json();
         const logs = await logsRes.json();
 
         updateStats(stats);
-        updateTable(subs);
         updateHealth(health);
         updateLogs(logs);
     } catch (err) {
@@ -25,13 +22,13 @@ async function fetchData() {
 
 function updateHealth(health) {
     const tgBadge = document.querySelector('#health-tg .health-badge');
-    const kpBadge = document.querySelector('#health-kp .health-badge');
+    const tmdbBadge = document.querySelector('#health-tmdb .health-badge');
 
     tgBadge.textContent = health.telegram ? 'OK' : 'ERROR';
     tgBadge.className = `health-badge ${health.telegram ? 'ok' : 'error'}`;
 
-    kpBadge.textContent = health.kinopoisk ? 'OK' : 'ERROR';
-    kpBadge.className = `health-badge ${health.kinopoisk ? 'ok' : 'error'}`;
+    tmdbBadge.textContent = health.tmdb ? 'OK' : 'ERROR';
+    tmdbBadge.className = `health-badge ${health.tmdb ? 'ok' : 'error'}`;
 }
 
 function updateLogs(logs) {
@@ -94,25 +91,152 @@ function updateStats(stats) {
     document.getElementById('chats-count').textContent = stats.chatsCount;
     document.getElementById('subs-count').textContent = stats.subsCount;
     document.getElementById('series-count').textContent = stats.seriesCount;
+    document.getElementById('films-count').textContent = stats.filmsCount;
 }
 
-function updateTable(subs) {
-    const tbody = document.getElementById('subs-table-body');
-    tbody.innerHTML = '';
+// List Modal Logic
+const listModal = document.getElementById('list-modal');
+const listModalTitle = document.getElementById('list-modal-title');
+const listTableHead = document.getElementById('list-table-head');
+const listTableBody = document.getElementById('list-table-body');
+const listFilterInput = document.getElementById('list-filter-input');
+let currentListData = [];
 
-    subs.forEach(sub => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${sub.chatId}</td>
-            <td>${sub.Chat ? (sub.Chat.username || 'N/A') : 'N/A'}</td>
-            <td>${sub.Series ? sub.Series.title : 'Unknown'}</td>
-            <td><span class="badge ${sub.notify_type}">${sub.notify_type}</span></td>
-            <td>
-                <button class="danger action-btn" onclick="deleteSub('${sub.chatId}', '${sub.seriesId}')">Delete</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+async function openList(type) {
+    listModal.style.display = 'flex';
+    listTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Loading...</td></tr>';
+
+    let title = '';
+    if (type === 'subs') title = 'Active Subscriptions';
+    else if (type === 'series') title = 'Monitored Series';
+    else if (type === 'films') title = 'Watchlist Films';
+    else if (type === 'chats') title = 'Users / Chats';
+    listModalTitle.textContent = title;
+
+    try {
+        const res = await fetch(`${API_URL}/data/${type}`);
+        currentListData = await res.json();
+        renderListData(type, currentListData);
+    } catch (err) {
+        listTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:red;">Failed to load data</td></tr>';
+    }
+}
+
+function renderListData(type, data) {
+    listTableHead.innerHTML = '';
+    listTableBody.innerHTML = '';
+
+    if (data.length === 0) {
+        listTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No data found.</td></tr>';
+        return;
+    }
+
+    if (type === 'subs') {
+        listTableHead.innerHTML = `<tr><th>Chat ID</th><th>User Name</th><th>Series</th><th>Type</th><th>Actions</th></tr>`;
+        data.forEach(sub => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${sub.chatId}</td>
+                <td>${sub.Chat ? (sub.Chat.username || 'N/A') : 'N/A'}</td>
+                <td>${sub.Series ? sub.Series.title : 'Unknown'}</td>
+                <td><span class="badge ${sub.notify_type}">${sub.notify_type}</span></td>
+                <td><button class="danger action-btn" onclick="deleteSub('${sub.chatId}', '${sub.seriesId}')">Delete</button></td>
+            `;
+            listTableBody.appendChild(tr);
+        });
+    } else if (type === 'series') {
+        listTableHead.innerHTML = `<tr><th>TMDB ID</th><th>Title</th><th>Last Season</th><th>Last Ep</th></tr>`;
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.tmdb_id}</td>
+                <td>${item.title}</td>
+                <td>${item.last_season}</td>
+                <td>${item.last_episode}</td>
+            `;
+            listTableBody.appendChild(tr);
+        });
+    } else if (type === 'films') {
+        listTableHead.innerHTML = `<tr><th>Chat ID</th><th>User Name</th><th>Film Title</th><th>Year</th><th>Digital Release</th></tr>`;
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.chatId}</td>
+                <td>${item.Chat ? (item.Chat.username || 'N/A') : 'N/A'}</td>
+                <td>${item.title}</td>
+                <td>${item.year || 'N/A'}</td>
+                <td>${item.premiere_digital || 'N/A'}</td>
+            `;
+            listTableBody.appendChild(tr);
+        });
+    } else if (type === 'chats') {
+        listTableHead.innerHTML = `<tr><th>Chat ID</th><th>Username</th><th>Type</th><th>Status</th><th>Actions</th></tr>`;
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+
+            const isBlocked = item.blockedUntil && new Date(item.blockedUntil) > new Date();
+            let statusHtml = '<span class="badge ok">Active</span>';
+            let actionsHtml = `
+                <select id="block-time-${item.id}" style="padding: 0.3rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+                    <option value="5">5 Minutes</option>
+                    <option value="60">1 Hour</option>
+                    <option value="1440">1 Day</option>
+                    <option value="52560000">Forever</option>
+                </select>
+                <button class="danger action-btn" onclick="blockUser('${item.id}')" style="margin-left: 0.5rem;">Block</button>
+            `;
+
+            if (isBlocked) {
+                const unblockTime = new Date(item.blockedUntil).toLocaleString();
+                statusHtml = `<span class="badge error">Blocked until ${unblockTime}</span>`;
+                actionsHtml = `<button class="secondary action-btn" onclick="unblockUser('${item.id}')">Unblock</button>`;
+            }
+
+            const usernameDisplay = item.username || 'Unknown';
+
+            tr.innerHTML = `
+                <td>${item.id}</td>
+                <td>${usernameDisplay}</td>
+                <td>${item.type}</td>
+                <td>${statusHtml}</td>
+                <td>${actionsHtml}</td>
+            `;
+            listTableBody.appendChild(tr);
+        });
+    }
+}
+
+async function blockUser(chatId) {
+    const minSelect = document.getElementById(`block-time-${chatId}`);
+    const minutes = minSelect ? parseInt(minSelect.value, 10) : 5;
+
+    if (!confirm(`Are you sure you want to block user ${chatId} for ${minutes} minutes?`)) return;
+
+    try {
+        const res = await fetch(`${API_URL}/chat/${chatId}/block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ minutes })
+        });
+        if (res.ok) openList('chats'); // refresh current view
+        else alert('Failed to block user');
+    } catch (err) {
+        alert('Failed to block user');
+    }
+}
+
+async function unblockUser(chatId) {
+    if (!confirm(`Are you sure you want to UNBLOCK user ${chatId}?`)) return;
+
+    try {
+        const res = await fetch(`${API_URL}/chat/${chatId}/unblock`, {
+            method: 'POST'
+        });
+        if (res.ok) openList('chats'); // refresh current view
+        else alert('Failed to unblock user');
+    } catch (err) {
+        alert('Failed to unblock user');
+    }
 }
 
 async function deleteSub(chatId, seriesId) {
@@ -152,9 +276,9 @@ confirmBtn.onclick = async () => {
 document.getElementById('refresh-btn').onclick = fetchData;
 
 // Filtering
-document.getElementById('filter-input').oninput = (e) => {
+document.getElementById('list-filter-input').oninput = (e) => {
     const term = e.target.value.toLowerCase();
-    const rows = document.querySelectorAll('#subs-table-body tr');
+    const rows = document.querySelectorAll('#list-table-body tr');
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         row.style.display = text.includes(term) ? '' : 'none';
@@ -162,7 +286,7 @@ document.getElementById('filter-input').oninput = (e) => {
 };
 
 // ============================================================
-// Settings: Kinopoisk API Key
+// Settings: TMDB API Key
 // ============================================================
 
 const apikeyInput = document.getElementById('apikey-input');
@@ -173,7 +297,7 @@ async function loadConfig() {
     try {
         const res = await fetch(`${API_URL}/config`);
         const data = await res.json();
-        apikeyInput.placeholder = data.kinopoiskApiKey || '••••••••';
+        apikeyInput.placeholder = data.tmdbApiKey || '••••••••';
     } catch { /* silent */ }
 }
 
@@ -195,12 +319,12 @@ document.getElementById('save-apikey').onclick = async () => {
         const res = await fetch(`${API_URL}/config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ kinopoiskApiKey: newKey })
+            body: JSON.stringify({ tmdbApiKey: newKey })
         });
         const result = await res.json();
         if (result.success) {
             apikeyInput.value = '';
-            apikeyInput.placeholder = result.kinopoiskApiKey;
+            apikeyInput.placeholder = result.tmdbApiKey;
             apikeyStatus.textContent = '✅ Saved! Takes effect immediately.';
             apikeyStatus.className = 'apikey-status success';
             setTimeout(() => { apikeyStatus.textContent = ''; }, 4000);

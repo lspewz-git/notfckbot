@@ -11,9 +11,17 @@ const Chat = sequelize.define('Chat', {
         type: DataTypes.ENUM('private', 'group', 'supergroup', 'channel'),
         allowNull: false
     },
+    username: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     menu_enabled: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+    },
+    blockedUntil: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 });
 
