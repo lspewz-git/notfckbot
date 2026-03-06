@@ -1,4 +1,5 @@
 const axios = require('axios');
+const https = require('https');
 require('dotenv').config();
 
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -6,6 +7,9 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 const apiClient = axios.create({
     baseURL: BASE_URL,
     timeout: 10000,
+    httpsAgent: new https.Agent({
+        rejectUnauthorized: process.env.TMDB_IGNORE_SSL !== 'true'
+    })
 });
 
 apiClient.interceptors.request.use((config) => {
