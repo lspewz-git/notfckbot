@@ -8,7 +8,7 @@ const apiClient = axios.create({
     baseURL: BASE_URL,
     timeout: 10000,
     httpsAgent: new https.Agent({
-        rejectUnauthorized: process.env.TMDB_IGNORE_SSL !== 'false', // Default to true if not explicitly false, or vice versa? Actually let's keep previous logic but add keepAlive
+        rejectUnauthorized: process.env.TMDB_IGNORE_SSL !== 'true',
         keepAlive: true
     })
 });

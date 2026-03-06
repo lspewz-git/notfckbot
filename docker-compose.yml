@@ -34,6 +34,7 @@ services:
       DB_USER: ${DB_USER:-bot_user}
       DB_PASSWORD: ${DB_PASSWORD:-bot_password}
       TMDB_IGNORE_SSL: ${TMDB_IGNORE_SSL:-false}
+      TMDB_BASE_URL: ${TMDB_BASE_URL}
     ports:
       - "3000:3000"
     volumes:
