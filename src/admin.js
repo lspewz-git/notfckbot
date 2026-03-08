@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
