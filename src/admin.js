@@ -111,11 +111,13 @@ app.get('/api/health', async (req, res) => {
         axios.get('https://api.themoviedb.org/3/authentication', {
             headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
-            httpsAgent: proxyUrl ? new SocksProxyAgent(proxyUrl) : null
+            httpsAgent: proxyUrl ? new SocksProxyAgent(proxyUrl) : null,
+            proxy: false
         }),
         proxyUrl ? axios.get('https://google.com', {
             timeout: 5000,
-            httpsAgent: new SocksProxyAgent(proxyUrl)
+            httpsAgent: new SocksProxyAgent(proxyUrl),
+            proxy: false
         }) : Promise.resolve({ status: 200 })
     ]);
 

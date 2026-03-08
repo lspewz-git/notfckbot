@@ -15,7 +15,7 @@ const getProxyAgent = () => {
 const apiClient = axios.create({
     baseURL: BASE_URL,
     timeout: 10000,
-    httpsAgent: getProxyAgent()
+    proxy: false // Disable system proxies to avoid ECONNREFUSED 127.0.0.1
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -24,6 +24,9 @@ apiClient.interceptors.request.use((config) => {
         config.headers['Authorization'] = `Bearer ${apiKey}`;
     }
     config.headers['Content-Type'] = 'application/json';
+
+    // Apply proxy dynamically so it picks up changes from the admin panel immediately
+    config.httpsAgent = getProxyAgent();
 
     return config;
 });
