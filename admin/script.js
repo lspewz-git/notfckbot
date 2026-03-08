@@ -23,12 +23,24 @@ async function fetchData() {
 function updateHealth(health) {
     const tgBadge = document.querySelector('#health-tg .health-badge');
     const tmdbBadge = document.querySelector('#health-tmdb .health-badge');
+    const proxyBadge = document.querySelector('#health-proxy .health-badge');
 
     tgBadge.textContent = health.telegram ? 'OK' : 'ERROR';
     tgBadge.className = `health-badge ${health.telegram ? 'ok' : 'error'}`;
 
     tmdbBadge.textContent = health.tmdb ? 'OK' : 'ERROR';
     tmdbBadge.className = `health-badge ${health.tmdb ? 'ok' : 'error'}`;
+
+    if (health.proxy === 'ok') {
+        proxyBadge.textContent = 'OK';
+        proxyBadge.className = 'health-badge ok';
+    } else if (health.proxy === 'error') {
+        proxyBadge.textContent = 'ERROR';
+        proxyBadge.className = 'health-badge error';
+    } else {
+        proxyBadge.textContent = 'OFF';
+        proxyBadge.className = 'health-badge secondary';
+    }
 }
 
 function updateLogs(logs) {

@@ -308,6 +308,12 @@ td {
     color: white;
 }
 
+.health-badge.secondary {
+    background: var(--glass);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+}
+
 /* Broadcast Section */
 .broadcast {
     background: var(--card-bg);

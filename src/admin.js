@@ -99,19 +99,38 @@ app.get('/api/logs', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-    const health = { telegram: false, tmdb: false };
+    const health = { telegram: false, tmdb: false, proxy: 'off' };
+    const proxyUrl = process.env.TMDB_PROXY_URL;
 
-    const [tgResult, tmdbResult] = await Promise.allSettled([
+    if (proxyUrl) {
+        health.proxy = 'error'; // Default to error if URL exists
+    }
+
+    const [tgResult, tmdbResult, proxyResult] = await Promise.allSettled([
         app.get('bot').telegram.getMe(),
         axios.get('https://api.themoviedb.org/3/authentication', {
             headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
-            httpsAgent: process.env.TMDB_PROXY_URL ? new SocksProxyAgent(process.env.TMDB_PROXY_URL) : null
+            httpsAgent: proxyUrl ? new SocksProxyAgent(proxyUrl) : null
         }),
+        proxyUrl ? axios.get('https://google.com', {
+            timeout: 5000,
+            httpsAgent: new SocksProxyAgent(proxyUrl)
+        }) : Promise.resolve({ status: 200 })
     ]);
 
     if (tgResult.status === 'fulfilled') health.telegram = true;
     if (tmdbResult.status === 'fulfilled' && tmdbResult.value.status === 200) health.tmdb = true;
+
+    if (proxyUrl) {
+        if (proxyResult.status === 'fulfilled' && proxyResult.value.status === 200) {
+            health.proxy = 'ok';
+        } else {
+            health.proxy = 'error';
+        }
+    } else {
+        health.proxy = 'off';
+    }
 
     res.json(health);
 });
