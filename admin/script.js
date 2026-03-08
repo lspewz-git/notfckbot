@@ -1,22 +1,20 @@
 const API_URL = '/api';
 
 async function fetchData() {
-    try {
-        const [statsRes, healthRes, logsRes] = await Promise.all([
-            fetch(`${API_URL}/stats`),
-            fetch(`${API_URL}/health`),
-            fetch(`${API_URL}/logs`)
-        ]);
+    const [statsRes, healthRes, logsRes] = await Promise.allSettled([
+        fetch(`${API_URL}/stats`),
+        fetch(`${API_URL}/health`),
+        fetch(`${API_URL}/logs`)
+    ]);
 
-        const stats = await statsRes.json();
-        const health = await healthRes.json();
-        const logs = await logsRes.json();
-
-        updateStats(stats);
-        updateHealth(health);
-        updateLogs(logs);
-    } catch (err) {
-        console.error('Failed to fetch data:', err);
+    if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+        try { updateStats(await statsRes.value.json()); } catch { /* ignore */ }
+    }
+    if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
+        try { updateHealth(await healthRes.value.json()); } catch { /* ignore */ }
+    }
+    if (logsRes.status === 'fulfilled' && logsRes.value.ok) {
+        try { updateLogs(await logsRes.value.json()); } catch { /* ignore */ }
     }
 }
 
@@ -306,20 +304,16 @@ const apikeyStatus = document.getElementById('apikey-status');
 const proxyInput = document.getElementById('proxy-input');
 const proxyStatus = document.getElementById('proxy-status');
 
-// Load the masked key on startup
+// Load the key on startup
 async function loadConfig() {
     try {
         const res = await fetch(`${API_URL}/config`);
         const data = await res.json();
-        apikeyInput.placeholder = data.tmdbApiKey || '••••••••';
+        apikeyInput.placeholder = data.tmdbApiKey || 'None';
         proxyInput.placeholder = data.tmdbProxyUrl || 'None';
     } catch { /* silent */ }
 }
 
-// Toggle show/hide
-document.getElementById('toggle-apikey').onclick = () => {
-    apikeyInput.type = apikeyInput.type === 'password' ? 'text' : 'password';
-};
 
 // Save new key
 document.getElementById('save-apikey').onclick = async () => {

@@ -1,14 +1,15 @@
 const axios = require('axios');
 const { SocksProxyAgent } = require('socks-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 require('dotenv').config();
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 
 const getProxyAgent = () => {
     const proxyUrl = process.env.TMDB_PROXY_URL;
-    if (proxyUrl && proxyUrl.startsWith('socks')) {
-        return new SocksProxyAgent(proxyUrl);
-    }
+    if (!proxyUrl) return null;
+    if (proxyUrl.startsWith('socks')) return new SocksProxyAgent(proxyUrl, { rejectUnauthorized: false });
+    if (proxyUrl.startsWith('http')) return new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false });
     return null;
 };
 

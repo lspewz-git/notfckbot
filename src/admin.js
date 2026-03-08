@@ -4,6 +4,14 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { SocksProxyAgent } = require('socks-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+
+const _getProxyAgent = (url) => {
+    if (!url) return null;
+    if (url.startsWith('socks')) return new SocksProxyAgent(url, { rejectUnauthorized: false });
+    if (url.startsWith('http')) return new HttpsProxyAgent(url, { rejectUnauthorized: false });
+    return null;
+};
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 
@@ -111,12 +119,12 @@ app.get('/api/health', async (req, res) => {
         axios.get('https://api.themoviedb.org/3/authentication', {
             headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
-            httpsAgent: proxyUrl ? new SocksProxyAgent(proxyUrl) : null,
+            httpsAgent: _getProxyAgent(proxyUrl),
             proxy: false
         }),
         proxyUrl ? axios.get('https://google.com', {
             timeout: 5000,
-            httpsAgent: new SocksProxyAgent(proxyUrl),
+            httpsAgent: _getProxyAgent(proxyUrl),
             proxy: false
         }) : Promise.resolve({ status: 200 })
     ]);
@@ -230,11 +238,7 @@ app.post('/api/chat/:chatId/unblock', requireAdminToken, async (req, res) => {
     }
 });
 
-// Helper to mask an API key: show only first 4 and last 4 chars
-const maskKey = (key) => {
-    if (!key || key.length < 10) return '••••••••';
-    return key.slice(0, 4) + '•'.repeat(key.length - 8) + key.slice(-4);
-};
+
 
 // Helper to update a value in the .env file
 const updateEnvFile = (key, value) => {
@@ -255,9 +259,9 @@ const updateEnvFile = (key, value) => {
 
 app.get('/api/config', requireAdminToken, (req, res) => {
     res.json({
-        tmdbApiKey: maskKey(process.env.TMDB_API_KEY),
-        tmdbProxyUrl: maskKey(process.env.TMDB_PROXY_URL),
-        adminToken: maskKey(process.env.ADMIN_TOKEN),
+        tmdbApiKey: process.env.TMDB_API_KEY || '',
+        tmdbProxyUrl: process.env.TMDB_PROXY_URL || '',
+        adminToken: process.env.ADMIN_TOKEN || '',
     });
 });
 
@@ -280,8 +284,8 @@ app.post('/api/config', requireAdminToken, (req, res) => {
     console.log('[Admin] Configuration updated successfully.');
     res.json({
         success: true,
-        tmdbApiKey: maskKey(process.env.TMDB_API_KEY),
-        tmdbProxyUrl: maskKey(process.env.TMDB_PROXY_URL)
+        tmdbApiKey: process.env.TMDB_API_KEY,
+        tmdbProxyUrl: process.env.TMDB_PROXY_URL
     });
 });
 
