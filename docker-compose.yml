@@ -27,7 +27,6 @@ services:
         condition: service_healthy
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
-      KINOPOISK_API_KEY: ${KINOPOISK_API_KEY}
       DB_HOST: db
       IS_DOCKER: "true"
       DB_NAME: ${DB_NAME:-series_bot}
@@ -36,7 +35,7 @@ services:
       TMDB_IGNORE_SSL: ${TMDB_IGNORE_SSL:-false}
       TMDB_BASE_URL: ${TMDB_BASE_URL}
     ports:
-      - "3000:3000"
+      - "3005:3000"
     volumes:
       - .:/app
       - /app/node_modules

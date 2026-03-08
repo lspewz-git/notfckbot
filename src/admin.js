@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const axios = require('axios');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 
@@ -105,6 +105,7 @@ app.get('/api/health', async (req, res) => {
         axios.get('https://api.themoviedb.org/3/authentication', {
             headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
+            httpsAgent: process.env.TMDB_PROXY_URL ? new SocksProxyAgent(process.env.TMDB_PROXY_URL) : null
         }),
     ]);
 
@@ -233,26 +234,33 @@ const updateEnvFile = (key, value) => {
 app.get('/api/config', requireAdminToken, (req, res) => {
     res.json({
         tmdbApiKey: maskKey(process.env.TMDB_API_KEY),
+        tmdbProxyUrl: maskKey(process.env.TMDB_PROXY_URL),
         adminToken: maskKey(process.env.ADMIN_TOKEN),
     });
 });
 
-// Update TMDB_API_KEY at runtime and persist to .env
+// Update configuration at runtime and persist to .env
 app.post('/api/config', requireAdminToken, (req, res) => {
-    const { tmdbApiKey } = req.body;
+    const { tmdbApiKey, tmdbProxyUrl } = req.body;
 
-    if (!tmdbApiKey || !tmdbApiKey.trim()) {
-        return res.status(400).json({ error: 'tmdbApiKey is required' });
+    if (tmdbApiKey && tmdbApiKey.trim()) {
+        const newKey = tmdbApiKey.trim();
+        process.env.TMDB_API_KEY = newKey;
+        updateEnvFile('TMDB_API_KEY', newKey);
     }
 
-    const newKey = tmdbApiKey.trim();
-    // Update in memory — takes effect immediately for all new API calls
-    process.env.TMDB_API_KEY = newKey;
-    // Persist to .env so it survives restarts
-    updateEnvFile('TMDB_API_KEY', newKey);
+    if (tmdbProxyUrl !== undefined) {
+        const newProxy = tmdbProxyUrl.trim();
+        process.env.TMDB_PROXY_URL = newProxy;
+        updateEnvFile('TMDB_PROXY_URL', newProxy);
+    }
 
-    console.log('[Admin] TMDB_API_KEY updated successfully.');
-    res.json({ success: true, tmdbApiKey: maskKey(newKey) });
+    console.log('[Admin] Configuration updated successfully.');
+    res.json({
+        success: true,
+        tmdbApiKey: maskKey(process.env.TMDB_API_KEY),
+        tmdbProxyUrl: maskKey(process.env.TMDB_PROXY_URL)
+    });
 });
 
 app.post('/api/clear-all', requireAdminToken, async (req, res) => {

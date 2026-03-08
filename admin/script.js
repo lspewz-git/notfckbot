@@ -291,6 +291,8 @@ document.getElementById('list-filter-input').oninput = (e) => {
 
 const apikeyInput = document.getElementById('apikey-input');
 const apikeyStatus = document.getElementById('apikey-status');
+const proxyInput = document.getElementById('proxy-input');
+const proxyStatus = document.getElementById('proxy-status');
 
 // Load the masked key on startup
 async function loadConfig() {
@@ -298,6 +300,7 @@ async function loadConfig() {
         const res = await fetch(`${API_URL}/config`);
         const data = await res.json();
         apikeyInput.placeholder = data.tmdbApiKey || '••••••••';
+        proxyInput.placeholder = data.tmdbProxyUrl || 'None';
     } catch { /* silent */ }
 }
 
@@ -335,6 +338,34 @@ document.getElementById('save-apikey').onclick = async () => {
     } catch (err) {
         apikeyStatus.textContent = '❌ Network error';
         apikeyStatus.className = 'apikey-status error';
+    }
+};
+
+// Save new proxy
+document.getElementById('save-proxy').onclick = async () => {
+    const newProxy = proxyInput.value.trim();
+
+    try {
+        const res = await fetch(`${API_URL}/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tmdbProxyUrl: newProxy })
+        });
+        const result = await res.json();
+        if (result.success) {
+            proxyInput.value = '';
+            proxyInput.placeholder = result.tmdbProxyUrl || 'None';
+            proxyStatus.textContent = '✅ Proxy updated! Checking health...';
+            proxyStatus.className = 'apikey-status success';
+            setTimeout(() => { proxyStatus.textContent = ''; }, 4000);
+            fetchData(); // Refresh health status
+        } else {
+            proxyStatus.textContent = '❌ Error: ' + result.error;
+            proxyStatus.className = 'apikey-status error';
+        }
+    } catch (err) {
+        proxyStatus.textContent = '❌ Network error';
+        proxyStatus.className = 'apikey-status error';
     }
 };
 
