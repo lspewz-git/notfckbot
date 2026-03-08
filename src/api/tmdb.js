@@ -5,18 +5,37 @@ require('dotenv').config();
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 
+let cachedProxyAgent = null;
+let currentProxyUrl = null;
+
 const getProxyAgent = () => {
     const proxyUrl = process.env.TMDB_PROXY_URL;
-    if (!proxyUrl) return null;
-    if (proxyUrl.startsWith('socks')) return new SocksProxyAgent(proxyUrl, { rejectUnauthorized: false });
-    if (proxyUrl.startsWith('http')) return new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false });
-    return null;
+    if (!proxyUrl) {
+        cachedProxyAgent = null;
+        currentProxyUrl = null;
+        return null;
+    }
+
+    // Reuse agent if URL hasn't changed to avoid ECONNRESET/socket leaks
+    if (proxyUrl === currentProxyUrl && cachedProxyAgent) {
+        return cachedProxyAgent;
+    }
+
+    currentProxyUrl = proxyUrl;
+    if (proxyUrl.startsWith('socks')) {
+        cachedProxyAgent = new SocksProxyAgent(proxyUrl, { rejectUnauthorized: false });
+    } else if (proxyUrl.startsWith('http')) {
+        cachedProxyAgent = new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false });
+    } else {
+        cachedProxyAgent = null;
+    }
+    return cachedProxyAgent;
 };
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
-    timeout: 10000,
-    proxy: false // Disable system proxies to avoid ECONNREFUSED 127.0.0.1
+    timeout: 15000, // Increased timeout for slow proxies
+    proxy: false
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -26,11 +45,24 @@ apiClient.interceptors.request.use((config) => {
     }
     config.headers['Content-Type'] = 'application/json';
 
-    // Apply proxy dynamically so it picks up changes from the admin panel immediately
+    // Apply proxy dynamically
     config.httpsAgent = getProxyAgent();
 
     return config;
-});
+}, (error) => Promise.reject(error));
+
+// Log details on error to help debugging
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.code === 'ECONNRESET') {
+            console.error('[TMDB] ❌ Connection Reset. Check your Proxy or Network.');
+        } else if (error.code === 'ETIMEDOUT') {
+            console.error('[TMDB] ❌ Timeout. Proxy is too slow.');
+        }
+        return Promise.reject(error);
+    }
+);
 
 const searchMulti = async (query) => {
     try {
