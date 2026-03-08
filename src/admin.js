@@ -221,10 +221,14 @@ app.delete('/api/subscription/:chatId/:seriesId', requireAdminToken, async (req,
 });
 
 app.post('/api/subscription', requireAdminToken, async (req, res) => {
-    const { chatId, tmdbId, notify_type } = req.body;
+    let { chatId, tmdbId, notify_type } = req.body;
     if (!chatId || !tmdbId) {
         return res.status(400).json({ error: 'chatId and tmdbId are required' });
     }
+
+    // Ensure tmdbId has the 'tv_' prefix as expected by the bot and cron jobs
+    const fulltmdbId = String(tmdbId).startsWith('tv_') ? String(tmdbId) : `tv_${tmdbId}`;
+    const numericTmdbId = String(tmdbId).replace('tv_', '');
 
     try {
         // 1. Ensure Chat exists
@@ -232,11 +236,11 @@ app.post('/api/subscription', requireAdminToken, async (req, res) => {
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
         // 2. Ensure Series exists, or fetch/create it
-        let series = await Series.findByPk(tmdbId);
+        let series = await Series.findByPk(fulltmdbId);
         if (!series) {
-            const details = await tmdb.getDetails(tmdbId, 'tv');
+            const details = await tmdb.getDetails(numericTmdbId, 'tv');
             series = await Series.create({
-                tmdb_id: String(tmdbId),
+                tmdb_id: fulltmdbId,
                 title: details.name || details.original_name,
                 last_season: details.number_of_seasons || 0,
                 last_episode: 0,
@@ -246,7 +250,7 @@ app.post('/api/subscription', requireAdminToken, async (req, res) => {
 
         // 3. Create or update subscription
         const [sub, created] = await Subscription.findOrCreate({
-            where: { chatId, seriesId: tmdbId },
+            where: { chatId, seriesId: fulltmdbId },
             defaults: { notify_type: notify_type || 'episode' }
         });
 
