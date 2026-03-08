@@ -458,3 +458,74 @@ td {
 .apikey-status.error {
     color: #ef4444;
 }
+
+/* Series Search Results */
+.search-results {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.result-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.result-item:hover {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.result-item img {
+    height: 60px;
+    width: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.result-info {
+    flex: 1;
+}
+
+.result-info h4 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.result-info p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.sub-options {
+    background: var(--glass);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid var(--primary);
+}
+
+.options-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+}
+
+.options-row select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.5rem;
+    border-radius: 4px;
+}

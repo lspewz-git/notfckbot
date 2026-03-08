@@ -209,7 +209,10 @@ function renderListData(type, data) {
                 <td>${usernameDisplay}</td>
                 <td>${item.type}</td>
                 <td>${statusHtml}</td>
-                <td>${actionsHtml}</td>
+                <td>
+                    ${actionsHtml}
+                    <button class="primary action-btn" onclick="openAddSubModal('${item.id}')" style="margin-left: 0.5rem;">+ Sub</button>
+                </td>
             `;
             listTableBody.appendChild(tr);
         });
@@ -372,6 +375,101 @@ document.getElementById('save-proxy').onclick = async () => {
     } catch (err) {
         proxyStatus.textContent = '❌ Network error';
         proxyStatus.className = 'apikey-status error';
+    }
+};
+
+// ============================================================
+// Manual Subscription Logic
+// ============================================================
+
+const addSubModal = document.getElementById('add-sub-modal');
+const seriesSearchInput = document.getElementById('series-search-input');
+const searchResultsDiv = document.getElementById('search-results');
+const subOptionsDiv = document.getElementById('sub-options');
+const selectedSeriesTitle = document.getElementById('selected-series-title');
+const confirmAddSubBtn = document.getElementById('confirm-add-sub');
+
+let currentAddSubChatId = null;
+let currentSelectedTmdbId = null;
+let searchTimeout = null;
+
+function openAddSubModal(chatId) {
+    currentAddSubChatId = chatId;
+    document.getElementById('add-sub-chat-id').textContent = chatId;
+    addSubModal.style.display = 'flex';
+    seriesSearchInput.value = '';
+    searchResultsDiv.innerHTML = '';
+    subOptionsDiv.style.display = 'none';
+}
+
+seriesSearchInput.oninput = (e) => {
+    clearTimeout(searchTimeout);
+    const query = e.target.value.trim();
+    if (query.length < 2) {
+        searchResultsDiv.innerHTML = '';
+        return;
+    }
+
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(query)}`);
+            const results = await res.json();
+            renderSearchResults(results);
+        } catch (err) {
+            searchResultsDiv.innerHTML = '<p style="color:red">Search failed</p>';
+        }
+    }, 500);
+};
+
+function renderSearchResults(results) {
+    const list = results.filter(r => r.media_type === 'tv');
+    if (list.length === 0) {
+        searchResultsDiv.innerHTML = '<p>No TV series found.</p>';
+        return;
+    }
+
+    searchResultsDiv.innerHTML = list.map(item => `
+        <div class="result-item" onclick="selectSeries('${item.id}', '${item.name || item.original_name}')">
+            <img src="${item.poster_path ? 'https://image.tmdb.org/t/p/w92' + item.poster_path : 'https://via.placeholder.com/92x138?text=No+Poster'}" alt="poster">
+            <div class="result-info">
+                <h4>${item.name || item.original_name}</h4>
+                <p>${item.first_air_date ? item.first_air_date.split('-')[0] : 'N/A'}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.selectSeries = (tmdbId, title) => {
+    currentSelectedTmdbId = tmdbId;
+    selectedSeriesTitle.textContent = title;
+    searchResultsDiv.innerHTML = '';
+    subOptionsDiv.style.display = 'block';
+};
+
+confirmAddSubBtn.onclick = async () => {
+    const notify_type = document.getElementById('sub-notify-type').value;
+
+    try {
+        const res = await fetch(`${API_URL}/subscription`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chatId: currentAddSubChatId,
+                tmdbId: currentSelectedTmdbId,
+                notify_type
+            })
+        });
+        const result = await res.json();
+        if (result.success) {
+            alert('Subscription added successfully!');
+            addSubModal.style.display = 'none';
+            fetchData();
+            if (listModal.style.display === 'flex') openList('chats');
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (err) {
+        alert('Failed to add subscription');
     }
 };
 

@@ -115,6 +115,36 @@
             </div>
         </div>
 
+        <!-- Modal for Adding Subscription -->
+        <div id="add-sub-modal" class="modal">
+            <div class="modal-content list-modal-content">
+                <div class="modal-header">
+                    <h3>Add Subscription for <span id="add-sub-chat-id"></span></h3>
+                    <button class="close-btn"
+                        onclick="document.getElementById('add-sub-modal').style.display='none'">✖</button>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="series-search-input" placeholder="Search for series (e.g. The Boys)...">
+                </div>
+                <div id="search-results" class="search-results">
+                    <!-- Results appear here -->
+                </div>
+                <div id="sub-options" class="sub-options" style="display: none;">
+                    <h4>Selected: <span id="selected-series-title"></span></h4>
+                    <div class="options-row">
+                        <label>Notification Type:</label>
+                        <select id="sub-notify-type">
+                            <option value="episode">New Episodes</option>
+                            <option value="season">Whole Seasons</option>
+                            <option value="first_and_full">1x1 + Whole Seasons</option>
+                        </select>
+                    </div>
+                    <button id="confirm-add-sub" class="primary" style="margin-top: 1rem; width: 100%;">Add
+                        Subscription</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal for Confirmation -->
         <div id="modal" class="modal">
             <div class="modal-content">

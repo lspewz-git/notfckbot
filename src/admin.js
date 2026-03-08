@@ -14,6 +14,7 @@ const _getProxyAgent = (url) => {
 };
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
+const tmdb = require('./api/tmdb');
 
 const app = express();
 const PORT = 3000;
@@ -104,6 +105,17 @@ app.get('/api/data/:type', async (req, res) => {
 
 app.get('/api/logs', (req, res) => {
     res.json(logBuffer);
+});
+
+app.get('/api/tmdb/search', requireAdminToken, async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) return res.status(400).json({ error: 'Query is required' });
+        const results = await tmdb.searchMulti(q);
+        res.json(results);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.get('/api/health', async (req, res) => {
@@ -203,6 +215,46 @@ app.delete('/api/subscription/:chatId/:seriesId', requireAdminToken, async (req,
     try {
         await Subscription.destroy({ where: { chatId, seriesId } });
         res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/subscription', requireAdminToken, async (req, res) => {
+    const { chatId, tmdbId, notify_type } = req.body;
+    if (!chatId || !tmdbId) {
+        return res.status(400).json({ error: 'chatId and tmdbId are required' });
+    }
+
+    try {
+        // 1. Ensure Chat exists
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+        // 2. Ensure Series exists, or fetch/create it
+        let series = await Series.findByPk(tmdbId);
+        if (!series) {
+            const details = await tmdb.getDetails(tmdbId, 'tv');
+            series = await Series.create({
+                tmdb_id: String(tmdbId),
+                title: details.name || details.original_name,
+                last_season: details.number_of_seasons || 0,
+                last_episode: 0,
+                poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null
+            });
+        }
+
+        // 3. Create or update subscription
+        const [sub, created] = await Subscription.findOrCreate({
+            where: { chatId, seriesId: tmdbId },
+            defaults: { notify_type: notify_type || 'episode' }
+        });
+
+        if (!created && notify_type) {
+            await sub.update({ notify_type });
+        }
+
+        res.json({ success: true, created, subscription: sub });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
