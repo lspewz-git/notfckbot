@@ -167,7 +167,7 @@ function renderListData(type, data) {
             listTableBody.appendChild(tr);
         });
     } else if (type === 'films') {
-        listTableHead.innerHTML = `<tr><th>Chat ID</th><th>User Name</th><th>Film Title</th><th>Year</th><th>Digital Release</th></tr>`;
+        listTableHead.innerHTML = `<tr><th>Chat ID</th><th>User Name</th><th>Film Title</th><th>Year</th><th>Digital Release</th><th>Actions</th></tr>`;
         data.forEach(item => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -176,6 +176,7 @@ function renderListData(type, data) {
                 <td>${item.title}</td>
                 <td>${item.year || 'N/A'}</td>
                 <td>${item.premiere_digital || 'N/A'}</td>
+                <td><button class="danger action-btn" onclick="deleteWatchlistItem('${item.id}')">Delete</button></td>
             `;
             listTableBody.appendChild(tr);
         });
@@ -212,6 +213,7 @@ function renderListData(type, data) {
                 <td>
                     ${actionsHtml}
                     <button class="primary action-btn" onclick="openAddSubModal('${item.id}')" style="margin-left: 0.5rem;">+ Sub</button>
+                    <button class="primary action-btn" onclick="openAddFilmModal('${item.id}')" style="margin-left: 0.5rem;">+ Film</button>
                 </td>
             `;
             listTableBody.appendChild(tr);
@@ -472,6 +474,119 @@ confirmAddSubBtn.onclick = async () => {
         alert('Failed to add subscription');
     }
 };
+
+// ============================================================
+// Watchlist (Films) Management Logic
+// ============================================================
+
+const addFilmModal = document.getElementById('add-film-modal');
+const filmSearchInput = document.getElementById('film-search-input');
+const filmSearchResultsDiv = document.getElementById('film-search-results');
+const filmSelectedInfo = document.getElementById('film-selected-info');
+const selectedFilmTitle = document.getElementById('selected-film-title');
+const confirmAddFilmBtn = document.getElementById('confirm-add-film');
+
+let currentAddFilmChatId = null;
+let currentSelectedMovieId = null;
+let filmSearchTimeout = null;
+
+function openAddFilmModal(chatId) {
+    currentAddFilmChatId = chatId;
+    document.getElementById('add-film-chat-id').textContent = chatId;
+    addFilmModal.style.display = 'flex';
+    filmSearchInput.value = '';
+    filmSearchResultsDiv.innerHTML = '';
+    filmSelectedInfo.style.display = 'none';
+}
+
+filmSearchInput.oninput = (e) => {
+    clearTimeout(filmSearchTimeout);
+    const query = e.target.value.trim();
+    if (query.length < 2) {
+        filmSearchResultsDiv.innerHTML = '';
+        return;
+    }
+
+    filmSearchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(query)}`);
+            const results = await res.json();
+            renderFilmSearchResults(results);
+        } catch (err) {
+            filmSearchResultsDiv.innerHTML = '<p style="color:red">Search failed</p>';
+        }
+    }, 500);
+};
+
+function renderFilmSearchResults(results) {
+    const list = results.filter(r => r.media_type === 'movie');
+    if (list.length === 0) {
+        filmSearchResultsDiv.innerHTML = '<p>No movies found.</p>';
+        return;
+    }
+
+    filmSearchResultsDiv.innerHTML = list.map(item => {
+        const title = (item.title || item.original_title || '').replace(/'/g, "\\'");
+        return `
+        <div class="result-item" onclick="selectMovie('${item.id}', '${title}')">
+            <img src="${item.poster_path ? 'https://image.tmdb.org/t/p/w92' + item.poster_path : 'https://via.placeholder.com/92x138?text=No+Poster'}" alt="poster">
+            <div class="result-info">
+                <h4>${item.title || item.original_title}</h4>
+                <p>${item.release_date ? item.release_date.split('-')[0] : 'N/A'}</p>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+window.selectMovie = (tmdbId, title) => {
+    currentSelectedMovieId = tmdbId;
+    selectedFilmTitle.textContent = title;
+    filmSearchResultsDiv.innerHTML = '';
+    filmSelectedInfo.style.display = 'block';
+};
+
+confirmAddFilmBtn.onclick = async () => {
+    try {
+        const res = await fetch(`${API_URL}/watchlist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chatId: currentAddFilmChatId,
+                tmdbId: currentSelectedMovieId
+            })
+        });
+        const result = await res.json();
+        if (result.success) {
+            alert('Film added to watchlist!');
+            addFilmModal.style.display = 'none';
+            fetchData();
+            if (listModal.style.display === 'flex') openList('chats');
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (err) {
+        alert('Failed to add film');
+    }
+};
+
+async function deleteWatchlistItem(id) {
+    if (!confirm('Are you sure you want to delete this film from the watchlist?')) return;
+
+    try {
+        const res = await fetch(`${API_URL}/watchlist/${id}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            fetchData();
+            openList('films');
+        } else {
+            alert('Failed to delete film');
+        }
+    } catch (err) {
+        alert('Failed to delete film');
+    }
+}
 
 // Initial load
 loadConfig();

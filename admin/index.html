@@ -145,6 +145,28 @@
             </div>
         </div>
 
+        <!-- Modal for Adding Film to Watchlist -->
+        <div id="add-film-modal" class="modal">
+            <div class="modal-content list-modal-content">
+                <div class="modal-header">
+                    <h3>Add Film for <span id="add-film-chat-id"></span></h3>
+                    <button class="close-btn"
+                        onclick="document.getElementById('add-film-modal').style.display='none'">✖</button>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="film-search-input" placeholder="Search for movies (e.g. Inception)...">
+                </div>
+                <div id="film-search-results" class="search-results">
+                    <!-- Results appear here -->
+                </div>
+                <div id="film-selected-info" style="display: none; padding: 1rem;">
+                    <h4>Selected: <span id="selected-film-title"></span></h4>
+                    <button id="confirm-add-film" class="primary" style="margin-top: 1rem; width: 100%;">Add to
+                        Watchlist</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal for Confirmation -->
         <div id="modal" class="modal">
             <div class="modal-content">

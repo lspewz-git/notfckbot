@@ -294,6 +294,48 @@ app.post('/api/chat/:chatId/unblock', requireAdminToken, async (req, res) => {
     }
 });
 
+// --- Watchlist (Films) Management ---
+
+app.post('/api/watchlist', requireAdminToken, async (req, res) => {
+    const { chatId, tmdbId } = req.body;
+    if (!chatId || !tmdbId) {
+        return res.status(400).json({ error: 'chatId and tmdbId are required' });
+    }
+
+    try {
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+        // Check for duplicate
+        const existing = await Watchlist.findOne({ where: { chatId, tmdb_id: String(tmdbId) } });
+        if (existing) return res.status(409).json({ error: 'Film already in watchlist for this chat' });
+
+        // Fetch movie details from TMDB
+        const details = await tmdb.getDetails(tmdbId, 'movie');
+        const entry = await Watchlist.create({
+            chatId,
+            tmdb_id: String(tmdbId),
+            title: details.title || details.original_title,
+            poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
+            year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
+        });
+
+        res.json({ success: true, entry });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/watchlist/:id', requireAdminToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await Watchlist.destroy({ where: { id } });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 
 // Helper to update a value in the .env file
