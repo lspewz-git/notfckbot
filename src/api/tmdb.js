@@ -92,10 +92,22 @@ const getDetails = async (id, media_type) => {
     try {
         const response = await apiClient.get(`/${media_type}/${id}`, {
             params: {
-                language: 'ru-RU'
+                language: 'ru-RU',
+                append_to_response: 'credits'
             }
         });
-        return response.data;
+        const data = response.data;
+
+        // Extract director if it's a movie
+        if (media_type === 'movie' && data.credits && data.credits.crew) {
+            const director = data.credits.crew.find(person => person.job === 'Director');
+            if (director) data.director_name = director.name;
+        } else if (media_type === 'tv' && data.created_by && data.created_by.length > 0) {
+            // For TV shows, we use "created_by" as the equivalent
+            data.director_name = data.created_by.map(c => c.name).join(', ');
+        }
+
+        return data;
     } catch (error) {
         console.error(`TMDB API Error (getDetails ${media_type}/${id}):`, error.message);
         throw error;

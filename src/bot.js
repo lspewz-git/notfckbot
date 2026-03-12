@@ -229,6 +229,15 @@ const showSearchPage = async (ctx, chatId, page = 0) => {
     for (const item of items) {
         const year = (item.release_date || item.first_air_date || '').substring(0, 4) || 'н/д';
         const name = item.title || item.name || item.original_title || item.original_name || 'Без названия';
+
+        let directorInfo = '';
+        if (item.media_type === 'movie' || item.media_type === 'tv') {
+            try {
+                // Since search results don't have credits, we can't show director here easily without extra API calls per item
+                // However, we can show it in the ACTUAL subscription prompt or random movie
+            } catch (e) { }
+        }
+
         const caption = `<b>${name}</b> (${year})`;
         const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
         const keyboard = Markup.inlineKeyboard([[Markup.button.callback('✨ Подписаться', `sub_${item.media_type}_${item.id}`)]]);
@@ -416,7 +425,12 @@ const handleRandomMovie = async (ctx) => {
         const year = (item.release_date || '').substring(0, 4) || 'н/д';
         const name = item.title || item.original_title || 'Без названия';
         const rating = item.vote_average ? `⭐️ ${item.vote_average.toFixed(1)}/10` : '';
-        const caption = `🎲 <b>${name}</b> (${year})\n${rating}\n\n<i>${item.overview || 'Описание отсутствует.'}</i>`;
+
+        // Random movie uses discover, but we need details for director
+        const fullDetails = await getDetails(item.id, 'movie');
+        const directorLine = fullDetails.director_name ? `🎬 Режиссер: ${fullDetails.director_name}\n` : '';
+
+        const caption = `🎲 <b>${name}</b> (${year})\n${rating}\n${directorLine}\n<i>${item.overview || 'Описание отсутствует.'}</i>`;
         const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
 
         // Inline keyboard: Add to watchlist OR Watch online directly
@@ -555,8 +569,10 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
                 [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
             ]);
 
+            const directorLabel = data.director_name ? `🎬 Режиссер: <b>${data.director_name}</b>\n` : '';
+
             await ctx.reply(
-                `🎬 <b>${title}</b>${movieYear ? ` (${movieYear})` : ''}\n\n` +
+                `🎬 <b>${title}</b>${movieYear ? ` (${movieYear})` : ''}\n${directorLabel}\n` +
                 `Это фильм, который ещё не вышел.\n` +
                 `📅 Релиз: <b>${comingDateLabel}</b>\n\n` +
                 `Добавить в список ожидания? Как только выйдет — пришлю уведомление.`,
@@ -588,7 +604,8 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
             [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
         ]);
 
-        await ctx.reply(`Выберите режим уведомлений для «${series.title}»:`, keyboard);
+        const directorLabel = data.director_name ? `🎬 Создатель: <b>${data.director_name}</b>\n` : '';
+        await ctx.reply(`<b>«${series.title}»</b>\n${directorLabel}\nВыберите режим уведомлений:`, { parse_mode: 'HTML', ...keyboard });
         await ctx.answerCbQuery();
     } catch (error) {
         console.error('[Bot] Subscription error:', error);

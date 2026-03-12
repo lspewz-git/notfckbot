@@ -151,9 +151,11 @@ const checkWatchlistReleases = async (bot) => {
 
             for (const entry of filmEntries) {
                 try {
+                    const directorInfo = data.director_name ? `🎬 Режиссер: <b>${data.director_name}</b>\n` : '';
                     const msg =
                         `🎬 <b>Фильм доступен!</b>\n\n` +
                         `🍿 <b>${entry.title}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
+                        `${directorInfo}` +
                         `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n\n` +
                         `▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
 

@@ -2,7 +2,7 @@ const API_URL = '/api';
 
 // --- Global State ---
 let currentSection = 'dashboard';
-let refreshTimer = 60;
+let refreshTimer = 10;
 let isPaused = false;
 let currentLogs = [];
 let logFilter = 'all';
@@ -247,7 +247,7 @@ function startTimer() {
         if (isPaused) return;
         refreshTimer--;
         if (refreshTimer <= 0) {
-            refreshTimer = 60;
+            refreshTimer = 10;
             fetchData();
         }
         document.getElementById('refresh-timer').innerText = refreshTimer;
