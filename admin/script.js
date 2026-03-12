@@ -9,11 +9,18 @@ let logFilter = 'all';
 
 // --- Initialization ---
 async function init() {
-    loadConfig();
     fetchData();
     startTimer();
     setupEventListeners();
     setupFilters();
+}
+
+function getHeaders() {
+    const token = localStorage.getItem('adminToken') || '';
+    return {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': token
+    };
 }
 
 function setupFilters() {
@@ -53,11 +60,10 @@ async function fetchData(isImmediate = false) {
     if (isPaused && !isImmediate) return;
 
     try {
-        const [stats, health, logs, popular] = await Promise.all([
-            fetch(`${API_URL}/stats`).then(r => r.json()),
-            fetch(`${API_URL}/health`).then(r => r.json()),
-            fetch(`${API_URL}/logs`).then(r => r.json()),
-            fetch(`${API_URL}/popular`).then(r => ({ success: false })) // Placeholder if endpoint not ready
+        const [stats, health, logs] = await Promise.all([
+            fetch(`${API_URL}/stats`, { headers: getHeaders() }).then(r => r.json()),
+            fetch(`${API_URL}/health`, { headers: getHeaders() }).then(r => r.json()),
+            fetch(`${API_URL}/logs`, { headers: getHeaders() }).then(r => r.json())
         ]);
 
         updateStats(stats);
@@ -71,7 +77,7 @@ async function fetchData(isImmediate = false) {
         if (currentSection === 'watchlist') fetchTypedData('films');
 
         // Fetch popular separately since it was just added
-        fetch(`${API_URL}/stats/popular`).then(r => r.json()).then(updatePopular);
+        fetch(`${API_URL}/stats/popular`, { headers: getHeaders() }).then(r => r.json()).then(updatePopular);
 
     } catch (err) {
         console.error('Fetch error:', err);
@@ -80,7 +86,7 @@ async function fetchData(isImmediate = false) {
 
 async function fetchTypedData(type) {
     try {
-        const data = await fetch(`${API_URL}/data/${type}`).then(r => r.json());
+        const data = await fetch(`${API_URL}/data/${type}`, { headers: getHeaders() }).then(r => r.json());
         renderTable(type, data);
     } catch (err) { console.error(`Error loading ${type}:`, err); }
 }
@@ -205,6 +211,16 @@ function renderTable(type, data) {
             `;
         }
     }).join('');
+
+    // Re-apply filter if active
+    const q = document.getElementById('chats-filter')?.value.toLowerCase();
+    if (q && type === 'chats') {
+        const rows = body.querySelectorAll('tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    }
 }
 
 // --- Smart Refresh Logic ---
@@ -236,7 +252,7 @@ async function openDM(id, name) {
         try {
             const res = await fetch(`${API_URL}/chat/${id}/message`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({ message: msg })
             }).then(r => r.json());
             if (res.success) {
@@ -255,7 +271,7 @@ async function openSeriesDetails(tmdbId) {
     modal.style.display = 'flex';
 
     try {
-        const data = await fetch(`${API_URL}/series/${tmdbId}`).then(r => r.json());
+        const data = await fetch(`${API_URL}/series/${tmdbId}`, { headers: getHeaders() }).then(r => r.json());
         setText('detail-title', data.name);
         setText('detail-desc', data.overview || 'No description available.');
         setText('detail-meta', `Rating: ⭐️ ${data.vote_average.toFixed(1)} • Seasons: ${data.number_of_seasons}`);
@@ -298,7 +314,7 @@ function setupEventListeners() {
     document.getElementById('series-search-input').oninput = debounce(async (e) => {
         const q = e.target.value.trim();
         if (q.length < 2) return;
-        const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+        const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() }).then(r => r.json());
         const results = res.filter(r => r.media_type === 'tv');
         document.getElementById('search-results').innerHTML = results.map(item => `
             <div class="popular-item" onclick="selectSeries('${item.id}', '${item.name.replace(/'/g, "\\'")}')">
@@ -312,7 +328,7 @@ function setupEventListeners() {
     document.getElementById('film-search-input').oninput = debounce(async (e) => {
         const q = e.target.value.trim();
         if (q.length < 2) return;
-        const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+        const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() }).then(r => r.json());
         const results = res.filter(r => r.media_type === 'movie');
         document.getElementById('film-search-results').innerHTML = results.map(item => `
             <div class="popular-item" onclick="selectMovie('${item.id}', '${item.title.replace(/'/g, "\\'")}')">
@@ -333,7 +349,7 @@ document.getElementById('confirm-add-sub').onclick = async () => {
     const chatId = document.getElementById('add-sub-chat-id').innerText;
     const res = await fetch(`${API_URL}/subscription`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({
             chatId,
             tmdbId: window.currentTmdbId,
@@ -353,7 +369,7 @@ document.getElementById('confirm-add-film').onclick = async () => {
     const chatId = document.getElementById('add-film-chat-id').innerText;
     const res = await fetch(`${API_URL}/watchlist`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({ chatId, tmdbId: window.currentMovieId })
     }).then(r => r.json());
     if (res.success) {
