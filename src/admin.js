@@ -103,6 +103,38 @@ app.get('/api/data/:type', async (req, res) => {
     }
 });
 
+app.get('/api/stats/popular', async (req, res) => {
+    try {
+        const popular = await Subscription.findAll({
+            attributes: [
+                'seriesId',
+                [Subscription.sequelize.fn('COUNT', Subscription.sequelize.col('chatId')), 'subCount']
+            ],
+            group: ['seriesId'],
+            order: [[Subscription.sequelize.literal('subCount'), 'DESC']],
+            limit: 5,
+            include: [{ model: Series }]
+        });
+        res.json(popular);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/series/:tmdbId', async (req, res) => {
+    try {
+        const { tmdbId } = req.params;
+        const numericId = tmdbId.replace('tv_', '');
+        const [details, subs] = await Promise.all([
+            tmdb.getDetails(numericId, 'tv'),
+            Subscription.count({ where: { seriesId: tmdbId } })
+        ]);
+        res.json({ ...details, subCount: subs });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/logs', (req, res) => {
     res.json(logBuffer);
 });
@@ -112,6 +144,7 @@ app.get('/api/tmdb/search', requireAdminToken, async (req, res) => {
         const { q } = req.query;
         if (!q) return res.status(400).json({ error: 'Query is required' });
         const results = await tmdb.searchMulti(q);
+        console.log(`[Admin] Search results for "${q}": ${results.length} items found.`);
         res.json(results);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -333,6 +366,21 @@ app.post('/api/watchlist', requireAdminToken, async (req, res) => {
         });
 
         res.json({ success: true, entry, isReleased });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/chat/:chatId/message', requireAdminToken, async (req, res) => {
+    const { chatId } = req.params;
+    const { message } = req.body;
+    if (!message || !message.trim()) return res.status(400).json({ error: 'Message is required' });
+
+    const bot = app.get('bot');
+    try {
+        await bot.telegram.sendMessage(chatId, `✉️ <b>Сообщение от администратора:</b>\n\n${message}`, { parse_mode: 'HTML' });
+        console.log(`[Admin] Direct message sent to ${chatId}`);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

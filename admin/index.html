@@ -4,182 +4,281 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NotFckBot Admin Dashboard</title>
+    <title>NotFckBot | Soft Glass Admin</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
-    <div class="dashboard">
-        <header>
-            <h1>NotFckBot <span>Admin</span></h1>
-            <div class="health-indicators">
-                <div class="health-item" id="health-tg">
-                    Telegram: <span class="health-badge">...</span>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                🎬 NotFck<span>Bot</span>
+            </div>
+            <nav class="nav-links">
+                <li class="nav-item active" onclick="switchSection('dashboard')">📊 Dashboard</li>
+                <li class="nav-item" onclick="switchSection('chats')">👤 Users / Chats</li>
+                <li class="nav-item" onclick="switchSection('subs')">📺 Subscriptions</li>
+                <li class="nav-item" onclick="switchSection('watchlist')">🎞 Watchlist</li>
+                <li class="nav-item" onclick="switchSection('logs')">📜 Activity Logs</li>
+            </nav>
+            <div style="margin-top: auto; padding-top: 2rem;">
+                <button id="clear-all-btn" class="btn btn-danger" style="width: 100%;">⚠️ Wipe All Data</button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="section active">
+                <header>
+                    <div class="header-info">
+                        <h1>Dashboard</h1>
+                        <p style="color: var(--text-dim)">Overview of system health and activity.</p>
+                    </div>
+                    <div class="header-status">
+                        <div id="health-tg" class="badge">TG: ...</div>
+                        <div id="health-tmdb" class="badge">TMDB: ...</div>
+                        <div id="health-proxy" class="badge">Proxy: ...</div>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card" onclick="switchSection('chats')">
+                        <span class="stat-title">Total Chats</span>
+                        <span id="chats-count" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card" onclick="switchSection('subs')">
+                        <span class="stat-title">Active Subs</span>
+                        <span id="subs-count" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card" onclick="switchSection('watchlist')">
+                        <span class="stat-title">Watchlist</span>
+                        <span id="films-count" class="stat-value">-</span>
+                    </div>
                 </div>
-                <div class="health-item" id="health-tmdb">
-                    TMDB: <span class="health-badge">...</span>
+
+                <div class="dashboard-bottom">
+                    <!-- Popularity Block -->
+                    <div class="glass-card">
+                        <h3>🔥 Popular Now</h3>
+                        <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem;">Most subscribed
+                            series by your users.</p>
+                        <div id="popular-list">
+                            <!-- Injected via script -->
+                            <p style="text-align: center; color: var(--text-dim);">Loading popularity stats...</p>
+                        </div>
+                    </div>
+
+                    <!-- System Controls -->
+                    <div class="glass-card">
+                        <h3>⚡️ Actions</h3>
+                        <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+                            <button id="trigger-btn" class="btn btn-primary">🔍 Trigger Update Check</button>
+                            <button id="refresh-btn" class="btn btn-ghost">🔄 Manual Refresh</button>
+                            <div class="refresh-bar">
+                                <div id="refresh-timer" class="timer-circle">60</div>
+                                <span style="font-size: 0.8rem; color: var(--text-dim);">Next auto-refresh</span>
+                                <button id="pause-refresh" class="btn btn-ghost"
+                                    style="padding: 0.2rem 0.6rem; font-size: 0.7rem;">Pause</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="health-item" id="health-proxy">
-                    Proxy: <span class="health-badge">...</span>
-                </div>
-            </div>
-            <div class="status-badge">System Live</div>
-        </header>
+            </section>
 
-        <section class="stats">
-            <div class="stat-card clickable" onclick="openList('chats')">
-                <h3>Chats</h3>
-                <p id="chats-count">-</p>
-            </div>
-            <div class="stat-card clickable" onclick="openList('subs')">
-                <h3>Subscriptions</h3>
-                <p id="subs-count">-</p>
-            </div>
-            <div class="stat-card clickable" onclick="openList('series')">
-                <h3>Series</h3>
-                <p id="series-count">-</p>
-            </div>
-            <div class="stat-card clickable" onclick="openList('films')">
-                <h3>Films</h3>
-                <p id="films-count">-</p>
-            </div>
-        </section>
-
-        <section class="controls">
-            <button id="refresh-btn" class="secondary">🔄 Refresh Data</button>
-            <button id="trigger-btn" class="secondary">🔍 Trigger Update Check</button>
-            <button id="clear-all-btn" class="danger">⚠️ Clear All Data</button>
-        </section>
-
-        <section class="logs-container">
-            <h2>📜 Real-time Logs</h2>
-            <div id="logs-viewer" class="logs-viewer">
-                <!-- Logs will appear here -->
-            </div>
-        </section>
-
-        <section class="settings-section">
-            <h2>⚙️ Settings</h2>
-            <div class="settings-row">
-                <label for="apikey-input">TMDB API Key</label>
-                <div class="apikey-row">
-                    <input type="text" id="apikey-input" placeholder="Loading current key..." autocomplete="off">
-                    <button id="save-apikey" class="primary">Save</button>
-                </div>
-                <span id="apikey-status" class="apikey-status"></span>
-            </div>
-            <div class="settings-row">
-                <label for="proxy-input">SOCKS5 Proxy URL (e.g. socks5://user:pass@host:port)</label>
-                <div class="apikey-row">
-                    <input type="text" id="proxy-input" placeholder="Loading current proxy..." autocomplete="off">
-                    <button id="save-proxy" class="primary">Save Proxy</button>
-                </div>
-                <span id="proxy-status" class="apikey-status"></span>
-            </div>
-        </section>
-
-        <section class="broadcast">
-            <h2>📢 Broadcast Message</h2>
-            <div class="broadcast-box">
-                <textarea id="broadcast-msg" placeholder="Enter message to send to all users..."></textarea>
-                <button id="send-broadcast" class="primary">Send Broadcast</button>
-            </div>
-        </section>
-
-
-
-        <!-- Modal for Lists -->
-        <div id="list-modal" class="modal">
-            <div class="modal-content list-modal-content">
-                <div class="modal-header">
-                    <h3 id="list-modal-title">Data List</h3>
-                    <button class="close-btn"
-                        onclick="document.getElementById('list-modal').style.display='none'">✖</button>
-                </div>
-                <div class="search-box">
-                    <input type="text" id="list-filter-input" placeholder="Search in table...">
-                </div>
-                <div class="table-scroll">
-                    <table>
-                        <thead id="list-table-head">
-                            <!-- Headers injected dynamically -->
+            <!-- Chats Section -->
+            <section id="chats-section" class="section">
+                <header>
+                    <h1>Users / Chats</h1>
+                </header>
+                <div class="glass-card">
+                    <div class="search-box">
+                        <input type="text" id="chats-filter" placeholder="Filter by ID or Username...">
+                    </div>
+                    <table id="chats-table">
+                        <thead>
+                            <tr>
+                                <th>Chat ID</th>
+                                <th>User</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
                         </thead>
-                        <tbody id="list-table-body">
-                            <!-- Data injected dynamically -->
-                        </tbody>
+                        <tbody id="chats-body"></tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <!-- Modal for Adding Subscription -->
-        <div id="add-sub-modal" class="modal">
-            <div class="modal-content list-modal-content">
-                <div class="modal-header">
-                    <h3>Add Subscription for <span id="add-sub-chat-id"></span></h3>
-                    <button class="close-btn"
-                        onclick="document.getElementById('add-sub-modal').style.display='none'">✖</button>
-                </div>
-                <div class="search-box">
-                    <input type="text" id="series-search-input" placeholder="Search for series (e.g. The Boys)...">
-                </div>
-                <div id="search-results" class="search-results">
-                    <!-- Results appear here -->
-                </div>
-                <div id="sub-options" class="sub-options" style="display: none;">
-                    <h4>Selected: <span id="selected-series-title"></span></h4>
-                    <div class="options-row">
-                        <label>Notification Type:</label>
-                        <select id="sub-notify-type">
-                            <option value="episode">New Episodes</option>
-                            <option value="season">Whole Seasons</option>
-                            <option value="first_and_full">1x1 + Whole Seasons</option>
-                        </select>
+            <!-- Logs Section -->
+            <section id="logs-section" class="section">
+                <header>
+                    <h1>Activity Logs</h1>
+                    <div class="log-filters" style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-ghost active" onclick="filterLogs('all')">All</button>
+                        <button class="btn btn-ghost" onclick="filterLogs('error')">Errors</button>
+                        <button class="btn btn-ghost" onclick="filterLogs('success')">Success</button>
                     </div>
-                    <button id="confirm-add-sub" class="primary" style="margin-top: 1rem; width: 100%;">Add
-                        Subscription</button>
+                </header>
+                <div class="glass-card">
+                    <div id="logs-viewer" class="logs-viewer"></div>
                 </div>
+            </section>
+
+            <!-- Settings (Merged into Dashboard or separate) -->
+            <section id="watchlist-section" class="section">
+                <header>
+                    <h1>Watchlist Films</h1>
+                </header>
+                <div class="glass-card">
+                    <table id="watchlist-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Film Title</th>
+                                <th>Year</th>
+                                <th>Release</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="watchlist-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="subs-section" class="section">
+                <header>
+                    <h1>Active Subscriptions</h1>
+                </header>
+                <div class="glass-card">
+                    <table id="subs-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Series</th>
+                                <th>Mode</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subs-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Direct Message Modal -->
+    <div id="dm-modal" class="modal">
+        <div class="modal-content">
+            <h3>Direct Message</h3>
+            <p id="dm-target-info">To: @username</p>
+            <textarea id="dm-text"
+                style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 1rem; color: white; padding: 1rem; margin-bottom: 1rem;"></textarea>
+            <div class="modal-actions" style="display: flex; gap: 1rem;">
+                <button id="confirm-dm" class="btn btn-primary" style="flex: 1;">Send Message</button>
+                <button onclick="closeModal('dm-modal')" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
+    </div>
 
-        <!-- Modal for Adding Film to Watchlist -->
-        <div id="add-film-modal" class="modal">
-            <div class="modal-content list-modal-content">
-                <div class="modal-header">
-                    <h3>Add Film for <span id="add-film-chat-id"></span></h3>
-                    <button class="close-btn"
-                        onclick="document.getElementById('add-film-modal').style.display='none'">✖</button>
+    <!-- Series Detail Modal -->
+    <div id="detail-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div id="detail-loading">Loading details...</div>
+            <div id="detail-ready" style="display: none;">
+                <div style="display: flex; gap: 2rem;">
+                    <img id="detail-poster" src="" style="width: 200px; border-radius: 1rem;">
+                    <div style="flex: 1;">
+                        <h2 id="detail-title">Series Title</h2>
+                        <div id="detail-meta" style="margin: 0.5rem 0; color: var(--primary);">S01E01 • ⭐️ 8.9</div>
+                        <p id="detail-desc"
+                            style="color: var(--text-dim); font-size: 0.9rem; margin: 1rem 0; line-height: 1.6;"></p>
+                        <div class="badge ok" id="detail-subs-count">12 Subscribers</div>
+                    </div>
                 </div>
-                <div class="search-box">
-                    <input type="text" id="film-search-input" placeholder="Search for movies (e.g. Inception)...">
-                </div>
-                <div id="film-search-results" class="search-results">
-                    <!-- Results appear here -->
-                </div>
-                <div id="film-selected-info" style="display: none; padding: 1rem;">
-                    <h4>Selected: <span id="selected-film-title"></span></h4>
-                    <button id="confirm-add-film" class="primary" style="margin-top: 1rem; width: 100%;">Add to
-                        Watchlist</button>
-                </div>
+                <button onclick="closeModal('detail-modal')" class="btn btn-ghost"
+                    style="margin-top: 2rem; width: 100%;">Close</button>
             </div>
         </div>
+    </div>
 
-        <!-- Modal for Confirmation -->
-        <div id="modal" class="modal">
-            <div class="modal-content">
-                <h3>Are you absolutely sure?</h3>
-                <p>This action will wipe all subscriptions and series tracking data. This cannot be undone.</p>
-                <div class="modal-actions">
-                    <button id="confirm-clear" class="danger">Yes, WIPE EVERYTHING</button>
-                    <button id="cancel-clear">Cancel</button>
-                </div>
+    <!-- Legacy Modals needed for logic -->
+    <div id="add-sub-modal" class="modal">
+        <div class="modal-content">
+            <h3>Add Subscription for <span id="add-sub-chat-id"></span></h3>
+            <div class="search-box">
+                <input type="text" id="series-search-input" placeholder="Search for series...">
+            </div>
+            <div id="search-results" class="search-results"
+                style="max-height: 300px; overflow-y: auto; margin-top: 1rem;"></div>
+            <div id="sub-options"
+                style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 1rem;">
+                <h4 id="selected-series-title"></h4>
+                <select id="sub-notify-type"
+                    style="width: 100%; padding: 0.5rem; margin: 1rem 0; background: #000; color: white; border: 1px solid var(--glass-border);">
+                    <option value="episode">New Episodes</option>
+                    <option value="season">Whole Seasons</option>
+                    <option value="first_and_full">1x1 + Whole Seasons</option>
+                </select>
+                <button id="confirm-add-sub" class="btn btn-primary" style="width: 100%;">Add Subscription</button>
+            </div>
+            <button onclick="closeModal('add-sub-modal')" class="btn btn-ghost"
+                style="margin-top: 1rem; width: 100%;">Cancel</button>
+        </div>
+    </div>
+
+    <div id="add-film-modal" class="modal">
+        <div class="modal-content">
+            <h3>Add Film for <span id="add-film-chat-id"></span></h3>
+            <div class="search-box">
+                <input type="text" id="film-search-input" placeholder="Search for movies...">
+            </div>
+            <div id="film-search-results" class="search-results"
+                style="max-height: 300px; overflow-y: auto; margin-top: 1rem;"></div>
+            <div id="film-selected-info" style="display: none; margin-top: 1rem;">
+                <h4 id="selected-film-title"></h4>
+                <button id="confirm-add-film" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Add to
+                    Watchlist</button>
+            </div>
+            <button onclick="closeModal('add-film-modal')" class="btn btn-ghost"
+                style="margin-top: 1rem; width: 100%;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Broadcast Modal -->
+    <div id="broadcast-modal" class="modal">
+        <div class="modal-content">
+            <h3>📢 Global Broadcast</h3>
+            <p style="color: var(--text-dim); margin-bottom: 1rem;">This message will be sent to ALL users.</p>
+            <textarea id="broadcast-msg"
+                style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 1rem; color: white; padding: 1rem; margin-bottom: 1rem;"></textarea>
+            <div class="modal-actions" style="display: flex; gap: 1rem;">
+                <button id="send-broadcast" class="btn btn-primary" style="flex: 1;">Send Broadcast</button>
+                <button onclick="closeModal('broadcast-modal')" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
+    </div>
 
-        <script src="script.js"></script>
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <h3>Are you sure?</h3>
+            <p id="confirm-text"></p>
+            <div class="modal-actions" style="display: flex; gap: 1rem;">
+                <button id="modal-confirm-btn" class="btn btn-danger" style="flex: 1;">Yes, Proceed</button>
+                <button onclick="closeModal('confirm-modal')" class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 
 </html>

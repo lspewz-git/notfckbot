@@ -332,6 +332,7 @@ const sendSubscriptionList = async (ctx) => {
 bot.command('start', async (ctx) => {
     delete userStates[getStateKey(ctx)];
     setState(ctx, { state: 'idle', results: [], currentPage: 0, lastMessageIds: [] });
+    console.log(`[Bot] /start from ${ctx.from.id} (${ctx.from.username || 'N/A'})`);
     await ctx.reply(
         '👋 <b>Привет!</b>\n\nЯ помогу тебе не пропустить выход новых серий твоих любимых сериалов и цифровой релиз фильмов.\n\nИспользуй меню ниже, чтобы начать работу.',
         { parse_mode: 'HTML', ...mainMenu(ctx) }
@@ -475,6 +476,7 @@ bot.on('text', async (ctx, next) => {
     if (state.state !== 'waiting_for_search') return;
 
     try {
+        console.log(`[Bot] Search query: "${text}" from ${ctx.from.id}`);
         const results = await searchMulti(text);
         if (!results || results.length === 0) {
             setState(ctx, { state: 'idle' });
@@ -608,6 +610,8 @@ bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx)
             defaults: { notify_type: notifyType },
         });
         if (!created) await subscription.update({ notify_type: notifyType });
+
+        console.log(`[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`);
 
         // Initialize the baseline episode tracking on first subscribe
         if (series.last_season === 0) {

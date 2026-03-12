@@ -51,9 +51,14 @@ apiClient.interceptors.request.use((config) => {
     return config;
 }, (error) => Promise.reject(error));
 
-// Log details on error to help debugging
+// Log details on success and error to help debugging
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        if (response.config.method === 'get') {
+            console.log(`[TMDB] ✅ Successful GET: ${response.config.url}`);
+        }
+        return response;
+    },
     (error) => {
         if (error.code === 'ECONNRESET') {
             console.error('[TMDB] ❌ Connection Reset. Check your Proxy or Network.');
