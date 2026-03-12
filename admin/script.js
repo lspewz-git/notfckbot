@@ -13,6 +13,21 @@ async function init() {
     fetchData();
     startTimer();
     setupEventListeners();
+    setupFilters();
+}
+
+function setupFilters() {
+    const chatFilter = document.getElementById('chats-filter');
+    if (chatFilter) {
+        chatFilter.oninput = (e) => {
+            const q = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('#chats-body tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(q) ? '' : 'none';
+            });
+        };
+    }
 }
 
 // --- Navigation ---
@@ -116,13 +131,16 @@ function renderLogs() {
         return true;
     });
 
-    viewer.innerHTML = filtered.reverse().map(l => `
+    viewer.innerHTML = filtered.map(l => `
         <div class="log-entry ${l.type}">
             <span class="log-time" style="color:var(--text-dim); font-size: 0.75rem;">${l.time}</span>
             <span class="type-tag">${l.type}</span>
             <span class="log-text">${l.text}</span>
         </div>
     `).join('');
+
+    // Auto-scroll to bottom
+    viewer.scrollTop = viewer.scrollHeight;
 }
 
 function filterLogs(type) {
