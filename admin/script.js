@@ -60,14 +60,16 @@ async function fetchData(isImmediate = false) {
     if (isPaused && !isImmediate) return;
 
     try {
-        const [stats, health, logs] = await Promise.all([
+        const [stats, health, logs, sys] = await Promise.all([
             fetch(`${API_URL}/stats`, { headers: getHeaders() }).then(r => r.json()),
             fetch(`${API_URL}/health`, { headers: getHeaders() }).then(r => r.json()),
-            fetch(`${API_URL}/logs`, { headers: getHeaders() }).then(r => r.json())
+            fetch(`${API_URL}/logs`, { headers: getHeaders() }).then(r => r.json()),
+            fetch(`${API_URL}/health/system`, { headers: getHeaders() }).then(r => r.json())
         ]);
 
         updateStats(stats);
         updateHealth(health);
+        updateSystem(sys);
         currentLogs = logs;
         renderLogs();
 
@@ -107,6 +109,22 @@ function updateHealth(h) {
     if (h.proxy === 'ok') { proxyText = 'Proxy: OK'; proxyClass = 'ok'; }
     else if (h.proxy === 'error') { proxyText = 'Proxy: ERR'; proxyClass = 'error'; }
     updateBadge('health-proxy', proxyText, proxyClass);
+}
+
+function updateSystem(sys) {
+    if (!sys) return;
+
+    // CPU
+    setText('sys-cpu-val', `${sys.cpu}%`);
+    document.getElementById('sys-cpu-bar').style.width = `${sys.cpu}%`;
+
+    // RAM
+    setText('sys-mem-val', `${sys.mem}%`);
+    document.getElementById('sys-mem-bar').style.width = `${sys.mem}%`;
+
+    // Info
+    setText('sys-uptime', sys.uptime);
+    setText('sys-platform', `${sys.platform} (${sys.arch})`);
 }
 
 function updatePopular(list) {

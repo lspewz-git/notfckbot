@@ -190,6 +190,35 @@ app.get('/api/health', async (req, res) => {
     res.json(health);
 });
 
+app.get('/api/health/system', requireAdminToken, (req, res) => {
+    const os = require('os');
+
+    // CPU Usage (approximate)
+    const cpus = os.cpus();
+    const load = os.loadavg();
+    const cpuUsage = Math.min(100, Math.round((load[0] / cpus.length) * 100));
+
+    // Memory
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const memUsage = Math.round((usedMem / totalMem) * 100);
+
+    // Uptime
+    const uptime = os.uptime();
+    const days = Math.floor(uptime / 86400);
+    const hours = Math.floor((uptime % 86400) / 3600);
+    const mins = Math.floor((uptime % 3600) / 60);
+
+    res.json({
+        cpu: cpuUsage,
+        mem: memUsage,
+        uptime: `${days}d ${hours}h ${mins}m`,
+        platform: os.platform(),
+        arch: os.arch()
+    });
+});
+
 app.get('/api/chats', async (req, res) => {
     try {
         const chats = await Chat.findAll({ include: [Series] });
