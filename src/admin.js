@@ -312,15 +312,27 @@ app.post('/api/watchlist', requireAdminToken, async (req, res) => {
 
         // Fetch movie details from TMDB
         const details = await tmdb.getDetails(tmdbId, 'movie');
+
+        let isReleased = false;
+        if (details.status === 'Released') {
+            isReleased = true;
+        } else if (details.release_date) {
+            const releaseDate = new Date(details.release_date);
+            if (!isNaN(releaseDate) && releaseDate <= new Date()) {
+                isReleased = true;
+            }
+        }
+
         const entry = await Watchlist.create({
             chatId,
             tmdb_id: String(tmdbId),
             title: details.title || details.original_title,
             poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
             year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
+            notified: isReleased // If already released, mark as notified so cron doesn't pick it up
         });
 
-        res.json({ success: true, entry });
+        res.json({ success: true, entry, isReleased });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

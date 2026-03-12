@@ -188,13 +188,13 @@ function renderListData(type, data) {
             const isBlocked = item.blockedUntil && new Date(item.blockedUntil) > new Date();
             let statusHtml = '<span class="badge ok">Active</span>';
             let actionsHtml = `
-                <select id="block-time-${item.id}" style="padding: 0.3rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+                <select id="block-time-${item.id}">
                     <option value="5">5 Minutes</option>
                     <option value="60">1 Hour</option>
                     <option value="1440">1 Day</option>
                     <option value="52560000">Forever</option>
                 </select>
-                <button class="danger action-btn" onclick="blockUser('${item.id}')" style="margin-left: 0.5rem;">Block</button>
+                <button class="danger action-btn" onclick="blockUser('${item.id}')">Block</button>
             `;
 
             if (isBlocked) {
@@ -211,9 +211,11 @@ function renderListData(type, data) {
                 <td>${item.type}</td>
                 <td>${statusHtml}</td>
                 <td>
-                    ${actionsHtml}
-                    <button class="primary action-btn" onclick="openAddSubModal('${item.id}')" style="margin-left: 0.5rem;">+ Sub</button>
-                    <button class="primary action-btn" onclick="openAddFilmModal('${item.id}')" style="margin-left: 0.5rem;">+ Film</button>
+                    <div class="chat-actions">
+                        ${actionsHtml}
+                        <button class="primary action-btn" onclick="openAddSubModal('${item.id}')">+ Sub</button>
+                        <button class="primary action-btn" onclick="openAddFilmModal('${item.id}')">+ Film</button>
+                    </div>
                 </td>
             `;
             listTableBody.appendChild(tr);
@@ -558,12 +560,16 @@ confirmAddFilmBtn.onclick = async () => {
         });
         const result = await res.json();
         if (result.success) {
-            alert('Film added to watchlist!');
+            if (result.isReleased) {
+                alert('⚠️ Фильм уже вышел!\n\nОн добавлен в список, но уведомление о выходе не придет, так как он уже доступен.');
+            } else {
+                alert('✅ Фильм успешно добавлен в список ожидания!');
+            }
             addFilmModal.style.display = 'none';
             fetchData();
             if (listModal.style.display === 'flex') openList('chats');
         } else {
-            alert('Error: ' + result.error);
+            alert('❌ Ошибка: ' + result.error);
         }
     } catch (err) {
         alert('Failed to add film');
