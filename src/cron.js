@@ -121,7 +121,11 @@ const checkWatchlistReleases = async (bot) => {
 
     for (const [tmdb_id, filmEntries] of Object.entries(byFilm)) {
         try {
-            const [mediaType, filmId] = tmdb_id.split('_');
+            let [mediaType, filmId] = tmdb_id.split('_');
+            if (!filmId) {
+                filmId = mediaType;
+                mediaType = 'movie'; // Watchlist currently only supports movies
+            }
             const data = await getDetails(filmId, mediaType);
             if (!data) continue;
 

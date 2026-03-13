@@ -385,9 +385,11 @@ app.post('/api/watchlist', requireAdminToken, async (req, res) => {
             }
         }
 
+        const fullTmdbId = String(tmdbId).startsWith('movie_') ? String(tmdbId) : `movie_${tmdbId}`;
+
         const entry = await Watchlist.create({
             chatId,
-            tmdb_id: String(tmdbId),
+            tmdb_id: fullTmdbId,
             title: details.title || details.original_title,
             poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
             year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,

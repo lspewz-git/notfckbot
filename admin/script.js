@@ -398,6 +398,73 @@ document.getElementById('confirm-add-film').onclick = async () => {
     }
 };
 
+// --- Subscription & Watchlist Management ---
+
+async function deleteSub(chatId, seriesId) {
+    if (!confirm('Are you sure you want to delete this subscription?')) return;
+    try {
+        const res = await fetch(`${API_URL}/subscription/${chatId}/${seriesId}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        }).then(r => r.json());
+
+        if (res.success) {
+            fetchData(true);
+        } else {
+            alert('Failed to delete: ' + (res.error || 'Unknown error'));
+        }
+    } catch (e) { alert('Request failed'); }
+}
+
+async function deleteWatchlistItem(id) {
+    if (!confirm('Are you sure you want to remove this from watchlist?')) return;
+    try {
+        const res = await fetch(`${API_URL}/watchlist/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        }).then(r => r.json());
+
+        if (res.success) {
+            fetchData(true);
+        } else {
+            alert('Failed to delete: ' + (res.error || 'Unknown error'));
+        }
+    } catch (e) { alert('Request failed'); }
+}
+
+async function blockUser(chatId) {
+    const mins = prompt('Block duration in minutes:', '5');
+    if (!mins) return;
+    try {
+        const res = await fetch(`${API_URL}/chat/${chatId}/block`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ minutes: mins })
+        }).then(r => r.json());
+
+        if (res.success) {
+            fetchData(true);
+        } else {
+            alert('Failed to block');
+        }
+    } catch (e) { alert('Request failed'); }
+}
+
+async function unblockUser(chatId) {
+    try {
+        const res = await fetch(`${API_URL}/chat/${chatId}/unblock`, {
+            method: 'POST',
+            headers: getHeaders()
+        }).then(r => r.json());
+
+        if (res.success) {
+            fetchData(true);
+        } else {
+            alert('Failed to unblock');
+        }
+    } catch (e) { alert('Request failed'); }
+}
+
 // --- Helpers ---
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 function updateBadge(id, text, type) {
