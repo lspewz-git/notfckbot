@@ -13,7 +13,7 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MARIADB_USER", "-p$$MARIADB_PASSWORD" ]
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u\"$$MARIADB_USER\" -p\"$$MARIADB_PASSWORD\" --silent" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,7 +36,7 @@ services:
       TMDB_PROXY_URL: ${TMDB_PROXY_URL}
       ADMIN_TOKEN: ${ADMIN_TOKEN}
     ports:
-      - "3005:3000"
+      - "80:3000"
     volumes:
       - .:/app
       - /app/node_modules

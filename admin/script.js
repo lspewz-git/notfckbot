@@ -3,16 +3,17 @@ const API_URL = '/api';
 // --- Global State ---
 let currentSection = 'dashboard';
 let refreshTimer = 10;
-let isPaused = false;
+let isPaused = true;
 let currentLogs = [];
 let logFilter = 'all';
 
 // --- Initialization ---
 async function init() {
-    fetchData();
+    fetchData(true); // Initial load runs even though auto-refresh starts paused
     startTimer();
     setupEventListeners();
     setupFilters();
+    updatePauseButton();
 }
 
 function getHeaders() {
@@ -254,10 +255,19 @@ function startTimer() {
     }, 1000);
 }
 
-document.getElementById('pause-refresh').onclick = (e) => {
+function updatePauseButton() {
+    const btn = document.getElementById('pause-refresh');
+    if (!btn) return;
+    btn.innerText = isPaused ? 'Resume' : 'Pause';
+    btn.classList.toggle('btn-primary', isPaused);
+    // Countdown is meaningless while paused
+    setText('refresh-timer', isPaused ? '—' : refreshTimer);
+}
+
+document.getElementById('pause-refresh').onclick = () => {
     isPaused = !isPaused;
-    e.target.innerText = isPaused ? 'Resume' : 'Pause';
-    e.target.classList.toggle('btn-primary', isPaused);
+    if (!isPaused) refreshTimer = 10;
+    updatePauseButton();
 };
 
 // --- API Actions ---
@@ -319,14 +329,55 @@ window.openAddFilmModal = (chatId) => {
     filmAddModal.style.display = 'flex';
 };
 
+window.openModal = (id) => document.getElementById(id).style.display = 'flex';
 window.closeModal = (id) => document.getElementById(id).style.display = 'none';
 
+// Generic confirmation dialog. The safe choice ("No") is the visually dominant one.
+function showConfirm({ title = 'Are you sure?', text, confirmLabel = 'Yes', cancelLabel = 'No, cancel', onConfirm }) {
+    setText('confirm-title', title);
+    setText('confirm-text', text);
+
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+    confirmBtn.innerText = confirmLabel;
+    cancelBtn.innerText = cancelLabel;
+
+    confirmBtn.onclick = async () => {
+        closeModal('confirm-modal');
+        await onConfirm();
+    };
+    cancelBtn.onclick = () => closeModal('confirm-modal');
+
+    openModal('confirm-modal');
+    cancelBtn.focus();
+}
+
 function setupEventListeners() {
-    document.getElementById('refresh-btn').onclick = () => fetchData(true);
+    document.getElementById('refresh-btn').onclick = async (e) => {
+        const btn = e.currentTarget;
+        btn.classList.add('spinning');
+        refreshTimer = 10;
+        try {
+            await fetchData(true);
+        } finally {
+            btn.classList.remove('spinning');
+        }
+    };
+
     document.getElementById('trigger-btn').onclick = async () => {
-        await fetch(`${API_URL}/trigger-check`, { method: 'POST' });
+        await fetch(`${API_URL}/trigger-check`, { method: 'POST', headers: getHeaders() });
         alert('Update check triggered!');
     };
+
+    document.getElementById('danger-btn').onclick = () => openModal('danger-modal');
+
+    document.getElementById('wipe-all-btn').onclick = () => showConfirm({
+        title: '⚠️ Wipe all data?',
+        text: 'This empties the entire database — all chats, subscriptions, series and watchlist entries. Every user will have to start over with /start. This cannot be undone.',
+        confirmLabel: 'Yes, wipe',
+        cancelLabel: 'No, keep my data',
+        onConfirm: wipeAllData
+    });
 
     // Series search logic
     document.getElementById('series-search-input').oninput = debounce(async (e) => {
@@ -397,6 +448,24 @@ document.getElementById('confirm-add-film').onclick = async () => {
         fetchData(true);
     }
 };
+
+async function wipeAllData() {
+    try {
+        const res = await fetch(`${API_URL}/clear-all`, {
+            method: 'POST',
+            headers: getHeaders()
+        }).then(r => r.json());
+
+        if (res.success) {
+            const d = res.deleted || {};
+            closeModal('danger-modal');
+            alert(`Wiped: ${d.chats ?? 0} chats, ${d.subscriptions ?? 0} subscriptions, ${d.watchlist ?? 0} watchlist entries, ${d.series ?? 0} series.`);
+            fetchData(true);
+        } else {
+            alert('Failed to wipe: ' + (res.error || 'Unknown error'));
+        }
+    } catch (e) { alert('Request failed'); }
+}
 
 // --- Subscription & Watchlist Management ---
 

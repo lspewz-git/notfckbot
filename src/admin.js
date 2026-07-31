@@ -480,9 +480,12 @@ app.post('/api/config', requireAdminToken, (req, res) => {
 
 app.post('/api/clear-all', requireAdminToken, async (req, res) => {
     try {
-        await Subscription.destroy({ where: {} });
-        await Series.destroy({ where: {} });
-        res.json({ success: true });
+        // Order matters: children before parents (Subscription -> Chat/Series, Watchlist -> Chat)
+        const subscriptions = await Subscription.destroy({ where: {} });
+        const watchlist = await Watchlist.destroy({ where: {} });
+        const series = await Series.destroy({ where: {} });
+        const chats = await Chat.destroy({ where: {} });
+        res.json({ success: true, deleted: { subscriptions, watchlist, series, chats } });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
