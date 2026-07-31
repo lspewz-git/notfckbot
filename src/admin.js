@@ -78,6 +78,35 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Chats whose name Telegram refused to give us (bot kicked, chat deleted...).
+// Remembered so the polling admin panel doesn't retry them on every refresh.
+const unresolvableChatNames = new Set();
+
+async function backfillChatNames(chats) {
+    const bot = app.get('bot');
+    if (!bot) return;
+
+    const pending = chats.filter(c =>
+        !c.username && c.type !== 'private' && !unresolvableChatNames.has(String(c.id))
+    );
+    if (!pending.length) return;
+
+    await Promise.all(pending.map(async (chat) => {
+        try {
+            const info = await bot.telegram.getChat(chat.id);
+            const name = info.title || (info.username ? `@${info.username}` : null);
+            if (name) {
+                await chat.update({ username: name });
+            } else {
+                unresolvableChatNames.add(String(chat.id));
+            }
+        } catch (err) {
+            unresolvableChatNames.add(String(chat.id));
+            console.error(`[Admin] Could not resolve name for chat ${chat.id}: ${err.message}`);
+        }
+    }));
+}
+
 app.get('/api/data/:type', async (req, res) => {
     try {
         const { type } = req.params;
@@ -96,6 +125,7 @@ app.get('/api/data/:type', async (req, res) => {
             data = await Chat.findAll({
                 order: [['createdAt', 'DESC']]
             });
+            await backfillChatNames(data);
         }
         res.json(data);
     } catch (err) {
@@ -230,15 +260,26 @@ app.get('/api/chats', async (req, res) => {
 
 // --- Write endpoints (auth required) ---
 
+const BROADCAST_TARGETS = {
+    all: {},
+    private: { type: 'private' },
+    groups: { type: ['group', 'supergroup', 'channel'] }
+};
+
 app.post('/api/broadcast', requireAdminToken, async (req, res) => {
-    const { message } = req.body;
+    const { message, target = 'all' } = req.body;
     if (!message || !message.trim()) {
         return res.status(400).json({ error: 'Message is required' });
     }
 
+    const where = BROADCAST_TARGETS[target];
+    if (!where) {
+        return res.status(400).json({ error: `Unknown target "${target}"` });
+    }
+
     const bot = app.get('bot');
     try {
-        const chats = await Chat.findAll();
+        const chats = await Chat.findAll({ where });
         let successCount = 0;
         let failCount = 0;
 
@@ -256,6 +297,7 @@ app.post('/api/broadcast', requireAdminToken, async (req, res) => {
             // FIX: Rate limit — Telegram allows ~30 messages/sec; 50ms keeps us safe
             await new Promise(r => setTimeout(r, 50));
         }
+        console.log(`[Admin] Broadcast to "${target}": ${successCount} delivered, ${failCount} failed.`);
         res.json({ success: true, successCount, failCount });
     } catch (err) {
         res.status(500).json({ error: err.message });

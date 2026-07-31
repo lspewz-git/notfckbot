@@ -132,10 +132,20 @@ bot.use(async (ctx, next) => {
 
         // Also ensure the actual group chat exists purely for settings like menu_enabled
         if (ctx.chat && ctx.chat.id !== userId) {
+            // Groups/channels have a title; public ones also have a @username
+            const chatTitle = ctx.chat.title
+                || (ctx.chat.username ? `@${ctx.chat.username}` : null);
+
             const [chatData] = await Chat.findOrCreate({
                 where: { id: ctx.chat.id },
-                defaults: { type: ctx.chat.type },
+                defaults: { type: ctx.chat.type, username: chatTitle },
             });
+
+            // Groups get renamed — keep the stored title fresh
+            if (chatTitle && chatData.username !== chatTitle) {
+                await chatData.update({ username: chatTitle });
+            }
+
             ctx.state.chatData = chatData;
         } else {
             ctx.state.chatData = userData; // In private chats, user == chat

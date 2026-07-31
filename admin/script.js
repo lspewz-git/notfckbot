@@ -6,6 +6,12 @@ let refreshTimer = 10;
 let isPaused = true;
 let currentLogs = [];
 let logFilter = 'all';
+let chatsById = new Map();
+let contentSearchResults = [];
+let addTargetChatId = null;
+let selectedContent = null;
+// Chat id to reopen the action menu for when a child modal is dismissed
+let modalReturnTo = null;
 
 // --- Initialization ---
 async function init() {
@@ -14,6 +20,7 @@ async function init() {
     setupEventListeners();
     setupFilters();
     updatePauseButton();
+    enhanceSelects();
 }
 
 function getHeaders() {
@@ -182,6 +189,10 @@ function renderTable(type, data) {
     const body = document.getElementById(bodyId);
     if (!body) return;
 
+    // Keep the raw records around — the action menu reads them by id instead of
+    // smuggling names through onclick attributes.
+    if (type === 'chats') chatsById = new Map(data.map(c => [String(c.id), c]));
+
     if (data.length === 0) {
         body.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-dim)">No records found.</td></tr>`;
         return;
@@ -194,16 +205,11 @@ function renderTable(type, data) {
             return `
                 <tr>
                     <td><code>${item.id}</code></td>
-                    <td>${item.username || 'Unknown'}</td>
+                    <td>${chatDisplayName(item)}</td>
                     <td><span style="font-size:0.7rem; text-transform:uppercase">${item.type}</span></td>
                     <td>${status}</td>
                     <td>
-                        <div class="chat-actions">
-                            <button class="btn btn-ghost" onclick="openDM('${item.id}', '${item.username || ''}')">✉️ Msg</button>
-                            <button class="btn btn-primary" onclick="openAddSubModal('${item.id}')">+ Sub</button>
-                            <button class="btn btn-primary" onclick="openAddFilmModal('${item.id}')">+ Film</button>
-                            ${isBlocked ? `<button class="btn btn-ghost" onclick="unblockUser('${item.id}')">Unblock</button>` : `<button class="btn btn-danger" onclick="blockUser('${item.id}')">Block</button>`}
-                        </div>
+                        <button class="btn btn-ghost" onclick="openChatActions('${item.id}')">Actions</button>
                     </td>
                 </tr>
             `;
@@ -211,7 +217,7 @@ function renderTable(type, data) {
         if (type === 'subs') {
             return `
                 <tr>
-                    <td>${item.Chat ? item.Chat.username : item.chatId}</td>
+                    <td>${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
                     <td style="cursor:pointer; color:var(--primary)" onclick="openSeriesDetails('${item.seriesId}')">${item.Series ? item.Series.title : 'Unknown'}</td>
                     <td><span class="badge ok">${item.notify_type}</span></td>
                     <td><button class="btn btn-danger" onclick="deleteSub('${item.chatId}', '${item.seriesId}')">Delete</button></td>
@@ -221,7 +227,7 @@ function renderTable(type, data) {
         if (type === 'films') {
             return `
                 <tr>
-                    <td>${item.Chat ? item.Chat.username : item.chatId}</td>
+                    <td>${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
                     <td>${item.title}</td>
                     <td>${item.year || 'N/A'}</td>
                     <td>${item.premiere_digital || 'Unknown'}</td>
@@ -272,23 +278,25 @@ document.getElementById('pause-refresh').onclick = () => {
 
 // --- API Actions ---
 async function openDM(id, name) {
-    document.getElementById('dm-target-info').innerText = `To: ${name || id}`;
-    document.getElementById('dm-modal').style.display = 'flex';
+    setText('dm-target-info', `To: ${name || id}`);
+    openModal('dm-modal');
     document.getElementById('confirm-dm').onclick = async () => {
         const msg = document.getElementById('dm-text').value.trim();
-        if (!msg) return alert('Enter message');
+        if (!msg) return toast('Enter a message first', 'warning');
         try {
             const res = await fetch(`${API_URL}/chat/${id}/message`, {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify({ message: msg })
             }).then(r => r.json());
-            if (res.success) {
-                alert('Message sent!');
-                closeModal('dm-modal');
-                document.getElementById('dm-text').value = '';
-            }
-        } catch (e) { alert('Failed to send'); }
+
+            if (!res.success) return toast('Failed to send: ' + (res.error || 'Unknown error'), 'error');
+
+            toast('Message sent', 'success');
+            modalReturnTo = null;
+            closeModal('dm-modal');
+            document.getElementById('dm-text').value = '';
+        } catch (e) { toast('Failed to send', 'error'); }
     };
 }
 
@@ -316,21 +324,164 @@ async function openSeriesDetails(tmdbId) {
 // --- Legacy & Core Logic ---
 // (Search, Sub, Film addition reused from previous implementation but adapted for new modals)
 
-const addSubModal = document.getElementById('add-sub-modal');
-const filmAddModal = document.getElementById('add-film-modal');
+function chatLabel(chat) {
+    if (chat.username) return chat.username;
+    return chat.type === 'private' ? 'Unknown user' : 'Unnamed group';
+}
 
-window.openAddSubModal = (chatId) => {
-    document.getElementById('add-sub-chat-id').innerText = chatId;
-    addSubModal.style.display = 'flex';
+function chatDisplayName(chat) {
+    const icon = chat.type === 'private' ? '👤' : (chat.type === 'channel' ? '📣' : '👥');
+    const label = escapeHtml(chatLabel(chat));
+    const dim = chat.username ? '' : ' style="color:var(--text-dim); font-style:italic"';
+    return `<span${dim}>${icon} ${label}</span>`;
+}
+
+// One button per row opens this menu instead of crowding the Actions column
+window.openChatActions = (chatId) => {
+    const chat = chatsById.get(String(chatId));
+    if (!chat) return;
+
+    const isBlocked = chat.blockedUntil && new Date(chat.blockedUntil) > new Date();
+    const label = chatLabel(chat);
+
+    setText('chat-actions-title', label);
+    setText('chat-actions-sub', `${chat.type} • ID ${chat.id}`);
+
+    document.getElementById('action-add').onclick = () => {
+        closeModal('chat-actions-modal');
+        modalReturnTo = chat.id;
+        openAddContentModal(chat.id, label);
+    };
+
+    document.getElementById('action-message').onclick = () => {
+        closeModal('chat-actions-modal');
+        modalReturnTo = chat.id;
+        openDM(chat.id, label);
+    };
+
+    const blockBtn = document.getElementById('action-block');
+    blockBtn.innerText = isBlocked ? '✅ Unblock' : '🚫 Block';
+    blockBtn.classList.toggle('action-row-danger', !isBlocked);
+    blockBtn.onclick = () => {
+        closeModal('chat-actions-modal');
+        if (isBlocked) {
+            unblockUser(chat.id);
+        } else {
+            modalReturnTo = chat.id;
+            blockUser(chat.id, label);
+        }
+    };
+
+    openModal('chat-actions-modal');
 };
 
-window.openAddFilmModal = (chatId) => {
-    document.getElementById('add-film-chat-id').innerText = chatId;
-    filmAddModal.style.display = 'flex';
+// --- Unified "add series or film" flow ---
+window.openAddContentModal = (chatId, label) => {
+    addTargetChatId = chatId;
+    selectedContent = null;
+    contentSearchResults = [];
+
+    setText('add-content-target', label || chatId);
+    document.getElementById('content-search-input').value = '';
+    document.getElementById('content-search-results').innerHTML = '';
+    document.getElementById('content-selected').style.display = 'none';
+
+    openModal('add-content-modal');
+    document.getElementById('content-search-input').focus();
+};
+
+function renderContentResults() {
+    const box = document.getElementById('content-search-results');
+    if (!contentSearchResults.length) {
+        box.innerHTML = '<p style="text-align:center; color:var(--text-dim)">Nothing found.</p>';
+        return;
+    }
+
+    box.innerHTML = contentSearchResults.map((item, idx) => {
+        const isTv = item.media_type === 'tv';
+        const title = isTv ? item.name : item.title;
+        const year = (isTv ? item.first_air_date : item.release_date)?.split('-')[0] || 'N/A';
+        const poster = item.poster_path
+            ? `<img src="https://image.tmdb.org/t/p/w92${item.poster_path}" style="width:40px; border-radius:4px;">`
+            : '<div class="poster-stub">?</div>';
+        return `
+            <div class="popular-item" onclick="selectContent(${idx})">
+                ${poster}
+                <span style="flex:1">${escapeHtml(title)} (${year})</span>
+                <span class="badge ${isTv ? 'ok' : ''}">${isTv ? '📺 Series' : '🎬 Movie'}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+window.selectContent = (idx) => {
+    const item = contentSearchResults[idx];
+    if (!item) return;
+
+    const isTv = item.media_type === 'tv';
+    selectedContent = { id: item.id, mediaType: item.media_type, title: isTv ? item.name : item.title };
+
+    setText('selected-content-title', selectedContent.title);
+    // Notification mode only makes sense for series
+    document.getElementById('notify-field').style.display = isTv ? 'block' : 'none';
+    document.getElementById('confirm-add-content').innerText = isTv ? 'Add Subscription' : 'Add to Watchlist';
+    document.getElementById('content-selected').style.display = 'block';
+};
+
+document.getElementById('confirm-add-content').onclick = async () => {
+    if (!selectedContent || !addTargetChatId) return;
+
+    const isTv = selectedContent.mediaType === 'tv';
+    const url = isTv ? `${API_URL}/subscription` : `${API_URL}/watchlist`;
+    const body = { chatId: addTargetChatId, tmdbId: selectedContent.id };
+    if (isTv) body.notify_type = document.getElementById('sub-notify-type').value;
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(body)
+        }).then(r => r.json());
+
+        if (!res.success) return toast('Failed: ' + (res.error || 'Unknown error'), 'error');
+
+        if (isTv) toast('Подписка добавлена', 'success');
+        else if (res.isReleased) toast('Фильм добавлен, но он уже вышел', 'warning');
+        else toast('Фильм добавлен в список ожидания', 'success');
+
+        modalReturnTo = null;
+        closeModal('add-content-modal');
+        fetchData(true);
+    } catch (e) { toast('Request failed', 'error'); }
 };
 
 window.openModal = (id) => document.getElementById(id).style.display = 'flex';
 window.closeModal = (id) => document.getElementById(id).style.display = 'none';
+
+// Dismissing a modal that was opened from the chat action menu goes back to it
+// instead of dropping the user all the way out.
+window.closeModalReturning = (id) => {
+    closeModal(id);
+    if (modalReturnTo === null) return;
+    const chatId = modalReturnTo;
+    modalReturnTo = null;
+    openChatActions(chatId);
+};
+
+function toast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.innerText = message;
+    container.appendChild(el);
+
+    setTimeout(() => {
+        el.classList.add('toast-out');
+        setTimeout(() => el.remove(), 300);
+    }, 3500);
+}
 
 // Generic confirmation dialog. The safe choice ("No") is the visually dominant one.
 function showConfirm({ title = 'Are you sure?', text, confirmLabel = 'Yes', cancelLabel = 'No, cancel', onConfirm }) {
@@ -366,8 +517,17 @@ function setupEventListeners() {
 
     document.getElementById('trigger-btn').onclick = async () => {
         await fetch(`${API_URL}/trigger-check`, { method: 'POST', headers: getHeaders() });
-        alert('Update check triggered!');
+        toast('Update check triggered', 'success');
     };
+
+    document.getElementById('broadcast-btn').onclick = () => {
+        document.getElementById('broadcast-msg').value = '';
+        setSelectValue('broadcast-target', 'all');
+        openModal('broadcast-modal');
+        document.getElementById('broadcast-msg').focus();
+    };
+
+    document.getElementById('send-broadcast').onclick = sendBroadcast;
 
     document.getElementById('danger-btn').onclick = () => openModal('danger-modal');
 
@@ -379,75 +539,60 @@ function setupEventListeners() {
         onConfirm: wipeAllData
     });
 
-    // Series search logic
-    document.getElementById('series-search-input').oninput = debounce(async (e) => {
+    // One search box covering both series and movies
+    document.getElementById('content-search-input').oninput = debounce(async (e) => {
         const q = e.target.value.trim();
         if (q.length < 2) return;
         const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() }).then(r => r.json());
-        const results = res.filter(r => r.media_type === 'tv');
-        document.getElementById('search-results').innerHTML = results.map(item => `
-            <div class="popular-item" onclick="selectSeries('${item.id}', '${item.name.replace(/'/g, "\\'")}')">
-                <img src="https://image.tmdb.org/t/p/w92${item.poster_path}" style="width:40px; border-radius:4px;">
-                <span>${item.name} (${item.first_air_date?.split('-')[0] || 'N/A'})</span>
-            </div>
-        `).join('');
-    }, 500);
-
-    // Film search logic
-    document.getElementById('film-search-input').oninput = debounce(async (e) => {
-        const q = e.target.value.trim();
-        if (q.length < 2) return;
-        const res = await fetch(`${API_URL}/tmdb/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() }).then(r => r.json());
-        const results = res.filter(r => r.media_type === 'movie');
-        document.getElementById('film-search-results').innerHTML = results.map(item => `
-            <div class="popular-item" onclick="selectMovie('${item.id}', '${item.title.replace(/'/g, "\\'")}')">
-                <img src="https://image.tmdb.org/t/p/w92${item.poster_path}" style="width:40px; border-radius:4px;">
-                <span>${item.title} (${item.release_date?.split('-')[0] || 'N/A'})</span>
-            </div>
-        `).join('');
+        contentSearchResults = res.filter(r => r.media_type === 'tv' || r.media_type === 'movie');
+        renderContentResults();
     }, 500);
 }
 
-window.selectSeries = (id, title) => {
-    window.currentTmdbId = id;
-    document.getElementById('selected-series-title').innerText = title;
-    document.getElementById('sub-options').style.display = 'block';
+const BROADCAST_AUDIENCE_LABELS = {
+    all: 'every private chat and group',
+    private: 'every private chat',
+    groups: 'every group and channel'
 };
 
-document.getElementById('confirm-add-sub').onclick = async () => {
-    const chatId = document.getElementById('add-sub-chat-id').innerText;
-    const res = await fetch(`${API_URL}/subscription`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-            chatId,
-            tmdbId: window.currentTmdbId,
-            notify_type: document.getElementById('sub-notify-type').value
-        })
-    }).then(r => r.json());
-    if (res.success) { alert('Subscribed!'); closeModal('add-sub-modal'); fetchData(true); }
-};
+function sendBroadcast() {
+    const message = document.getElementById('broadcast-msg').value.trim();
+    if (!message) return toast('Enter a message first', 'warning');
 
-window.selectMovie = (id, title) => {
-    window.currentMovieId = id;
-    document.getElementById('selected-film-title').innerText = title;
-    document.getElementById('film-selected-info').style.display = 'block';
-};
+    const target = document.getElementById('broadcast-target').value;
 
-document.getElementById('confirm-add-film').onclick = async () => {
-    const chatId = document.getElementById('add-film-chat-id').innerText;
-    const res = await fetch(`${API_URL}/watchlist`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ chatId, tmdbId: window.currentMovieId })
-    }).then(r => r.json());
-    if (res.success) {
-        if (res.isReleased) alert('⚠️ Фильм уже вышел!');
-        else alert('✅ Фильм успешно добавлен!');
-        closeModal('add-film-modal');
-        fetchData(true);
-    }
-};
+    showConfirm({
+        title: '📢 Send broadcast?',
+        text: `This sends the message to ${BROADCAST_AUDIENCE_LABELS[target]}. Delivery cannot be undone or recalled.`,
+        confirmLabel: 'Yes, send',
+        cancelLabel: 'No, cancel',
+        onConfirm: async () => {
+            const btn = document.getElementById('send-broadcast');
+            btn.disabled = true;
+            btn.innerText = 'Sending...';
+
+            try {
+                const res = await fetch(`${API_URL}/broadcast`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ message, target })
+                }).then(r => r.json());
+
+                if (!res.success) return toast('Broadcast failed: ' + (res.error || 'Unknown error'), 'error');
+
+                const failed = res.failCount ? `, ${res.failCount} failed` : '';
+                toast(`Delivered to ${res.successCount} chats${failed}`, res.failCount ? 'warning' : 'success');
+                closeModal('broadcast-modal');
+                document.getElementById('broadcast-msg').value = '';
+            } catch (e) {
+                toast('Request failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Send Broadcast';
+            }
+        }
+    });
+}
 
 async function wipeAllData() {
     try {
@@ -459,64 +604,89 @@ async function wipeAllData() {
         if (res.success) {
             const d = res.deleted || {};
             closeModal('danger-modal');
-            alert(`Wiped: ${d.chats ?? 0} chats, ${d.subscriptions ?? 0} subscriptions, ${d.watchlist ?? 0} watchlist entries, ${d.series ?? 0} series.`);
+            toast(`Wiped ${d.chats ?? 0} chats, ${d.subscriptions ?? 0} subscriptions, ${d.watchlist ?? 0} watchlist entries, ${d.series ?? 0} series.`, 'success');
             fetchData(true);
         } else {
-            alert('Failed to wipe: ' + (res.error || 'Unknown error'));
+            toast('Failed to wipe: ' + (res.error || 'Unknown error'), 'error');
         }
-    } catch (e) { alert('Request failed'); }
+    } catch (e) { toast('Request failed', 'error'); }
 }
 
 // --- Subscription & Watchlist Management ---
 
-async function deleteSub(chatId, seriesId) {
-    if (!confirm('Are you sure you want to delete this subscription?')) return;
-    try {
-        const res = await fetch(`${API_URL}/subscription/${chatId}/${seriesId}`, {
-            method: 'DELETE',
-            headers: getHeaders()
-        }).then(r => r.json());
+function deleteSub(chatId, seriesId) {
+    showConfirm({
+        title: 'Delete subscription?',
+        text: 'The user will stop receiving notifications for this series.',
+        confirmLabel: 'Yes, delete',
+        cancelLabel: 'No, keep it',
+        onConfirm: async () => {
+            try {
+                const res = await fetch(`${API_URL}/subscription/${chatId}/${seriesId}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                }).then(r => r.json());
 
-        if (res.success) {
-            fetchData(true);
-        } else {
-            alert('Failed to delete: ' + (res.error || 'Unknown error'));
+                if (!res.success) return toast('Failed to delete: ' + (res.error || 'Unknown error'), 'error');
+                toast('Subscription deleted', 'success');
+                fetchData(true);
+            } catch (e) { toast('Request failed', 'error'); }
         }
-    } catch (e) { alert('Request failed'); }
+    });
 }
 
-async function deleteWatchlistItem(id) {
-    if (!confirm('Are you sure you want to remove this from watchlist?')) return;
-    try {
-        const res = await fetch(`${API_URL}/watchlist/${id}`, {
-            method: 'DELETE',
-            headers: getHeaders()
-        }).then(r => r.json());
+function deleteWatchlistItem(id) {
+    showConfirm({
+        title: 'Remove from watchlist?',
+        text: 'The user will no longer be notified about this film\'s release.',
+        confirmLabel: 'Yes, remove',
+        cancelLabel: 'No, keep it',
+        onConfirm: async () => {
+            try {
+                const res = await fetch(`${API_URL}/watchlist/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                }).then(r => r.json());
 
-        if (res.success) {
-            fetchData(true);
-        } else {
-            alert('Failed to delete: ' + (res.error || 'Unknown error'));
+                if (!res.success) return toast('Failed to delete: ' + (res.error || 'Unknown error'), 'error');
+                toast('Removed from watchlist', 'success');
+                fetchData(true);
+            } catch (e) { toast('Request failed', 'error'); }
         }
-    } catch (e) { alert('Request failed'); }
+    });
 }
 
-async function blockUser(chatId) {
-    const mins = prompt('Block duration in minutes:', '5');
-    if (!mins) return;
-    try {
-        const res = await fetch(`${API_URL}/chat/${chatId}/block`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ minutes: mins })
-        }).then(r => r.json());
+function blockUser(chatId, label) {
+    const input = document.getElementById('block-minutes');
+    setText('block-target', label ? `${label} • ID ${chatId}` : `ID ${chatId}`);
+    input.value = '5';
 
-        if (res.success) {
+    const submit = async () => {
+        const minutes = parseInt(input.value, 10);
+        if (!minutes || minutes < 1) return toast('Enter a duration of at least 1 minute', 'warning');
+
+        modalReturnTo = null;
+        closeModal('block-modal');
+
+        try {
+            const res = await fetch(`${API_URL}/chat/${chatId}/block`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ minutes })
+            }).then(r => r.json());
+
+            if (!res.success) return toast('Failed to block', 'error');
+            toast(`Blocked for ${minutes} min`, 'success');
             fetchData(true);
-        } else {
-            alert('Failed to block');
-        }
-    } catch (e) { alert('Request failed'); }
+        } catch (e) { toast('Request failed', 'error'); }
+    };
+
+    document.getElementById('confirm-block').onclick = submit;
+    input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+
+    openModal('block-modal');
+    input.focus();
+    input.select();
 }
 
 async function unblockUser(chatId) {
@@ -526,16 +696,123 @@ async function unblockUser(chatId) {
             headers: getHeaders()
         }).then(r => r.json());
 
-        if (res.success) {
-            fetchData(true);
-        } else {
-            alert('Failed to unblock');
-        }
-    } catch (e) { alert('Request failed'); }
+        if (!res.success) return toast('Failed to unblock', 'error');
+        toast('Chat unblocked', 'success');
+        fetchData(true);
+    } catch (e) { toast('Request failed', 'error'); }
+}
+
+// --- Custom Dropdowns ---
+// The native <select> popup is rendered by the OS and ignores our CSS. The real
+// <select> stays in the DOM (hidden) so `el.value` keeps working everywhere;
+// a styled button + panel drive it.
+let openDropdown = null;
+
+function closeDropdown() {
+    if (!openDropdown) return;
+    openDropdown.panel.remove();
+    openDropdown.trigger.setAttribute('aria-expanded', 'false');
+    openDropdown = null;
+}
+
+function setSelectValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function enhanceSelect(select) {
+    const wrap = document.createElement('div');
+    wrap.className = 'custom-select';
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+
+    // Drop .select-field so a second pass won't wrap this element again
+    select.classList.remove('select-field');
+    select.classList.add('custom-select-native');
+    select.tabIndex = -1;
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'select-field custom-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    wrap.appendChild(trigger);
+
+    const syncLabel = () => {
+        const opt = select.options[select.selectedIndex];
+        trigger.innerText = opt ? opt.text : '';
+    };
+    syncLabel();
+    select.addEventListener('change', syncLabel);
+
+    const openPanel = () => {
+        const panel = document.createElement('div');
+        panel.className = 'custom-select-panel';
+        panel.setAttribute('role', 'listbox');
+        panel.onclick = (e) => e.stopPropagation();
+
+        Array.from(select.options).forEach((opt, idx) => {
+            const isSelected = idx === select.selectedIndex;
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = `custom-select-option${isSelected ? ' selected' : ''}`;
+            row.setAttribute('role', 'option');
+            row.setAttribute('aria-selected', String(isSelected));
+            row.innerHTML = `<span>${escapeHtml(opt.text)}</span>` +
+                (isSelected ? '<span class="custom-select-check">✓</span>' : '');
+            row.onclick = () => {
+                select.value = opt.value;
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                closeDropdown();
+                trigger.focus();
+            };
+            panel.appendChild(row);
+        });
+
+        document.body.appendChild(panel);
+
+        // Fixed positioning keeps the panel out of the modal's overflow clipping
+        const rect = trigger.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        panel.style.width = `${rect.width}px`;
+        panel.style.left = `${rect.left}px`;
+        panel.style.top = (spaceBelow < panel.offsetHeight + 12 && rect.top > spaceBelow)
+            ? `${rect.top - panel.offsetHeight - 6}px`
+            : `${rect.bottom + 6}px`;
+
+        trigger.setAttribute('aria-expanded', 'true');
+        openDropdown = { trigger, panel };
+
+        const first = panel.querySelector('.selected') || panel.firstChild;
+        if (first) first.focus();
+    };
+
+    trigger.onclick = (e) => {
+        e.stopPropagation();
+        const wasOpen = openDropdown && openDropdown.trigger === trigger;
+        closeDropdown();
+        if (!wasOpen) openPanel();
+    };
+}
+
+function enhanceSelects() {
+    document.querySelectorAll('select.select-field').forEach(enhanceSelect);
+
+    document.addEventListener('click', closeDropdown);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDropdown(); });
+    window.addEventListener('resize', closeDropdown);
+    window.addEventListener('scroll', closeDropdown, true);
 }
 
 // --- Helpers ---
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
 function updateBadge(id, text, type) {
     const el = document.getElementById(id);
     if (!el) return;
