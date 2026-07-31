@@ -348,7 +348,8 @@ app.post('/api/subscription', requireAdminToken, async (req, res) => {
                 title: details.name || details.original_name,
                 last_season: details.number_of_seasons || 0,
                 last_episode: 0,
-                poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null
+                poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
+                status: details.status || null
             });
         }
 

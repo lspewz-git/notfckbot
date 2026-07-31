@@ -26,6 +26,12 @@ const Series = sequelize.define('Series', {
     poster_url: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // TMDB production status: Returning Series / In Production / Planned /
+    // Pilot / Ended / Canceled. Null until the next update check fills it in.
+    status: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 });
 

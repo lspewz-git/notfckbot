@@ -7,6 +7,7 @@ let isPaused = true;
 let currentLogs = [];
 let logFilter = 'all';
 let chatsById = new Map();
+let subsByKey = new Map();
 let contentSearchResults = [];
 let addTargetChatId = null;
 let selectedContent = null;
@@ -31,18 +32,28 @@ function getHeaders() {
     };
 }
 
+const TABLE_FILTERS = [
+    { input: 'chats-filter', body: 'chats-body' },
+    { input: 'subs-filter', body: 'subs-body' },
+    { input: 'watchlist-filter', body: 'watchlist-body' }
+];
+
+function applyTableFilter(inputId, bodyId) {
+    const input = document.getElementById(inputId);
+    const body = document.getElementById(bodyId);
+    if (!input || !body) return;
+
+    const q = input.value.trim().toLowerCase();
+    body.querySelectorAll('tr').forEach(row => {
+        row.style.display = (!q || row.innerText.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+
 function setupFilters() {
-    const chatFilter = document.getElementById('chats-filter');
-    if (chatFilter) {
-        chatFilter.oninput = (e) => {
-            const q = e.target.value.toLowerCase();
-            const rows = document.querySelectorAll('#chats-body tr');
-            rows.forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(q) ? '' : 'none';
-            });
-        };
-    }
+    TABLE_FILTERS.forEach(({ input, body }) => {
+        const el = document.getElementById(input);
+        if (el) el.oninput = () => applyTableFilter(input, body);
+    });
 }
 
 // --- Navigation ---
@@ -192,6 +203,7 @@ function renderTable(type, data) {
     // Keep the raw records around — the action menu reads them by id instead of
     // smuggling names through onclick attributes.
     if (type === 'chats') chatsById = new Map(data.map(c => [String(c.id), c]));
+    if (type === 'subs') subsByKey = new Map(data.map(s => [subKey(s.chatId, s.seriesId), s]));
 
     if (data.length === 0) {
         body.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-dim)">No records found.</td></tr>`;
@@ -215,12 +227,19 @@ function renderTable(type, data) {
             `;
         }
         if (type === 'subs') {
+            const key = subKey(item.chatId, item.seriesId);
             return `
                 <tr>
                     <td>${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
-                    <td style="cursor:pointer; color:var(--primary)" onclick="openSeriesDetails('${item.seriesId}')">${item.Series ? item.Series.title : 'Unknown'}</td>
-                    <td><span class="badge ok">${item.notify_type}</span></td>
-                    <td><button class="btn btn-danger" onclick="deleteSub('${item.chatId}', '${item.seriesId}')">Delete</button></td>
+                    <td style="cursor:pointer; color:var(--primary)" onclick="openSeriesDetails('${item.seriesId}')">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</td>
+                    <td>${seriesStatusBadge(item.Series && item.Series.status)}</td>
+                    <td><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="btn btn-ghost" onclick="openModeModal('${key}')">Mode</button>
+                            <button class="btn btn-danger" onclick="deleteSub('${item.chatId}', '${item.seriesId}')">Delete</button>
+                        </div>
+                    </td>
                 </tr>
             `;
         }
@@ -237,15 +256,9 @@ function renderTable(type, data) {
         }
     }).join('');
 
-    // Re-apply filter if active
-    const q = document.getElementById('chats-filter')?.value.toLowerCase();
-    if (q && type === 'chats') {
-        const rows = body.querySelectorAll('tr');
-        rows.forEach(row => {
-            const text = row.innerText.toLowerCase();
-            row.style.display = text.includes(q) ? '' : 'none';
-        });
-    }
+    // The rows were just replaced — re-apply whatever filter is active
+    const filter = TABLE_FILTERS.find(f => f.body === bodyId);
+    if (filter) applyTableFilter(filter.input, filter.body);
 }
 
 // --- Smart Refresh Logic ---
@@ -323,6 +336,66 @@ async function openSeriesDetails(tmdbId) {
 
 // --- Legacy & Core Logic ---
 // (Search, Sub, Film addition reused from previous implementation but adapted for new modals)
+
+// TMDB reports one of: Returning Series / In Production / Planned / Pilot /
+// Ended / Canceled. There is no "paused" state in the API.
+const SERIES_STATUS = {
+    'Returning Series': { label: 'On Air', cls: 'ok' },
+    'In Production': { label: 'In Production', cls: 'warn' },
+    'Planned': { label: 'Planned', cls: 'warn' },
+    'Pilot': { label: 'Pilot', cls: 'warn' },
+    'Ended': { label: 'Ended', cls: 'muted' },
+    'Canceled': { label: 'Canceled', cls: 'error' }
+};
+
+const MODE_LABELS = {
+    episode: 'Every episode',
+    season: 'Whole season',
+    first_and_full: '1st + season'
+};
+
+function seriesStatusBadge(status) {
+    if (!status) {
+        return '<span class="badge muted" title="Filled in by the next update check">Unknown</span>';
+    }
+    const known = SERIES_STATUS[status];
+    if (!known) return `<span class="badge muted">${escapeHtml(status)}</span>`;
+    return `<span class="badge ${known.cls}" title="TMDB: ${escapeHtml(status)}">${known.label}</span>`;
+}
+
+const subKey = (chatId, seriesId) => `${chatId}|${seriesId}`;
+
+window.openModeModal = (key) => {
+    const sub = subsByKey.get(key);
+    if (!sub) return;
+
+    const title = sub.Series ? sub.Series.title : sub.seriesId;
+    const who = sub.Chat ? chatLabel(sub.Chat) : sub.chatId;
+    setText('mode-target', `${title} • ${who}`);
+    setSelectValue('mode-select', sub.notify_type);
+
+    document.getElementById('confirm-mode').onclick = async () => {
+        const notify_type = document.getElementById('mode-select').value;
+        if (notify_type === sub.notify_type) return closeModal('mode-modal');
+
+        try {
+            // POST /api/subscription updates notify_type on an existing row
+            const res = await fetch(`${API_URL}/subscription`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ chatId: sub.chatId, tmdbId: sub.seriesId, notify_type })
+            }).then(r => r.json());
+
+            if (!res.success) return toast('Failed to update: ' + (res.error || 'Unknown error'), 'error');
+
+            toast(`Mode set to "${MODE_LABELS[notify_type]}"`, 'success');
+            closeModal('mode-modal');
+            fetchData(true);
+        } catch (e) { toast('Request failed', 'error'); }
+    };
+
+    openModal('mode-modal');
+};
 
 function chatLabel(chat) {
     if (chat.username) return chat.username;

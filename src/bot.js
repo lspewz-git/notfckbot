@@ -599,6 +599,7 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
                 last_season: 0,
                 last_episode: 0,
                 poster_url: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
+                status: data.status || null,
             },
         });
 

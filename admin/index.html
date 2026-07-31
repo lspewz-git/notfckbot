@@ -175,12 +175,14 @@
                 </div>
             </section>
 
-            <!-- Settings (Merged into Dashboard or separate) -->
             <section id="watchlist-section" class="section">
                 <header>
                     <h1>Watchlist Films</h1>
                 </header>
                 <div class="glass-card">
+                    <div class="search-box">
+                        <input type="text" id="watchlist-filter" placeholder="Filter by user, film or year...">
+                    </div>
                     <table id="watchlist-table">
                         <thead>
                             <tr>
@@ -201,11 +203,15 @@
                     <h1>Active Subscriptions</h1>
                 </header>
                 <div class="glass-card">
+                    <div class="search-box">
+                        <input type="text" id="subs-filter" placeholder="Filter by user, series or mode...">
+                    </div>
                     <table id="subs-table">
                         <thead>
                             <tr>
                                 <th>User</th>
                                 <th>Series</th>
+                                <th>Status</th>
                                 <th>Mode</th>
                                 <th>Actions</th>
                             </tr>
@@ -344,8 +350,28 @@
             <h3 id="confirm-title">Are you sure?</h3>
             <p id="confirm-text" style="color: var(--text-dim); margin: 1rem 0 1.75rem;"></p>
             <div class="modal-actions" style="display: flex; gap: 1rem; align-items: center;">
-                <button id="modal-cancel-btn" class="btn btn-primary" style="flex: 2;">No, cancel</button>
                 <button id="modal-confirm-btn" class="btn btn-danger-quiet" style="flex: 1;">Yes</button>
+                <button id="modal-cancel-btn" class="btn btn-primary" style="flex: 2;">No, cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification mode editor -->
+    <div id="mode-modal" class="modal">
+        <div class="modal-content" style="max-width: 420px;">
+            <h3>Notification mode</h3>
+            <p id="mode-target" style="color: var(--text-dim); font-size: 0.85rem; margin-top: 0.35rem;"></p>
+            <div style="margin: 1.5rem 0;">
+                <label class="field-label" for="mode-select">Notify about</label>
+                <select id="mode-select" class="select-field">
+                    <option value="episode">Every new episode</option>
+                    <option value="season">Whole season</option>
+                    <option value="first_and_full">1st episode + whole season</option>
+                </select>
+            </div>
+            <div class="modal-actions" style="display: flex; gap: 1rem;">
+                <button id="confirm-mode" class="btn btn-primary" style="flex: 1;">Save</button>
+                <button onclick="closeModal('mode-modal')" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
     </div>

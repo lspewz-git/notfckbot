@@ -26,6 +26,13 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             const data = await getDetails(filmId, mediaType);
             if (!data) continue;
 
+            // Keep the production status fresh — the admin panel surfaces it.
+            // Done before the early return below so shows with no aired
+            // episodes still get a status.
+            if (data.status && data.status !== item.status) {
+                await item.update({ status: data.status });
+            }
+
             const lastE = data.last_episode_to_air;
             if (!lastE) continue; // No episodes aired yet
 

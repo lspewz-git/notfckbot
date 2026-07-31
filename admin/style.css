@@ -327,6 +327,21 @@ tr td:last-child {
     color: var(--danger);
 }
 
+.badge.warn {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+}
+
+.badge.muted {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-dim);
+}
+
+.row-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 /* Buttons */
 .btn {
     padding: 0.6rem 1.25rem;
