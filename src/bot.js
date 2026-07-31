@@ -2,9 +2,14 @@ const { Telegraf, Markup } = require('telegraf');
 const { searchMulti, getDetails, getSeasonDetails, getRandomMovie } = require('./api/tmdb');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { NOTIFY_LABELS, NOTIFY_LABELS_SHORT, NOTIFY_CYCLE, getWatchLink } = require('./constants');
+const { getProxyAgent } = require('./proxy');
 require('dotenv').config();
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+// Route Bot API traffic through the proxy too, not just TMDB. The agent is
+// swapped at runtime by the admin panel via applyProxyToBot().
+const bot = new Telegraf(process.env.BOT_TOKEN, {
+    telegram: { agent: getProxyAgent() }
+});
 
 // ============================================================
 // In-Memory State Management

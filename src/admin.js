@@ -3,15 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
-const { SocksProxyAgent } = require('socks-proxy-agent');
-const { HttpsProxyAgent } = require('https-proxy-agent');
-
-const _getProxyAgent = (url) => {
-    if (!url) return null;
-    if (url.startsWith('socks')) return new SocksProxyAgent(url, { rejectUnauthorized: false });
-    if (url.startsWith('http')) return new HttpsProxyAgent(url, { rejectUnauthorized: false });
-    return null;
-};
+const { buildProxyAgent, applyProxyToBot } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 const tmdb = require('./api/tmdb');
@@ -194,12 +186,12 @@ app.get('/api/health', async (req, res) => {
         axios.get('https://api.themoviedb.org/3/authentication', {
             headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
-            httpsAgent: _getProxyAgent(proxyUrl),
+            httpsAgent: buildProxyAgent(proxyUrl),
             proxy: false
         }),
         proxyUrl ? axios.get('https://google.com', {
             timeout: 5000,
-            httpsAgent: _getProxyAgent(proxyUrl),
+            httpsAgent: buildProxyAgent(proxyUrl),
             proxy: false
         }) : Promise.resolve({ status: 200 })
     ]);
@@ -218,35 +210,6 @@ app.get('/api/health', async (req, res) => {
     }
 
     res.json(health);
-});
-
-app.get('/api/health/system', requireAdminToken, (req, res) => {
-    const os = require('os');
-
-    // CPU Usage (approximate)
-    const cpus = os.cpus();
-    const load = os.loadavg();
-    const cpuUsage = Math.min(100, Math.round((load[0] / cpus.length) * 100));
-
-    // Memory
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = totalMem - freeMem;
-    const memUsage = Math.round((usedMem / totalMem) * 100);
-
-    // Uptime
-    const uptime = os.uptime();
-    const days = Math.floor(uptime / 86400);
-    const hours = Math.floor((uptime % 86400) / 3600);
-    const mins = Math.floor((uptime % 3600) / 60);
-
-    res.json({
-        cpu: cpuUsage,
-        mem: memUsage,
-        uptime: `${days}d ${hours}h ${mins}m`,
-        platform: os.platform(),
-        arch: os.arch()
-    });
 });
 
 app.get('/api/chats', async (req, res) => {
@@ -489,6 +452,9 @@ const updateEnvFile = (key, value) => {
     }
 };
 
+const PROXY_SCHEMES = ['http://', 'https://', 'socks://', 'socks4://', 'socks5://', 'socks5h://'];
+const isSupportedProxyUrl = (url) => !url || PROXY_SCHEMES.some(s => url.startsWith(s));
+
 app.get('/api/config', requireAdminToken, (req, res) => {
     res.json({
         tmdbApiKey: process.env.TMDB_API_KEY || '',
@@ -509,8 +475,15 @@ app.post('/api/config', requireAdminToken, (req, res) => {
 
     if (tmdbProxyUrl !== undefined) {
         const newProxy = tmdbProxyUrl.trim();
+        if (!isSupportedProxyUrl(newProxy)) {
+            return res.status(400).json({
+                error: 'Proxy URL must start with http://, https://, socks4://, socks5:// or socks5h://'
+            });
+        }
         process.env.TMDB_PROXY_URL = newProxy;
         updateEnvFile('TMDB_PROXY_URL', newProxy);
+        // TMDB picks the new agent up per request; Telegram holds onto one
+        applyProxyToBot(app.get('bot'));
     }
 
     console.log('[Admin] Configuration updated successfully.');
@@ -531,6 +504,31 @@ app.post('/api/clear-all', requireAdminToken, async (req, res) => {
         res.json({ success: true, deleted: { subscriptions, watchlist, series, chats } });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/config/test-proxy', requireAdminToken, async (req, res) => {
+    const url = (req.body.url || '').trim();
+
+    if (!isSupportedProxyUrl(url)) {
+        return res.json({ success: false, error: 'Unsupported scheme' });
+    }
+
+    const started = Date.now();
+    try {
+        await axios.get('https://api.themoviedb.org/3/authentication', {
+            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+            timeout: 10000,
+            httpsAgent: buildProxyAgent(url),
+            // Ignore any HTTP(S)_PROXY picked up from the environment
+            proxy: false
+        });
+        res.json({ success: true, ms: Date.now() - started, direct: !url });
+    } catch (err) {
+        const reason = err.response
+            ? `TMDB replied ${err.response.status}`
+            : (err.code || err.message);
+        res.json({ success: false, error: reason, ms: Date.now() - started });
     }
 });
 

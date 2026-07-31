@@ -11,7 +11,7 @@ let subsByKey = new Map();
 let contentSearchResults = [];
 let addTargetChatId = null;
 let selectedContent = null;
-// Chat id to reopen the action menu for when a child modal is dismissed
+// How to reopen the parent menu when a child modal is dismissed, or null
 let modalReturnTo = null;
 
 // --- Initialization ---
@@ -20,6 +20,7 @@ async function init() {
     startTimer();
     setupEventListeners();
     setupFilters();
+    setupProxyForm();
     updatePauseButton();
     enhanceSelects();
 }
@@ -79,16 +80,14 @@ async function fetchData(isImmediate = false) {
     if (isPaused && !isImmediate) return;
 
     try {
-        const [stats, health, logs, sys] = await Promise.all([
+        const [stats, health, logs] = await Promise.all([
             fetch(`${API_URL}/stats`, { headers: getHeaders() }).then(r => r.json()),
             fetch(`${API_URL}/health`, { headers: getHeaders() }).then(r => r.json()),
-            fetch(`${API_URL}/logs`, { headers: getHeaders() }).then(r => r.json()),
-            fetch(`${API_URL}/health/system`, { headers: getHeaders() }).then(r => r.json())
+            fetch(`${API_URL}/logs`, { headers: getHeaders() }).then(r => r.json())
         ]);
 
         updateStats(stats);
         updateHealth(health);
-        updateSystem(sys);
         currentLogs = logs;
         renderLogs();
 
@@ -128,22 +127,6 @@ function updateHealth(h) {
     if (h.proxy === 'ok') { proxyText = 'Proxy: OK'; proxyClass = 'ok'; }
     else if (h.proxy === 'error') { proxyText = 'Proxy: ERR'; proxyClass = 'error'; }
     updateBadge('health-proxy', proxyText, proxyClass);
-}
-
-function updateSystem(sys) {
-    if (!sys) return;
-
-    // CPU
-    setText('sys-cpu-val', `${sys.cpu}%`);
-    document.getElementById('sys-cpu-bar').style.width = `${sys.cpu}%`;
-
-    // RAM
-    setText('sys-mem-val', `${sys.mem}%`);
-    document.getElementById('sys-mem-bar').style.width = `${sys.mem}%`;
-
-    // Info
-    setText('sys-uptime', sys.uptime);
-    setText('sys-platform', `${sys.platform} (${sys.arch})`);
 }
 
 function updatePopular(list) {
@@ -420,15 +403,17 @@ window.openChatActions = (chatId) => {
     setText('chat-actions-title', label);
     setText('chat-actions-sub', `${chat.type} • ID ${chat.id}`);
 
+    const backToChat = () => openChatActions(chat.id);
+
     document.getElementById('action-add').onclick = () => {
         closeModal('chat-actions-modal');
-        modalReturnTo = chat.id;
+        modalReturnTo = backToChat;
         openAddContentModal(chat.id, label);
     };
 
     document.getElementById('action-message').onclick = () => {
         closeModal('chat-actions-modal');
-        modalReturnTo = chat.id;
+        modalReturnTo = backToChat;
         openDM(chat.id, label);
     };
 
@@ -440,7 +425,7 @@ window.openChatActions = (chatId) => {
         if (isBlocked) {
             unblockUser(chat.id);
         } else {
-            modalReturnTo = chat.id;
+            modalReturnTo = backToChat;
             blockUser(chat.id, label);
         }
     };
@@ -535,10 +520,9 @@ window.closeModal = (id) => document.getElementById(id).style.display = 'none';
 // instead of dropping the user all the way out.
 window.closeModalReturning = (id) => {
     closeModal(id);
-    if (modalReturnTo === null) return;
-    const chatId = modalReturnTo;
+    const back = modalReturnTo;
     modalReturnTo = null;
-    openChatActions(chatId);
+    if (back) back();
 };
 
 function toast(message, type = 'info') {
@@ -588,12 +572,17 @@ function setupEventListeners() {
         }
     };
 
+    document.getElementById('actions-btn').onclick = () => openModal('actions-modal');
+
     document.getElementById('trigger-btn').onclick = async () => {
+        closeModal('actions-modal');
         await fetch(`${API_URL}/trigger-check`, { method: 'POST', headers: getHeaders() });
         toast('Update check triggered', 'success');
     };
 
     document.getElementById('broadcast-btn').onclick = () => {
+        closeModal('actions-modal');
+        modalReturnTo = () => openModal('actions-modal');
         document.getElementById('broadcast-msg').value = '';
         setSelectValue('broadcast-target', 'all');
         openModal('broadcast-modal');
@@ -655,6 +644,7 @@ function sendBroadcast() {
 
                 const failed = res.failCount ? `, ${res.failCount} failed` : '';
                 toast(`Delivered to ${res.successCount} chats${failed}`, res.failCount ? 'warning' : 'success');
+                modalReturnTo = null;
                 closeModal('broadcast-modal');
                 document.getElementById('broadcast-msg').value = '';
             } catch (e) {
@@ -773,6 +763,126 @@ async function unblockUser(chatId) {
         toast('Chat unblocked', 'success');
         fetchData(true);
     } catch (e) { toast('Request failed', 'error'); }
+}
+
+// --- TMDB Proxy Settings ---
+// The stored value is a single URL; the form edits it as parts.
+function proxyUrlFromForm() {
+    const scheme = document.getElementById('proxy-scheme').value;
+    if (!scheme) return '';
+
+    const host = document.getElementById('proxy-host').value.trim();
+    const port = document.getElementById('proxy-port').value.trim();
+    if (!host || !port) return '';
+
+    const user = document.getElementById('proxy-user').value.trim();
+    const pass = document.getElementById('proxy-pass').value;
+    const auth = user
+        ? `${encodeURIComponent(user)}${pass ? ':' + encodeURIComponent(pass) : ''}@`
+        : '';
+
+    return `${scheme}://${auth}${host}:${port}`;
+}
+
+function syncProxyForm() {
+    const scheme = document.getElementById('proxy-scheme').value;
+    document.getElementById('proxy-fields').style.display = scheme ? 'block' : 'none';
+
+    const url = proxyUrlFromForm();
+    const preview = document.getElementById('proxy-preview');
+    // Never echo the password back into the UI
+    preview.innerText = url ? url.replace(/:([^:@/]+)@/, ':•••@') : '—';
+}
+
+function fillProxyForm(url) {
+    const set = (id, value) => { document.getElementById(id).value = value; };
+
+    if (!url) {
+        setSelectValue('proxy-scheme', '');
+        ['proxy-host', 'proxy-port', 'proxy-user', 'proxy-pass'].forEach(id => set(id, ''));
+        syncProxyForm();
+        return;
+    }
+
+    try {
+        const parsed = new URL(url);
+        setSelectValue('proxy-scheme', parsed.protocol.replace(':', ''));
+        set('proxy-host', parsed.hostname);
+        set('proxy-port', parsed.port);
+        set('proxy-user', decodeURIComponent(parsed.username || ''));
+        set('proxy-pass', decodeURIComponent(parsed.password || ''));
+    } catch (e) {
+        // Hand-edited .env value we can't parse — start from a clean form
+        toast('Stored proxy URL could not be parsed', 'warning');
+        setSelectValue('proxy-scheme', '');
+    }
+
+    syncProxyForm();
+}
+
+window.openProxyModal = async () => {
+    openModal('proxy-modal');
+    try {
+        const cfg = await fetch(`${API_URL}/config`, { headers: getHeaders() }).then(r => r.json());
+        fillProxyForm(cfg.tmdbProxyUrl || '');
+    } catch (e) {
+        toast('Could not load current proxy settings', 'error');
+    }
+};
+
+function setupProxyForm() {
+    ['proxy-host', 'proxy-port', 'proxy-user', 'proxy-pass'].forEach(id => {
+        document.getElementById(id).addEventListener('input', syncProxyForm);
+    });
+    document.getElementById('proxy-scheme').addEventListener('change', syncProxyForm);
+
+    document.getElementById('proxy-test').onclick = async (e) => {
+        const scheme = document.getElementById('proxy-scheme').value;
+        const url = proxyUrlFromForm();
+        if (scheme && !url) return toast('Fill in host and port first', 'warning');
+
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.innerText = 'Testing...';
+        try {
+            const res = await fetch(`${API_URL}/config/test-proxy`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ url })
+            }).then(r => r.json());
+
+            if (res.success) {
+                toast(`${res.direct ? 'Direct connection' : 'Proxy'} reached TMDB in ${res.ms} ms`, 'success');
+            } else {
+                toast(`Failed: ${res.error}`, 'error');
+            }
+        } catch (err) {
+            toast('Test request failed', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Test';
+        }
+    };
+
+    document.getElementById('proxy-save').onclick = async () => {
+        const scheme = document.getElementById('proxy-scheme').value;
+        const url = proxyUrlFromForm();
+        if (scheme && !url) return toast('Fill in host and port first', 'warning');
+
+        try {
+            const res = await fetch(`${API_URL}/config`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ tmdbProxyUrl: url })
+            }).then(r => r.json());
+
+            if (!res.success) return toast('Failed to save: ' + (res.error || 'Unknown error'), 'error');
+
+            toast(url ? 'Proxy enabled' : 'Proxy disabled — connecting directly', 'success');
+            closeModal('proxy-modal');
+            fetchData(true);
+        } catch (e) { toast('Request failed', 'error'); }
+    };
 }
 
 // --- Custom Dropdowns ---

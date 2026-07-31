@@ -1,36 +1,8 @@
 const axios = require('axios');
-const { SocksProxyAgent } = require('socks-proxy-agent');
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const { getProxyAgent } = require('../proxy');
 require('dotenv').config();
 
 const BASE_URL = 'https://api.themoviedb.org/3';
-
-let cachedProxyAgent = null;
-let currentProxyUrl = null;
-
-const getProxyAgent = () => {
-    const proxyUrl = process.env.TMDB_PROXY_URL;
-    if (!proxyUrl) {
-        cachedProxyAgent = null;
-        currentProxyUrl = null;
-        return null;
-    }
-
-    // Reuse agent if URL hasn't changed to avoid ECONNRESET/socket leaks
-    if (proxyUrl === currentProxyUrl && cachedProxyAgent) {
-        return cachedProxyAgent;
-    }
-
-    currentProxyUrl = proxyUrl;
-    if (proxyUrl.startsWith('socks')) {
-        cachedProxyAgent = new SocksProxyAgent(proxyUrl, { rejectUnauthorized: false });
-    } else if (proxyUrl.startsWith('http')) {
-        cachedProxyAgent = new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false });
-    } else {
-        cachedProxyAgent = null;
-    }
-    return cachedProxyAgent;
-};
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
