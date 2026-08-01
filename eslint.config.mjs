@@ -93,6 +93,18 @@ export default [
     },
 
     {
+        // Playwright specs. They run on Node, but page.evaluate() callbacks
+        // are executed in the browser, so both sets of globals are legitimate.
+        files: ['tests/**/*.js'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'commonjs',
+            globals: { ...NODE_GLOBALS, ...BROWSER_GLOBALS }
+        },
+        rules: RULES
+    },
+
+    {
         // Admin panel
         files: ['admin/js/**/*.js'],
         languageOptions: {

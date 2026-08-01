@@ -10,6 +10,9 @@ import { $field, escapeHtml } from './dom.js';
 
 let openDropdown = null;
 
+/** @returns {boolean} Whether a dropdown panel is currently open. */
+export const isDropdownOpen = () => openDropdown !== null;
+
 export function closeDropdown() {
     if (!openDropdown) return;
     openDropdown.panel.remove();

@@ -4,8 +4,8 @@ import { $, $field, all, closest, setText, debounce, target } from './dom.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters } from './tables.js';
 import { filterLogs } from './logs.js';
-import { openModal, closeModal, closeModalReturning } from './ui.js';
-import { enhanceSelects, closeDropdown } from './select.js';
+import { openModal, closeModal, closeModalReturning, topmostModal } from './ui.js';
+import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openChatActions, searchContent, selectContent, submitAddContent } from './chats.js';
 import { openSeriesDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
@@ -106,6 +106,16 @@ function setupDelegation() {
         if (closeReturn) closeModalReturning(closeReturn);
         if (logFilter) filterLogs(logFilter);
     });
+
+    // Delegated targets are often <li> or <td>, which the browser will not
+    // activate from the keyboard on its own
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const el = closest(e, DELEGATED);
+        if (!el || !el.hasAttribute('tabindex')) return;
+        e.preventDefault();
+        el.click();
+    });
 }
 
 function setupControls() {
@@ -149,10 +159,15 @@ function init() {
     updatePauseButton();
     startTimer();
 
-    // One Escape handler for every dismissible layer
+    // One Escape handler for every dismissible layer, innermost first
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        closeDropdown();
+        if (isDropdownOpen()) return closeDropdown();
+
+        // Same as pressing Cancel, so a child dialog returns to its menu
+        const modal = topmostModal();
+        if (modal) return closeModalReturning(modal.id);
+
         if (closeNav) closeNav();
     });
 

@@ -34,7 +34,6 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-bot_password}
       TMDB_API_KEY: ${TMDB_API_KEY}
       TMDB_PROXY_URL: ${TMDB_PROXY_URL}
-      ADMIN_TOKEN: ${ADMIN_TOKEN}
     ports:
       - "80:3000"
     volumes:

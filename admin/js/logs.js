@@ -1,6 +1,6 @@
 /** The activity log viewer. */
 
-import { $, all } from './dom.js';
+import { $, all, escapeHtml } from './dom.js';
 import { isUnchanged } from './render.js';
 
 const FILTERS = {
@@ -32,9 +32,9 @@ export function renderLogs() {
         .map(
             (l) => `
         <div class="log-entry ${l.type}">
-            <span class="log-time">${l.time}</span>
-            <span class="type-tag">${l.type}</span>
-            <span class="log-text">${l.text}</span>
+            <span class="log-time">${escapeHtml(l.time)}</span>
+            <span class="type-tag">${escapeHtml(l.type)}</span>
+            <span class="log-text">${escapeHtml(l.text)}</span>
         </div>
     `
         )

@@ -2,14 +2,6 @@
 
 const API_URL = '/api';
 
-/** @returns {Record<string, string>} */
-function getHeaders() {
-    return {
-        'Content-Type': 'application/json',
-        'X-Admin-Token': localStorage.getItem('adminToken') || ''
-    };
-}
-
 /**
  * Throws on a non-2xx status or an { error } body, so callers only ever deal
  * with the success shape and can report `err.message` as-is.
@@ -23,7 +15,7 @@ export async function api(path, options = {}) {
 
     const res = await fetch(`${API_URL}${path}`, {
         method,
-        headers: getHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body)
     });
 

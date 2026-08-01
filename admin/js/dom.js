@@ -45,8 +45,7 @@ export const closest = (event, selector) =>
  * @param {ParentNode} [root]
  * @returns {HTMLElement[]}
  */
-export const all = (selector, root = document) =>
-    /** @type {HTMLElement[]} */ ([...root.querySelectorAll(selector)]);
+export const all = (selector, root = document) => /** @type {HTMLElement[]} */ ([...root.querySelectorAll(selector)]);
 
 /**
  * @param {string} id

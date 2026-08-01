@@ -35,19 +35,6 @@ function startLogCapture() {
     };
 }
 
-// --- Auth Middleware for destructive/sensitive endpoints ---
-function requireAdminToken(req, res, next) {
-    const adminToken = process.env.ADMIN_TOKEN;
-    // If no token is configured, skip auth (backward compat for local dev)
-    if (!adminToken || adminToken === 'change_me_to_a_strong_secret') return next();
-
-    const provided = req.headers['x-admin-token'];
-    if (!provided || provided !== adminToken) {
-        return res.status(401).json({ error: 'Unauthorized: missing or invalid X-Admin-Token header.' });
-    }
-    return next();
-}
-
 app.use(cors());
 app.use(express.json());
 
@@ -163,7 +150,7 @@ app.get('/api/logs', (req, res) => {
     res.json(logBuffer);
 });
 
-app.get('/api/tmdb/search', requireAdminToken, async (req, res) => {
+app.get('/api/tmdb/search', async (req, res) => {
     try {
         const { q } = req.query;
         if (!q) return res.status(400).json({ error: 'Query is required' });
@@ -233,7 +220,7 @@ const BROADCAST_TARGETS = {
     groups: { type: ['group', 'supergroup', 'channel'] }
 };
 
-app.post('/api/broadcast', requireAdminToken, async (req, res) => {
+app.post('/api/broadcast', async (req, res) => {
     const { message, target = 'all' } = req.body;
     if (!message || !message.trim()) {
         return res.status(400).json({ error: 'Message is required' });
@@ -267,7 +254,7 @@ app.post('/api/broadcast', requireAdminToken, async (req, res) => {
     }
 });
 
-app.post('/api/trigger-check', requireAdminToken, async (req, res) => {
+app.post('/api/trigger-check', async (req, res) => {
     const bot = app.get('bot');
     try {
         checkUpdates(bot); // Run in background, don't await
@@ -277,7 +264,7 @@ app.post('/api/trigger-check', requireAdminToken, async (req, res) => {
     }
 });
 
-app.delete('/api/subscription/:chatId/:seriesId', requireAdminToken, async (req, res) => {
+app.delete('/api/subscription/:chatId/:seriesId', async (req, res) => {
     const { chatId, seriesId } = req.params;
     try {
         await Subscription.destroy({ where: { chatId, seriesId } });
@@ -287,7 +274,7 @@ app.delete('/api/subscription/:chatId/:seriesId', requireAdminToken, async (req,
     }
 });
 
-app.post('/api/subscription', requireAdminToken, async (req, res) => {
+app.post('/api/subscription', async (req, res) => {
     const { chatId, tmdbId, notify_type } = req.body;
     if (!chatId || !tmdbId) {
         return res.status(400).json({ error: 'chatId and tmdbId are required' });
@@ -332,7 +319,7 @@ app.post('/api/subscription', requireAdminToken, async (req, res) => {
     }
 });
 
-app.post('/api/chat/:chatId/block', requireAdminToken, async (req, res) => {
+app.post('/api/chat/:chatId/block', async (req, res) => {
     const { chatId } = req.params;
     const { minutes } = req.body;
     try {
@@ -349,7 +336,7 @@ app.post('/api/chat/:chatId/block', requireAdminToken, async (req, res) => {
     }
 });
 
-app.post('/api/chat/:chatId/unblock', requireAdminToken, async (req, res) => {
+app.post('/api/chat/:chatId/unblock', async (req, res) => {
     const { chatId } = req.params;
     try {
         const chat = await Chat.findByPk(chatId);
@@ -364,7 +351,7 @@ app.post('/api/chat/:chatId/unblock', requireAdminToken, async (req, res) => {
 
 // --- Watchlist (Films) Management ---
 
-app.post('/api/watchlist', requireAdminToken, async (req, res) => {
+app.post('/api/watchlist', async (req, res) => {
     const { chatId, tmdbId } = req.body;
     if (!chatId || !tmdbId) {
         return res.status(400).json({ error: 'chatId and tmdbId are required' });
@@ -408,7 +395,7 @@ app.post('/api/watchlist', requireAdminToken, async (req, res) => {
     }
 });
 
-app.post('/api/chat/:chatId/message', requireAdminToken, async (req, res) => {
+app.post('/api/chat/:chatId/message', async (req, res) => {
     const { chatId } = req.params;
     const { message } = req.body;
     if (!message || !message.trim()) return res.status(400).json({ error: 'Message is required' });
@@ -425,7 +412,7 @@ app.post('/api/chat/:chatId/message', requireAdminToken, async (req, res) => {
     }
 });
 
-app.delete('/api/watchlist/:id', requireAdminToken, async (req, res) => {
+app.delete('/api/watchlist/:id', async (req, res) => {
     const { id } = req.params;
     try {
         await Watchlist.destroy({ where: { id } });
@@ -455,16 +442,15 @@ const updateEnvFile = (key, value) => {
 const PROXY_SCHEMES = ['http://', 'https://', 'socks://', 'socks4://', 'socks5://', 'socks5h://'];
 const isSupportedProxyUrl = (url) => !url || PROXY_SCHEMES.some((s) => url.startsWith(s));
 
-app.get('/api/config', requireAdminToken, (req, res) => {
+app.get('/api/config', (req, res) => {
     res.json({
         tmdbApiKey: process.env.TMDB_API_KEY || '',
-        tmdbProxyUrl: process.env.TMDB_PROXY_URL || '',
-        adminToken: process.env.ADMIN_TOKEN || ''
+        tmdbProxyUrl: process.env.TMDB_PROXY_URL || ''
     });
 });
 
 // Update configuration at runtime and persist to .env
-app.post('/api/config', requireAdminToken, (req, res) => {
+app.post('/api/config', (req, res) => {
     const { tmdbApiKey, tmdbProxyUrl } = req.body;
 
     if (tmdbApiKey && tmdbApiKey.trim()) {
@@ -494,7 +480,7 @@ app.post('/api/config', requireAdminToken, (req, res) => {
     });
 });
 
-app.post('/api/clear-all', requireAdminToken, async (req, res) => {
+app.post('/api/clear-all', async (req, res) => {
     try {
         // Order matters: children before parents (Subscription -> Chat/Series, Watchlist -> Chat)
         const subscriptions = await Subscription.destroy({ where: {} });
@@ -507,7 +493,7 @@ app.post('/api/clear-all', requireAdminToken, async (req, res) => {
     }
 });
 
-app.post('/api/config/test-proxy', requireAdminToken, async (req, res) => {
+app.post('/api/config/test-proxy', async (req, res) => {
     const url = (req.body.url || '').trim();
 
     if (!isSupportedProxyUrl(url)) {
