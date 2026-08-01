@@ -8,6 +8,8 @@ let currentLogs = [];
 let logFilter = 'all';
 let chatsById = new Map();
 let subsByKey = new Map();
+// Tables that have received a response at least once
+const loadedTables = new Set();
 let contentSearchResults = [];
 let addTargetChatId = null;
 let selectedContent = null;
@@ -104,9 +106,22 @@ function switchSection(id) {
     fetchData(true); // Immediate fetch on switch
 }
 
+// Which /api/data/:type each section needs, if any
+const SECTION_TABLES = {
+    chats: 'chats',
+    subs: 'subs',
+    watchlist: 'films'
+};
+
 // --- Data Fetching ---
 async function fetchData(isImmediate = false) {
     if (isPaused && !isImmediate) return;
+
+    // Start the active section's table first, and outside the await below.
+    // Its skeleton paints in this same tick, and the request no longer queues
+    // behind /api/health, which spends up to 5s probing Telegram and TMDB.
+    const sectionTable = SECTION_TABLES[currentSection];
+    if (sectionTable) fetchTypedData(sectionTable);
 
     try {
         const [stats, health, logs] = await Promise.all([
@@ -120,11 +135,6 @@ async function fetchData(isImmediate = false) {
         currentLogs = logs;
         renderLogs();
 
-        // Conditional data based on active section
-        if (currentSection === 'chats') fetchTypedData('chats');
-        if (currentSection === 'subs') fetchTypedData('subs');
-        if (currentSection === 'watchlist') fetchTypedData('films');
-
         // Fetch popular separately since it was just added
         fetch(`${API_URL}/stats/popular`, { headers: getHeaders() }).then(r => r.json()).then(updatePopular);
 
@@ -134,10 +144,19 @@ async function fetchData(isImmediate = false) {
 }
 
 async function fetchTypedData(type) {
+    // Only on the first load of this table: the 10s poll would otherwise
+    // replace real rows with a shimmer every time it fires.
+    if (!loadedTables.has(type)) renderSkeleton(type);
+
     try {
         const data = await fetch(`${API_URL}/data/${type}`, { headers: getHeaders() }).then(r => r.json());
+        loadedTables.add(type);
         renderTable(type, data);
-    } catch (err) { console.error(`Error loading ${type}:`, err); }
+    } catch (err) {
+        console.error(`Error loading ${type}:`, err);
+        // Leave a dead end rather than an animation that never stops
+        if (!loadedTables.has(type)) renderTableMessage(type, 'Failed to load. Retrying on the next refresh.');
+    }
 }
 
 // --- UI Updates ---
@@ -207,8 +226,44 @@ function filterLogs(type) {
 }
 
 // --- Table Rendering ---
+const tableBodyId = (type) => (type === 'films' ? 'watchlist-body' : `${type}-body`);
+
+// Column labels per table — also what data-label uses for the mobile cards
+const TABLE_COLUMNS = {
+    chats: ['Chat ID', 'User / Group', 'Type', 'Status', 'Actions'],
+    subs: ['User', 'Series', 'Status', 'Mode', 'Actions'],
+    films: ['User', 'Film Title', 'Year', 'Release', 'Actions']
+};
+
+// Uneven widths read as content rather than as a progress bar
+const SKELETON_WIDTHS = ['55%', '80%', '45%', '60%'];
+
+function renderTableMessage(type, message) {
+    const body = document.getElementById(tableBodyId(type));
+    if (!body) return;
+    const cols = (TABLE_COLUMNS[type] || []).length || 5;
+    body.innerHTML = `<tr><td colspan="${cols}" style="text-align:center; color:var(--text-dim)">${escapeHtml(message)}</td></tr>`;
+}
+
+function renderSkeleton(type, rows = 4) {
+    const body = document.getElementById(tableBodyId(type));
+    const labels = TABLE_COLUMNS[type];
+    if (!body || !labels) return;
+
+    body.innerHTML = Array.from({ length: rows }, () => `
+        <tr class="skeleton-row" aria-hidden="true">
+            ${labels.map((label, i) => {
+                const isActions = i === labels.length - 1;
+                const cls = isActions ? 'skeleton skeleton-btn' : 'skeleton';
+                const width = isActions ? '100%' : SKELETON_WIDTHS[i % SKELETON_WIDTHS.length];
+                return `<td data-label="${label}"><span class="${cls}" style="width:${width}"></span></td>`;
+            }).join('')}
+        </tr>
+    `).join('');
+}
+
 function renderTable(type, data) {
-    const bodyId = type === 'films' ? 'watchlist-body' : `${type}-body`;
+    const bodyId = tableBodyId(type);
     const body = document.getElementById(bodyId);
     if (!body) return;
 
