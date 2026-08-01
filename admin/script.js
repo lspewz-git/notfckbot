@@ -20,6 +20,7 @@ async function init() {
     startTimer();
     setupEventListeners();
     setupFilters();
+    setupNav();
     setupProxyForm();
     updatePauseButton();
     enhanceSelects();
@@ -54,6 +55,34 @@ function setupFilters() {
     TABLE_FILTERS.forEach(({ input, body }) => {
         const el = document.getElementById(input);
         if (el) el.oninput = () => applyTableFilter(input, body);
+    });
+}
+
+// --- Off-canvas navigation (narrow screens) ---
+function setupNav() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggle = document.getElementById('nav-toggle');
+    const backdrop = document.getElementById('nav-backdrop');
+    if (!sidebar || !toggle || !backdrop) return;
+
+    const setOpen = (open) => {
+        sidebar.classList.toggle('open', open);
+        backdrop.classList.toggle('open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+    };
+
+    toggle.onclick = () => setOpen(!sidebar.classList.contains('open'));
+    backdrop.onclick = () => setOpen(false);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+
+    // Picking a section or an action should get the drawer out of the way
+    sidebar.querySelectorAll('.nav-item, .btn').forEach(el =>
+        el.addEventListener('click', () => setOpen(false))
+    );
+
+    // Back on a wide screen the sidebar is permanent again
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 1024) setOpen(false);
     });
 }
 
@@ -199,11 +228,11 @@ function renderTable(type, data) {
             const status = isBlocked ? `<span class="badge error">Blocked</span>` : `<span class="badge ok">Active</span>`;
             return `
                 <tr>
-                    <td><code>${item.id}</code></td>
-                    <td>${chatDisplayName(item)}</td>
-                    <td><span style="font-size:0.7rem; text-transform:uppercase">${item.type}</span></td>
-                    <td>${status}</td>
-                    <td>
+                    <td data-label="Chat ID"><code>${item.id}</code></td>
+                    <td data-label="User / Group">${chatDisplayName(item)}</td>
+                    <td data-label="Type"><span style="font-size:0.7rem; text-transform:uppercase">${item.type}</span></td>
+                    <td data-label="Status">${status}</td>
+                    <td data-label="Actions">
                         <button class="btn btn-ghost" onclick="openChatActions('${item.id}')">Actions</button>
                     </td>
                 </tr>
@@ -213,11 +242,11 @@ function renderTable(type, data) {
             const key = subKey(item.chatId, item.seriesId);
             return `
                 <tr>
-                    <td>${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
-                    <td style="cursor:pointer; color:var(--primary)" onclick="openSeriesDetails('${item.seriesId}')">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</td>
-                    <td>${seriesStatusBadge(item.Series && item.Series.status)}</td>
-                    <td><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>
-                    <td>
+                    <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
+                    <td data-label="Series" style="cursor:pointer; color:var(--primary)" onclick="openSeriesDetails('${item.seriesId}')">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</td>
+                    <td data-label="Status">${seriesStatusBadge(item.Series && item.Series.status)}</td>
+                    <td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>
+                    <td data-label="Actions">
                         <div class="row-actions">
                             <button class="btn btn-ghost" onclick="openModeModal('${key}')">Mode</button>
                             <button class="btn btn-danger" onclick="deleteSub('${item.chatId}', '${item.seriesId}')">Delete</button>
@@ -229,11 +258,11 @@ function renderTable(type, data) {
         if (type === 'films') {
             return `
                 <tr>
-                    <td>${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
-                    <td>${item.title}</td>
-                    <td>${item.year || 'N/A'}</td>
-                    <td>${item.premiere_digital || 'Unknown'}</td>
-                    <td><button class="btn btn-danger" onclick="deleteWatchlistItem('${item.id}')">Delete</button></td>
+                    <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
+                    <td data-label="Film Title">${escapeHtml(item.title)}</td>
+                    <td data-label="Year">${item.year || 'N/A'}</td>
+                    <td data-label="Release">${item.premiere_digital || 'Unknown'}</td>
+                    <td data-label="Actions"><button class="btn btn-danger" onclick="deleteWatchlistItem('${item.id}')">Delete</button></td>
                 </tr>
             `;
         }

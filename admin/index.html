@@ -14,6 +14,10 @@
 </head>
 
 <body>
+    <!-- Shown only on narrow screens; toggles the off-canvas sidebar -->
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+    <div id="nav-backdrop" class="nav-backdrop"></div>
+
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -27,8 +31,7 @@
                 <li class="nav-item" onclick="switchSection('watchlist')">🎞 Watchlist</li>
                 <li class="nav-item" onclick="switchSection('logs')">📜 Activity Logs</li>
             </nav>
-            <div
-                style="margin-top: auto; padding-top: 2rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="sidebar-footer">
                 <button id="actions-btn" class="btn btn-ghost" style="width: 100%;">⚡️ Actions</button>
                 <button id="danger-btn" class="btn btn-danger" style="width: 100%;">☠️ Danger Zone</button>
             </div>
@@ -104,18 +107,20 @@
                     <div class="search-box">
                         <input type="text" id="chats-filter" placeholder="Filter by ID or Username...">
                     </div>
-                    <table id="chats-table">
-                        <thead>
-                            <tr>
-                                <th>Chat ID</th>
-                                <th>User / Group</th>
-                                <th>Type</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="chats-body"></tbody>
-                    </table>
+                    <div class="table-wrap">
+                        <table id="chats-table">
+                            <thead>
+                                <tr>
+                                    <th>Chat ID</th>
+                                    <th>User / Group</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="chats-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -142,18 +147,20 @@
                     <div class="search-box">
                         <input type="text" id="watchlist-filter" placeholder="Filter by user, film or year...">
                     </div>
-                    <table id="watchlist-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Film Title</th>
-                                <th>Year</th>
-                                <th>Release</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="watchlist-body"></tbody>
-                    </table>
+                    <div class="table-wrap">
+                        <table id="watchlist-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Film Title</th>
+                                    <th>Year</th>
+                                    <th>Release</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="watchlist-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -165,18 +172,20 @@
                     <div class="search-box">
                         <input type="text" id="subs-filter" placeholder="Filter by user, series or mode...">
                     </div>
-                    <table id="subs-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Series</th>
-                                <th>Status</th>
-                                <th>Mode</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="subs-body"></tbody>
-                    </table>
+                    <div class="table-wrap">
+                        <table id="subs-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Series</th>
+                                    <th>Status</th>
+                                    <th>Mode</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subs-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
         </main>
@@ -285,7 +294,7 @@
             </div>
 
             <div id="proxy-fields">
-                <div style="display: flex; gap: 1rem;">
+                <div class="field-row">
                     <div style="flex: 2;">
                         <label class="field-label" for="proxy-host">Host</label>
                         <input type="text" id="proxy-host" class="input-field" placeholder="127.0.0.1"
@@ -297,7 +306,7 @@
                             max="65535">
                     </div>
                 </div>
-                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <div class="field-row" style="margin-top: 1rem;">
                     <div style="flex: 1;">
                         <label class="field-label" for="proxy-user">Username (optional)</label>
                         <input type="text" id="proxy-user" class="input-field" autocomplete="off">
