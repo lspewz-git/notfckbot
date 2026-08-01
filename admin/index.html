@@ -25,15 +25,15 @@
                 🎬 NotFck<span>Bot</span>
             </div>
             <nav class="nav-links">
-                <li class="nav-item active" onclick="switchSection('dashboard')">📊 Dashboard</li>
-                <li class="nav-item" onclick="switchSection('chats')">👤 Users / Chats</li>
-                <li class="nav-item" onclick="switchSection('subs')">📺 Subscriptions</li>
-                <li class="nav-item" onclick="switchSection('watchlist')">🎞 Watchlist</li>
-                <li class="nav-item" onclick="switchSection('logs')">📜 Activity Logs</li>
+                <li class="nav-item active" data-section="dashboard">📊 Dashboard</li>
+                <li class="nav-item" data-section="chats">👤 Users / Chats</li>
+                <li class="nav-item" data-section="subs">📺 Subscriptions</li>
+                <li class="nav-item" data-section="watchlist">🎞 Watchlist</li>
+                <li class="nav-item" data-section="logs">📜 Activity Logs</li>
             </nav>
             <div class="sidebar-footer">
-                <button id="actions-btn" class="btn btn-ghost" style="width: 100%;">⚡️ Actions</button>
-                <button id="danger-btn" class="btn btn-danger" style="width: 100%;">☠️ Danger Zone</button>
+                <button id="actions-btn" class="btn btn-ghost btn-block">⚡️ Actions</button>
+                <button id="danger-btn" class="btn btn-danger btn-block">☠️ Danger Zone</button>
             </div>
         </aside>
 
@@ -64,21 +64,21 @@
                             <div id="health-tg" class="badge">TG: ...</div>
                             <div id="health-tmdb" class="badge">TMDB: ...</div>
                             <div id="health-proxy" class="badge" style="cursor: pointer;"
-                                title="Configure the TMDB proxy" onclick="openProxyModal()">Proxy: ...</div>
+                                title="Configure the TMDB proxy" data-action="proxy">Proxy: ...</div>
                         </div>
                     </div>
                 </header>
 
                 <div class="stats-grid">
-                    <div class="stat-card" onclick="switchSection('chats')">
+                    <div class="stat-card" data-section="chats">
                         <span class="stat-title">Total Chats</span>
                         <span id="chats-count" class="stat-value">-</span>
                     </div>
-                    <div class="stat-card" onclick="switchSection('subs')">
+                    <div class="stat-card" data-section="subs">
                         <span class="stat-title">Active Subs</span>
                         <span id="subs-count" class="stat-value">-</span>
                     </div>
-                    <div class="stat-card" onclick="switchSection('watchlist')">
+                    <div class="stat-card" data-section="watchlist">
                         <span class="stat-title">Watchlist</span>
                         <span id="films-count" class="stat-value">-</span>
                     </div>
@@ -92,7 +92,7 @@
                             series by your users.</p>
                         <div id="popular-list">
                             <!-- Injected via script -->
-                            <p style="text-align: center; color: var(--text-dim);">Loading popularity stats...</p>
+                            <p class="empty-cell">Loading popularity stats...</p>
                         </div>
                     </div>
                 </div>
@@ -128,10 +128,10 @@
             <section id="logs-section" class="section">
                 <header>
                     <h1>Activity Logs</h1>
-                    <div class="log-filters" style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-ghost active" onclick="filterLogs('all')">All</button>
-                        <button class="btn btn-ghost" onclick="filterLogs('error')">Errors</button>
-                        <button class="btn btn-ghost" onclick="filterLogs('success')">Success</button>
+                    <div class="log-filters">
+                        <button class="btn btn-ghost active" data-log-filter="all">All</button>
+                        <button class="btn btn-ghost" data-log-filter="error">Errors</button>
+                        <button class="btn btn-ghost" data-log-filter="success">Success</button>
                     </div>
                 </header>
                 <div class="glass-card">
@@ -197,23 +197,23 @@
         <div class="modal-content">
             <h3>Direct Message</h3>
             <p id="dm-target-info">To: @username</p>
-            <textarea id="dm-text"
-                style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 1rem; color: white; padding: 1rem; margin-bottom: 1rem;"></textarea>
-            <div class="modal-actions" style="display: flex; gap: 1rem;">
-                <button id="confirm-dm" class="btn btn-primary" style="flex: 1;">Send Message</button>
-                <button onclick="closeModalReturning('dm-modal')" class="btn btn-ghost">Cancel</button>
+            <textarea class="textarea-field" id="dm-text"
+               ></textarea>
+            <div class="modal-actions">
+                <button id="confirm-dm" class="btn btn-primary btn-grow">Send Message</button>
+                <button data-close-return="dm-modal" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Series Detail Modal -->
     <div id="detail-modal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content modal-wide">
             <div id="detail-loading">Loading details...</div>
             <div id="detail-ready" style="display: none;">
                 <div style="display: flex; gap: 2rem;">
                     <img id="detail-poster" src="" style="width: 200px; border-radius: 1rem;">
-                    <div style="flex: 1;">
+                    <div class="btn-grow">
                         <h2 id="detail-title">Series Title</h2>
                         <div id="detail-meta" style="margin: 0.5rem 0; color: var(--primary);">S01E01 • ⭐️ 8.9</div>
                         <p id="detail-desc"
@@ -221,24 +221,24 @@
                         <div class="badge ok" id="detail-subs-count">12 Subscribers</div>
                     </div>
                 </div>
-                <button onclick="closeModal('detail-modal')" class="btn btn-ghost"
-                    style="margin-top: 2rem; width: 100%;">Close</button>
+                <button data-close="detail-modal" class="btn btn-ghost btn-block mt-xl"
+                   >Close</button>
             </div>
         </div>
     </div>
 
     <!-- Per-chat action menu (replaces the row of buttons in the chats table) -->
     <div id="chat-actions-modal" class="modal">
-        <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-content modal-narrow">
             <h3 id="chat-actions-title">Manage chat</h3>
-            <p id="chat-actions-sub" style="color: var(--text-dim); font-size: 0.85rem; margin-top: 0.35rem;"></p>
+            <p class="modal-sub" id="chat-actions-sub"></p>
             <div class="action-list">
                 <button id="action-add" class="btn btn-ghost action-row">➕ Add series or film</button>
                 <button id="action-message" class="btn btn-ghost action-row">✉️ Send message</button>
                 <button id="action-block" class="btn btn-ghost action-row">🚫 Block</button>
             </div>
-            <button onclick="closeModal('chat-actions-modal')" class="btn btn-ghost"
-                style="margin-top: 1.5rem; width: 100%;">Close</button>
+            <button data-close="chat-actions-modal" class="btn btn-ghost btn-block mt-lg"
+               >Close</button>
         </div>
     </div>
 
@@ -246,7 +246,7 @@
     <div id="add-content-modal" class="modal">
         <div class="modal-content">
             <h3>Add for <span id="add-content-target"></span></h3>
-            <div class="search-box" style="margin-top: 1rem;">
+            <div class="search-box mt-md">
                 <input type="text" id="content-search-input" placeholder="Search series or movies...">
             </div>
             <div id="content-search-results" class="search-results"
@@ -254,7 +254,7 @@
             <div id="content-selected"
                 style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 1rem;">
                 <h4 id="selected-content-title"></h4>
-                <div id="notify-field" style="margin: 1.25rem 0;">
+                <div class="field-block" id="notify-field">
                     <label class="field-label" for="sub-notify-type">Notification mode</label>
                     <select id="sub-notify-type" class="select-field">
                         <option value="episode">New Episodes</option>
@@ -262,16 +262,16 @@
                         <option value="first_and_full">1x1 + Whole Seasons</option>
                     </select>
                 </div>
-                <button id="confirm-add-content" class="btn btn-primary" style="width: 100%;">Add</button>
+                <button id="confirm-add-content" class="btn btn-primary btn-block">Add</button>
             </div>
-            <button onclick="closeModalReturning('add-content-modal')" class="btn btn-ghost"
-                style="margin-top: 1rem; width: 100%;">Cancel</button>
+            <button data-close-return="add-content-modal" class="btn btn-ghost btn-block mt-md"
+               >Cancel</button>
         </div>
     </div>
 
     <!-- TMDB proxy settings -->
     <div id="proxy-modal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content modal-medium">
             <h3>🌐 TMDB Proxy</h3>
             <div class="proxy-note">
                 <p><strong>Covers</strong> everything the bot sends out — TMDB and the Telegram Bot API. Applied
@@ -282,7 +282,7 @@
                     (<code>npm</code>, <code>apt</code>) — those never leave this container.</p>
             </div>
 
-            <div style="margin: 1.5rem 0;">
+            <div class="field-block">
                 <label class="field-label" for="proxy-scheme">Mode</label>
                 <select id="proxy-scheme" class="select-field">
                     <option value="">Off — connect directly</option>
@@ -295,23 +295,23 @@
 
             <div id="proxy-fields">
                 <div class="field-row">
-                    <div style="flex: 2;">
+                    <div class="btn-grow-2">
                         <label class="field-label" for="proxy-host">Host</label>
                         <input type="text" id="proxy-host" class="input-field" placeholder="127.0.0.1"
                             autocomplete="off">
                     </div>
-                    <div style="flex: 1;">
+                    <div class="btn-grow">
                         <label class="field-label" for="proxy-port">Port</label>
                         <input type="number" id="proxy-port" class="input-field" placeholder="1080" min="1"
                             max="65535">
                     </div>
                 </div>
-                <div class="field-row" style="margin-top: 1rem;">
-                    <div style="flex: 1;">
+                <div class="field-row mt-md">
+                    <div class="btn-grow">
                         <label class="field-label" for="proxy-user">Username (optional)</label>
                         <input type="text" id="proxy-user" class="input-field" autocomplete="off">
                     </div>
-                    <div style="flex: 1;">
+                    <div class="btn-grow">
                         <label class="field-label" for="proxy-pass">Password (optional)</label>
                         <input type="password" id="proxy-pass" class="input-field" autocomplete="new-password">
                     </div>
@@ -322,26 +322,26 @@
                 </div>
             </div>
 
-            <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <div class="modal-actions mt-lg">
                 <button id="proxy-test" class="btn btn-ghost">Test</button>
-                <button id="proxy-save" class="btn btn-primary" style="flex: 1;">Save</button>
-                <button onclick="closeModal('proxy-modal')" class="btn btn-ghost">Cancel</button>
+                <button id="proxy-save" class="btn btn-primary btn-grow">Save</button>
+                <button data-close="proxy-modal" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Actions menu -->
     <div id="actions-modal" class="modal">
-        <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-content modal-narrow">
             <h3>⚡️ Actions</h3>
-            <p style="color: var(--text-dim); font-size: 0.85rem; margin-top: 0.35rem;">Manual operations you can run
+            <p class="modal-sub">Manual operations you can run
                 on demand.</p>
             <div class="action-list">
                 <button id="trigger-btn" class="btn btn-ghost action-row">🔍 Trigger Update Check</button>
                 <button id="broadcast-btn" class="btn btn-ghost action-row">📢 Broadcast Message</button>
             </div>
-            <button onclick="closeModal('actions-modal')" class="btn btn-ghost"
-                style="margin-top: 1.5rem; width: 100%;">Close</button>
+            <button data-close="actions-modal" class="btn btn-ghost btn-block mt-lg"
+               >Close</button>
         </div>
     </div>
 
@@ -351,7 +351,7 @@
             <h3>📢 Global Broadcast</h3>
             <p style="color: var(--text-dim); margin-bottom: 1.5rem;">The message is delivered to every chat in the
                 selected audience, prefixed with <code>📣 ОБЪЯВЛЕНИЕ:</code></p>
-            <div style="margin-bottom: 1.25rem;">
+            <div class="field-block-tight">
                 <label class="field-label" for="broadcast-target">Audience</label>
                 <select id="broadcast-target" class="select-field">
                     <option value="all">Everyone (private chats + groups)</option>
@@ -360,18 +360,18 @@
                 </select>
             </div>
             <label class="field-label" for="broadcast-msg">Message</label>
-            <textarea id="broadcast-msg"
-                style="width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 1rem; color: white; padding: 1rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.85rem;"></textarea>
-            <div class="modal-actions" style="display: flex; gap: 1rem;">
-                <button id="send-broadcast" class="btn btn-primary" style="flex: 1;">Send Broadcast</button>
-                <button onclick="closeModalReturning('broadcast-modal')" class="btn btn-ghost">Cancel</button>
+            <textarea class="textarea-field" id="broadcast-msg"
+               ></textarea>
+            <div class="modal-actions">
+                <button id="send-broadcast" class="btn btn-primary btn-grow">Send Broadcast</button>
+                <button data-close-return="broadcast-modal" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Danger Zone Modal -->
     <div id="danger-modal" class="modal">
-        <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-content modal-medium">
             <h3>☠️ Danger Zone</h3>
             <p style="color: var(--text-dim); margin-top: 0.5rem;">Irreversible operations. Every action here asks for
                 confirmation first.</p>
@@ -383,29 +383,29 @@
                 </div>
                 <button id="wipe-all-btn" class="btn btn-danger">Wipe</button>
             </div>
-            <button onclick="closeModal('danger-modal')" class="btn btn-ghost"
-                style="margin-top: 1.5rem; width: 100%;">Close</button>
+            <button data-close="danger-modal" class="btn btn-ghost btn-block mt-lg"
+               >Close</button>
         </div>
     </div>
 
     <!-- Confirmation Modal -->
     <div id="confirm-modal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-content modal-medium">
             <h3 id="confirm-title">Are you sure?</h3>
             <p id="confirm-text" style="color: var(--text-dim); margin: 1rem 0 1.75rem;"></p>
-            <div class="modal-actions" style="display: flex; gap: 1rem; align-items: center;">
-                <button id="modal-confirm-btn" class="btn btn-danger-quiet" style="flex: 1;">Yes</button>
-                <button id="modal-cancel-btn" class="btn btn-primary" style="flex: 2;">No, cancel</button>
+            <div class="modal-actions">
+                <button id="modal-confirm-btn" class="btn btn-danger-quiet btn-grow">Yes</button>
+                <button id="modal-cancel-btn" class="btn btn-primary btn-grow-2">No, cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Notification mode editor -->
     <div id="mode-modal" class="modal">
-        <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-content modal-narrow">
             <h3>Notification mode</h3>
-            <p id="mode-target" style="color: var(--text-dim); font-size: 0.85rem; margin-top: 0.35rem;"></p>
-            <div style="margin: 1.5rem 0;">
+            <p class="modal-sub" id="mode-target"></p>
+            <div class="field-block">
                 <label class="field-label" for="mode-select">Notify about</label>
                 <select id="mode-select" class="select-field">
                     <option value="episode">Every new episode</option>
@@ -413,25 +413,25 @@
                     <option value="first_and_full">1st episode + whole season</option>
                 </select>
             </div>
-            <div class="modal-actions" style="display: flex; gap: 1rem;">
-                <button id="confirm-mode" class="btn btn-primary" style="flex: 1;">Save</button>
-                <button onclick="closeModal('mode-modal')" class="btn btn-ghost">Cancel</button>
+            <div class="modal-actions">
+                <button id="confirm-mode" class="btn btn-primary btn-grow">Save</button>
+                <button data-close="mode-modal" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Block duration (replaces window.prompt) -->
     <div id="block-modal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-content modal-narrow">
             <h3>🚫 Block chat</h3>
-            <p id="block-target" style="color: var(--text-dim); font-size: 0.85rem; margin-top: 0.35rem;"></p>
-            <div style="margin: 1.5rem 0;">
+            <p class="modal-sub" id="block-target"></p>
+            <div class="field-block">
                 <label class="field-label" for="block-minutes">Duration (minutes)</label>
                 <input type="number" id="block-minutes" class="input-field" min="1" value="5">
             </div>
-            <div class="modal-actions" style="display: flex; gap: 1rem;">
-                <button id="confirm-block" class="btn btn-danger" style="flex: 1;">Block</button>
-                <button onclick="closeModalReturning('block-modal')" class="btn btn-ghost">Cancel</button>
+            <div class="modal-actions">
+                <button id="confirm-block" class="btn btn-danger btn-grow">Block</button>
+                <button data-close-return="block-modal" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
     </div>
@@ -439,7 +439,7 @@
     <!-- Toasts (replace window.alert) -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="script.js"></script>
+    <script type="module" src="js/app.js"></script>
 </body>
 
 </html>

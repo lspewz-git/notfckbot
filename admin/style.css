@@ -876,13 +876,158 @@ select:focus {
    ============================================================ */
 
 /* Laptops — reclaim horizontal padding */
+/* Tablets and below — sidebar becomes an off-canvas drawer */
+/* Phones — stack the header, shrink the chrome */
+/* Below this width a 5-column table cannot be read by scrolling, so each row
+   becomes a labelled card. Labels come from the td's data-label attribute, so
+   there is still only one render path in JS. */
+/* Short viewports — the drawer has to fit logo + 5 items + 2 buttons */
+/* Skeleton loading — shown while a table's first request is in flight */
+.skeleton {
+    display: block;
+    height: 0.9rem;
+    border-radius: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.04);
+    background-image: linear-gradient(90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.09) 50%,
+            rgba(255, 255, 255, 0) 100%);
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+.skeleton-btn {
+    height: 2.1rem;
+    border-radius: 0.75rem;
+}
+
+/* Stagger the rows so the sweep reads as one surface, not four separate bars */
+.skeleton-row:nth-child(2) .skeleton {
+    animation-delay: 0.1s;
+}
+
+.skeleton-row:nth-child(3) .skeleton {
+    animation-delay: 0.2s;
+}
+
+.skeleton-row:nth-child(4) .skeleton {
+    animation-delay: 0.3s;
+}
+
+@keyframes skeleton-sweep {
+    from {
+        background-position: 150% 0;
+    }
+
+    to {
+        background-position: -50% 0;
+    }
+}
+
+/* Table cell that opens a detail view */
+.link-cell {
+    cursor: pointer;
+    color: var(--primary);
+}
+
+/* ============================================================
+   Utilities extracted from inline styles
+   ============================================================ */
+
+.modal-narrow { max-width: 420px; }
+.modal-medium { max-width: 500px; }
+.modal-wide { max-width: 800px; }
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.modal-sub {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 0.35rem;
+}
+
+.log-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-grow { flex: 1; }
+.btn-grow-2 { flex: 2; }
+.btn-block { width: 100%; }
+
+.mt-md { margin-top: 1rem; }
+.mt-lg { margin-top: 1.5rem; }
+.mt-xl { margin-top: 2rem; }
+
+.field-block { margin: 1.5rem 0; }
+.field-block-tight { margin-bottom: 1.25rem; }
+
+.textarea-field {
+    width: 100%;
+    height: 120px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 1rem;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+/* Empty and placeholder states */
+.empty-cell,
+.empty-note {
+    text-align: center;
+    color: var(--text-dim);
+}
+
+/* Pieces of generated markup */
+.chat-type {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+}
+
+.log-time {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+
+.popular-body { flex: 1; }
+.popular-title { font-weight: 600; }
+
+.popular-sub {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.popular-chevron {
+    font-size: 1.2rem;
+    color: var(--primary);
+}
+
+.result-poster {
+    width: 40px;
+    border-radius: 4px;
+}
+
+.result-title { flex: 1; }
+
+/* ============================================================
+   Responsive — widest breakpoint first
+   ============================================================ */
+
 @media (max-width: 1280px) {
     .main-content {
         padding: 2rem;
     }
 }
 
-/* Tablets and below — sidebar becomes an off-canvas drawer */
 @media (max-width: 1024px) {
     .nav-toggle {
         display: flex;
@@ -915,7 +1060,25 @@ select:focus {
     }
 }
 
-/* Phones — stack the header, shrink the chrome */
+@media (max-width: 1024px) and (max-height: 820px) {
+    .sidebar-logo {
+        font-size: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .nav-links {
+        gap: 0.25rem;
+    }
+
+    .nav-item {
+        padding: 0.6rem 1rem;
+    }
+
+    .sidebar-footer {
+        margin-top: 1.25rem;
+    }
+}
+
 @media (max-width: 768px) {
     header {
         flex-direction: column;
@@ -962,76 +1125,6 @@ select:focus {
     }
 }
 
-@media (max-width: 640px) {
-    .main-content {
-        padding: 4.5rem 1rem 1.5rem;
-    }
-
-    .modal {
-        padding: 1rem;
-    }
-
-    .modal-content {
-        width: 100%;
-        max-height: 88vh;
-        max-height: 88svh;
-        padding: 1.5rem;
-        border-radius: 1.25rem;
-    }
-
-    /* Full-width toasts read better than a narrow column on a phone */
-    .toast-container {
-        left: 1rem;
-        right: 1rem;
-        bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-    }
-
-    .toast {
-        min-width: 0;
-        max-width: none;
-    }
-
-    .refresh-bar {
-        flex-wrap: wrap;
-    }
-}
-
-@media (max-width: 560px) {
-    /* Modal footers are authored with inline flex styles, so overriding the
-       direction and the per-button grow needs !important here. */
-    .modal-actions {
-        flex-direction: column;
-        align-items: stretch !important;
-    }
-
-    .modal-actions .btn {
-        width: 100%;
-        flex: 0 0 auto !important;
-    }
-
-    .field-row {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .danger-item {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .danger-item .btn {
-        width: 100%;
-    }
-
-    .popular-item {
-        gap: 0.75rem;
-        padding: 0.85rem;
-    }
-}
-
-/* Below this width a 5-column table cannot be read by scrolling, so each row
-   becomes a labelled card. Labels come from the td's data-label attribute, so
-   there is still only one render path in JS. */
 @media (max-width: 760px) {
     .table-wrap {
         overflow-x: visible;
@@ -1112,9 +1205,6 @@ select:focus {
     .table-wrap td[data-label="Actions"] .row-actions .btn {
         flex: 1;
     }
-}
-
-@media (max-width: 760px) {
 
     /* `tr td:first-child` in the base sheet outranks `.table-wrap td`, so the
        pill corners have to be reset with matching specificity. */
@@ -1129,67 +1219,68 @@ select:focus {
     }
 }
 
-
-/* Short viewports — the drawer has to fit logo + 5 items + 2 buttons */
-@media (max-width: 1024px) and (max-height: 820px) {
-    .sidebar-logo {
-        font-size: 1.25rem;
-        margin-bottom: 1.5rem;
+@media (max-width: 640px) {
+    .main-content {
+        padding: 4.5rem 1rem 1.5rem;
     }
 
-    .nav-links {
-        gap: 0.25rem;
+    .modal {
+        padding: 1rem;
     }
 
-    .nav-item {
-        padding: 0.6rem 1rem;
+    .modal-content {
+        width: 100%;
+        max-height: 88vh;
+        max-height: 88svh;
+        padding: 1.5rem;
+        border-radius: 1.25rem;
     }
 
-    .sidebar-footer {
-        margin-top: 1.25rem;
+    /* Full-width toasts read better than a narrow column on a phone */
+    .toast-container {
+        left: 1rem;
+        right: 1rem;
+        bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .toast {
+        min-width: 0;
+        max-width: none;
+    }
+
+    .refresh-bar {
+        flex-wrap: wrap;
     }
 }
 
-/* Skeleton loading — shown while a table's first request is in flight */
-.skeleton {
-    display: block;
-    height: 0.9rem;
-    border-radius: 0.5rem;
-    background-color: rgba(255, 255, 255, 0.04);
-    background-image: linear-gradient(90deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.09) 50%,
-            rgba(255, 255, 255, 0) 100%);
-    background-size: 200% 100%;
-    background-repeat: no-repeat;
-    animation: skeleton-sweep 1.4s ease-in-out infinite;
-}
-
-.skeleton-btn {
-    height: 2.1rem;
-    border-radius: 0.75rem;
-}
-
-/* Stagger the rows so the sweep reads as one surface, not four separate bars */
-.skeleton-row:nth-child(2) .skeleton {
-    animation-delay: 0.1s;
-}
-
-.skeleton-row:nth-child(3) .skeleton {
-    animation-delay: 0.2s;
-}
-
-.skeleton-row:nth-child(4) .skeleton {
-    animation-delay: 0.3s;
-}
-
-@keyframes skeleton-sweep {
-    from {
-        background-position: 150% 0;
+@media (max-width: 560px) {
+    .modal-actions {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-    to {
-        background-position: -50% 0;
+    .modal-actions .btn {
+        width: 100%;
+        flex: 0 0 auto;
+    }
+
+    .field-row {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .danger-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .danger-item .btn {
+        width: 100%;
+    }
+
+    .popular-item {
+        gap: 0.75rem;
+        padding: 0.85rem;
     }
 }
 
