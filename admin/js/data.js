@@ -14,7 +14,9 @@ const SECTION_TABLES = {
 };
 
 let currentSection = 'dashboard';
-export const setSection = (id) => { currentSection = id; };
+export const setSection = (id) => {
+    currentSection = id;
+};
 
 // Tables that have received a response at least once
 const loadedTables = new Set();
@@ -36,11 +38,18 @@ export async function fetchData() {
         jobs.push(api('/stats/popular').then(updatePopular));
     }
     if (currentSection === 'logs') {
-        jobs.push(api('/logs').then(logs => { setLogs(logs); renderLogs(); }));
+        jobs.push(
+            api('/logs').then((logs) => {
+                setLogs(logs);
+                renderLogs();
+            })
+        );
     }
 
     const results = await Promise.allSettled(jobs);
-    results.forEach(r => { if (r.status === 'rejected') console.error('Fetch error:', r.reason); });
+    results.forEach((r) => {
+        if (r.status === 'rejected') console.error('Fetch error:', r.reason);
+    });
 }
 
 async function fetchTypedData(type) {

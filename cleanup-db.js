@@ -15,7 +15,7 @@ async function cleanup() {
                 // We can't just update primary key easily in some DBs without cascades
                 // Better approach: Create new, move subs, delete old
 
-                const [newSeries] = await Series.findOrCreate({
+                await Series.findOrCreate({
                     where: { tmdb_id: newId },
                     defaults: {
                         title: s.title,

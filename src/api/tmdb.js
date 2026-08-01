@@ -10,18 +10,21 @@ const apiClient = axios.create({
     proxy: false
 });
 
-apiClient.interceptors.request.use((config) => {
-    const apiKey = process.env.TMDB_API_KEY;
-    if (apiKey) {
-        config.headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-    config.headers['Content-Type'] = 'application/json';
+apiClient.interceptors.request.use(
+    (config) => {
+        const apiKey = process.env.TMDB_API_KEY;
+        if (apiKey) {
+            config.headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+        config.headers['Content-Type'] = 'application/json';
 
-    // Apply proxy dynamically
-    config.httpsAgent = getProxyAgent();
+        // Apply proxy dynamically
+        config.httpsAgent = getProxyAgent();
 
-    return config;
-}, (error) => Promise.reject(error));
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
 
 // Log details on success and error to help debugging
 apiClient.interceptors.response.use(
@@ -46,14 +49,12 @@ const searchMulti = async (query) => {
         const response = await apiClient.get('/search/multi', {
             params: {
                 query: query,
-                language: 'ru-RU',
+                language: 'ru-RU'
             }
         });
 
         // Return only movies and tv shows
-        return (response.data.results || []).filter(item =>
-            item.media_type === 'movie' || item.media_type === 'tv'
-        );
+        return (response.data.results || []).filter((item) => item.media_type === 'movie' || item.media_type === 'tv');
     } catch (error) {
         console.error('TMDB API Error (searchMulti):', error.message);
         throw error;
@@ -72,11 +73,11 @@ const getDetails = async (id, media_type) => {
 
         // Extract director if it's a movie
         if (media_type === 'movie' && data.credits && data.credits.crew) {
-            const director = data.credits.crew.find(person => person.job === 'Director');
+            const director = data.credits.crew.find((person) => person.job === 'Director');
             if (director) data.director_name = director.name;
         } else if (media_type === 'tv' && data.created_by && data.created_by.length > 0) {
             // For TV shows, we use "created_by" as the equivalent
-            data.director_name = data.created_by.map(c => c.name).join(', ');
+            data.director_name = data.created_by.map((c) => c.name).join(', ');
         }
 
         return data;
@@ -112,7 +113,7 @@ const getRandomMovie = async () => {
                 page: randomPage,
                 sort_by: 'popularity.desc',
                 'vote_count.gte': 500,
-                'vote_average.gte': 7.0,
+                'vote_average.gte': 7.0
             }
         });
 

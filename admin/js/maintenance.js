@@ -1,6 +1,6 @@
 /** Operations that affect everyone at once: update check, broadcast, wipe. */
 
-import { $ } from './dom.js';
+import { $field } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { toast, openModal, closeModal, setReturnTo, clearReturnTo, showConfirm } from './ui.js';
@@ -20,17 +20,17 @@ export async function triggerCheck() {
 export function openBroadcastModal() {
     closeModal('actions-modal');
     setReturnTo(() => openModal('actions-modal'));
-    $('broadcast-msg').value = '';
+    $field('broadcast-msg').value = '';
     setSelectValue('broadcast-target', 'all');
     openModal('broadcast-modal');
-    $('broadcast-msg').focus();
+    $field('broadcast-msg').focus();
 }
 
 export function sendBroadcast() {
-    const message = $('broadcast-msg').value.trim();
+    const message = $field('broadcast-msg').value.trim();
     if (!message) return toast('Enter a message first', 'warning');
 
-    const target = $('broadcast-target').value;
+    const target = $field('broadcast-target').value;
 
     showConfirm({
         title: '📢 Send broadcast?',
@@ -38,7 +38,7 @@ export function sendBroadcast() {
         confirmLabel: 'Yes, send',
         cancelLabel: 'No, cancel',
         onConfirm: async () => {
-            const btn = $('send-broadcast');
+            const btn = $field('send-broadcast');
             btn.disabled = true;
             btn.innerText = 'Sending...';
 
@@ -48,7 +48,7 @@ export function sendBroadcast() {
                 toast(`Delivered to ${res.successCount} chats${failed}`, res.failCount ? 'warning' : 'success');
                 clearReturnTo();
                 closeModal('broadcast-modal');
-                $('broadcast-msg').value = '';
+                $field('broadcast-msg').value = '';
             } catch (e) {
                 toast('Broadcast failed: ' + e.message, 'error');
             } finally {

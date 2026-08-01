@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const { searchMulti, getDetails, getSeasonDetails, getRandomMovie } = require('./api/tmdb');
+const { searchMulti, getDetails, getRandomMovie } = require('./api/tmdb');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { NOTIFY_LABELS, NOTIFY_LABELS_SHORT, NOTIFY_CYCLE, getWatchLink } = require('./constants');
 const { getProxyAgent } = require('./proxy');
@@ -32,15 +32,18 @@ const setState = (ctx, data) => {
 
 // FIX: Memory leak — purge idle state entries older than 30 minutes
 const STATE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-setInterval(() => {
-    const now = Date.now();
-    for (const key of Object.keys(userStates)) {
-        const last = userStates[key]._lastActivity || 0;
-        if (now - last > STATE_TTL_MS) {
-            delete userStates[key];
+setInterval(
+    () => {
+        const now = Date.now();
+        for (const key of Object.keys(userStates)) {
+            const last = userStates[key]._lastActivity || 0;
+            if (now - last > STATE_TTL_MS) {
+                delete userStates[key];
+            }
         }
-    }
-}, 10 * 60 * 1000); // Run cleanup every 10 minutes
+    },
+    10 * 60 * 1000
+); // Run cleanup every 10 minutes
 
 // Anti-Spam: throttle to 1 request/second per user
 // And track identical rapid commands for auto-blocking
@@ -72,7 +75,9 @@ bot.use(async (ctx, next) => {
 
         // If it's a callback query, we should silently answer it to turn off the loading icon
         if (ctx.callbackQuery) {
-            try { await ctx.answerCbQuery(); } catch (e) { }
+            try {
+                await ctx.answerCbQuery();
+            } catch (e) {}
         }
         return;
     }
@@ -90,7 +95,7 @@ const mainMenu = (ctx) => {
     }
     return Markup.keyboard([
         ['🔍 Поиск', '📺 Мои подписки'],
-        ['🎲 Случайный фильм', 'ℹ️ Помощь'],
+        ['🎲 Случайный фильм', 'ℹ️ Помощь']
     ]).resize();
 };
 
@@ -138,12 +143,11 @@ bot.use(async (ctx, next) => {
         // Also ensure the actual group chat exists purely for settings like menu_enabled
         if (ctx.chat && ctx.chat.id !== userId) {
             // Groups/channels have a title; public ones also have a @username
-            const chatTitle = ctx.chat.title
-                || (ctx.chat.username ? `@${ctx.chat.username}` : null);
+            const chatTitle = ctx.chat.title || (ctx.chat.username ? `@${ctx.chat.username}` : null);
 
             const [chatData] = await Chat.findOrCreate({
                 where: { id: ctx.chat.id },
-                defaults: { type: ctx.chat.type, username: chatTitle },
+                defaults: { type: ctx.chat.type, username: chatTitle }
             });
 
             // Groups get renamed — keep the stored title fresh
@@ -173,7 +177,7 @@ bot.use(async (ctx, next) => {
             const trk = commandTracking[userId] || { text: '', count: 0, lastTime: 0, msgIds: [] };
 
             // If they sent the EXACT same text/button within 5 seconds...
-            if (trk.text === spamText && (now - trk.lastTime < 5000)) {
+            if (trk.text === spamText && now - trk.lastTime < 5000) {
                 trk.count += 1;
                 if (spamMsgId && !trk.msgIds.includes(spamMsgId)) trk.msgIds.push(spamMsgId);
             } else {
@@ -245,17 +249,11 @@ const showSearchPage = async (ctx, chatId, page = 0) => {
         const year = (item.release_date || item.first_air_date || '').substring(0, 4) || 'н/д';
         const name = item.title || item.name || item.original_title || item.original_name || 'Без названия';
 
-        let directorInfo = '';
-        if (item.media_type === 'movie' || item.media_type === 'tv') {
-            try {
-                // Since search results don't have credits, we can't show director here easily without extra API calls per item
-                // However, we can show it in the ACTUAL subscription prompt or random movie
-            } catch (e) { }
-        }
-
         const caption = `<b>${name}</b> (${year})`;
         const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
-        const keyboard = Markup.inlineKeyboard([[Markup.button.callback('✨ Подписаться', `sub_${item.media_type}_${item.id}`)]]);
+        const keyboard = Markup.inlineKeyboard([
+            [Markup.button.callback('✨ Подписаться', `sub_${item.media_type}_${item.id}`)]
+        ]);
 
         let sentMsg;
         if (posterUrl) {
@@ -287,7 +285,11 @@ const clearLastMessages = async (ctx, chatId) => {
     const state = getState(ctx);
     if (!state.lastMessageIds) return;
     for (const msgId of state.lastMessageIds) {
-        try { await ctx.telegram.deleteMessage(chatId, msgId); } catch { /* already deleted */ }
+        try {
+            await ctx.telegram.deleteMessage(chatId, msgId);
+        } catch {
+            /* already deleted */
+        }
     }
 };
 
@@ -307,7 +309,7 @@ const sendSubscriptionList = async (ctx) => {
         if (!hasSubs && !hasWatchlist) {
             return ctx.reply('У вас пока нет подписок. Нажмите 🔍 <b>Поиск</b> или используйте /search!', {
                 parse_mode: 'HTML',
-                ...mainMenu(ctx),
+                ...mainMenu(ctx)
             });
         }
 
@@ -318,10 +320,12 @@ const sendSubscriptionList = async (ctx) => {
                 const typeLabel = NOTIFY_LABELS[notifyType] || notifyType;
                 await ctx.reply(
                     `📺 ${s.title}\nРежим: ${typeLabel}`,
-                    Markup.inlineKeyboard([[
-                        Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${s.tmdb_id}`),
-                        Markup.button.callback('❌ Отписаться', `unsub_${s.tmdb_id}`),
-                    ]])
+                    Markup.inlineKeyboard([
+                        [
+                            Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${s.tmdb_id}`),
+                            Markup.button.callback('❌ Отписаться', `unsub_${s.tmdb_id}`)
+                        ]
+                    ])
                 );
             }
         }
@@ -333,13 +337,15 @@ const sendSubscriptionList = async (ctx) => {
             });
             for (const item of watchlistItems) {
                 const dateLabel = item.premiere_digital
-                    ? new Date(item.premiere_digital).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+                    ? new Date(item.premiere_digital).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                      })
                     : 'дата не объявлена';
                 await ctx.reply(
                     `🎬 ${item.title}${item.year ? ` (${item.year})` : ''}\n📅 Цифровой релиз: ${dateLabel}`,
-                    Markup.inlineKeyboard([[
-                        Markup.button.callback('❌ Удалить', `unwatchlist_${item.id}`),
-                    ]])
+                    Markup.inlineKeyboard([[Markup.button.callback('❌ Удалить', `unwatchlist_${item.id}`)]])
                 );
             }
         }
@@ -420,7 +426,10 @@ bot.hears('📺 Мои подписки', sendSubscriptionList);
 bot.command('menu_off', async (ctx) => {
     if (ctx.state.chatData) {
         await ctx.state.chatData.update({ menu_enabled: false });
-        await ctx.reply('Нижнее меню отключено. Теперь используйте команды: /search, /subs, /help', Markup.removeKeyboard());
+        await ctx.reply(
+            'Нижнее меню отключено. Теперь используйте команды: /search, /subs, /help',
+            Markup.removeKeyboard()
+        );
     }
 });
 
@@ -509,9 +518,10 @@ bot.on('text', async (ctx, next) => {
         const results = await searchMulti(text);
         if (!results || results.length === 0) {
             setState(ctx, { state: 'idle' });
-            return ctx.reply('Ничего не найдено 😕', Markup.inlineKeyboard([
-                [Markup.button.callback('🏠 В главное меню', 'cancel_search')],
-            ]));
+            return ctx.reply(
+                'Ничего не найдено 😕',
+                Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
+            );
         }
         setState(ctx, { results, state: 'searching' });
         await showSearchPage(ctx, ctx.chat.id, 0);
@@ -553,7 +563,11 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
                 const releaseDate = new Date(data.release_date);
                 if (!isNaN(releaseDate) && releaseDate <= new Date()) {
                     isAlreadyReleased = true;
-                    releaseDateLabel = releaseDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                    releaseDateLabel = releaseDate.toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                    });
                 }
             }
             if (status === 'Released') isAlreadyReleased = true;
@@ -563,11 +577,11 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
                 const watchLink = getWatchLink(title);
                 const keyboard = Markup.inlineKeyboard([
                     [Markup.button.url(`▶️ Смотреть онлайн`, watchLink)],
-                    [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
+                    [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
                 ]);
                 await ctx.reply(
                     `🎬 <b>${title}</b>${movieYear ? ` (${movieYear})` : ''}\n\n` +
-                    `✅ Фильм уже вышел${releaseDateLabel ? ` — <b>${releaseDateLabel}</b>` : ''}.\n`,
+                        `✅ Фильм уже вышел${releaseDateLabel ? ` — <b>${releaseDateLabel}</b>` : ''}.\n`,
                     { parse_mode: 'HTML', ...keyboard }
                 );
                 return ctx.answerCbQuery();
@@ -576,21 +590,25 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
             // Film is upcoming — offer to add to watchlist
             let comingDateLabel = 'дата не объявлена';
             if (data.release_date) {
-                comingDateLabel = new Date(data.release_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                comingDateLabel = new Date(data.release_date).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                });
             }
 
             const keyboard = Markup.inlineKeyboard([
                 [Markup.button.callback('📌 В список ожидания', `watchlist_add_${tmdbId}`)],
-                [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
+                [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
             ]);
 
             const directorLabel = data.director_name ? `🎬 Режиссер: <b>${data.director_name}</b>\n` : '';
 
             await ctx.reply(
                 `🎬 <b>${title}</b>${movieYear ? ` (${movieYear})` : ''}\n${directorLabel}\n` +
-                `Это фильм, который ещё не вышел.\n` +
-                `📅 Релиз: <b>${comingDateLabel}</b>\n\n` +
-                `Добавить в список ожидания? Как только выйдет — пришлю уведомление.`,
+                    `Это фильм, который ещё не вышел.\n` +
+                    `📅 Релиз: <b>${comingDateLabel}</b>\n\n` +
+                    `Добавить в список ожидания? Как только выйдет — пришлю уведомление.`,
                 { parse_mode: 'HTML', ...keyboard }
             );
             return ctx.answerCbQuery();
@@ -604,8 +622,8 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
                 last_season: 0,
                 last_episode: 0,
                 poster_url: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
-                status: data.status || null,
-            },
+                status: data.status || null
+            }
         });
 
         const currentSub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: series.tmdb_id } });
@@ -614,14 +632,17 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
         const keyboard = Markup.inlineKeyboard([
             [
                 Markup.button.callback('🔔 Каждую серию', `sub_set_${tmdbId}_episode`),
-                Markup.button.callback('📦 Весь сезон', `sub_set_${tmdbId}_season`),
+                Markup.button.callback('📦 Весь сезон', `sub_set_${tmdbId}_season`)
             ],
             [Markup.button.callback('🆕 1-я серия + Сезон', `sub_set_${tmdbId}_first_and_full`)],
-            [Markup.button.callback('⬅️ К результатам', 'back_to_results')],
+            [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
         ]);
 
         const directorLabel = data.director_name ? `🎬 Создатель: <b>${data.director_name}</b>\n` : '';
-        await ctx.reply(`<b>«${series.title}»</b>\n${directorLabel}\nВыберите режим уведомлений:`, { parse_mode: 'HTML', ...keyboard });
+        await ctx.reply(`<b>«${series.title}»</b>\n${directorLabel}\nВыберите режим уведомлений:`, {
+            parse_mode: 'HTML',
+            ...keyboard
+        });
         await ctx.answerCbQuery();
     } catch (error) {
         console.error('[Bot] Subscription error:', error);
@@ -640,11 +661,13 @@ bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx)
 
         const [subscription, created] = await Subscription.findOrCreate({
             where: { chatId, seriesId: tmdbId },
-            defaults: { notify_type: notifyType },
+            defaults: { notify_type: notifyType }
         });
         if (!created) await subscription.update({ notify_type: notifyType });
 
-        console.log(`[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`);
+        console.log(
+            `[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`
+        );
 
         // Initialize the baseline episode tracking on first subscribe
         if (series.last_season === 0) {
@@ -654,7 +677,7 @@ bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx)
                 await series.update({
                     last_season: data.last_episode_to_air.season_number,
                     last_episode: data.last_episode_to_air.episode_number,
-                    last_episode_name: data.last_episode_to_air.name || '',
+                    last_episode_name: data.last_episode_to_air.name || ''
                 });
             }
         }
@@ -662,18 +685,22 @@ bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx)
         const typeLabel = NOTIFY_LABELS_SHORT[notifyType] || notifyType;
 
         // Fetch seasons to find the next episode
-        let nextEpisodeText = "информации о ближайшей серии пока нет";
+        let nextEpisodeText = 'информации о ближайшей серии пока нет';
         try {
             const [mediaType, filmId] = tmdbId.split('_');
             const data = await getDetails(filmId, mediaType);
 
             if (data) {
                 if (data.status === 'Ended' || data.status === 'Canceled') {
-                    nextEpisodeText = "Сериал завершён/закрыт";
+                    nextEpisodeText = 'Сериал завершён/закрыт';
                 } else if (data.next_episode_to_air) {
                     const nextEp = data.next_episode_to_air;
                     if (nextEp.air_date) {
-                        const dateStr = new Date(nextEp.air_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                        const dateStr = new Date(nextEp.air_date).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric'
+                        });
                         nextEpisodeText = `Ближайшая серия (${nextEp.season_number} сезон, ${nextEp.episode_number} серия) ожидается <b>${dateStr}</b>`;
                     }
                 }
@@ -689,7 +716,10 @@ bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx)
         await ctx.answerCbQuery('Успешно подписаны! ✅');
         await ctx.editMessageText(
             `✅ Вы успешно подписались на <b>«${series.title}»</b>\n\n🔔 Режим уведомлений: <b>${typeLabel}</b>\n\n📅 ${nextEpisodeText}`,
-            { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]]) }
+            {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
+            }
         );
     } catch (error) {
         console.error('[Bot] Finalize subscription error:', error);
@@ -732,8 +762,8 @@ bot.action(/^watchlist_add_([a-z0-9_]+)$/, async (ctx) => {
         await ctx.answerCbQuery('Добавлено в список ожидания! 📌');
         await ctx.editMessageText(
             `📌 <b>«${title}»</b> добавлен в список ожидания!\n\n` +
-            `📅 Цифровой релиз: <b>${dateLabel}</b>\n\n` +
-            `<i>Как только фильм выйдет в цифру — пришлю ссылку для просмотра.</i>`,
+                `📅 Цифровой релиз: <b>${dateLabel}</b>\n\n` +
+                `<i>Как только фильм выйдет в цифру — пришлю ссылку для просмотра.</i>`,
             {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
@@ -779,10 +809,12 @@ bot.action(/^toggle_notify_([a-z0-9_]+)$/, async (ctx) => {
 
         await ctx.editMessageText(
             `📺 ${series.title}\nРежим: ${typeLabel}`,
-            Markup.inlineKeyboard([[
-                Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${tmdbId}`),
-                Markup.button.callback('❌ Отписаться', `unsub_${tmdbId}`),
-            ]])
+            Markup.inlineKeyboard([
+                [
+                    Markup.button.callback('⚙️ Сменить режим', `toggle_notify_${tmdbId}`),
+                    Markup.button.callback('❌ Отписаться', `unsub_${tmdbId}`)
+                ]
+            ])
         );
         await ctx.answerCbQuery('Режим подписки обновлен!');
     } catch (error) {
@@ -806,15 +838,17 @@ bot.action(/^unsub_([a-z0-9_]+)$/, async (ctx) => {
 // ============================================================
 // Setup Bot Commands Menu (Slash commands highlighting)
 // ============================================================
-bot.telegram.setMyCommands([
-    { command: 'start', description: 'Перезапустить бота' },
-    { command: 'search', description: 'Найти фильм или сериал' },
-    { command: 'subs', description: 'Мои подписки и список ожидания' },
-    { command: 'random', description: 'Случайный фильм на вечер' },
-    { command: 'help', description: 'Как пользоваться ботом' },
-    { command: 'cancel', description: 'Отменить текущее действие' },
-    { command: 'menu_on', description: 'Включить нижнее меню' },
-    { command: 'menu_off', description: 'ОТКЛЮЧИТЬ нижнее меню' },
-]).catch(err => console.error('[Bot] Failed to set commands:', err));
+bot.telegram
+    .setMyCommands([
+        { command: 'start', description: 'Перезапустить бота' },
+        { command: 'search', description: 'Найти фильм или сериал' },
+        { command: 'subs', description: 'Мои подписки и список ожидания' },
+        { command: 'random', description: 'Случайный фильм на вечер' },
+        { command: 'help', description: 'Как пользоваться ботом' },
+        { command: 'cancel', description: 'Отменить текущее действие' },
+        { command: 'menu_on', description: 'Включить нижнее меню' },
+        { command: 'menu_off', description: 'ОТКЛЮЧИТЬ нижнее меню' }
+    ])
+    .catch((err) => console.error('[Bot] Failed to set commands:', err));
 
 module.exports = bot;

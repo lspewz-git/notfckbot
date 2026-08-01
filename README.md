@@ -112,6 +112,24 @@ node src/test-notifications.js <TMDB_ID>
 docker compose exec app node src/test-watchlist.js <TMDB_ID>
 ```
 
+## Проверка кода
+
+Линтер, форматтер и проверка типов настроены и запускаются одной командой:
+
+```bash
+docker compose exec app npm run check
+```
+
+По отдельности: `npm run lint`, `npm run format:check`, `npm run typecheck`.
+Исправить автоматически — `npm run lint:fix` и `npm run format`.
+
+Инструменты лежат в `devDependencies`, поэтому после их добавления образ нужно
+пересобрать: `docker compose up -d --build`.
+
+Проверка типов работает через JSDoc и `checkJs` (`admin/jsconfig.json`) — сборки
+нет, в браузер уходят те же файлы. Она охватывает `admin/js/`; бэкенд не включён,
+так как для него нужны типы установленных пакетов.
+
 ## Служебные скрипты
 - `cleanup-db.js` — очистка базы от мусорных записей.
 - `fix-watchlist-ids.js` — починка идентификаторов в списке ожидания.

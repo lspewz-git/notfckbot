@@ -6,7 +6,7 @@
  * panel drive it. Reading `el.value` keeps working everywhere.
  */
 
-import { $, escapeHtml } from './dom.js';
+import { $field, escapeHtml } from './dom.js';
 
 let openDropdown = null;
 
@@ -19,7 +19,7 @@ export function closeDropdown() {
 
 /** Set a value programmatically and let the styled trigger catch up. */
 export function setSelectValue(id, value) {
-    const el = $(id);
+    const el = $field(id);
     if (!el) return;
     el.value = value;
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -63,7 +63,8 @@ function enhanceSelect(select) {
             row.className = `custom-select-option${isSelected ? ' selected' : ''}`;
             row.setAttribute('role', 'option');
             row.setAttribute('aria-selected', String(isSelected));
-            row.innerHTML = `<span>${escapeHtml(opt.text)}</span>` +
+            row.innerHTML =
+                `<span>${escapeHtml(opt.text)}</span>` +
                 (isSelected ? '<span class="custom-select-check">✓</span>' : '');
             row.onclick = () => {
                 select.value = opt.value;
@@ -81,14 +82,15 @@ function enhanceSelect(select) {
         const spaceBelow = window.innerHeight - rect.bottom;
         panel.style.width = `${rect.width}px`;
         panel.style.left = `${rect.left}px`;
-        panel.style.top = (spaceBelow < panel.offsetHeight + 12 && rect.top > spaceBelow)
-            ? `${rect.top - panel.offsetHeight - 6}px`
-            : `${rect.bottom + 6}px`;
+        panel.style.top =
+            spaceBelow < panel.offsetHeight + 12 && rect.top > spaceBelow
+                ? `${rect.top - panel.offsetHeight - 6}px`
+                : `${rect.bottom + 6}px`;
 
         trigger.setAttribute('aria-expanded', 'true');
         openDropdown = { trigger, panel };
 
-        const first = panel.querySelector('.selected') || panel.firstChild;
+        const first = /** @type {HTMLElement} */ (panel.querySelector('.selected') || panel.firstElementChild);
         if (first) first.focus();
     };
 

@@ -1,0 +1,47 @@
+/* Logs */
+.logs-viewer {
+    height: 400px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 1rem;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 0.85rem;
+    overflow-y: auto;
+}
+
+.log-entry {
+    margin-bottom: 0.4rem;
+    border-left: 2px solid transparent;
+    padding-left: 0.75rem;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.log-entry.success {
+    border-color: var(--success);
+}
+
+.log-entry.error {
+    border-color: var(--danger);
+}
+
+.log-entry.log {
+    border-color: var(--primary);
+}
+
+.log-entry .type-tag {
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    margin-right: 0.5rem;
+}
+
+.log-entry.success .type-tag {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.log-entry.error .type-tag {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}

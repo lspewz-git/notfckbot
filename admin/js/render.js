@@ -16,4 +16,6 @@ export function isUnchanged(key, data) {
 }
 
 /** Call when something other than fresh data replaced the markup. */
-export const invalidate = (key) => { delete signatures[key]; };
+export const invalidate = (key) => {
+    delete signatures[key];
+};

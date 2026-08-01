@@ -28,12 +28,11 @@ async function start() {
         console.log('Launching Telegram bot...');
         bot.launch({ dropPendingUpdates: true })
             .then(() => console.log('Bot is running! 🚀'))
-            .catch(err => console.error('Bot launch failed:', err));
+            .catch((err) => console.error('Bot launch failed:', err));
 
         // Enable graceful stop
         process.once('SIGINT', () => bot.stop('SIGINT'));
         process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
     } catch (err) {
         console.error('Fatal error during startup:', err);
         process.exit(1);

@@ -1,0 +1,32 @@
+:root {
+    --primary: #6366f1;
+    --primary-glow: rgba(99, 102, 241, 0.4);
+    --bg: #030712;
+    --glass-bg: rgba(17, 24, 39, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text: #f3f4f6;
+    --text-dim: #9ca3af;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --sidebar-width: 260px;
+    --radius: 1.25rem;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image:
+        radial-gradient(at 0% 0%, hsla(250, 100%, 15%, 0.15) 0, transparent 50%),
+        radial-gradient(at 100% 100%, hsla(280, 100%, 15%, 0.15) 0, transparent 50%),
+        radial-gradient(at 50% 50%, hsla(250, 100%, 10%, 1) 0, transparent 100%);
+}

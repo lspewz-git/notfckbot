@@ -8,7 +8,7 @@ export function chatLabel(chat) {
 }
 
 export function chatDisplayName(chat) {
-    const icon = chat.type === 'private' ? '👤' : (chat.type === 'channel' ? '📣' : '👥');
+    const icon = chat.type === 'private' ? '👤' : chat.type === 'channel' ? '📣' : '👥';
     const label = escapeHtml(chatLabel(chat));
     const dim = chat.username ? '' : ' style="color:var(--text-dim); font-style:italic"';
     return `<span${dim}>${icon} ${label}</span>`;
@@ -19,10 +19,10 @@ export function chatDisplayName(chat) {
 const SERIES_STATUS = {
     'Returning Series': { label: 'On Air', cls: 'ok' },
     'In Production': { label: 'In Production', cls: 'warn' },
-    'Planned': { label: 'Planned', cls: 'warn' },
-    'Pilot': { label: 'Pilot', cls: 'warn' },
-    'Ended': { label: 'Ended', cls: 'muted' },
-    'Canceled': { label: 'Canceled', cls: 'error' }
+    Planned: { label: 'Planned', cls: 'warn' },
+    Pilot: { label: 'Pilot', cls: 'warn' },
+    Ended: { label: 'Ended', cls: 'muted' },
+    Canceled: { label: 'Canceled', cls: 'error' }
 };
 
 export function seriesStatusBadge(status) {

@@ -19,9 +19,6 @@ async function testNotification(kpId, forceMode = 'episode') {
         console.log(`Current state: S${series.last_season}E${series.last_episode}`);
 
         // Simulate an older state to trigger "new episode" detection
-        const originalSeason = series.last_season;
-        const originalEpisode = series.last_episode;
-
         if (series.last_episode > 1) {
             await series.update({ last_episode: series.last_episode - 1 });
         } else if (series.last_season > 1) {

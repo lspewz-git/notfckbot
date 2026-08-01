@@ -1,6 +1,6 @@
 /** The three data tables: filters, skeletons and row rendering. */
 
-import { $, escapeHtml } from './dom.js';
+import { $, $field, escapeHtml } from './dom.js';
 import { chatDisplayName, chatLabel, seriesStatusBadge, MODE_LABELS } from './format.js';
 import { chatsById, subsByKey, subKey, refill } from './store.js';
 import { isUnchanged, invalidate } from './render.js';
@@ -76,13 +76,13 @@ const TABLES = {
 // --- Filtering ---
 export function applyTableFilter(type) {
     const table = TABLES[type];
-    const input = $(table.filter);
+    const input = $field(table.filter);
     const body = $(table.body);
     if (!input || !body) return;
 
     const q = input.value.trim().toLowerCase();
-    body.querySelectorAll('tr').forEach(row => {
-        row.style.display = (!q || row.innerText.toLowerCase().includes(q)) ? '' : 'none';
+    body.querySelectorAll('tr').forEach((row) => {
+        row.style.display = !q || row.innerText.toLowerCase().includes(q) ? '' : 'none';
     });
 }
 
@@ -117,15 +117,19 @@ export function renderSkeleton(type, rows = 4) {
     if (!TABLES[type]) return;
     const { columns } = TABLES[type];
 
-    const cells = columns.map((label, i) => {
-        const isActions = i === columns.length - 1;
-        const cls = isActions ? 'skeleton skeleton-btn' : 'skeleton';
-        const width = isActions ? '100%' : SKELETON_WIDTHS[i % SKELETON_WIDTHS.length];
-        return `<td data-label="${label}"><span class="${cls}" style="width:${width}"></span></td>`;
-    }).join('');
+    const cells = columns
+        .map((label, i) => {
+            const isActions = i === columns.length - 1;
+            const cls = isActions ? 'skeleton skeleton-btn' : 'skeleton';
+            const width = isActions ? '100%' : SKELETON_WIDTHS[i % SKELETON_WIDTHS.length];
+            return `<td data-label="${label}"><span class="${cls}" style="width:${width}"></span></td>`;
+        })
+        .join('');
 
-    fillBody(type, Array.from({ length: rows },
-        () => `<tr class="skeleton-row" aria-hidden="true">${cells}</tr>`).join(''));
+    fillBody(
+        type,
+        Array.from({ length: rows }, () => `<tr class="skeleton-row" aria-hidden="true">${cells}</tr>`).join('')
+    );
 }
 
 // --- Rows ---
@@ -136,8 +140,16 @@ export function renderTable(type, data) {
 
     if (isUnchanged(`table:${type}`, data)) return;
 
-    if (type === 'chats') refill(chatsById, data.map(c => [String(c.id), c]));
-    if (type === 'subs') refill(subsByKey, data.map(s => [subKey(s.chatId, s.seriesId), s]));
+    if (type === 'chats')
+        refill(
+            chatsById,
+            data.map((c) => [String(c.id), c])
+        );
+    if (type === 'subs')
+        refill(
+            subsByKey,
+            data.map((s) => [subKey(s.chatId, s.seriesId), s])
+        );
 
     if (data.length === 0) {
         body.innerHTML = fullWidthRow(type, 'No records found.');

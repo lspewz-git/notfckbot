@@ -40,11 +40,10 @@ async function testWatchlistRelease(kpId) {
         yesterday.setDate(yesterday.getDate() - 1);
         const fakeDate = yesterday.toISOString();
 
-        console.log(`\nForcing digital release date to: ${yesterday.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`);
-        await Watchlist.update(
-            { premiere_digital: fakeDate },
-            { where: { kp_id: kpId, notified: false } }
+        console.log(
+            `\nForcing digital release date to: ${yesterday.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`
         );
+        await Watchlist.update({ premiere_digital: fakeDate }, { where: { kp_id: kpId, notified: false } });
 
         console.log('\nRunning cron update check — notification should be sent now...\n');
         await checkUpdates(bot);

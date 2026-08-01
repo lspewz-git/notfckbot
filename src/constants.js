@@ -7,21 +7,21 @@
 const NOTIFY_LABELS = {
     episode: '🔔 Каждая серия',
     season: '📦 Весь сезон',
-    first_and_full: '🆕 1-я серия + Сезон',
+    first_and_full: '🆕 1-я серия + Сезон'
 };
 
 /** Human-readable labels for subscription confirmation messages */
 const NOTIFY_LABELS_SHORT = {
     episode: 'каждую серию',
     season: 'выход всего сезона',
-    first_and_full: '1-я серия + весь сезон',
+    first_and_full: '1-я серия + весь сезон'
 };
 
 /** Cycle order for toggling notify modes */
 const NOTIFY_CYCLE = {
     episode: 'season',
     season: 'first_and_full',
-    first_and_full: 'episode',
+    first_and_full: 'episode'
 };
 
 const getWatchLink = (title) => {

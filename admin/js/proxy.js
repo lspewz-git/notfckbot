@@ -5,7 +5,7 @@
  * parts and composes/parses it on the way in and out.
  */
 
-import { $ } from './dom.js';
+import { $, $field, target } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { toast, openModal, closeModal } from './ui.js';
@@ -14,24 +14,22 @@ import { setSelectValue } from './select.js';
 const FIELDS = ['proxy-host', 'proxy-port', 'proxy-user', 'proxy-pass'];
 
 function urlFromForm() {
-    const scheme = $('proxy-scheme').value;
+    const scheme = $field('proxy-scheme').value;
     if (!scheme) return '';
 
-    const host = $('proxy-host').value.trim();
-    const port = $('proxy-port').value.trim();
+    const host = $field('proxy-host').value.trim();
+    const port = $field('proxy-port').value.trim();
     if (!host || !port) return '';
 
-    const user = $('proxy-user').value.trim();
-    const pass = $('proxy-pass').value;
-    const auth = user
-        ? `${encodeURIComponent(user)}${pass ? ':' + encodeURIComponent(pass) : ''}@`
-        : '';
+    const user = $field('proxy-user').value.trim();
+    const pass = $field('proxy-pass').value;
+    const auth = user ? `${encodeURIComponent(user)}${pass ? ':' + encodeURIComponent(pass) : ''}@` : '';
 
     return `${scheme}://${auth}${host}:${port}`;
 }
 
 function syncForm() {
-    const scheme = $('proxy-scheme').value;
+    const scheme = $field('proxy-scheme').value;
     $('proxy-fields').style.display = scheme ? 'block' : 'none';
 
     const url = urlFromForm();
@@ -40,7 +38,10 @@ function syncForm() {
 }
 
 function fillForm(url) {
-    const clear = () => FIELDS.forEach(id => { $(id).value = ''; });
+    const clear = () =>
+        FIELDS.forEach((id) => {
+            $field(id).value = '';
+        });
 
     if (!url) {
         setSelectValue('proxy-scheme', '');
@@ -51,10 +52,10 @@ function fillForm(url) {
     try {
         const parsed = new URL(url);
         setSelectValue('proxy-scheme', parsed.protocol.replace(':', ''));
-        $('proxy-host').value = parsed.hostname;
-        $('proxy-port').value = parsed.port;
-        $('proxy-user').value = decodeURIComponent(parsed.username || '');
-        $('proxy-pass').value = decodeURIComponent(parsed.password || '');
+        $field('proxy-host').value = parsed.hostname;
+        $field('proxy-port').value = parsed.port;
+        $field('proxy-user').value = decodeURIComponent(parsed.username || '');
+        $field('proxy-pass').value = decodeURIComponent(parsed.password || '');
     } catch (e) {
         // Hand-edited .env value we can't parse — start from a clean form
         toast('Stored proxy URL could not be parsed', 'warning');
@@ -77,7 +78,7 @@ export async function openProxyModal() {
 
 /** Both buttons need the same "is the form usable" check first. */
 function urlOrWarn() {
-    const scheme = $('proxy-scheme').value;
+    const scheme = $field('proxy-scheme').value;
     const url = urlFromForm();
     if (scheme && !url) {
         toast('Fill in host and port first', 'warning');
@@ -87,14 +88,14 @@ function urlOrWarn() {
 }
 
 export function setupProxyForm() {
-    FIELDS.forEach(id => $(id).addEventListener('input', syncForm));
-    $('proxy-scheme').addEventListener('change', syncForm);
+    FIELDS.forEach((id) => $(id).addEventListener('input', syncForm));
+    $field('proxy-scheme').addEventListener('change', syncForm);
 
     $('proxy-test').onclick = async (e) => {
         const url = urlOrWarn();
         if (url === null) return;
 
-        const btn = e.currentTarget;
+        const btn = target(e);
         btn.disabled = true;
         btn.innerText = 'Testing...';
         try {

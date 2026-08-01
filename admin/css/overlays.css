@@ -1,0 +1,144 @@
+/* Toasts */
+.toast-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    pointer-events: none;
+}
+
+.toast {
+    min-width: 260px;
+    max-width: 380px;
+    padding: 0.9rem 1.1rem;
+    border-radius: 0.9rem;
+    background: #0d1117;
+    border: 1px solid var(--glass-border);
+    border-left: 3px solid var(--primary);
+    color: var(--text);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    animation: toast-in 0.25s ease-out;
+}
+
+.toast-success {
+    border-left-color: var(--success);
+}
+
+.toast-error {
+    border-left-color: var(--danger);
+}
+
+.toast-warning {
+    border-left-color: var(--warning);
+}
+
+.toast-out {
+    opacity: 0;
+    transform: translateX(16px);
+    transition:
+        opacity 0.3s,
+        transform 0.3s;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Vertical action menu inside modals */
+.action-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 1.5rem;
+}
+
+.action-row {
+    width: 100%;
+    text-align: left;
+    padding: 0.85rem 1rem;
+    color: var(--text);
+}
+
+.action-row-danger {
+    color: rgba(239, 68, 68, 0.8);
+    border-color: rgba(239, 68, 68, 0.25);
+}
+
+.action-row-danger:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.poster-stub {
+    width: 40px;
+    height: 60px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+}
+
+/* Danger Zone */
+.danger-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 1rem;
+}
+
+.danger-item-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.danger-item-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+/* Modals */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: #0d1117;
+    border: 1px solid var(--glass-border);
+    border-radius: 1.5rem;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    max-height: 90svh;
+    padding: 2.5rem;
+    position: relative;
+    overflow-y: auto;
+}

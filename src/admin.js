@@ -21,14 +21,14 @@ function startLogCapture() {
     originalError = console.error;
 
     console.log = (...args) => {
-        const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
+        const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
         logBuffer.push({ type: 'log', time: new Date().toLocaleTimeString(), text });
         if (logBuffer.length > 200) logBuffer.shift();
         originalLog.apply(console, args);
     };
 
     console.error = (...args) => {
-        const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
+        const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
         logBuffer.push({ type: 'error', time: new Date().toLocaleTimeString(), text });
         if (logBuffer.length > 200) logBuffer.shift();
         originalError.apply(console, args);
@@ -62,7 +62,7 @@ app.get('/api/stats', async (req, res) => {
             Chat.count(),
             Series.count(),
             Subscription.count(),
-            Watchlist.count(),
+            Watchlist.count()
         ]);
         res.json({ chatsCount, seriesCount, subsCount, filmsCount });
     } catch (err) {
@@ -78,25 +78,27 @@ async function backfillChatNames(chats) {
     const bot = app.get('bot');
     if (!bot) return;
 
-    const pending = chats.filter(c =>
-        !c.username && c.type !== 'private' && !unresolvableChatNames.has(String(c.id))
+    const pending = chats.filter(
+        (c) => !c.username && c.type !== 'private' && !unresolvableChatNames.has(String(c.id))
     );
     if (!pending.length) return;
 
-    await Promise.all(pending.map(async (chat) => {
-        try {
-            const info = await bot.telegram.getChat(chat.id);
-            const name = info.title || (info.username ? `@${info.username}` : null);
-            if (name) {
-                await chat.update({ username: name });
-            } else {
+    await Promise.all(
+        pending.map(async (chat) => {
+            try {
+                const info = await bot.telegram.getChat(chat.id);
+                const name = info.title || (info.username ? `@${info.username}` : null);
+                if (name) {
+                    await chat.update({ username: name });
+                } else {
+                    unresolvableChatNames.add(String(chat.id));
+                }
+            } catch (err) {
                 unresolvableChatNames.add(String(chat.id));
+                console.error(`[Admin] Could not resolve name for chat ${chat.id}: ${err.message}`);
             }
-        } catch (err) {
-            unresolvableChatNames.add(String(chat.id));
-            console.error(`[Admin] Could not resolve name for chat ${chat.id}: ${err.message}`);
-        }
-    }));
+        })
+    );
 }
 
 app.get('/api/data/:type', async (req, res) => {
@@ -105,13 +107,13 @@ app.get('/api/data/:type', async (req, res) => {
         let data = [];
         if (type === 'subs') {
             data = await Subscription.findAll({
-                include: [{ model: Chat }, { model: Series }],
+                include: [{ model: Chat }, { model: Series }]
             });
         } else if (type === 'series') {
             data = await Series.findAll();
         } else if (type === 'films') {
             data = await Watchlist.findAll({
-                include: [{ model: Chat }],
+                include: [{ model: Chat }]
             });
         } else if (type === 'chats') {
             data = await Chat.findAll({
@@ -184,16 +186,18 @@ app.get('/api/health', async (req, res) => {
     const [tgResult, tmdbResult, proxyResult] = await Promise.allSettled([
         app.get('bot').telegram.getMe(),
         axios.get('https://api.themoviedb.org/3/authentication', {
-            headers: { 'Authorization': `Bearer ${process.env.TMDB_API_KEY}` },
+            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 5000,
             httpsAgent: buildProxyAgent(proxyUrl),
             proxy: false
         }),
-        proxyUrl ? axios.get('https://google.com', {
-            timeout: 5000,
-            httpsAgent: buildProxyAgent(proxyUrl),
-            proxy: false
-        }) : Promise.resolve({ status: 200 })
+        proxyUrl
+            ? axios.get('https://google.com', {
+                  timeout: 5000,
+                  httpsAgent: buildProxyAgent(proxyUrl),
+                  proxy: false
+              })
+            : Promise.resolve({ status: 200 })
     ]);
 
     if (tgResult.status === 'fulfilled') health.telegram = true;
@@ -248,17 +252,13 @@ app.post('/api/broadcast', requireAdminToken, async (req, res) => {
 
         for (const chat of chats) {
             try {
-                await bot.telegram.sendMessage(
-                    chat.id,
-                    `📣 <b>ОБЪЯВЛЕНИЕ:</b>\n\n${message}`,
-                    { parse_mode: 'HTML' }
-                );
+                await bot.telegram.sendMessage(chat.id, `📣 <b>ОБЪЯВЛЕНИЕ:</b>\n\n${message}`, { parse_mode: 'HTML' });
                 successCount++;
             } catch (e) {
                 failCount++;
             }
             // FIX: Rate limit — Telegram allows ~30 messages/sec; 50ms keeps us safe
-            await new Promise(r => setTimeout(r, 50));
+            await new Promise((r) => setTimeout(r, 50));
         }
         console.log(`[Admin] Broadcast to "${target}": ${successCount} delivered, ${failCount} failed.`);
         res.json({ success: true, successCount, failCount });
@@ -288,7 +288,7 @@ app.delete('/api/subscription/:chatId/:seriesId', requireAdminToken, async (req,
 });
 
 app.post('/api/subscription', requireAdminToken, async (req, res) => {
-    let { chatId, tmdbId, notify_type } = req.body;
+    const { chatId, tmdbId, notify_type } = req.body;
     if (!chatId || !tmdbId) {
         return res.status(400).json({ error: 'chatId and tmdbId are required' });
     }
@@ -415,7 +415,9 @@ app.post('/api/chat/:chatId/message', requireAdminToken, async (req, res) => {
 
     const bot = app.get('bot');
     try {
-        await bot.telegram.sendMessage(chatId, `✉️ <b>Сообщение от администратора:</b>\n\n${message}`, { parse_mode: 'HTML' });
+        await bot.telegram.sendMessage(chatId, `✉️ <b>Сообщение от администратора:</b>\n\n${message}`, {
+            parse_mode: 'HTML'
+        });
         console.log(`[Admin] Direct message sent to ${chatId}`);
         res.json({ success: true });
     } catch (err) {
@@ -432,8 +434,6 @@ app.delete('/api/watchlist/:id', requireAdminToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
-
 
 // Helper to update a value in the .env file
 const updateEnvFile = (key, value) => {
@@ -453,13 +453,13 @@ const updateEnvFile = (key, value) => {
 };
 
 const PROXY_SCHEMES = ['http://', 'https://', 'socks://', 'socks4://', 'socks5://', 'socks5h://'];
-const isSupportedProxyUrl = (url) => !url || PROXY_SCHEMES.some(s => url.startsWith(s));
+const isSupportedProxyUrl = (url) => !url || PROXY_SCHEMES.some((s) => url.startsWith(s));
 
 app.get('/api/config', requireAdminToken, (req, res) => {
     res.json({
         tmdbApiKey: process.env.TMDB_API_KEY || '',
         tmdbProxyUrl: process.env.TMDB_PROXY_URL || '',
-        adminToken: process.env.ADMIN_TOKEN || '',
+        adminToken: process.env.ADMIN_TOKEN || ''
     });
 });
 
@@ -525,9 +525,7 @@ app.post('/api/config/test-proxy', requireAdminToken, async (req, res) => {
         });
         res.json({ success: true, ms: Date.now() - started, direct: !url });
     } catch (err) {
-        const reason = err.response
-            ? `TMDB replied ${err.response.status}`
-            : (err.code || err.message);
+        const reason = err.response ? `TMDB replied ${err.response.status}` : err.code || err.message;
         res.json({ success: false, error: reason, ms: Date.now() - started });
     }
 });

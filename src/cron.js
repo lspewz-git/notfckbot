@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
 const { getDetails } = require('./api/tmdb');
-const { NOTIFY_LABELS, getWatchLink } = require('./constants');
+const { getWatchLink } = require('./constants');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
 let isRunning = false;
@@ -47,7 +47,7 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             console.log(`[Cron] New content for "${item.title}": S${currentSeason}E${currentEpisode}`);
             const epName = lastE.name || 'Без названия';
 
-            const seasonObj = (data.seasons || []).find(s => s.season_number === currentSeason);
+            const seasonObj = (data.seasons || []).find((s) => s.season_number === currentSeason);
             const targetCount = seasonObj ? seasonObj.episode_count : 0;
             const isSeasonComplete = targetCount > 0 && currentEpisode >= targetCount;
 
@@ -82,7 +82,10 @@ const checkSeriesUpdates = async (bot, allSeries) => {
 
                     if (shouldNotify) {
                         if (item.poster_url) {
-                            await bot.telegram.sendPhoto(chat.id, item.poster_url, { caption: msg, parse_mode: 'HTML' });
+                            await bot.telegram.sendPhoto(chat.id, item.poster_url, {
+                                caption: msg,
+                                parse_mode: 'HTML'
+                            });
                         } else {
                             await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
                         }

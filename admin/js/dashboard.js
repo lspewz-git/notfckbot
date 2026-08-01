@@ -17,7 +17,8 @@ const PROXY_HEALTH = {
 export function updateHealth(h) {
     updateBadge('health-tg', h.telegram ? 'TG: OK' : 'TG: ERR', h.telegram ? 'ok' : 'error');
     updateBadge('health-tmdb', h.tmdb ? 'TMDB: OK' : 'TMDB: ERR', h.tmdb ? 'ok' : 'error');
-    updateBadge('health-proxy', ...(PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost']));
+    const [proxyText, proxyClass] = PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost'];
+    updateBadge('health-proxy', proxyText, proxyClass);
 }
 
 export function updatePopular(list) {
@@ -29,7 +30,9 @@ export function updatePopular(list) {
         return;
     }
 
-    container.innerHTML = list.map((item, idx) => `
+    container.innerHTML = list
+        .map(
+            (item, idx) => `
         <div class="popular-item" data-action="series" data-id="${item.seriesId}">
             <div class="popular-rank">${idx + 1}</div>
             <div class="popular-body">
@@ -38,5 +41,7 @@ export function updatePopular(list) {
             </div>
             <div class="popular-chevron">›</div>
         </div>
-    `).join('');
+    `
+        )
+        .join('');
 }

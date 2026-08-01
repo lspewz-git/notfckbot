@@ -1,6 +1,6 @@
 /** Acting on one subscription or watchlist entry. */
 
-import { $, setText } from './dom.js';
+import { $, $field, $img, setText } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm } from './ui.js';
@@ -19,7 +19,7 @@ export async function openSeriesDetails(tmdbId) {
         setText('detail-desc', data.overview || 'No description available.');
         setText('detail-meta', `Rating: ⭐️ ${data.vote_average.toFixed(1)} • Seasons: ${data.number_of_seasons}`);
         setText('detail-subs-count', `${data.subCount} Subscribers`);
-        $('detail-poster').src = data.poster_path
+        $img('detail-poster').src = data.poster_path
             ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
             : 'https://via.placeholder.com/200x300';
 
@@ -40,7 +40,7 @@ export function openModeModal(key) {
     setSelectValue('mode-select', sub.notify_type);
 
     $('confirm-mode').onclick = async () => {
-        const notify_type = $('mode-select').value;
+        const notify_type = $field('mode-select').value;
         if (notify_type === sub.notify_type) return closeModal('mode-modal');
 
         // POST /api/subscription updates notify_type on an existing row
@@ -68,7 +68,7 @@ export function deleteSub(chatId, seriesId) {
 export function deleteWatchlistItem(id) {
     showConfirm({
         title: 'Remove from watchlist?',
-        text: 'The user will no longer be notified about this film\'s release.',
+        text: "The user will no longer be notified about this film's release.",
         confirmLabel: 'Yes, remove',
         cancelLabel: 'No, keep it',
         onConfirm: () => mutate(`/watchlist/${id}`, { method: 'DELETE' }, 'Removed from watchlist')

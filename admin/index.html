@@ -1,445 +1,497 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>NotFckBot | Soft Glass Admin</title>
+        <link rel="stylesheet" href="css/base.css" />
+        <link rel="stylesheet" href="css/layout.css" />
+        <link rel="stylesheet" href="css/cards.css" />
+        <link rel="stylesheet" href="css/logs.css" />
+        <link rel="stylesheet" href="css/tables.css" />
+        <link rel="stylesheet" href="css/buttons.css" />
+        <link rel="stylesheet" href="css/forms.css" />
+        <link rel="stylesheet" href="css/overlays.css" />
+        <link rel="stylesheet" href="css/utilities.css" />
+        <link rel="stylesheet" href="css/responsive.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap"
+            rel="stylesheet"
+        />
+    </head>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NotFckBot | Soft Glass Admin</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap"
-        rel="stylesheet">
-</head>
+    <body>
+        <!-- Shown only on narrow screens; toggles the off-canvas sidebar -->
+        <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+        <div id="nav-backdrop" class="nav-backdrop"></div>
 
-<body>
-    <!-- Shown only on narrow screens; toggles the off-canvas sidebar -->
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
-    <div id="nav-backdrop" class="nav-backdrop"></div>
-
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="sidebar-logo">
-                🎬 NotFck<span>Bot</span>
-            </div>
-            <nav class="nav-links">
-                <li class="nav-item active" data-section="dashboard">📊 Dashboard</li>
-                <li class="nav-item" data-section="chats">👤 Users / Chats</li>
-                <li class="nav-item" data-section="subs">📺 Subscriptions</li>
-                <li class="nav-item" data-section="watchlist">🎞 Watchlist</li>
-                <li class="nav-item" data-section="logs">📜 Activity Logs</li>
-            </nav>
-            <div class="sidebar-footer">
-                <button id="actions-btn" class="btn btn-ghost btn-block">⚡️ Actions</button>
-                <button id="danger-btn" class="btn btn-danger btn-block">☠️ Danger Zone</button>
-            </div>
-        </aside>
-
-        <!-- Main Workspace -->
-        <main class="main-content">
-            <!-- Dashboard Section -->
-            <section id="dashboard-section" class="section active">
-                <header>
-                    <div class="header-info">
-                        <h1>Dashboard</h1>
-                        <p style="color: var(--text-dim)">Overview of system health and activity.</p>
-                    </div>
-                    <div class="header-status">
-                        <div class="refresh-bar">
-                            <div id="refresh-timer" class="timer-circle">—</div>
-                            <span class="refresh-label">Auto-refresh</span>
-                            <button id="pause-refresh" class="btn btn-ghost btn-compact">Resume</button>
-                            <button id="refresh-btn" class="btn btn-ghost btn-icon" title="Refresh now"
-                                aria-label="Refresh now">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                                    <polyline points="21 3 21 9 15 9" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="status-badges">
-                            <div id="health-tg" class="badge">TG: ...</div>
-                            <div id="health-tmdb" class="badge">TMDB: ...</div>
-                            <div id="health-proxy" class="badge" style="cursor: pointer;"
-                                title="Configure the TMDB proxy" data-action="proxy">Proxy: ...</div>
-                        </div>
-                    </div>
-                </header>
-
-                <div class="stats-grid">
-                    <div class="stat-card" data-section="chats">
-                        <span class="stat-title">Total Chats</span>
-                        <span id="chats-count" class="stat-value">-</span>
-                    </div>
-                    <div class="stat-card" data-section="subs">
-                        <span class="stat-title">Active Subs</span>
-                        <span id="subs-count" class="stat-value">-</span>
-                    </div>
-                    <div class="stat-card" data-section="watchlist">
-                        <span class="stat-title">Watchlist</span>
-                        <span id="films-count" class="stat-value">-</span>
-                    </div>
+        <div class="app-container">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <div class="sidebar-logo">🎬 NotFck<span>Bot</span></div>
+                <nav class="nav-links">
+                    <li class="nav-item active" data-section="dashboard">📊 Dashboard</li>
+                    <li class="nav-item" data-section="chats">👤 Users / Chats</li>
+                    <li class="nav-item" data-section="subs">📺 Subscriptions</li>
+                    <li class="nav-item" data-section="watchlist">🎞 Watchlist</li>
+                    <li class="nav-item" data-section="logs">📜 Activity Logs</li>
+                </nav>
+                <div class="sidebar-footer">
+                    <button id="actions-btn" class="btn btn-ghost btn-block">⚡️ Actions</button>
+                    <button id="danger-btn" class="btn btn-danger btn-block">☠️ Danger Zone</button>
                 </div>
+            </aside>
 
-                <div class="dashboard-bottom">
-                    <!-- Popularity Block -->
+            <!-- Main Workspace -->
+            <main class="main-content">
+                <!-- Dashboard Section -->
+                <section id="dashboard-section" class="section active">
+                    <header>
+                        <div class="header-info">
+                            <h1>Dashboard</h1>
+                            <p style="color: var(--text-dim)">Overview of system health and activity.</p>
+                        </div>
+                        <div class="header-status">
+                            <div class="refresh-bar">
+                                <div id="refresh-timer" class="timer-circle">—</div>
+                                <span class="refresh-label">Auto-refresh</span>
+                                <button id="pause-refresh" class="btn btn-ghost btn-compact">Resume</button>
+                                <button
+                                    id="refresh-btn"
+                                    class="btn btn-ghost btn-icon"
+                                    title="Refresh now"
+                                    aria-label="Refresh now"
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        width="16"
+                                        height="16"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                        <polyline points="21 3 21 9 15 9" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="status-badges">
+                                <div id="health-tg" class="badge">TG: ...</div>
+                                <div id="health-tmdb" class="badge">TMDB: ...</div>
+                                <div
+                                    id="health-proxy"
+                                    class="badge"
+                                    style="cursor: pointer"
+                                    title="Configure the TMDB proxy"
+                                    data-action="proxy"
+                                >
+                                    Proxy: ...
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div class="stats-grid">
+                        <div class="stat-card" data-section="chats">
+                            <span class="stat-title">Total Chats</span>
+                            <span id="chats-count" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-card" data-section="subs">
+                            <span class="stat-title">Active Subs</span>
+                            <span id="subs-count" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-card" data-section="watchlist">
+                            <span class="stat-title">Watchlist</span>
+                            <span id="films-count" class="stat-value">-</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-bottom">
+                        <!-- Popularity Block -->
+                        <div class="glass-card">
+                            <h3>🔥 Popular Now</h3>
+                            <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem">
+                                Most subscribed series by your users.
+                            </p>
+                            <div id="popular-list">
+                                <!-- Injected via script -->
+                                <p class="empty-cell">Loading popularity stats...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Chats Section -->
+                <section id="chats-section" class="section">
+                    <header>
+                        <h1>Users / Chats</h1>
+                    </header>
                     <div class="glass-card">
-                        <h3>🔥 Popular Now</h3>
-                        <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem;">Most subscribed
-                            series by your users.</p>
-                        <div id="popular-list">
-                            <!-- Injected via script -->
-                            <p class="empty-cell">Loading popularity stats...</p>
+                        <div class="search-box">
+                            <input type="text" id="chats-filter" placeholder="Filter by ID or Username..." />
+                        </div>
+                        <div class="table-wrap">
+                            <table id="chats-table">
+                                <thead>
+                                    <tr>
+                                        <th>Chat ID</th>
+                                        <th>User / Group</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="chats-body"></tbody>
+                            </table>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- Chats Section -->
-            <section id="chats-section" class="section">
-                <header>
-                    <h1>Users / Chats</h1>
-                </header>
-                <div class="glass-card">
-                    <div class="search-box">
-                        <input type="text" id="chats-filter" placeholder="Filter by ID or Username...">
+                <!-- Logs Section -->
+                <section id="logs-section" class="section">
+                    <header>
+                        <h1>Activity Logs</h1>
+                        <div class="log-filters">
+                            <button class="btn btn-ghost active" data-log-filter="all">All</button>
+                            <button class="btn btn-ghost" data-log-filter="error">Errors</button>
+                            <button class="btn btn-ghost" data-log-filter="success">Success</button>
+                        </div>
+                    </header>
+                    <div class="glass-card">
+                        <div id="logs-viewer" class="logs-viewer"></div>
                     </div>
-                    <div class="table-wrap">
-                        <table id="chats-table">
-                            <thead>
-                                <tr>
-                                    <th>Chat ID</th>
-                                    <th>User / Group</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="chats-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- Logs Section -->
-            <section id="logs-section" class="section">
-                <header>
-                    <h1>Activity Logs</h1>
-                    <div class="log-filters">
-                        <button class="btn btn-ghost active" data-log-filter="all">All</button>
-                        <button class="btn btn-ghost" data-log-filter="error">Errors</button>
-                        <button class="btn btn-ghost" data-log-filter="success">Success</button>
+                <section id="watchlist-section" class="section">
+                    <header>
+                        <h1>Watchlist Films</h1>
+                    </header>
+                    <div class="glass-card">
+                        <div class="search-box">
+                            <input type="text" id="watchlist-filter" placeholder="Filter by user, film or year..." />
+                        </div>
+                        <div class="table-wrap">
+                            <table id="watchlist-table">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Film Title</th>
+                                        <th>Year</th>
+                                        <th>Release</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="watchlist-body"></tbody>
+                            </table>
+                        </div>
                     </div>
-                </header>
-                <div class="glass-card">
-                    <div id="logs-viewer" class="logs-viewer"></div>
-                </div>
-            </section>
+                </section>
 
-            <section id="watchlist-section" class="section">
-                <header>
-                    <h1>Watchlist Films</h1>
-                </header>
-                <div class="glass-card">
-                    <div class="search-box">
-                        <input type="text" id="watchlist-filter" placeholder="Filter by user, film or year...">
+                <section id="subs-section" class="section">
+                    <header>
+                        <h1>Active Subscriptions</h1>
+                    </header>
+                    <div class="glass-card">
+                        <div class="search-box">
+                            <input type="text" id="subs-filter" placeholder="Filter by user, series or mode..." />
+                        </div>
+                        <div class="table-wrap">
+                            <table id="subs-table">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Series</th>
+                                        <th>Status</th>
+                                        <th>Mode</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="subs-body"></tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="table-wrap">
-                        <table id="watchlist-table">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Film Title</th>
-                                    <th>Year</th>
-                                    <th>Release</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="watchlist-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
+                </section>
+            </main>
+        </div>
 
-            <section id="subs-section" class="section">
-                <header>
-                    <h1>Active Subscriptions</h1>
-                </header>
-                <div class="glass-card">
-                    <div class="search-box">
-                        <input type="text" id="subs-filter" placeholder="Filter by user, series or mode...">
-                    </div>
-                    <div class="table-wrap">
-                        <table id="subs-table">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Series</th>
-                                    <th>Status</th>
-                                    <th>Mode</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subs-body"></tbody>
-                        </table>
-                    </div>
+        <!-- Modals -->
+        <!-- Direct Message Modal -->
+        <div id="dm-modal" class="modal">
+            <div class="modal-content">
+                <h3>Direct Message</h3>
+                <p id="dm-target-info">To: @username</p>
+                <textarea class="textarea-field" id="dm-text"></textarea>
+                <div class="modal-actions">
+                    <button id="confirm-dm" class="btn btn-primary btn-grow">Send Message</button>
+                    <button data-close-return="dm-modal" class="btn btn-ghost">Cancel</button>
                 </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- Modals -->
-    <!-- Direct Message Modal -->
-    <div id="dm-modal" class="modal">
-        <div class="modal-content">
-            <h3>Direct Message</h3>
-            <p id="dm-target-info">To: @username</p>
-            <textarea class="textarea-field" id="dm-text"
-               ></textarea>
-            <div class="modal-actions">
-                <button id="confirm-dm" class="btn btn-primary btn-grow">Send Message</button>
-                <button data-close-return="dm-modal" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
-    </div>
 
-    <!-- Series Detail Modal -->
-    <div id="detail-modal" class="modal">
-        <div class="modal-content modal-wide">
-            <div id="detail-loading">Loading details...</div>
-            <div id="detail-ready" style="display: none;">
-                <div style="display: flex; gap: 2rem;">
-                    <img id="detail-poster" src="" style="width: 200px; border-radius: 1rem;">
-                    <div class="btn-grow">
-                        <h2 id="detail-title">Series Title</h2>
-                        <div id="detail-meta" style="margin: 0.5rem 0; color: var(--primary);">S01E01 • ⭐️ 8.9</div>
-                        <p id="detail-desc"
-                            style="color: var(--text-dim); font-size: 0.9rem; margin: 1rem 0; line-height: 1.6;"></p>
-                        <div class="badge ok" id="detail-subs-count">12 Subscribers</div>
+        <!-- Series Detail Modal -->
+        <div id="detail-modal" class="modal">
+            <div class="modal-content modal-wide">
+                <div id="detail-loading">Loading details...</div>
+                <div id="detail-ready" style="display: none">
+                    <div style="display: flex; gap: 2rem">
+                        <img id="detail-poster" src="" style="width: 200px; border-radius: 1rem" />
+                        <div class="btn-grow">
+                            <h2 id="detail-title">Series Title</h2>
+                            <div id="detail-meta" style="margin: 0.5rem 0; color: var(--primary)">S01E01 • ⭐️ 8.9</div>
+                            <p
+                                id="detail-desc"
+                                style="color: var(--text-dim); font-size: 0.9rem; margin: 1rem 0; line-height: 1.6"
+                            ></p>
+                            <div class="badge ok" id="detail-subs-count">12 Subscribers</div>
+                        </div>
                     </div>
+                    <button data-close="detail-modal" class="btn btn-ghost btn-block mt-xl">Close</button>
                 </div>
-                <button data-close="detail-modal" class="btn btn-ghost btn-block mt-xl"
-                   >Close</button>
             </div>
         </div>
-    </div>
 
-    <!-- Per-chat action menu (replaces the row of buttons in the chats table) -->
-    <div id="chat-actions-modal" class="modal">
-        <div class="modal-content modal-narrow">
-            <h3 id="chat-actions-title">Manage chat</h3>
-            <p class="modal-sub" id="chat-actions-sub"></p>
-            <div class="action-list">
-                <button id="action-add" class="btn btn-ghost action-row">➕ Add series or film</button>
-                <button id="action-message" class="btn btn-ghost action-row">✉️ Send message</button>
-                <button id="action-block" class="btn btn-ghost action-row">🚫 Block</button>
+        <!-- Per-chat action menu (replaces the row of buttons in the chats table) -->
+        <div id="chat-actions-modal" class="modal">
+            <div class="modal-content modal-narrow">
+                <h3 id="chat-actions-title">Manage chat</h3>
+                <p class="modal-sub" id="chat-actions-sub"></p>
+                <div class="action-list">
+                    <button id="action-add" class="btn btn-ghost action-row">➕ Add series or film</button>
+                    <button id="action-message" class="btn btn-ghost action-row">✉️ Send message</button>
+                    <button id="action-block" class="btn btn-ghost action-row">🚫 Block</button>
+                </div>
+                <button data-close="chat-actions-modal" class="btn btn-ghost btn-block mt-lg">Close</button>
             </div>
-            <button data-close="chat-actions-modal" class="btn btn-ghost btn-block mt-lg"
-               >Close</button>
         </div>
-    </div>
 
-    <!-- Unified add modal: series and movies in one search -->
-    <div id="add-content-modal" class="modal">
-        <div class="modal-content">
-            <h3>Add for <span id="add-content-target"></span></h3>
-            <div class="search-box mt-md">
-                <input type="text" id="content-search-input" placeholder="Search series or movies...">
+        <!-- Unified add modal: series and movies in one search -->
+        <div id="add-content-modal" class="modal">
+            <div class="modal-content">
+                <h3>Add for <span id="add-content-target"></span></h3>
+                <div class="search-box mt-md">
+                    <input type="text" id="content-search-input" placeholder="Search series or movies..." />
+                </div>
+                <div
+                    id="content-search-results"
+                    class="search-results"
+                    style="max-height: 320px; overflow-y: auto; margin-top: 1rem"
+                ></div>
+                <div
+                    id="content-selected"
+                    style="
+                        display: none;
+                        margin-top: 1rem;
+                        padding: 1rem;
+                        background: rgba(255, 255, 255, 0.05);
+                        border-radius: 1rem;
+                    "
+                >
+                    <h4 id="selected-content-title"></h4>
+                    <div class="field-block" id="notify-field">
+                        <label class="field-label" for="sub-notify-type">Notification mode</label>
+                        <select id="sub-notify-type" class="select-field">
+                            <option value="episode">New Episodes</option>
+                            <option value="season">Whole Seasons</option>
+                            <option value="first_and_full">1x1 + Whole Seasons</option>
+                        </select>
+                    </div>
+                    <button id="confirm-add-content" class="btn btn-primary btn-block">Add</button>
+                </div>
+                <button data-close-return="add-content-modal" class="btn btn-ghost btn-block mt-md">Cancel</button>
             </div>
-            <div id="content-search-results" class="search-results"
-                style="max-height: 320px; overflow-y: auto; margin-top: 1rem;"></div>
-            <div id="content-selected"
-                style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 1rem;">
-                <h4 id="selected-content-title"></h4>
-                <div class="field-block" id="notify-field">
-                    <label class="field-label" for="sub-notify-type">Notification mode</label>
-                    <select id="sub-notify-type" class="select-field">
-                        <option value="episode">New Episodes</option>
-                        <option value="season">Whole Seasons</option>
-                        <option value="first_and_full">1x1 + Whole Seasons</option>
+        </div>
+
+        <!-- TMDB proxy settings -->
+        <div id="proxy-modal" class="modal">
+            <div class="modal-content modal-medium">
+                <h3>🌐 TMDB Proxy</h3>
+                <div class="proxy-note">
+                    <p>
+                        <strong>Covers</strong> everything the bot sends out — TMDB and the Telegram Bot API. Applied
+                        immediately, no restart. The database connection stays direct, inside the docker network.
+                    </p>
+                    <p>
+                        <strong>DNS:</strong> HTTP(S) and SOCKS5h resolve hostnames on the proxy side. Plain SOCKS5
+                        resolves them on this host first — pick SOCKS5h if the local resolver is the problem.
+                    </p>
+                    <p>
+                        <strong>Not covered:</strong> image downloads by Telegram's servers and build-time traffic
+                        (<code>npm</code>, <code>apt</code>) — those never leave this container.
+                    </p>
+                </div>
+
+                <div class="field-block">
+                    <label class="field-label" for="proxy-scheme">Mode</label>
+                    <select id="proxy-scheme" class="select-field">
+                        <option value="">Off — connect directly</option>
+                        <option value="http">HTTP</option>
+                        <option value="https">HTTPS</option>
+                        <option value="socks5">SOCKS5</option>
+                        <option value="socks5h">SOCKS5h — resolve DNS on the proxy</option>
                     </select>
                 </div>
-                <button id="confirm-add-content" class="btn btn-primary btn-block">Add</button>
-            </div>
-            <button data-close-return="add-content-modal" class="btn btn-ghost btn-block mt-md"
-               >Cancel</button>
-        </div>
-    </div>
 
-    <!-- TMDB proxy settings -->
-    <div id="proxy-modal" class="modal">
-        <div class="modal-content modal-medium">
-            <h3>🌐 TMDB Proxy</h3>
-            <div class="proxy-note">
-                <p><strong>Covers</strong> everything the bot sends out — TMDB and the Telegram Bot API. Applied
-                    immediately, no restart. The database connection stays direct, inside the docker network.</p>
-                <p><strong>DNS:</strong> HTTP(S) and SOCKS5h resolve hostnames on the proxy side. Plain SOCKS5
-                    resolves them on this host first — pick SOCKS5h if the local resolver is the problem.</p>
-                <p><strong>Not covered:</strong> image downloads by Telegram's servers and build-time traffic
-                    (<code>npm</code>, <code>apt</code>) — those never leave this container.</p>
-            </div>
-
-            <div class="field-block">
-                <label class="field-label" for="proxy-scheme">Mode</label>
-                <select id="proxy-scheme" class="select-field">
-                    <option value="">Off — connect directly</option>
-                    <option value="http">HTTP</option>
-                    <option value="https">HTTPS</option>
-                    <option value="socks5">SOCKS5</option>
-                    <option value="socks5h">SOCKS5h — resolve DNS on the proxy</option>
-                </select>
-            </div>
-
-            <div id="proxy-fields">
-                <div class="field-row">
-                    <div class="btn-grow-2">
-                        <label class="field-label" for="proxy-host">Host</label>
-                        <input type="text" id="proxy-host" class="input-field" placeholder="127.0.0.1"
-                            autocomplete="off">
+                <div id="proxy-fields">
+                    <div class="field-row">
+                        <div class="btn-grow-2">
+                            <label class="field-label" for="proxy-host">Host</label>
+                            <input
+                                type="text"
+                                id="proxy-host"
+                                class="input-field"
+                                placeholder="127.0.0.1"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="btn-grow">
+                            <label class="field-label" for="proxy-port">Port</label>
+                            <input
+                                type="number"
+                                id="proxy-port"
+                                class="input-field"
+                                placeholder="1080"
+                                min="1"
+                                max="65535"
+                            />
+                        </div>
                     </div>
-                    <div class="btn-grow">
-                        <label class="field-label" for="proxy-port">Port</label>
-                        <input type="number" id="proxy-port" class="input-field" placeholder="1080" min="1"
-                            max="65535">
+                    <div class="field-row mt-md">
+                        <div class="btn-grow">
+                            <label class="field-label" for="proxy-user">Username (optional)</label>
+                            <input type="text" id="proxy-user" class="input-field" autocomplete="off" />
+                        </div>
+                        <div class="btn-grow">
+                            <label class="field-label" for="proxy-pass">Password (optional)</label>
+                            <input type="password" id="proxy-pass" class="input-field" autocomplete="new-password" />
+                        </div>
+                    </div>
+                    <div class="proxy-preview">
+                        <span class="field-label" style="margin: 0">Resulting URL</span>
+                        <code id="proxy-preview">—</code>
                     </div>
                 </div>
-                <div class="field-row mt-md">
-                    <div class="btn-grow">
-                        <label class="field-label" for="proxy-user">Username (optional)</label>
-                        <input type="text" id="proxy-user" class="input-field" autocomplete="off">
+
+                <div class="modal-actions mt-lg">
+                    <button id="proxy-test" class="btn btn-ghost">Test</button>
+                    <button id="proxy-save" class="btn btn-primary btn-grow">Save</button>
+                    <button data-close="proxy-modal" class="btn btn-ghost">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions menu -->
+        <div id="actions-modal" class="modal">
+            <div class="modal-content modal-narrow">
+                <h3>⚡️ Actions</h3>
+                <p class="modal-sub">Manual operations you can run on demand.</p>
+                <div class="action-list">
+                    <button id="trigger-btn" class="btn btn-ghost action-row">🔍 Trigger Update Check</button>
+                    <button id="broadcast-btn" class="btn btn-ghost action-row">📢 Broadcast Message</button>
+                </div>
+                <button data-close="actions-modal" class="btn btn-ghost btn-block mt-lg">Close</button>
+            </div>
+        </div>
+
+        <!-- Broadcast Modal -->
+        <div id="broadcast-modal" class="modal">
+            <div class="modal-content">
+                <h3>📢 Global Broadcast</h3>
+                <p style="color: var(--text-dim); margin-bottom: 1.5rem">
+                    The message is delivered to every chat in the selected audience, prefixed with
+                    <code>📣 ОБЪЯВЛЕНИЕ:</code>
+                </p>
+                <div class="field-block-tight">
+                    <label class="field-label" for="broadcast-target">Audience</label>
+                    <select id="broadcast-target" class="select-field">
+                        <option value="all">Everyone (private chats + groups)</option>
+                        <option value="private">Private chats only</option>
+                        <option value="groups">Groups and channels only</option>
+                    </select>
+                </div>
+                <label class="field-label" for="broadcast-msg">Message</label>
+                <textarea class="textarea-field" id="broadcast-msg"></textarea>
+                <div class="modal-actions">
+                    <button id="send-broadcast" class="btn btn-primary btn-grow">Send Broadcast</button>
+                    <button data-close-return="broadcast-modal" class="btn btn-ghost">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone Modal -->
+        <div id="danger-modal" class="modal">
+            <div class="modal-content modal-medium">
+                <h3>☠️ Danger Zone</h3>
+                <p style="color: var(--text-dim); margin-top: 0.5rem">
+                    Irreversible operations. Every action here asks for confirmation first.
+                </p>
+                <div class="danger-item">
+                    <div class="danger-item-info">
+                        <div class="danger-item-title">Wipe All Data</div>
+                        <div class="danger-item-desc">
+                            Empties the database completely — all chats, subscriptions, series and watchlist entries.
+                        </div>
                     </div>
-                    <div class="btn-grow">
-                        <label class="field-label" for="proxy-pass">Password (optional)</label>
-                        <input type="password" id="proxy-pass" class="input-field" autocomplete="new-password">
-                    </div>
+                    <button id="wipe-all-btn" class="btn btn-danger">Wipe</button>
                 </div>
-                <div class="proxy-preview">
-                    <span class="field-label" style="margin: 0;">Resulting URL</span>
-                    <code id="proxy-preview">—</code>
+                <button data-close="danger-modal" class="btn btn-ghost btn-block mt-lg">Close</button>
+            </div>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div id="confirm-modal" class="modal">
+            <div class="modal-content modal-medium">
+                <h3 id="confirm-title">Are you sure?</h3>
+                <p id="confirm-text" style="color: var(--text-dim); margin: 1rem 0 1.75rem"></p>
+                <div class="modal-actions">
+                    <button id="modal-confirm-btn" class="btn btn-danger-quiet btn-grow">Yes</button>
+                    <button id="modal-cancel-btn" class="btn btn-primary btn-grow-2">No, cancel</button>
                 </div>
             </div>
-
-            <div class="modal-actions mt-lg">
-                <button id="proxy-test" class="btn btn-ghost">Test</button>
-                <button id="proxy-save" class="btn btn-primary btn-grow">Save</button>
-                <button data-close="proxy-modal" class="btn btn-ghost">Cancel</button>
-            </div>
         </div>
-    </div>
 
-    <!-- Actions menu -->
-    <div id="actions-modal" class="modal">
-        <div class="modal-content modal-narrow">
-            <h3>⚡️ Actions</h3>
-            <p class="modal-sub">Manual operations you can run
-                on demand.</p>
-            <div class="action-list">
-                <button id="trigger-btn" class="btn btn-ghost action-row">🔍 Trigger Update Check</button>
-                <button id="broadcast-btn" class="btn btn-ghost action-row">📢 Broadcast Message</button>
-            </div>
-            <button data-close="actions-modal" class="btn btn-ghost btn-block mt-lg"
-               >Close</button>
-        </div>
-    </div>
-
-    <!-- Broadcast Modal -->
-    <div id="broadcast-modal" class="modal">
-        <div class="modal-content">
-            <h3>📢 Global Broadcast</h3>
-            <p style="color: var(--text-dim); margin-bottom: 1.5rem;">The message is delivered to every chat in the
-                selected audience, prefixed with <code>📣 ОБЪЯВЛЕНИЕ:</code></p>
-            <div class="field-block-tight">
-                <label class="field-label" for="broadcast-target">Audience</label>
-                <select id="broadcast-target" class="select-field">
-                    <option value="all">Everyone (private chats + groups)</option>
-                    <option value="private">Private chats only</option>
-                    <option value="groups">Groups and channels only</option>
-                </select>
-            </div>
-            <label class="field-label" for="broadcast-msg">Message</label>
-            <textarea class="textarea-field" id="broadcast-msg"
-               ></textarea>
-            <div class="modal-actions">
-                <button id="send-broadcast" class="btn btn-primary btn-grow">Send Broadcast</button>
-                <button data-close-return="broadcast-modal" class="btn btn-ghost">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Danger Zone Modal -->
-    <div id="danger-modal" class="modal">
-        <div class="modal-content modal-medium">
-            <h3>☠️ Danger Zone</h3>
-            <p style="color: var(--text-dim); margin-top: 0.5rem;">Irreversible operations. Every action here asks for
-                confirmation first.</p>
-            <div class="danger-item">
-                <div class="danger-item-info">
-                    <div class="danger-item-title">Wipe All Data</div>
-                    <div class="danger-item-desc">Empties the database completely — all chats, subscriptions, series
-                        and watchlist entries.</div>
+        <!-- Notification mode editor -->
+        <div id="mode-modal" class="modal">
+            <div class="modal-content modal-narrow">
+                <h3>Notification mode</h3>
+                <p class="modal-sub" id="mode-target"></p>
+                <div class="field-block">
+                    <label class="field-label" for="mode-select">Notify about</label>
+                    <select id="mode-select" class="select-field">
+                        <option value="episode">Every new episode</option>
+                        <option value="season">Whole season</option>
+                        <option value="first_and_full">1st episode + whole season</option>
+                    </select>
                 </div>
-                <button id="wipe-all-btn" class="btn btn-danger">Wipe</button>
-            </div>
-            <button data-close="danger-modal" class="btn btn-ghost btn-block mt-lg"
-               >Close</button>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirm-modal" class="modal">
-        <div class="modal-content modal-medium">
-            <h3 id="confirm-title">Are you sure?</h3>
-            <p id="confirm-text" style="color: var(--text-dim); margin: 1rem 0 1.75rem;"></p>
-            <div class="modal-actions">
-                <button id="modal-confirm-btn" class="btn btn-danger-quiet btn-grow">Yes</button>
-                <button id="modal-cancel-btn" class="btn btn-primary btn-grow-2">No, cancel</button>
+                <div class="modal-actions">
+                    <button id="confirm-mode" class="btn btn-primary btn-grow">Save</button>
+                    <button data-close="mode-modal" class="btn btn-ghost">Cancel</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Notification mode editor -->
-    <div id="mode-modal" class="modal">
-        <div class="modal-content modal-narrow">
-            <h3>Notification mode</h3>
-            <p class="modal-sub" id="mode-target"></p>
-            <div class="field-block">
-                <label class="field-label" for="mode-select">Notify about</label>
-                <select id="mode-select" class="select-field">
-                    <option value="episode">Every new episode</option>
-                    <option value="season">Whole season</option>
-                    <option value="first_and_full">1st episode + whole season</option>
-                </select>
-            </div>
-            <div class="modal-actions">
-                <button id="confirm-mode" class="btn btn-primary btn-grow">Save</button>
-                <button data-close="mode-modal" class="btn btn-ghost">Cancel</button>
+        <!-- Block duration (replaces window.prompt) -->
+        <div id="block-modal" class="modal">
+            <div class="modal-content modal-narrow">
+                <h3>🚫 Block chat</h3>
+                <p class="modal-sub" id="block-target"></p>
+                <div class="field-block">
+                    <label class="field-label" for="block-minutes">Duration (minutes)</label>
+                    <input type="number" id="block-minutes" class="input-field" min="1" value="5" />
+                </div>
+                <div class="modal-actions">
+                    <button id="confirm-block" class="btn btn-danger btn-grow">Block</button>
+                    <button data-close-return="block-modal" class="btn btn-ghost">Cancel</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Block duration (replaces window.prompt) -->
-    <div id="block-modal" class="modal">
-        <div class="modal-content modal-narrow">
-            <h3>🚫 Block chat</h3>
-            <p class="modal-sub" id="block-target"></p>
-            <div class="field-block">
-                <label class="field-label" for="block-minutes">Duration (minutes)</label>
-                <input type="number" id="block-minutes" class="input-field" min="1" value="5">
-            </div>
-            <div class="modal-actions">
-                <button id="confirm-block" class="btn btn-danger btn-grow">Block</button>
-                <button data-close-return="block-modal" class="btn btn-ghost">Cancel</button>
-            </div>
-        </div>
-    </div>
+        <!-- Toasts (replace window.alert) -->
+        <div id="toast-container" class="toast-container"></div>
 
-    <!-- Toasts (replace window.alert) -->
-    <div id="toast-container" class="toast-container"></div>
-
-    <script type="module" src="js/app.js"></script>
-</body>
-
+        <script type="module" src="js/app.js"></script>
+    </body>
 </html>
