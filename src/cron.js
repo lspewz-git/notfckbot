@@ -61,6 +61,26 @@ const checkSeriesUpdates = async (bot, allSeries) => {
     }
 };
 
+/**
+ * A season counts as complete only when both hold:
+ * - the last aired episode has reached the season's episode count, and
+ * - TMDB announces no further episode in that same season.
+ * TMDB often lists only the episodes announced so far, so the count alone can
+ * say "complete" while more episodes are still scheduled.
+ */
+const isSeasonComplete = (data, season, episode) => {
+    const seasonObj = (data.seasons || []).find((s) => s.season_number === season);
+    const total = seasonObj ? seasonObj.episode_count : 0;
+    const next = data.next_episode_to_air;
+    const moreInSeason = Boolean(next) && next.season_number === season;
+    return total > 0 && episode >= total && !moreInSeason;
+};
+
+const sendToChat = (bot, item, chatId, msg) =>
+    item.poster_url
+        ? bot.telegram.sendPhoto(chatId, item.poster_url, { caption: msg, parse_mode: 'HTML' })
+        : bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+
 const notifyNewEpisodes = async (bot, item, data) => {
     const lastE = data.last_episode_to_air;
     if (!lastE) return; // No episodes aired yet
@@ -70,67 +90,61 @@ const notifyNewEpisodes = async (bot, item, data) => {
 
     const hasNewSeason = currentSeason > item.last_season;
     const hasNewEpisode = currentSeason === item.last_season && currentEpisode > item.last_episode;
+    const hasNewContent = hasNewSeason || hasNewEpisode;
+    const complete = isSeasonComplete(data, currentSeason, currentEpisode);
 
-    if (!hasNewSeason && !hasNewEpisode) return;
+    // First check since completed_season existed: take what is already on screen as
+    // announced, so old seasons don't suddenly produce "season complete" messages.
+    let completedSeason = item.completed_season;
+    if (completedSeason === null || completedSeason === undefined) {
+        if (hasNewContent) completedSeason = item.last_season;
+        else completedSeason = complete ? currentSeason : currentSeason - 1;
+        await item.update({ completed_season: completedSeason });
+    }
 
-    console.log(`[Cron] New content for "${item.title}": S${currentSeason}E${currentEpisode}`);
+    // Completion is announced once per season, on whichever check first sees it —
+    // possibly a later one than the final episode, if TMDB still listed more then.
+    const announceComplete = complete && completedSeason < currentSeason;
+    if (!hasNewContent && !announceComplete) return;
+
+    console.log(
+        `[Cron] "${item.title}": S${currentSeason}E${currentEpisode}` +
+            (hasNewContent ? ' new' : '') +
+            (announceComplete ? ', season complete' : '')
+    );
     const epName = lastE.name || 'Без названия';
     const title = escapeHtml(item.title);
     const safeEpName = escapeHtml(epName);
+    const watchLink = getWatchLink(item.title);
 
-    const seasonObj = (data.seasons || []).find((s) => s.season_number === currentSeason);
-    const targetCount = seasonObj ? seasonObj.episode_count : 0;
-    const isSeasonComplete = targetCount > 0 && currentEpisode >= targetCount;
+    const episodeMsg = `⚡️ Новая серия! <b>${title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
+    const premiereMsg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
+    const completeMsg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
 
-    const chats = item.Chats || [];
-    for (const chat of chats) {
+    for (const chat of item.Chats || []) {
         try {
-            const subscription = chat.Subscription;
-            const notify_type = subscription.notify_type;
-
-            let shouldNotify = false;
-            let msg = '';
-
-            const watchLink = getWatchLink(item.title);
-
-            if (notify_type === 'episode') {
-                shouldNotify = true;
-                msg = `⚡️ Новая серия! <b>${title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
-            } else if (notify_type === 'season') {
-                if (isSeasonComplete) {
-                    shouldNotify = true;
-                    msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
-                }
-            } else if (notify_type === 'first_and_full') {
-                if (currentEpisode === 1) {
-                    shouldNotify = true;
-                    msg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
-                } else if (isSeasonComplete) {
-                    shouldNotify = true;
-                    msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
-                }
+            const mode = chat.Subscription.notify_type;
+            let msg = null;
+            if (mode === 'episode') {
+                if (hasNewContent) msg = episodeMsg;
+            } else if (mode === 'season') {
+                if (announceComplete) msg = completeMsg;
+            } else if (mode === 'first_and_full') {
+                // A one-episode season is both premiere and finale: one message is enough
+                if (hasNewContent && currentEpisode === 1) msg = premiereMsg;
+                else if (announceComplete) msg = completeMsg;
             }
-
-            if (shouldNotify) {
-                if (item.poster_url) {
-                    await bot.telegram.sendPhoto(chat.id, item.poster_url, {
-                        caption: msg,
-                        parse_mode: 'HTML'
-                    });
-                } else {
-                    await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
-                }
-            }
+            if (msg) await sendToChat(bot, item, chat.id, msg);
         } catch (err) {
             console.error(`[Cron] Failed to notify chat ${chat.id}:`, err.message);
         }
     }
 
-    // Update series state in DB
     await item.update({
         last_season: currentSeason,
         last_episode: currentEpisode,
-        last_episode_name: epName
+        last_episode_name: epName,
+        ...(announceComplete ? { completed_season: currentSeason } : {})
     });
 };
 

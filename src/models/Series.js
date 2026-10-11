@@ -32,6 +32,13 @@ const Series = sequelize.define('Series', {
     status: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // Last season announced as complete ("весь сезон вышел"). Kept apart from
+    // last_season so completion can be announced on a later check than the final
+    // episode. Null until the first check after this column was added.
+    completed_season: {
+        type: DataTypes.INTEGER,
+        allowNull: true
     }
 });
 
