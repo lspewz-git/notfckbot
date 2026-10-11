@@ -101,7 +101,9 @@ const notifyNewEpisodes = async (bot, item, data) => {
     // announced, so old seasons don't suddenly produce "season complete" messages.
     let completedSeason = item.completed_season;
     if (completedSeason === null || completedSeason === undefined) {
-        if (hasNewContent) completedSeason = item.last_season;
+        // With new content in hand, only seasons before the current one count as
+        // announced, so a finale arriving on this very check is still announced.
+        if (hasNewContent) completedSeason = currentSeason - 1;
         else completedSeason = complete ? currentSeason : currentSeason - 1;
         await item.update({ completed_season: completedSeason });
     }

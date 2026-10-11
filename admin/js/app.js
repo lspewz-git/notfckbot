@@ -69,7 +69,7 @@ const CLICK_ACTIONS = {
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
     'select-content': (el) => selectContent(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
-    service: (el) => openServiceModal(el.dataset.service)
+    service: (el) => openServiceModal(el.dataset.service, el.dataset.label)
 };
 
 const DELEGATED =

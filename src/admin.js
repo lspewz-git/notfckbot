@@ -177,7 +177,17 @@ app.get('/api/tmdb/search', async (req, res) => {
     }
 });
 
+// The dashboard polls every 10 s, and each check calls three external services.
+// A short cache keeps that to a few calls a minute; saving a token clears it.
+const HEALTH_TTL_MS = 30_000;
+let healthCache = null;
+const invalidateHealth = () => {
+    healthCache = null;
+};
+
 app.get('/api/health', async (req, res) => {
+    if (healthCache && Date.now() - healthCache.at < HEALTH_TTL_MS) return res.json(healthCache.value);
+
     const health = { telegram: false, tmdb: false, proxy: 'off', kinopoisk: 'off', kinopoiskQuota: null };
     const proxyUrl = process.env.TMDB_PROXY_URL;
 
@@ -226,6 +236,7 @@ app.get('/api/health', async (req, res) => {
         health.proxy = 'off';
     }
 
+    healthCache = { at: Date.now(), value: health };
     res.json(health);
 });
 
@@ -448,8 +459,16 @@ app.delete('/api/watchlist/:id', async (req, res) => {
     }
 });
 
+/**
+ * A value .env can hold safely: one line of printable ASCII. Anything with a line
+ * break could smuggle a second KEY=value line in, and .env overrides the
+ * container environment on every start.
+ */
+const isSafeEnvValue = (value) => typeof value === 'string' && /^[\x20-\x7e]*$/.test(value);
+
 // Helper to update a value in the .env file
 const updateEnvFile = (key, value) => {
+    if (!isSafeEnvValue(value)) throw new Error(`Refusing to write an unsafe value to ${key}`);
     const envPath = path.join(__dirname, '../.env');
     try {
         let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : '';
@@ -500,6 +519,9 @@ const SERVICES = {
         statusLabel: 'Open @BotFather',
         // Telegraf holds the token for the life of the process
         restartOnChange: true,
+        // <bot id>:<secret>. Strict, because the token becomes part of the request path
+        format: /^\d{5,12}:[A-Za-z0-9_-]{30,64}$/,
+        formatHint: 'a token from @BotFather, like 123456789:AA…',
         check: async (token) => {
             const res = await axios.get(`https://api.telegram.org/bot${token}/getMe`, outbound());
             const me = res.data.result;
@@ -514,6 +536,9 @@ const SERVICES = {
     tmdb: {
         label: 'TMDB API',
         env: 'TMDB_API_KEY',
+        // The v4 Read Access Token is a JWT
+        format: /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+        formatHint: 'the API Read Access Token (starts with eyJ…)',
         statusUrl: 'https://status.themoviedb.org',
         statusLabel: 'Status page',
         check: async (token) => {
@@ -527,6 +552,8 @@ const SERVICES = {
     kinopoisk: {
         label: 'Kinopoisk API',
         env: 'KINOPOISK_API_KEY',
+        format: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        formatHint: 'a Kinopoisk API key (1a2b3c4d-1a2b-…)',
         statusUrl: 'https://kinopoiskapiunofficial.tech/status',
         statusLabel: 'Status page',
         check: async (token) => {
@@ -547,8 +574,11 @@ const describeError = (err) =>
         ? `${err.response.status} ${err.response.data?.description || err.response.statusText || ''}`.trim()
         : err.message;
 
+// Own keys only, so "constructor" and friends are not services
+const findService = (name) => (Object.hasOwn(SERVICES, name) ? SERVICES[name] : null);
+
 app.get('/api/services/:name', async (req, res) => {
-    const service = SERVICES[req.params.name];
+    const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
 
     const token = process.env[service.env];
@@ -574,13 +604,12 @@ app.get('/api/services/:name', async (req, res) => {
 });
 
 app.post('/api/services/:name', async (req, res) => {
-    const service = SERVICES[req.params.name];
+    const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
 
     const token = typeof req.body.token === 'string' ? req.body.token.trim() : '';
-    // Printable ASCII only: the value is written into .env as one line
-    if (!/^[\x21-\x7e]{8,256}$/.test(token)) {
-        return res.status(400).json({ error: 'Token must be 8–256 characters, no spaces' });
+    if (!service.format.test(token)) {
+        return res.status(400).json({ error: `That doesn't look like ${service.formatHint}` });
     }
 
     try {
@@ -591,6 +620,7 @@ app.post('/api/services/:name', async (req, res) => {
 
     process.env[service.env] = token;
     updateEnvFile(service.env, token);
+    invalidateHealth();
     console.log(`[Admin] ${service.env} updated (${maskToken(token)}).`);
 
     res.json({ success: true, masked: maskToken(token), restarting: Boolean(service.restartOnChange) });
@@ -601,16 +631,14 @@ app.post('/api/services/:name', async (req, res) => {
 
 // Update configuration at runtime and persist to .env
 app.post('/api/config', (req, res) => {
-    const { tmdbApiKey, tmdbProxyUrl } = req.body;
-
-    if (tmdbApiKey && tmdbApiKey.trim()) {
-        const newKey = tmdbApiKey.trim();
-        process.env.TMDB_API_KEY = newKey;
-        updateEnvFile('TMDB_API_KEY', newKey);
-    }
+    // The TMDB key is changed through /api/services/tmdb, which checks it first
+    const { tmdbProxyUrl } = req.body;
 
     if (tmdbProxyUrl !== undefined) {
-        const newProxy = tmdbProxyUrl.trim();
+        const newProxy = typeof tmdbProxyUrl === 'string' ? tmdbProxyUrl.trim() : '';
+        if (!isSafeEnvValue(newProxy) || /\s/.test(newProxy)) {
+            return res.status(400).json({ error: 'Proxy URL must be a single line without spaces' });
+        }
         if (!isSupportedProxyUrl(newProxy)) {
             return res.status(400).json({
                 error: 'Proxy URL must start with http://, https://, socks4://, socks5:// or socks5h://'
@@ -620,6 +648,7 @@ app.post('/api/config', (req, res) => {
         updateEnvFile('TMDB_PROXY_URL', newProxy);
         // TMDB picks the new agent up per request; Telegram holds onto one
         applyProxyToBot(app.get('bot'));
+        invalidateHealth();
     }
 
     console.log('[Admin] Configuration updated successfully.');

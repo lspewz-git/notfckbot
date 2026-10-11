@@ -51,23 +51,48 @@ async function fromKinopoiskApi(imdbId) {
     return toId(res.data?.items?.[0]?.kinopoiskId);
 }
 
+// Answers already known, so repeated taps on "Случайный фильм" don't repeat the
+// lookup (and don't spend API quota). Misses expire, as both sources catch up.
+const cache = new Map();
+const CACHE_MAX = 1000;
+const MISS_TTL_MS = 6 * 60 * 60 * 1000;
+
 /**
  * @param {string} tmdbId e.g. "tv_1399" or "movie_603"
  * @param {string | null} imdbId e.g. "tt0944947", if known
- * @returns {Promise<number | null>} null when neither source knows the title
+ * @returns {Promise<{ id: number | null, failed: boolean }>} `failed` means a source
+ *   could not be asked (network, quota) — as opposed to it not knowing the title
  */
-async function findKinopoiskId(tmdbId, imdbId) {
+async function lookupKinopoiskId(tmdbId, imdbId) {
+    const hit = cache.get(tmdbId);
+    if (hit && (hit.id || Date.now() - hit.at < MISS_TTL_MS)) return { id: hit.id, failed: false };
+
     const [mediaType, numericId] = String(tmdbId).split('_');
+    let failed = false;
     for (const lookup of [() => fromWikidata(numericId, mediaType), () => fromKinopoiskApi(imdbId)]) {
         try {
             const id = await lookup();
-            if (id) return id;
+            if (id) {
+                remember(tmdbId, id);
+                return { id, failed: false };
+            }
         } catch (err) {
+            failed = true;
             console.error(`[Kinopoisk] Lookup failed for ${tmdbId}:`, err.message);
         }
     }
-    return null;
+    // A miss is only worth remembering when both sources actually answered
+    if (!failed) remember(tmdbId, null);
+    return { id: null, failed };
 }
+
+function remember(tmdbId, id) {
+    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+    cache.set(tmdbId, { id, at: Date.now() });
+}
+
+/** @returns {Promise<number | null>} null when the title is unknown or a source was unreachable */
+const findKinopoiskId = async (tmdbId, imdbId) => (await lookupKinopoiskId(tmdbId, imdbId)).id;
 
 // A miss is retried once a day: Wikidata and Kinopoisk catch up on new titles
 const RETRY_MS = 24 * 60 * 60 * 1000;
@@ -85,7 +110,9 @@ async function ensureKinopoiskId(row, imdbId) {
     const last = row.kinopoisk_checked_at ? new Date(row.kinopoisk_checked_at).getTime() : 0;
     if (Date.now() - last < RETRY_MS) return null;
 
-    const id = await findKinopoiskId(row.tmdb_id, imdbId);
+    const { id, failed } = await lookupKinopoiskId(row.tmdb_id, imdbId);
+    // An outage is not an answer: leave checked_at alone so the next run tries again
+    if (failed && !id) return null;
     try {
         await row.update({ kinopoisk_id: id, kinopoisk_checked_at: new Date() });
     } catch (err) {

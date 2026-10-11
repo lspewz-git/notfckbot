@@ -70,15 +70,15 @@ function render(info) {
     );
 }
 
-/** @param {string} name telegram | tmdb | kinopoisk */
-export async function openServiceModal(name) {
+/**
+ * @param {string} name telegram | tmdb | kinopoisk
+ * @param {string} [label] shown until the server's own label arrives
+ */
+export async function openServiceModal(name, label = '') {
     current = name;
     // Clear everything from the previously opened service before the slow request,
     // so nothing stale (e.g. another service's status link) shows while loading
-    setText(
-        'service-title',
-        name === 'tmdb' ? 'TMDB API' : name === 'kinopoisk' ? 'Kinopoisk API' : 'Telegram Bot API'
-    );
+    setText('service-title', label);
     setText('service-state', 'Checking…');
     $('service-state').className = 'modal-sub';
     renderDetails([]);
@@ -111,7 +111,7 @@ export async function saveServiceToken() {
             return;
         }
         toast('Token saved', 'success');
-        await openServiceModal(current);
+        await openServiceModal(current, $('service-title').textContent);
         fetchData();
     } catch (e) {
         toast(e.message, 'error');
