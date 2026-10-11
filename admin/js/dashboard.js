@@ -5,7 +5,14 @@ import { isUnchanged } from './render.js';
 
 export function updateStats(stats) {
     setText('chats-count', stats.chatsCount);
-    setText('subs-count', stats.subsCount);
+    // activeSubsCount is newer than the panel's first backend — fall back to the total
+    setText('subs-count', stats.activeSubsCount ?? stats.subsCount);
+
+    const archived = $('subs-archived-count');
+    if (archived) {
+        archived.hidden = !stats.archivedSubsCount;
+        archived.innerText = `+ ${stats.archivedSubsCount ?? 0} archived`;
+    }
     setText('films-count', stats.filmsCount);
 }
 

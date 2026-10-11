@@ -80,6 +80,17 @@
         flex-wrap: wrap;
     }
 
+    /* Tabs become one full-width segmented control with thumb-sized targets */
+    .tab-filters .btn {
+        flex: 1;
+        min-height: 2.75rem;
+    }
+
+    .tab-filters,
+    .tab-hint {
+        margin-bottom: 1rem;
+    }
+
     .glass-card {
         padding: 1.5rem;
         margin-bottom: 1.5rem;

@@ -3,9 +3,11 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const { Op } = require('sequelize');
 const { buildProxyAgent, applyProxyToBot } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
+const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('./constants');
 const tmdb = require('./api/tmdb');
 
 const app = express();
@@ -43,15 +45,25 @@ app.use(express.static(path.join(__dirname, '../admin')));
 
 // --- Read-only endpoints (no auth required) ---
 
+// TMDB statuses after which a show gets no new episodes. Subscriptions to such
+// shows are "archived" — derived from Series.status alone, nothing is stored.
+const FINISHED_SERIES_STATUSES = Object.keys(FINISHED_STATUS_LABELS);
+
 app.get('/api/stats', async (req, res) => {
     try {
-        const [chatsCount, seriesCount, subsCount, filmsCount] = await Promise.all([
+        const [chatsCount, seriesCount, subsCount, archivedSubsCount, filmsCount] = await Promise.all([
             Chat.count(),
             Series.count(),
             Subscription.count(),
+            Subscription.count({
+                include: [{ model: Series, attributes: [], required: true }],
+                where: { '$Series.status$': { [Op.in]: FINISHED_SERIES_STATUSES } }
+            }),
             Watchlist.count()
         ]);
-        res.json({ chatsCount, seriesCount, subsCount, filmsCount });
+        // A null (not yet checked) status counts as active, hence the subtraction
+        const activeSubsCount = subsCount - archivedSubsCount;
+        res.json({ chatsCount, seriesCount, subsCount, activeSubsCount, archivedSubsCount, filmsCount });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -93,9 +105,11 @@ app.get('/api/data/:type', async (req, res) => {
         const { type } = req.params;
         let data = [];
         if (type === 'subs') {
-            data = await Subscription.findAll({
+            const subs = await Subscription.findAll({
                 include: [{ model: Chat }, { model: Series }]
             });
+            // The server owns the "archived" rule so the panel never keeps its own status list
+            data = subs.map((s) => ({ ...s.toJSON(), archived: isFinishedStatus(s.Series && s.Series.status) }));
         } else if (type === 'series') {
             data = await Series.findAll();
         } else if (type === 'films') {

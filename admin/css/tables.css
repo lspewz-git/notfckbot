@@ -53,6 +53,11 @@ tr td:last-child {
     color: var(--text-dim);
 }
 
+/* A tab can drop a column; its rows leave the <td> out, this drops the <th> */
+table[data-tab='archive'] .col-mode {
+    display: none;
+}
+
 .row-actions {
     display: flex;
     gap: 0.5rem;

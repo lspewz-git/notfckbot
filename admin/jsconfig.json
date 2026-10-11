@@ -8,6 +8,8 @@
         "checkJs": true,
         "noEmit": true,
         "skipLibCheck": true,
+        // Browser code: keep @types/node (pulled in by dependencies) out of the program
+        "types": [],
 
         "noUnusedLocals": true,
         "noImplicitReturns": true,

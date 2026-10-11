@@ -102,9 +102,10 @@
                             <span class="stat-title">Total Chats</span>
                             <span id="chats-count" class="stat-value">-</span>
                         </div>
-                        <div class="stat-card" data-section="subs" role="button" tabindex="0">
+                        <div class="stat-card" data-section="subs" data-subs-tab="active" role="button" tabindex="0">
                             <span class="stat-title">Active Subs</span>
                             <span id="subs-count" class="stat-value">-</span>
+                            <span id="subs-archived-count" class="stat-sub" hidden></span>
                         </div>
                         <div class="stat-card" data-section="watchlist" role="button" tabindex="0">
                             <span class="stat-title">Watchlist</span>
@@ -195,20 +196,30 @@
 
                 <section id="subs-section" class="section">
                     <header>
-                        <h1>Active Subscriptions</h1>
+                        <h1>Subscriptions</h1>
                     </header>
                     <div class="glass-card">
+                        <div class="tab-filters" role="group" aria-label="Which subscriptions to show">
+                            <button class="btn btn-ghost active" data-subs-tab="active" aria-pressed="true">
+                                Active
+                            </button>
+                            <button class="btn btn-ghost" data-subs-tab="archive" aria-pressed="false">Archive</button>
+                        </div>
+                        <p id="subs-archive-hint" class="tab-hint" hidden>
+                            Series that ended or were canceled. They return to Active automatically if TMDB marks them
+                            as renewed.
+                        </p>
                         <div class="search-box">
                             <input type="text" id="subs-filter" placeholder="Filter by user, series or mode..." />
                         </div>
                         <div class="table-wrap">
-                            <table id="subs-table">
+                            <table id="subs-table" data-tab="active">
                                 <thead>
                                     <tr>
                                         <th>User</th>
                                         <th>Series</th>
                                         <th>Status</th>
-                                        <th>Mode</th>
+                                        <th class="col-mode">Mode</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>

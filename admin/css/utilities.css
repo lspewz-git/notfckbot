@@ -143,9 +143,29 @@ select:focus {
     margin-top: 0.35rem;
 }
 
-.log-filters {
+.log-filters,
+.tab-filters {
     display: flex;
     gap: 0.5rem;
+}
+
+/* The selected log filter or table tab */
+.log-filters .btn.active,
+.tab-filters .btn.active {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--text);
+}
+
+.tab-filters {
+    margin-bottom: 1.25rem;
+}
+
+/* One-line explanation under a tab strip */
+.tab-hint {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
 }
 
 .btn-grow {

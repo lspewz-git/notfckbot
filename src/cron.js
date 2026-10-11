@@ -1,24 +1,39 @@
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
 const { getDetails } = require('./api/tmdb');
-const { getWatchLink } = require('./constants');
+const { getWatchLink, isFinishedStatus, escapeHtml, formatRuDate } = require('./constants');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
 let isRunning = false;
 
 // ============================================================
-// Helper: Format digital release date nicely
-// ============================================================
-const formatReleaseDate = (isoString) => {
-    if (!isoString) return null;
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return null;
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-};
-
-// ============================================================
 // TV Series update check
 // ============================================================
+// Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
+// Returning <-> In Production changes are not interesting to users and stay silent.
+// Ended/canceled shows are shown in the bot's "Завершённые" archive instead of the active list.
+const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
+    // The first status fill (null -> X) is bookkeeping, not news.
+    if (!oldStatus || isFinishedStatus(oldStatus) === isFinishedStatus(newStatus)) return;
+
+    const title = escapeHtml(item.title);
+    const msg = isFinishedStatus(newStatus)
+        ? `${newStatus === 'Canceled' ? '⛔ <b>Сериал отменён</b>' : '🏁 <b>Сериал завершён</b>'}\n\n` +
+          `📺 <b>${title}</b> — новых серий не будет.\n\n` +
+          'Перенёс его в 📺 Мои подписки → 🗄 Завершённые. Если сериал продлят, я сообщу.'
+        : `🎉 <b>Сериал продлили!</b>\n\n📺 <b>${title}</b> снова в активных подписках — ` +
+          'уведомления о новых сериях придут как обычно.';
+
+    console.log(`[Cron] Status of "${item.title}": ${oldStatus} -> ${newStatus}, notifying subscribers`);
+    for (const chat of item.Chats || []) {
+        try {
+            await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
+        } catch (err) {
+            console.error(`[Cron] Failed to send status update to chat ${chat.id}:`, err.message);
+        }
+    }
+};
+
 const checkSeriesUpdates = async (bot, allSeries) => {
     for (const item of allSeries) {
         try {
@@ -26,85 +41,97 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             const data = await getDetails(filmId, mediaType);
             if (!data) continue;
 
-            // Keep the production status fresh — the admin panel surfaces it.
-            // Done before the early return below so shows with no aired
-            // episodes still get a status.
-            if (data.status && data.status !== item.status) {
-                await item.update({ status: data.status });
+            // Store the status first so a failure in the episode step below can't hold up the
+            // archive move. The status message is still sent last: a finale often airs in the
+            // same check that flips the status to Ended, and "new episode" should come first.
+            const oldStatus = item.status;
+            const statusChanged = Boolean(data.status) && data.status !== oldStatus;
+            if (statusChanged) await item.update({ status: data.status });
+
+            try {
+                await notifyNewEpisodes(bot, item, data);
+            } catch (err) {
+                console.error(`[Cron] Episode check failed for ${item.tmdb_id} ("${item.title}"):`, err.message);
             }
 
-            const lastE = data.last_episode_to_air;
-            if (!lastE) continue; // No episodes aired yet
-
-            const currentSeason = lastE.season_number;
-            const currentEpisode = lastE.episode_number;
-
-            const hasNewSeason = currentSeason > item.last_season;
-            const hasNewEpisode = currentSeason === item.last_season && currentEpisode > item.last_episode;
-
-            if (!hasNewSeason && !hasNewEpisode) continue;
-
-            console.log(`[Cron] New content for "${item.title}": S${currentSeason}E${currentEpisode}`);
-            const epName = lastE.name || 'Без названия';
-
-            const seasonObj = (data.seasons || []).find((s) => s.season_number === currentSeason);
-            const targetCount = seasonObj ? seasonObj.episode_count : 0;
-            const isSeasonComplete = targetCount > 0 && currentEpisode >= targetCount;
-
-            const chats = item.Chats || [];
-            for (const chat of chats) {
-                try {
-                    const subscription = chat.Subscription;
-                    const notify_type = subscription.notify_type;
-
-                    let shouldNotify = false;
-                    let msg = '';
-
-                    const watchLink = getWatchLink(item.title);
-
-                    if (notify_type === 'episode') {
-                        shouldNotify = true;
-                        msg = `⚡️ Новая серия! <b>${item.title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${epName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
-                    } else if (notify_type === 'season') {
-                        if (isSeasonComplete) {
-                            shouldNotify = true;
-                            msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${item.title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
-                        }
-                    } else if (notify_type === 'first_and_full') {
-                        if (currentEpisode === 1) {
-                            shouldNotify = true;
-                            msg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${item.title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${epName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
-                        } else if (isSeasonComplete) {
-                            shouldNotify = true;
-                            msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${item.title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
-                        }
-                    }
-
-                    if (shouldNotify) {
-                        if (item.poster_url) {
-                            await bot.telegram.sendPhoto(chat.id, item.poster_url, {
-                                caption: msg,
-                                parse_mode: 'HTML'
-                            });
-                        } else {
-                            await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
-                        }
-                    }
-                } catch (err) {
-                    console.error(`[Cron] Failed to notify chat ${chat.id}:`, err.message);
-                }
-            }
-
-            // Update series state in DB
-            await item.update({
-                last_season: currentSeason,
-                last_episode: currentEpisode,
-                last_episode_name: epName
-            });
+            if (statusChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
         } catch (err) {
             console.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"):`, err.message);
         }
     }
+};
+
+const notifyNewEpisodes = async (bot, item, data) => {
+    const lastE = data.last_episode_to_air;
+    if (!lastE) return; // No episodes aired yet
+
+    const currentSeason = lastE.season_number;
+    const currentEpisode = lastE.episode_number;
+
+    const hasNewSeason = currentSeason > item.last_season;
+    const hasNewEpisode = currentSeason === item.last_season && currentEpisode > item.last_episode;
+
+    if (!hasNewSeason && !hasNewEpisode) return;
+
+    console.log(`[Cron] New content for "${item.title}": S${currentSeason}E${currentEpisode}`);
+    const epName = lastE.name || 'Без названия';
+    const title = escapeHtml(item.title);
+    const safeEpName = escapeHtml(epName);
+
+    const seasonObj = (data.seasons || []).find((s) => s.season_number === currentSeason);
+    const targetCount = seasonObj ? seasonObj.episode_count : 0;
+    const isSeasonComplete = targetCount > 0 && currentEpisode >= targetCount;
+
+    const chats = item.Chats || [];
+    for (const chat of chats) {
+        try {
+            const subscription = chat.Subscription;
+            const notify_type = subscription.notify_type;
+
+            let shouldNotify = false;
+            let msg = '';
+
+            const watchLink = getWatchLink(item.title);
+
+            if (notify_type === 'episode') {
+                shouldNotify = true;
+                msg = `⚡️ Новая серия! <b>${title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
+            } else if (notify_type === 'season') {
+                if (isSeasonComplete) {
+                    shouldNotify = true;
+                    msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
+                }
+            } else if (notify_type === 'first_and_full') {
+                if (currentEpisode === 1) {
+                    shouldNotify = true;
+                    msg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
+                } else if (isSeasonComplete) {
+                    shouldNotify = true;
+                    msg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).`;
+                }
+            }
+
+            if (shouldNotify) {
+                if (item.poster_url) {
+                    await bot.telegram.sendPhoto(chat.id, item.poster_url, {
+                        caption: msg,
+                        parse_mode: 'HTML'
+                    });
+                } else {
+                    await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
+                }
+            }
+        } catch (err) {
+            console.error(`[Cron] Failed to notify chat ${chat.id}:`, err.message);
+        }
+    }
+
+    // Update series state in DB
+    await item.update({
+        last_season: currentSeason,
+        last_episode: currentEpisode,
+        last_episode_name: epName
+    });
 };
 
 // ============================================================
@@ -160,15 +187,17 @@ const checkWatchlistReleases = async (bot) => {
 
             // 🎉 Film is released! Notify all users waiting for it
             console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
-            const formattedDate = formatReleaseDate(displayDate);
+            const formattedDate = formatRuDate(displayDate);
             const watchLink = getWatchLink(firstEntry.title);
 
             for (const entry of filmEntries) {
                 try {
-                    const directorInfo = data.director_name ? `🎬 Режиссер: <b>${data.director_name}</b>\n` : '';
+                    const directorInfo = data.director_name
+                        ? `🎬 Режиссер: <b>${escapeHtml(data.director_name)}</b>\n`
+                        : '';
                     const msg =
                         `🎬 <b>Фильм доступен!</b>\n\n` +
-                        `🍿 <b>${entry.title}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
+                        `🍿 <b>${escapeHtml(entry.title)}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
                         `${directorInfo}` +
                         `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n\n` +
                         `▶️ <a href="${watchLink}">Смотреть онлайн</a>`;

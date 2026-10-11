@@ -52,6 +52,13 @@
     font-weight: 700;
 }
 
+/* Secondary figure under the main one, e.g. archived subscriptions */
+.stat-sub {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
 /* Secondary Data (Popular Series) */
 .dashboard-bottom {
     display: grid;

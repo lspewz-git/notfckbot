@@ -2,7 +2,7 @@
 
 import { $, $field, all, closest, setText, debounce, target } from './dom.js';
 import { fetchData, setSection } from './data.js';
-import { setupFilters } from './tables.js';
+import { setupFilters, setTableTab } from './tables.js';
 import { filterLogs } from './logs.js';
 import { openModal, closeModal, closeModalReturning, topmostModal } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
@@ -91,16 +91,19 @@ const CLICK_ACTIONS = {
     proxy: () => openProxyModal()
 };
 
-const DELEGATED = '[data-action], [data-section], [data-close], [data-close-return], [data-log-filter]';
+const DELEGATED =
+    '[data-action], [data-section], [data-close], [data-close-return], [data-log-filter], [data-subs-tab]';
 
 function setupDelegation() {
     document.addEventListener('click', (e) => {
         const el = closest(e, DELEGATED);
         if (!el) return;
 
-        const { action, section, close, closeReturn, logFilter } = el.dataset;
+        const { action, section, close, closeReturn, logFilter, subsTab } = el.dataset;
 
         if (action && CLICK_ACTIONS[action]) CLICK_ACTIONS[action](el);
+        // Before the section switch, so the dashboard card lands on the right tab
+        if (subsTab) setTableTab('subs', subsTab);
         if (section) switchSection(section);
         if (close) closeModal(close);
         if (closeReturn) closeModalReturning(closeReturn);
