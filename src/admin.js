@@ -170,28 +170,27 @@ app.get('/api/stats/popular', async (req, res) => {
 // The update check: running now, how the last one went, when the next one fires
 app.get('/api/cron', (req, res) => res.json(getCronStatus()));
 
-const UPCOMING_DAYS = 7;
+// The panel shows five; a few spare cover the ones it drops as already past
+const UPCOMING_LIMIT = 10;
 const isoDay = (d) => d.toISOString().slice(0, 10);
 
 /**
- * Episodes and films due in the next week, soonest first. Starts a day back: the
- * server runs in UTC, and the panel drops what is already past in its own time zone.
- * Only titles someone still waits for: series with an active subscription, films
- * not yet announced.
+ * The nearest episodes and film releases, soonest first, however far off. Starts a day
+ * back: the server runs in UTC, and the panel drops what is already past in its own
+ * time zone. Only titles someone still waits for: series with an active subscription,
+ * films not yet announced.
  */
 app.get('/api/upcoming', async (req, res) => {
     try {
-        const now = new Date();
-        const from = isoDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
-        const to = isoDay(new Date(now.getTime() + UPCOMING_DAYS * 24 * 60 * 60 * 1000));
+        const from = isoDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
         const [series, films] = await Promise.all([
             Series.findAll({
-                where: { next_episode_date: { [Op.between]: [from, to] } },
+                where: { next_episode_date: { [Op.gte]: from } },
                 include: [{ model: Chat, attributes: ['id'], through: { attributes: [] }, required: true }]
             }),
             Watchlist.findAll({
-                where: { notified: false, premiere_digital: { [Op.between]: [from, to] } },
+                where: { notified: false, premiere_digital: { [Op.gte]: from } },
                 attributes: ['tmdb_id', 'title', 'premiere_digital', 'chatId']
             })
         ]);
@@ -221,7 +220,7 @@ app.get('/api/upcoming', async (req, res) => {
         for (const f of byFilm.values()) items.push({ ...f, chats: f.chats.size });
 
         items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title)));
-        res.json(items);
+        res.json(items.slice(0, UPCOMING_LIMIT));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

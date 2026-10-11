@@ -1,7 +1,6 @@
 /** The dashboard's counters, health badges, upcoming releases, update check and popularity list. */
 
 import { $, setText, updateBadge, escapeHtml } from './dom.js';
-import { formatReleaseDate } from './format.js';
 import { isUnchanged } from './render.js';
 
 export function updateStats(stats) {
@@ -67,11 +66,16 @@ function dayLabel(iso, today) {
     const diff = Math.round((localDay(iso) - today) / DAY);
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Tomorrow';
-    const weekday = localDay(iso).toLocaleDateString('en-GB', { weekday: 'short' });
-    return `${weekday}, ${formatReleaseDate(iso)}`;
+    // "Thu 15 Oct" for the coming months; "8 Jul 2027" only once the date is far enough
+    // off that the month alone would be ambiguous (not for 2 Jan seen on 30 Dec)
+    return diff < 180
+        ? localDay(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+        : localDay(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 let upcoming = null;
+// As many as Popular now lists, so the cards side by side stay the same size
+const UPCOMING_SHOWN = 5;
 
 function renderUpcoming() {
     const container = $('upcoming-list');
@@ -84,26 +88,24 @@ function renderUpcoming() {
     if (isUnchanged('upcoming', [today.getTime(), upcoming])) return;
     const items = upcoming.filter((i) => localDay(i.date) >= today);
     if (items.length === 0) {
-        container.innerHTML = '<p class="empty-note">Nothing due in the next 7 days.</p>';
+        container.innerHTML = '<p class="empty-note">No dates announced yet.</p>';
         return;
     }
 
-    let lastDay = null;
+    // The five nearest, like the five rows of Popular now
     container.innerHTML = items
+        .slice(0, UPCOMING_SHOWN)
         .map((item) => {
-            const head =
-                item.date !== lastDay ? `<div class="upcoming-day">${escapeHtml(dayLabel(item.date, today))}</div>` : '';
-            lastDay = item.date;
             const what = item.kind === 'tv' ? item.episode || 'New episode' : 'Film release';
             const chats = `${item.chats} ${item.chats === 1 ? 'chat' : 'chats'}`;
-            return `${head}
+            return `
         <div class="popular-item upcoming-item" data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0">
             <span class="upcoming-icon">${KIND_ICON[item.kind] || ''}</span>
             <div class="popular-body">
                 <div class="popular-title">${escapeHtml(item.title)}</div>
-                <div class="upcoming-sub">${escapeHtml(what)}</div>
+                <div class="upcoming-sub">${escapeHtml(`${what} · ${chats}`)}</div>
             </div>
-            <span class="popular-sub">${chats}</span>
+            <span class="upcoming-when">${escapeHtml(dayLabel(item.date, today))}</span>
         </div>`;
         })
         .join('');
@@ -171,9 +173,7 @@ function renderCron() {
     const until = new Date(cron.nextRunAt).getTime() - now;
     setText(
         'cron-next',
-        until > 0
-            ? `In ${duration(until)}, at ${clock(cron.nextRunAt)}`
-            : `Due now, every ${cron.intervalHours} h`
+        until > 0 ? `In ${duration(until)}, at ${clock(cron.nextRunAt)}` : `Due now, every ${cron.intervalHours} h`
     );
 }
 

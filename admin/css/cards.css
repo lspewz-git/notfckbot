@@ -126,30 +126,50 @@
     display: grid;
     /* min(100%, …): one column on a phone; a long title ellipsizes instead of widening it */
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
-    align-items: start;
     gap: var(--space-4);
+}
+
+/* Side by side, the cards are one size: every row as tall as the tallest card (Popular now,
+   five rows). Stacked on a phone, each keeps its own height. */
+@media (min-width: 761px) {
+    .dashboard-bottom {
+        grid-auto-rows: 1fr;
+    }
+}
+
+/* Dashboard lists: tighter rows than the generic .popular-item (also used in search
+   results), so the three cards are shorter. A two-line Coming up row fits the same height. */
+.dashboard-bottom .popular-item {
+    min-height: 2.5rem;
+    padding: var(--space-1) var(--space-3);
+}
+
+.dashboard-bottom .card-head {
+    margin-bottom: var(--space-2);
 }
 
 .card-head .badge {
     flex: none;
 }
 
-/* Coming up: day headings with the items due that day */
-.upcoming-day {
-    margin: var(--space-3) 0 var(--space-1);
-    font-size: var(--text-xs);
-    font-weight: 600;
+/* Coming up: rows like Popular now, the day on the right */
+.upcoming-when {
+    flex: none;
+    font-size: var(--text-sm);
     color: var(--text-dim);
-}
-
-.upcoming-day:first-child {
-    margin-top: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 .upcoming-icon {
     display: inline-flex;
     flex: none;
     color: var(--text-dim);
+}
+
+/* Two lines in the height of one Popular now row, so five rows match five rows */
+.upcoming-item .popular-title,
+.upcoming-sub {
+    line-height: 1.2;
 }
 
 .upcoming-sub {
