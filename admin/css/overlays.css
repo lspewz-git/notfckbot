@@ -57,29 +57,89 @@
     }
 }
 
-/* Vertical action menu inside modals */
+/* Action menu: full-width rows with an icon, a title and one line of explanation */
 .action-list {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    margin-top: 1.5rem;
+    gap: var(--space-1);
+    margin-top: var(--space-4);
 }
 
 .action-row {
     width: 100%;
-    text-align: left;
-    padding: 0.85rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 3.25rem;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
     color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        background-color 0.15s,
+        border-color 0.15s;
 }
 
-.action-row-danger {
-    color: var(--danger);
-    border-color: rgba(239, 68, 68, 0.25);
+.action-row:hover {
+    background: var(--surface-2);
+    border-color: var(--border);
 }
 
-.action-row-danger:hover {
+.action-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+}
+
+.action-icon .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.action-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+
+.action-title {
+    font-size: var(--text-base);
+    font-weight: 500;
+}
+
+.action-desc {
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+
+.action-chevron {
+    color: var(--text-dim);
+    display: inline-flex;
+}
+
+.action-chevron .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.action-row-danger .action-title,
+.action-row-danger .action-icon {
     color: var(--danger);
-    border-color: var(--danger);
+}
+
+.action-row-danger .action-icon {
+    border-color: rgba(248, 113, 113, 0.35);
 }
 
 .poster-stub {
@@ -123,22 +183,73 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
     z-index: 1000;
     align-items: center;
     justify-content: center;
+    padding: var(--space-4);
+    animation: modal-fade 0.15s ease-out;
 }
 
 .modal-content {
     background: var(--surface-overlay);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    width: 90%;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+    width: 100%;
     max-width: 600px;
     max-height: 90vh;
     max-height: 90svh;
-    padding: 2.5rem;
+    padding: var(--space-6);
     position: relative;
     overflow-y: auto;
+    animation: modal-in 0.15s ease-out;
+}
+
+.modal-content h3 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    /* clear the close button */
+    padding-right: var(--space-8);
+}
+
+/* Close (×) in the top-right corner */
+.modal-x {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.modal-x:hover {
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+.modal-x .icon {
+    width: 16px;
+    height: 16px;
+}
+
+@keyframes modal-fade {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: scale(0.97);
+    }
 }

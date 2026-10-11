@@ -116,6 +116,18 @@ function setupDelegation() {
         if (logFilter) filterLogs(logFilter);
     });
 
+    // A click on the dimmed backdrop dismisses the dialog, like Cancel. The press must also
+    // start there: dragging a text selection out of a field ends the click on the backdrop too.
+    let pressedBackdrop = null;
+    document.addEventListener('mousedown', (e) => {
+        const t = /** @type {HTMLElement} */ (e.target);
+        pressedBackdrop = t.classList && t.classList.contains('modal') ? t : null;
+    });
+    document.addEventListener('click', (e) => {
+        if (pressedBackdrop && e.target === pressedBackdrop) closeModalReturning(pressedBackdrop.id);
+        pressedBackdrop = null;
+    });
+
     // Delegated targets are often <li> or <td>, which the browser will not
     // activate from the keyboard on its own
     document.addEventListener('keydown', (e) => {

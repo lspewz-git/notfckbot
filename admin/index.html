@@ -425,11 +425,58 @@
                 <h3 id="chat-actions-title">Manage chat</h3>
                 <p class="modal-sub" id="chat-actions-sub"></p>
                 <div class="action-list">
-                    <button id="action-add" class="btn btn-ghost action-row">➕ Add series or film</button>
-                    <button id="action-message" class="btn btn-ghost action-row">✉️ Send message</button>
-                    <button id="action-block" class="btn btn-ghost action-row">🚫 Block</button>
+                    <button id="action-add" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Add series or film</span>
+                            <span class="action-desc">Subscribe this chat to something</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                    <button id="action-message" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <rect x="2" y="4" width="20" height="16" rx="2" />
+                                <path d="m22 7-10 5L2 7" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Send message</span>
+                            <span class="action-desc">Write to this chat as the bot</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                    <button id="action-block" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="4.9" y1="4.9" x2="19.1" y2="19.1" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Block</span>
+                            <span class="action-desc">Ignore this chat for a while</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
                 </div>
-                <button data-close="chat-actions-modal" class="btn btn-ghost btn-block mt-lg">Close</button>
+                <button data-close="chat-actions-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 
@@ -557,13 +604,46 @@
         <!-- Actions menu -->
         <div id="actions-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="actions-modal-title">
             <div class="modal-content modal-narrow">
-                <h3 id="actions-modal-title">⚡️ Actions</h3>
+                <h3 id="actions-modal-title">Actions</h3>
                 <p class="modal-sub">Manual operations you can run on demand.</p>
                 <div class="action-list">
-                    <button id="trigger-btn" class="btn btn-ghost action-row">🔍 Trigger Update Check</button>
-                    <button id="broadcast-btn" class="btn btn-ghost action-row">📢 Broadcast Message</button>
+                    <button id="trigger-btn" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                <polyline points="21 3 21 9 15 9" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Run update check</span>
+                            <span class="action-desc">Check TMDB for new episodes and releases now</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                    <button id="broadcast-btn" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m3 11 18-5v12L3 14v-3z" />
+                                <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Broadcast message</span>
+                            <span class="action-desc">Send an announcement to every chat</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
                 </div>
-                <button data-close="actions-modal" class="btn btn-ghost btn-block mt-lg">Close</button>
+                <button data-close="actions-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 
@@ -595,10 +675,8 @@
         <!-- Danger Zone Modal -->
         <div id="danger-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="danger-modal-title">
             <div class="modal-content modal-medium">
-                <h3 id="danger-modal-title">☠️ Danger Zone</h3>
-                <p style="color: var(--text-dim); margin-top: 0.5rem">
-                    Irreversible operations. Every action here asks for confirmation first.
-                </p>
+                <h3 id="danger-modal-title">Danger zone</h3>
+                <p class="modal-sub">Irreversible operations. Every action here asks for confirmation first.</p>
                 <div class="danger-item">
                     <div class="danger-item-info">
                         <div class="danger-item-title">Wipe All Data</div>
@@ -608,7 +686,12 @@
                     </div>
                     <button id="wipe-all-btn" class="btn btn-danger">Wipe</button>
                 </div>
-                <button data-close="danger-modal" class="btn btn-ghost btn-block mt-lg">Close</button>
+                <button data-close="danger-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 

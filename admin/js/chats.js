@@ -33,7 +33,10 @@ export function openChatActions(chatId) {
     };
 
     const blockBtn = $('action-block');
-    blockBtn.innerText = isBlocked ? '✅ Unblock' : '🚫 Block';
+    blockBtn.querySelector('.action-title').textContent = isBlocked ? 'Unblock' : 'Block';
+    blockBtn.querySelector('.action-desc').textContent = isBlocked
+        ? 'Let this chat use the bot again'
+        : 'Ignore this chat for a while';
     blockBtn.classList.toggle('action-row-danger', !isBlocked);
     blockBtn.onclick = () => {
         closeModal('chat-actions-modal');
