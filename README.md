@@ -56,6 +56,9 @@ MARIADB_ROOT_PASSWORD=root_password
 
 # Необязательно: прокси (см. раздел «Прокси»)
 TMDB_PROXY_URL=
+
+# Необязательно: ключ kinopoiskapiunofficial.tech (см. раздел «Ссылки на просмотр»)
+KINOPOISK_API_KEY=
 ```
 
 ### 2. Запуск через Docker (рекомендуется)
@@ -123,6 +126,17 @@ socks5h://user:pass@10.0.0.5:1080
 
 О DNS: `http(s)` и `socks5h` разрешают имя на стороне прокси, а обычный `socks5` — локально. Если проблема именно в подменённом DNS (симптом — `ECONNREFUSED 127.0.0.1:443`), выбирайте `socks5h`.
 
+## Ссылки на просмотр
+
+В уведомлениях о новых сериях, сезонах и вышедших фильмах бот даёт три ссылки:
+
+- **Смотреть на HDRezka** — поиск по названию;
+- **Смотреть на SSPoisk** и **Страница на Кинопоиске** — прямо на страницу тайтла (`sspoisk.ru/film/ID` повторяет адреса Кинопоиска).
+
+Для двух последних нужен ID Кинопоиска. Бот берёт его из Wikidata по TMDB ID (без ключа и лимитов), а если там тайтла ещё нет — из [kinopoiskapiunofficial.tech](https://kinopoiskapiunofficial.tech) по IMDb ID, если задан `KINOPOISK_API_KEY` (бесплатный ключ — 500 запросов в день). Найденный ID сохраняется у сериала; не найденный ищется снова раз в сутки. Без ID ссылка на Кинопоиск ведёт на поиск, а SSPoisk не показывается.
+
+Состояние API и расход квоты видны в панели — индикатор **KP** в шапке дашборда, клик открывает [страницу статуса](https://kinopoiskapiunofficial.tech/status).
+
 ## Разработка
 
 ### Проверка кода
@@ -184,6 +198,7 @@ docker compose exec app node src/test-watchlist.js <TMDB_ID>
 - `src/cron.js` — фоновая проверка обновлений.
 - `src/proxy.js` — единая точка сборки прокси-агента для TMDB и Telegram.
 - `src/api/tmdb.js` — клиент TMDB.
+- `src/api/kinopoisk.js` — поиск ID Кинопоиска (Wikidata, kinopoiskapiunofficial.tech) и статус API.
 - `src/constants.js` — общие подписи и перечисления.
 - `src/models/` — модели БД: `Chat`, `Series`, `Subscription`, `Watchlist`.
 - `src/db.js`, `src/database.js` — Sequelize и подключение к MariaDB.
