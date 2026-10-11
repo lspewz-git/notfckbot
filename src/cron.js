@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
-const { getDetails } = require('./api/tmdb');
+const { getDetails, nextEpisodeFields } = require('./api/tmdb');
 const { isFinishedStatus, escapeHtml, formatRuDate, formatWatchLinks } = require('./constants');
 const { ensureKinopoiskId, findKinopoiskId } = require('./api/kinopoisk');
 
@@ -47,7 +47,11 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             // same check that flips the status to Ended, and "new episode" should come first.
             const oldStatus = item.status;
             const statusChanged = Boolean(data.status) && data.status !== oldStatus;
-            if (statusChanged) await item.update({ status: data.status });
+            const next = nextEpisodeFields(data);
+            const nextChanged = Object.keys(next).some((k) => String(item[k] ?? '') !== String(next[k] ?? ''));
+            if (statusChanged || nextChanged) {
+                await item.update({ ...(statusChanged ? { status: data.status } : {}), ...next });
+            }
 
             // Cached on the row after the first hit, so this is a lookup only for new titles
             await ensureKinopoiskId(item, data.imdb_id);

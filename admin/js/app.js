@@ -2,7 +2,7 @@
 
 import { $, $field, all, closest, setText, debounce, target } from './dom.js';
 import { fetchData, setSection } from './data.js';
-import { setupFilters, setTableTab } from './tables.js';
+import { setupFilters, setTableTab, setTableSort } from './tables.js';
 import { filterLogs } from './logs.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
@@ -69,6 +69,7 @@ const CLICK_ACTIONS = {
     mode: (el) => openModeModal(el.dataset.key),
     'delete-sub': (el) => deleteSub(el.dataset.chat, el.dataset.series),
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
+    sort: (el) => setTableSort(el.dataset.table, el.dataset.sort),
     'select-content': (el) => selectContent(Number(el.dataset.index)),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),

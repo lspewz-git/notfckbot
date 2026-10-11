@@ -146,6 +146,27 @@
         border-spacing: 0;
     }
 
+    .sort-bar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: var(--space-2);
+    }
+
+    .sort-bar-label {
+        font-size: var(--text-xs);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-dim);
+    }
+
+    .sort-bar .sort-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+    }
+
     /* Kept in the DOM for screen readers, just not painted */
     .table-wrap thead {
         position: absolute;

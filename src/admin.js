@@ -502,7 +502,8 @@ app.post('/api/subscription', async (req, res) => {
                 last_season: details.number_of_seasons || 0,
                 last_episode: 0,
                 poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
-                status: details.status || null
+                status: details.status || null,
+                ...tmdb.nextEpisodeFields(details)
             });
         }
 

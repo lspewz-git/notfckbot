@@ -73,7 +73,7 @@
                                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                         <rect x="2" y="7" width="20" height="15" rx="2" />
                                         <polyline points="17 2 12 7 7 2" /></svg
-                                    >Subscriptions
+                                    >Serials
                                 </button>
                             </li>
                             <li>
@@ -81,7 +81,7 @@
                                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                         <rect x="2" y="2" width="20" height="20" rx="2" />
                                         <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" /></svg
-                                    >Watchlist
+                                    >Movies
                                 </button>
                             </li>
                         </ul>
@@ -257,7 +257,7 @@
                                 tabindex="0"
                             >
                                 <div class="stat-head">
-                                    <span class="stat-title">Watchlist</span>
+                                    <span class="stat-title">Movies</span>
                                     <span id="films-released-count" class="stat-badge" hidden>+ 0 released</span>
                                 </div>
                                 <span id="films-count" class="stat-value">-</span>
@@ -348,7 +348,7 @@
 
                     <section id="watchlist-section" class="section">
                         <header>
-                            <h1>Watchlist</h1>
+                            <h1>Movies</h1>
                         </header>
                         <div class="glass-card">
                             <div class="tab-filters" role="group" aria-label="Which films to show">
@@ -369,14 +369,32 @@
                                     placeholder="Filter by user, film or year..."
                                 />
                             </div>
+                            <!-- Phones: the header row is hidden, so sorting gets its own strip -->
+                            <div class="sort-bar" role="group" aria-label="Sort films">
+                                <span class="sort-bar-label">Sort</span>
+                                <button class="btn btn-ghost sort-btn" data-action="sort" data-table="films" data-sort="year">
+                                    Year<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                </button>
+                                <button class="btn btn-ghost sort-btn" data-action="sort" data-table="films" data-sort="release">
+                                    Release<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                </button>
+                            </div>
                             <div class="table-wrap">
                                 <table id="watchlist-table" data-tab="active">
                                     <thead>
                                         <tr>
                                             <th>User</th>
                                             <th>Film Title</th>
-                                            <th>Year</th>
-                                            <th>Release</th>
+                                            <th aria-sort="none">
+                                                <button class="th-sort sort-btn" data-action="sort" data-table="films" data-sort="year">
+                                                    Year<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                                </button>
+                                            </th>
+                                            <th aria-sort="none">
+                                                <button class="th-sort sort-btn" data-action="sort" data-table="films" data-sort="release">
+                                                    Release<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                                </button>
+                                            </th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -388,7 +406,7 @@
 
                     <section id="subs-section" class="section">
                         <header>
-                            <h1>Subscriptions</h1>
+                            <h1>Serials</h1>
                         </header>
                         <div class="glass-card">
                             <div class="tab-filters" role="group" aria-label="Which subscriptions to show">
@@ -413,6 +431,7 @@
                                             <th>User</th>
                                             <th>Series</th>
                                             <th>Status</th>
+                                            <th class="col-next">Next Episode</th>
                                             <th class="col-mode">Mode</th>
                                             <th>Actions</th>
                                         </tr>
@@ -448,13 +467,13 @@
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="2" y="7" width="20" height="15" rx="2" />
                     <polyline points="17 2 12 7 7 2" /></svg
-                ><span>Subs</span>
+                ><span>Serials</span>
             </button>
             <button class="tab-item" data-section="watchlist">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="2" y="2" width="20" height="20" rx="2" />
                     <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" /></svg
-                ><span>Watchlist</span>
+                ><span>Movies</span>
             </button>
             <button class="tab-item" data-open="more-modal" data-tab-sections="logs" aria-haspopup="dialog">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">

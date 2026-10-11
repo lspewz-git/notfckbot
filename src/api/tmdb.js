@@ -84,6 +84,17 @@ function digitalReleaseDate(releaseDates) {
     return byCountry.map(digitalIn).filter(Boolean).sort()[0] || null;
 }
 
+/** Series columns for TMDB's next announced episode; all null when none is announced. */
+function nextEpisodeFields(data) {
+    const next = data && data.next_episode_to_air;
+    return {
+        next_episode_date: (next && next.air_date) || null,
+        // ?? not ||: season 0 holds TMDB's specials
+        next_episode_season: next ? (next.season_number ?? null) : null,
+        next_episode_number: next ? (next.episode_number ?? null) : null
+    };
+}
+
 const getDetails = async (id, media_type) => {
     try {
         const response = await apiClient.get(`/${media_type}/${id}`, {
@@ -164,6 +175,7 @@ const getRandomMovie = async () => {
 module.exports = {
     searchMulti,
     getDetails,
+    nextEpisodeFields,
     getSeasonDetails,
     getRandomMovie
 };

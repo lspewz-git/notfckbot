@@ -92,7 +92,53 @@ a.badge:hover {
 }
 
 /* A tab can drop a column; its rows leave the <td> out, this drops the <th> */
-table[data-tab='archive'] .col-mode {
+table[data-tab='archive'] .col-mode,
+table[data-tab='archive'] .col-next {
+    display: none;
+}
+
+/* Sortable column headers: the whole label is the button */
+.th-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0 calc(-1 * var(--space-2));
+    padding: var(--space-1) var(--space-2);
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.th-sort:hover,
+.th-sort.active {
+    color: var(--text);
+}
+
+.th-sort:hover {
+    background: var(--surface-2);
+}
+
+.sort-icon {
+    width: 14px;
+    height: 14px;
+    opacity: 0.5;
+}
+
+.sort-btn.active .sort-icon {
+    opacity: 1;
+}
+
+/* One chevron for the active direction instead of both */
+.sort-btn[data-dir='asc'] .sort-icon path:first-child,
+.sort-btn[data-dir='desc'] .sort-icon path:last-child {
+    display: none;
+}
+
+/* Phones only: on wider screens the column headers sort */
+.sort-bar {
     display: none;
 }
 

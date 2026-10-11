@@ -1,7 +1,14 @@
 /** The three data tables: filters, skeletons and row rendering. */
 
 import { $, $field, all, escapeHtml } from './dom.js';
-import { chatDisplayName, chatLabel, seriesStatusBadge, formatReleaseDate, MODE_LABELS } from './format.js';
+import {
+    chatDisplayName,
+    chatLabel,
+    seriesStatusBadge,
+    formatReleaseDate,
+    formatNextEpisode,
+    MODE_LABELS
+} from './format.js';
 import { chatsById, subsByKey, subKey, refill } from './store.js';
 import { isUnchanged, invalidate } from './render.js';
 
@@ -27,6 +34,8 @@ const ICON = {
  * client-side, so switching tabs needs no request; `hides` lists columns the
  * slice has no use for (the stylesheet hides their <th> via the table's
  * data-tab, the row simply leaves the <td> out).
+ *
+ * `sorts` lists the keys a table can be ordered by (asc/desc, empty values last).
  *
  * Row handlers are wired by delegation in app.js, so markup carries only
  * data-* attributes — no value is ever interpolated into executable code.
@@ -58,7 +67,7 @@ const TABLES = {
     subs: {
         body: 'subs-body',
         filter: 'subs-filter',
-        columns: ['User', 'Series', 'Status', 'Mode', 'Actions'],
+        columns: ['User', 'Series', 'Status', 'Next Episode', 'Mode', 'Actions'],
         tabs: {
             active: {
                 label: 'Active',
@@ -71,11 +80,14 @@ const TABLES = {
                 matches: isArchivedSub,
                 empty: 'No archived subscriptions.',
                 hint: 'subs-archive-hint',
-                hides: ['Mode']
+                hides: ['Next Episode', 'Mode']
             }
         },
         row: (item) => {
             const archived = isArchivedSub(item);
+            const next = archived
+                ? ''
+                : `<td data-label="Next Episode">${escapeHtml(formatNextEpisode(item.Series))}</td>`;
             const mode = archived
                 ? ''
                 : `<td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>`;
@@ -87,6 +99,7 @@ const TABLES = {
                     <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
                     <td data-label="Series" class="link-cell" data-action="series" data-id="${item.seriesId}"><span class="link-text">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</span></td>
                     <td data-label="Status">${seriesStatusBadge(item.Series && item.Series.status)}</td>
+                    ${next}
                     ${mode}
                     <td data-label="Actions">
                         <div class="row-actions">
@@ -104,6 +117,11 @@ const TABLES = {
         filter: 'watchlist-filter',
         columns: ['User', 'Film Title', 'Year', 'Release', 'Actions'],
         table: 'watchlist-table',
+        sorts: {
+            // Within a year, by release date
+            year: (item) => (item.year ? `${item.year}|${item.premiere_digital || '~'}` : null),
+            release: (item) => item.premiere_digital || null
+        },
         tabs: {
             active: {
                 label: 'Waiting',
@@ -140,6 +158,56 @@ const selectedTab = Object.fromEntries(
 
 // Last payload per table, so a tab switch can re-slice it without a request
 const lastData = {};
+
+// --- Sorting ---
+// Per table: { key, dir }, or absent for the API's order
+const sortState = {};
+
+function sortRows(type, rows) {
+    const state = sortState[type];
+    const value = state && TABLES[type].sorts[state.key];
+    if (!value) return rows;
+    const sign = state.dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+        const va = value(a);
+        const vb = value(b);
+        // Unknown values (TBA, no year) stay at the bottom either way
+        if (va === null || vb === null) return Number(va === null) - Number(vb === null);
+        return va < vb ? -sign : va > vb ? sign : 0;
+    });
+}
+
+function updateSortButtons(type) {
+    const state = sortState[type];
+    all(`[data-action="sort"][data-table="${type}"]`).forEach((btn) => {
+        const on = Boolean(state) && state.key === btn.dataset.sort;
+        btn.classList.toggle('active', on);
+        btn.dataset.dir = on ? state.dir : '';
+        const label = btn.innerText.trim();
+        btn.setAttribute(
+            'aria-label',
+            on ? `${label}, sorted ${state.dir === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`
+        );
+        const th = btn.closest('th');
+        if (th) th.setAttribute('aria-sort', on ? (state.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+}
+
+/** First click sorts ascending, the next descending, the third restores the API's order. */
+export function setTableSort(type, key) {
+    const table = TABLES[type];
+    if (!table || !table.sorts || !table.sorts[key]) return;
+    const state = sortState[type];
+    if (!state || state.key !== key) sortState[type] = { key, dir: 'asc' };
+    else if (state.dir === 'asc') state.dir = 'desc';
+    else delete sortState[type];
+
+    updateSortButtons(type);
+    if (lastData[type]) {
+        invalidate(`table:${type}`);
+        renderTable(type, lastData[type]);
+    }
+}
 
 /** @returns {any} the selected tab's config, or undefined for an untabbed table */
 const currentTab = (type) => TABLES[type].tabs && TABLES[type].tabs[selectedTab[type]];
@@ -265,7 +333,7 @@ export function renderTable(type, data) {
         );
 
     if (tab) updateTabCounts(type, data);
-    const rows = tab ? data.filter(tab.matches) : data;
+    const rows = sortRows(type, tab ? data.filter(tab.matches) : data);
 
     if (rows.length === 0) {
         body.innerHTML = fullWidthRow(type, tab ? tab.empty : 'No records found.');

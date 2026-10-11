@@ -39,7 +39,21 @@ export function formatReleaseDate(iso) {
     if (!iso) return 'TBA';
     const d = new Date(iso);
     if (isNaN(d.getTime())) return String(iso);
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    // "YYYY-MM-DD" parses as UTC midnight; formatting it in local time would show the
+    // day before for anyone west of UTC
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+/**
+ * "S2E5 · 15 Oct 2026" for the next announced episode, "S2E5 · TBA" when it has
+ * no date yet, plain "TBA" when TMDB announces nothing. Plain text.
+ */
+export function formatNextEpisode(series) {
+    if (!series) return 'TBA';
+    const { next_episode_season: season, next_episode_number: episode, next_episode_date: date } = series;
+    const known = (n) => n !== null && n !== undefined;
+    const num = known(season) && known(episode) ? `S${season}E${episode} · ` : '';
+    return num + formatReleaseDate(date);
 }
 
 export const MODE_LABELS = {

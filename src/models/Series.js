@@ -49,6 +49,20 @@ const Series = sequelize.define('Series', {
     kinopoisk_checked_at: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    // TMDB's next_episode_to_air, refreshed on every update check. Null when
+    // nothing is announced (shown as TBA in the admin panel).
+    next_episode_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+    },
+    next_episode_season: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    next_episode_number: {
+        type: DataTypes.INTEGER,
+        allowNull: true
     }
 });
 
