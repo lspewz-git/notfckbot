@@ -9,7 +9,14 @@ import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
 import { openChatActions, searchContent, selectContent, submitAddContent } from './chats.js';
-import { openSeriesDetails, openFilmDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
+import {
+    openSeriesDetails,
+    openFilmDetails,
+    openModeModal,
+    openSubActions,
+    deleteSub,
+    deleteWatchlistItem
+} from './records.js';
 import { triggerCheck, openBroadcastModal, sendBroadcast, confirmWipeAll } from './maintenance.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 
@@ -67,6 +74,7 @@ const CLICK_ACTIONS = {
     series: (el) => openSeriesDetails(el.dataset.id),
     film: (el) => openFilmDetails(el.dataset.id),
     mode: (el) => openModeModal(el.dataset.key),
+    'sub-actions': (el) => openSubActions(el.dataset.key),
     'delete-sub': (el) => deleteSub(el.dataset.chat, el.dataset.series),
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
     sort: (el) => setTableSort(el.dataset.table, el.dataset.sort),

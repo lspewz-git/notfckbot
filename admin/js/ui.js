@@ -166,10 +166,13 @@ export function showConfirm({
     cancelBtn.innerText = cancelLabel;
 
     confirmBtn.onclick = async () => {
+        // Done: a pending return to the menu that opened this would fire on some later dialog
+        clearReturnTo();
         closeModal('confirm-modal');
         await onConfirm();
     };
-    cancelBtn.onclick = () => closeModal('confirm-modal');
+    // Like Escape and the backdrop: back to the menu this was opened from, if any
+    cancelBtn.onclick = () => closeModalReturning('confirm-modal');
 
     openModal('confirm-modal');
     // Land on the safe choice, not the destructive one

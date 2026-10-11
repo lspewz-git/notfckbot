@@ -625,6 +625,52 @@
         </div>
 
         <!-- Per-chat action menu (replaces the row of buttons in the chats table) -->
+        <div id="sub-actions-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="sub-actions-title">
+            <div class="modal-content modal-narrow">
+                <h3 id="sub-actions-title">Subscription</h3>
+                <p class="modal-sub" id="sub-actions-sub"></p>
+                <div class="action-list">
+                    <button id="sub-action-mode" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Notification mode</span>
+                            <span class="action-desc" id="sub-action-mode-desc"></span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                    <button id="sub-action-delete" class="action-row action-row-danger">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Delete subscription</span>
+                            <span class="action-desc">Stop notifications for this chat</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                </div>
+                <button data-close="sub-actions-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         <div id="chat-actions-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="chat-actions-title">
             <div class="modal-content modal-narrow">
                 <h3 id="chat-actions-title">Manage chat</h3>
@@ -1052,7 +1098,7 @@
                 </div>
                 <div class="modal-actions">
                     <button id="confirm-mode" class="btn btn-primary btn-grow">Save</button>
-                    <button data-close="mode-modal" class="btn btn-ghost">Cancel</button>
+                    <button data-close-return="mode-modal" class="btn btn-ghost">Cancel</button>
                 </div>
             </div>
         </div>

@@ -26,6 +26,24 @@ const ICON = {
 };
 
 /**
+ * The phone card: the title (with a badge) on one line, the rest as one muted line.
+ * Desktop hides this cell; phones hide every other cell except Actions.
+ * @param {{ title: string, action?: string, id?: string, badge?: string, meta: string[] }} card
+ */
+function compactCell({ title, action, id, badge = '', meta }) {
+    const titleHtml = action
+        ? `<span class="compact-title link-text" data-action="${action}" data-id="${escapeHtml(id)}" role="button" tabindex="0">${title}</span>`
+        : `<span class="compact-title">${title}</span>`;
+    return `
+        <td class="cell-compact">
+            <div class="compact-head">${titleHtml}${badge}</div>
+            <div class="compact-meta">${meta.filter(Boolean).map(escapeHtml).join(' · ')}</div>
+        </td>`;
+}
+
+const btnLabel = (text) => `<span class="btn-label">${text}</span>`;
+
+/**
  * Everything that differs between the three tables, in one place: where the
  * rows go, which input filters them, the column labels (also used as
  * data-label for the mobile card layout) and how one record becomes a row.
@@ -52,13 +70,14 @@ const TABLES = {
                 ? '<span class="badge error">Blocked</span>'
                 : '<span class="badge ok">Active</span>';
             return `
-                <tr>
+                <tr class="row-compact">
                     <td data-label="Chat ID"><code>${item.id}</code></td>
                     <td data-label="User / Group">${chatDisplayName(item)}</td>
                     <td data-label="Type"><span class="chat-type">${item.type}</span></td>
                     <td data-label="Status">${status}</td>
+                    ${compactCell({ title: chatDisplayName(item), badge: status, meta: [item.type, String(item.id)] })}
                     <td data-label="Actions">
-                        <button class="btn btn-row" data-action="chat-actions" data-id="${item.id}">${ICON.more}Actions</button>
+                        <button class="btn btn-row" data-action="chat-actions" data-id="${item.id}" aria-label="Actions for ${escapeHtml(chatLabel(item))}">${ICON.more}${btnLabel('Actions')}</button>
                     </td>
                 </tr>
             `;
@@ -93,20 +112,36 @@ const TABLES = {
             const mode = archived
                 ? ''
                 : `<td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>`;
+            const key = subKey(item.chatId, item.seriesId);
+            const title = item.Series ? item.Series.title : 'Unknown';
+            const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
+            const status = seriesStatusBadge(item.Series && item.Series.status);
+            // Phones: one menu instead of two buttons; an archived row has only Delete, kept as an icon
             const modeBtn = archived
                 ? ''
-                : `<button class="btn btn-row" data-action="mode" data-key="${subKey(item.chatId, item.seriesId)}">${ICON.mode}Mode</button>`;
+                : `<button class="btn btn-row btn-wide-only" data-action="mode" data-key="${key}">${ICON.mode}Mode</button>
+                   <button class="btn btn-row btn-narrow-only" data-action="sub-actions" data-key="${key}" aria-label="Actions for ${escapeHtml(title)}">${ICON.more}</button>`;
+            const deleteBtn = `<button class="btn btn-row btn-row-danger${archived ? '' : ' btn-wide-only'}" data-action="delete-sub" data-chat="${item.chatId}" data-series="${item.seriesId}" aria-label="Delete ${escapeHtml(title)} for ${escapeHtml(user)}">${ICON.trash}${btnLabel('Delete')}</button>`;
             return `
-                <tr>
-                    <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
-                    <td data-label="Series" class="link-cell" data-action="series" data-id="${item.seriesId}"><span class="link-text">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</span></td>
-                    <td data-label="Status">${seriesStatusBadge(item.Series && item.Series.status)}</td>
+                <tr class="row-compact">
+                    <td data-label="User">${escapeHtml(user)}</td>
+                    <td data-label="Series" class="link-cell" data-action="series" data-id="${item.seriesId}"><span class="link-text">${escapeHtml(title)}</span></td>
+                    <td data-label="Status">${status}</td>
                     ${next}
                     ${mode}
+                    ${compactCell({
+                        title: escapeHtml(title),
+                        action: 'series',
+                        id: item.seriesId,
+                        badge: status,
+                        meta: archived
+                            ? [user]
+                            : [user, formatNextEpisode(item.Series), MODE_LABELS[item.notify_type] || item.notify_type]
+                    })}
                     <td data-label="Actions">
                         <div class="row-actions">
                             ${modeBtn}
-                            <button class="btn btn-row btn-row-danger" data-action="delete-sub" data-chat="${item.chatId}" data-series="${item.seriesId}">${ICON.trash}Delete</button>
+                            ${deleteBtn}
                         </div>
                     </td>
                 </tr>
@@ -139,15 +174,25 @@ const TABLES = {
                 hint: 'films-archive-hint'
             }
         },
-        row: (item) => `
-            <tr>
-                <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
+        row: (item) => {
+            const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
+            return `
+            <tr class="row-compact">
+                <td data-label="User">${escapeHtml(user)}</td>
                 <td data-label="Film Title" class="link-cell" data-action="film" data-id="${escapeHtml(item.tmdb_id)}"><span class="link-text">${escapeHtml(item.title)}</span></td>
                 <td data-label="Year">${item.year || '—'}</td>
                 <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}</td>
-                <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="${item.id}">${ICON.trash}Delete</button></td>
+                ${compactCell({
+                    title: escapeHtml(item.title),
+                    action: 'film',
+                    id: item.tmdb_id,
+                    badge: item.year ? `<span class="compact-year">${item.year}</span>` : '',
+                    meta: [user, `Release ${formatReleaseDate(item.premiere_digital)}`]
+                })}
+                <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="${item.id}" aria-label="Delete ${escapeHtml(item.title)} for ${escapeHtml(user)}">${ICON.trash}${btnLabel('Delete')}</button></td>
             </tr>
-        `
+        `;
+        }
     }
 };
 
@@ -415,9 +460,15 @@ export function renderSkeleton(type, rows = 4) {
         })
         .join('');
 
+    // Phones show only this cell and Actions, so the placeholder has the compact card's shape
+    const compact =
+        '<td class="cell-compact"><span class="skeleton" style="width:55%"></span><span class="skeleton skeleton-sub" style="width:80%"></span></td>';
     fillBody(
         type,
-        Array.from({ length: rows }, () => `<tr class="skeleton-row" aria-hidden="true">${cells}</tr>`).join('')
+        Array.from(
+            { length: rows },
+            () => `<tr class="skeleton-row row-compact" aria-hidden="true">${cells}${compact}</tr>`
+        ).join('')
     );
 }
 

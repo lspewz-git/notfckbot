@@ -3,7 +3,7 @@
 import { $, $field, $img, setText } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
-import { openModal, closeModal, showConfirm } from './ui.js';
+import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
 import { chatLabel, formatReleaseDate, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
@@ -88,7 +88,11 @@ export function openModeModal(key) {
 
     $('confirm-mode').onclick = async () => {
         const notify_type = $field('mode-select').value;
-        if (notify_type === sub.notify_type) return closeModal('mode-modal');
+        // Saving ends the flow: nothing to return to
+        if (notify_type === sub.notify_type) {
+            clearReturnTo();
+            return closeModal('mode-modal');
+        }
 
         // POST /api/subscription updates notify_type on an existing row
         const ok = await mutate(
@@ -96,10 +100,40 @@ export function openModeModal(key) {
             { method: 'POST', body: { chatId: sub.chatId, tmdbId: sub.seriesId, notify_type } },
             `Mode set to "${MODE_LABELS[notify_type]}"`
         );
-        if (ok) closeModal('mode-modal');
+        if (ok) {
+            clearReturnTo();
+            closeModal('mode-modal');
+        }
     };
 
     openModal('mode-modal');
+}
+
+/**
+ * Phones: Mode and Delete behind one button, in a sheet like the chat actions.
+ * Cancelling the chosen dialog comes back here.
+ */
+export function openSubActions(key) {
+    const sub = subsByKey.get(key);
+    if (!sub) return;
+    const back = () => openSubActions(key);
+
+    setText('sub-actions-title', sub.Series ? sub.Series.title : sub.seriesId);
+    setText('sub-actions-sub', sub.Chat ? chatLabel(sub.Chat) : String(sub.chatId));
+    setText('sub-action-mode-desc', `Now: ${MODE_LABELS[sub.notify_type] || sub.notify_type}`);
+
+    $('sub-action-mode').onclick = () => {
+        closeModal('sub-actions-modal');
+        setReturnTo(back);
+        openModeModal(key);
+    };
+    $('sub-action-delete').onclick = () => {
+        closeModal('sub-actions-modal');
+        setReturnTo(back);
+        deleteSub(sub.chatId, sub.seriesId);
+    };
+
+    openModal('sub-actions-modal');
 }
 
 export function deleteSub(chatId, seriesId) {

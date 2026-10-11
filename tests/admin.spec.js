@@ -18,6 +18,20 @@ function visibleRows(page, bodyId) {
     return page.locator(`#${bodyId} tr`).evaluateAll((rows) => rows.filter((r) => r.style.display !== 'none').length);
 }
 
+/** Phones (<=760px) show compact cards: row actions sit behind a "⋯" menu. */
+const isPhone = (page) => page.viewportSize().width <= 760;
+
+/** Opens a subscription's Mode or Delete, through the phone menu where there is one. */
+async function subAction(page, action) {
+    if (isPhone(page)) {
+        await page.locator('#subs-body [data-action="sub-actions"]').first().click();
+        await expect(page.locator('#sub-actions-modal')).toBeVisible();
+        await page.locator(action === 'mode' ? '#sub-action-mode' : '#sub-action-delete').click();
+    } else {
+        await page.locator(`#subs-body [data-action="${action === 'mode' ? 'mode' : 'delete-sub'}"]`).first().click();
+    }
+}
+
 /** Below 1024px the sidebar gives way to a bottom tab bar; logs sit behind "More". */
 async function goToSection(page, section) {
     if (page.viewportSize().width > 1024) {
@@ -89,14 +103,19 @@ test('subscriptions show a status and let the mode be reviewed', async ({ page }
     const status = page.locator('#subs-body [data-label="Status"]').first();
     await expect(status).toHaveText(/On Air|Ended|Canceled|In Production|Planned|Pilot|Unknown/);
 
-    await page.locator('#subs-body [data-action="mode"]').first().click();
+    await subAction(page, 'mode');
     const modal = page.locator('#mode-modal');
     await expect(modal).toBeVisible();
     // The custom trigger must mirror the hidden <select>
     await expect(modal.locator('.custom-select-trigger')).not.toBeEmpty();
 
-    await modal.locator('[data-close="mode-modal"]').click();
+    await modal.locator('[data-close-return="mode-modal"]').click();
     await expect(modal).toBeHidden();
+    // Opened from the phone menu, Cancel goes back to it
+    if (isPhone(page)) {
+        await expect(page.locator('#sub-actions-modal')).toBeVisible();
+        await page.keyboard.press('Escape');
+    }
 });
 
 test('declining the confirmation leaves the data alone', async ({ page }) => {
@@ -104,7 +123,7 @@ test('declining the confirmation leaves the data alone', async ({ page }) => {
     await waitForRows(page, 'subs-body');
     const before = await page.locator('#subs-body tr').count();
 
-    await page.locator('#subs-body [data-action="delete-sub"]').first().click();
+    await subAction(page, 'delete');
     const confirm = page.locator('#confirm-modal');
     await expect(confirm).toBeVisible();
 
@@ -113,20 +132,22 @@ test('declining the confirmation leaves the data alone', async ({ page }) => {
     await page.locator('#modal-cancel-btn').click();
 
     await expect(confirm).toBeHidden();
+    if (isPhone(page)) await page.keyboard.press('Escape');
     await expect(page.locator('#subs-body tr')).toHaveCount(before);
 });
 
 test('the search box filters rows and restores them', async ({ page }) => {
     await goToSection(page, 'watchlist');
     await waitForRows(page, 'watchlist-body');
-    const total = await page.locator('#watchlist-body tr').count();
-    expect(total).toBeGreaterThan(0);
+    // The pager shows one page, so compare what is visible, not every row in the DOM
+    const shown = await visibleRows(page, 'watchlist-body');
+    expect(shown).toBeGreaterThan(0);
 
     await page.locator('#watchlist-filter').fill('zzz-no-such-record');
     await expect.poll(() => visibleRows(page, 'watchlist-body')).toBe(0);
 
     await page.locator('#watchlist-filter').fill('');
-    await expect.poll(() => visibleRows(page, 'watchlist-body')).toBe(total);
+    await expect.poll(() => visibleRows(page, 'watchlist-body')).toBe(shown);
 });
 
 test('log filters switch the visible entries', async ({ page }) => {
@@ -214,10 +235,12 @@ test.describe('narrow screens', () => {
         await expect(page.locator('.tab-item[data-section="chats"]')).toHaveAttribute('aria-current', 'page');
         await waitForRows(page, 'chats-body');
 
-        const cell = page.locator('#chats-body td').first();
-        await expect(cell).toHaveCSS('display', 'flex');
-        const label = await cell.evaluate((el) => getComputedStyle(el, '::before').content);
-        expect(label).toContain('Chat ID');
+        // Compact cards: a two-line summary and an icon button; the per-column cells are hidden
+        const row = page.locator('#chats-body tr').first();
+        await expect(row.locator('.cell-compact')).toBeVisible();
+        await expect(row.locator('td[data-label="Chat ID"]')).toBeHidden();
+        await expect(row.locator('[data-action="chat-actions"]')).toBeVisible();
+        expect((await row.boundingBox()).height).toBeLessThan(90);
 
         const overflows = await page.evaluate(() => document.body.scrollWidth > window.innerWidth);
         expect(overflows, 'page must not scroll sideways').toBe(false);

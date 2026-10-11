@@ -275,11 +275,18 @@ for (const [width, height] of [
             await expect(page.locator('#subs-body tr')).toHaveCount(ARCHIVED);
             expect(await overflows(), 'archive tab').toBe(false);
 
-            // Card layout: each archived card is User, Series, Status, Actions — no blank Mode or Next Episode line
-            const cells = await page.locator('#subs-body tr').first().locator('td').count();
-            expect(cells).toBe(4);
-            // Rows only turn into cards below 760px; above that it is still a table
-            if (width <= 760) await expect(page.locator('#subs-body td').first()).toHaveCSS('display', 'flex');
+            const first = page.locator('#subs-body tr').first();
+            const shownCells = () =>
+                first.locator('td').evaluateAll((tds) => tds.filter((td) => getComputedStyle(td).display !== 'none').length);
+            if (width <= 760) {
+                // Compact card: the summary cell and one icon button, about a quarter of the old card
+                expect(await shownCells()).toBe(2);
+                await expect(first.locator('.cell-compact .compact-meta')).toBeVisible();
+                expect((await first.boundingBox()).height).toBeLessThan(90);
+            } else {
+                // Still a table: User, Series, Status, Actions — no blank Mode or Next Episode column
+                expect(await shownCells()).toBe(4);
+            }
         });
     });
 }

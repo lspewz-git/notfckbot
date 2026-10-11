@@ -141,7 +141,11 @@
         padding: 0;
     }
 
-    .table-wrap table {
+    /* Plain blocks: as a table it would widen to fit the longest one-line card */
+    .table-wrap table,
+    .table-wrap tbody {
+        display: block;
+        width: 100%;
         min-width: 0;
         border-spacing: 0;
     }
@@ -269,6 +273,107 @@
     /* Empty-state row has no label to sit opposite, so centre it */
     .table-wrap td:not([data-label]) {
         justify-content: center;
+    }
+
+    /* Compact card: title + badge, one muted line, actions as icons on the right */
+    .table-wrap tr.row-compact {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: 6px;
+        padding: 10px var(--space-2) 10px var(--space-3);
+    }
+
+    .table-wrap tr.row-compact > td {
+        display: none;
+    }
+
+    .table-wrap tr.row-compact > td.cell-compact {
+        display: block;
+        flex: 1;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .table-wrap tr.row-compact > td::before {
+        display: none;
+    }
+
+    .table-wrap tr.row-compact > td[data-label='Actions'] {
+        display: flex;
+        flex: none;
+        flex-direction: row;
+        width: auto;
+        padding: 0;
+        border: 0;
+    }
+
+    .table-wrap tr.row-compact td[data-label='Actions'] .row-actions {
+        width: auto;
+    }
+
+    /* Icon-only, square; matches the full-width rule above in specificity */
+    .table-wrap tr.row-compact td[data-label='Actions'] .btn-row {
+        flex: none;
+        width: var(--control-h);
+        padding: 0;
+        justify-content: center;
+    }
+
+    .table-wrap tr.row-compact .btn-label,
+    .table-wrap tr.row-compact .btn-wide-only {
+        display: none;
+    }
+
+    .table-wrap tr.row-compact .btn-narrow-only {
+        display: inline-flex;
+    }
+
+    .compact-head {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+    }
+
+    .compact-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+    }
+
+    .compact-title.link-text {
+        cursor: pointer;
+        text-decoration: underline;
+        text-decoration-color: var(--border-strong);
+        text-underline-offset: 3px;
+    }
+
+    .compact-head .badge {
+        flex: none;
+    }
+
+    .compact-year {
+        flex: none;
+        font-size: var(--text-xs);
+        color: var(--text-dim);
+    }
+
+    .compact-meta {
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--text-xs);
+        color: var(--text-dim);
+    }
+
+    .cell-compact .skeleton-sub {
+        margin-top: 6px;
+        height: 0.7rem;
     }
 }
 
