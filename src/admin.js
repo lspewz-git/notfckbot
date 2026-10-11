@@ -506,8 +506,7 @@ const SERVICES = {
             return {
                 details: [
                     ['Bot', `@${me.username}`],
-                    ['Bot ID', String(me.id)],
-                    ['Quota', 'No daily limit']
+                    ['Bot ID', String(me.id)]
                 ]
             };
         }

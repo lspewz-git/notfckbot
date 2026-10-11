@@ -783,20 +783,43 @@
                 <dl id="service-details" class="kv-list"></dl>
 
                 <div class="field-block">
-                    <span class="field-label">Current token</span>
-                    <code id="service-current" class="token-masked">—</code>
-                </div>
-
-                <div class="field-block">
-                    <label class="field-label" for="service-token">New token</label>
-                    <input
-                        type="text"
-                        id="service-token"
-                        class="input-field"
-                        placeholder="Paste a new token to replace the current one"
-                        autocomplete="off"
-                        spellcheck="false"
-                    />
+                    <label class="field-label" for="service-token">Token</label>
+                    <!-- Masked value by default; the pencil swaps it for an empty field -->
+                    <div class="token-row">
+                        <code id="service-current" class="token-masked">—</code>
+                        <input
+                            type="text"
+                            id="service-token"
+                            class="input-field"
+                            placeholder="Paste the new token"
+                            autocomplete="off"
+                            spellcheck="false"
+                            hidden
+                        />
+                        <button
+                            id="service-edit"
+                            class="btn btn-ghost btn-icon-square"
+                            aria-label="Replace token"
+                            title="Replace token"
+                        >
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                <path d="m15 5 4 4" />
+                            </svg>
+                        </button>
+                        <button
+                            id="service-cancel-edit"
+                            class="btn btn-ghost btn-icon-square"
+                            aria-label="Keep the current token"
+                            title="Keep the current token"
+                            hidden
+                        >
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M3 7v6h6" />
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                            </svg>
+                        </button>
+                    </div>
                     <p class="field-hint" id="service-hint">
                         The token is checked with the service before it is saved.
                     </p>
@@ -810,7 +833,7 @@
                             <path d="M10 14 21 3" />
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg
                     ></a>
-                    <button id="service-save" class="btn btn-primary btn-grow">Save token</button>
+                    <button id="service-save" class="btn btn-primary btn-grow" disabled>Save token</button>
                 </div>
                 <button data-close="service-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">

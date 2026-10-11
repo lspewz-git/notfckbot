@@ -223,3 +223,39 @@
 .modal-sub.state-error {
     color: var(--danger);
 }
+
+/* Token field: masked value (or the edit input) with square icon buttons beside it */
+.token-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-2);
+}
+
+.token-row .token-masked,
+.token-row .input-field {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+}
+
+.token-row .token-masked {
+    display: flex;
+    align-items: center;
+}
+
+.btn-icon-square {
+    width: var(--control-h);
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+.btn-icon-square .icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* .btn and .input-field set display, which would otherwise beat the hidden attribute */
+.token-row [hidden],
+.modal-actions [hidden] {
+    display: none;
+}

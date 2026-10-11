@@ -7,7 +7,7 @@ import { filterLogs } from './logs.js';
 import { openModal, closeModal, closeModalReturning, topmostModal } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
-import { openServiceModal, saveServiceToken } from './services.js';
+import { openServiceModal, setupServiceDialog } from './services.js';
 import { openChatActions, searchContent, selectContent, submitAddContent } from './chats.js';
 import { openSeriesDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
 import { triggerCheck, openBroadcastModal, sendBroadcast, confirmWipeAll } from './maintenance.js';
@@ -166,10 +166,7 @@ function setupControls() {
     $('send-broadcast').onclick = sendBroadcast;
     $('wipe-all-btn').onclick = confirmWipeAll;
     $('confirm-add-content').onclick = submitAddContent;
-    $('service-save').onclick = saveServiceToken;
-    $field('service-token').onkeydown = (e) => {
-        if (e.key === 'Enter') saveServiceToken();
-    };
+    setupServiceDialog();
 
     // One search box covering both series and movies
     $field('content-search-input').oninput = debounce((e) => searchContent(e.target.value.trim()), 500);
