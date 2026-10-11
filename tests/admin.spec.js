@@ -18,11 +18,16 @@ function visibleRows(page, bodyId) {
     return page.locator(`#${bodyId} tr`).evaluateAll((rows) => rows.filter((r) => r.style.display !== 'none').length);
 }
 
-/** The sidebar is a drawer below 1024px, so a section has to be reached differently. */
+/** Below 1024px the sidebar gives way to a bottom tab bar; logs sit behind "More". */
 async function goToSection(page, section) {
-    const width = page.viewportSize().width;
-    if (width <= 1024) await page.locator('#nav-toggle').click();
-    await page.locator(`.nav-item[data-section="${section}"]`).click();
+    if (page.viewportSize().width > 1024) {
+        await page.locator(`.nav-item[data-section="${section}"]`).click();
+    } else if (section === 'logs') {
+        await page.locator('.tab-item[data-open="more-modal"]').click();
+        await page.locator('#more-modal [data-section="logs"]').click();
+    } else {
+        await page.locator(`.tab-item[data-section="${section}"]`).click();
+    }
     await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
 }
 
@@ -54,11 +59,10 @@ test('every module loads', async ({ page }) => {
 });
 
 test('a table shows skeleton rows before its data arrives', async ({ page }) => {
-    const width = page.viewportSize().width;
-    if (width <= 1024) await page.locator('#nav-toggle').click();
+    const narrow = page.viewportSize().width <= 1024;
 
     // The skeleton is painted in the same tick as the click
-    await page.locator('.nav-item[data-section="chats"]').click();
+    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
     expect(await page.locator('#chats-body .skeleton-row').count()).toBeGreaterThan(0);
 
     await expect(page.locator('#chats-body .skeleton-row')).toHaveCount(0, { timeout: 10_000 });
@@ -182,32 +186,32 @@ test('dialogs are announced, trap focus and close on Escape', async ({ page }) =
 });
 
 test('sections are reachable with the keyboard alone', async ({ page }) => {
-    const width = page.viewportSize().width;
-    if (width <= 1024) await page.locator('#nav-toggle').click();
-
-    const item = page.locator('.nav-item[data-section="subs"]');
-    await expect(item).toHaveAttribute('role', 'button');
+    const narrow = page.viewportSize().width <= 1024;
+    const item = page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="subs"]`);
+    // A native <button>, so Enter and Space work without a key handler
+    await expect(item).toHaveJSProperty('tagName', 'BUTTON');
     await item.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('#subs-section')).toHaveClass(/active/);
+    await expect(item).toHaveAttribute('aria-current', 'page');
 });
 
 test.describe('narrow screens', () => {
     // viewport is a real fixture; project name is not
     test.skip(({ viewport }) => viewport.width > 640, 'narrow viewports only');
 
-    test('the sidebar is a drawer and tables become cards', async ({ page }) => {
-        const sidebar = page.locator('.sidebar');
-        await expect(page.locator('#nav-toggle')).toBeVisible();
+    test('a bottom tab bar replaces the sidebar and tables become cards', async ({ page }) => {
+        await expect(page.locator('.sidebar')).toBeHidden();
+        const tabbar = page.locator('.tabbar');
+        await expect(tabbar).toBeInViewport();
 
-        await page.locator('#nav-toggle').click();
-        await expect(sidebar).toHaveClass(/open/);
+        // Everything that doesn't fit in five tabs is one tap away under "More"
+        await page.locator('.tab-item[data-open="more-modal"]').click();
+        await expect(page.locator('#more-modal [data-open="danger-modal"]')).toBeInViewport();
+        await page.keyboard.press('Escape');
 
-        // The buttons pinned to the bottom must be reachable, not under the browser chrome
-        await expect(page.locator('#danger-btn')).toBeInViewport();
-
-        await page.locator('.nav-item[data-section="chats"]').click();
-        await expect(sidebar).not.toHaveClass(/open/);
+        await page.locator('.tab-item[data-section="chats"]').click();
+        await expect(page.locator('.tab-item[data-section="chats"]')).toHaveAttribute('aria-current', 'page');
         await waitForRows(page, 'chats-body');
 
         const cell = page.locator('#chats-body td').first();

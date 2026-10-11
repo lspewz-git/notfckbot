@@ -12,49 +12,22 @@ import { openChatActions, searchContent, selectContent, submitAddContent } from 
 import { openSeriesDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
 import { triggerCheck, openBroadcastModal, sendBroadcast, confirmWipeAll } from './maintenance.js';
 
-const MOBILE_BREAKPOINT = 1024;
 const REFRESH_SECONDS = 10;
 
 // --- Navigation ---
-let closeNav = null;
 
 function switchSection(id) {
     setSection(id);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
-    all('.nav-item').forEach((n) => {
-        const on = n.dataset.section === id;
+    // Sidebar items and tab-bar items; "More" counts as active for the sections it holds
+    all('.nav-item, .tab-item').forEach((n) => {
+        const on = n.dataset.section === id || (n.dataset.tabSections || '').split(' ').includes(id);
         n.classList.toggle('active', on);
         // Screen readers announce the current section, not just a coloured row
         if (on) n.setAttribute('aria-current', 'page');
         else n.removeAttribute('aria-current');
     });
     fetchData();
-}
-
-/** Below MOBILE_BREAKPOINT the sidebar is an off-canvas drawer. */
-function setupNav() {
-    const sidebar = document.querySelector('.sidebar');
-    const toggle = $('nav-toggle');
-    const backdrop = $('nav-backdrop');
-    if (!sidebar || !toggle || !backdrop) return;
-
-    const setOpen = (open) => {
-        sidebar.classList.toggle('open', open);
-        backdrop.classList.toggle('open', open);
-        toggle.setAttribute('aria-expanded', String(open));
-    };
-    closeNav = () => setOpen(false);
-
-    toggle.onclick = () => setOpen(!sidebar.classList.contains('open'));
-    backdrop.onclick = closeNav;
-
-    // Picking a section or an action should get the drawer out of the way
-    sidebar.querySelectorAll('.nav-item, .btn').forEach((el) => el.addEventListener('click', closeNav));
-
-    // Back on a wide screen the sidebar is permanent again
-    window.addEventListener('resize', () => {
-        if (window.innerWidth > MOBILE_BREAKPOINT) setOpen(false);
-    });
 }
 
 // --- Refresh timer ---
@@ -100,14 +73,14 @@ const CLICK_ACTIONS = {
 };
 
 const DELEGATED =
-    '[data-action], [data-section], [data-close], [data-close-return], [data-log-filter], [data-subs-tab]';
+    '[data-action], [data-section], [data-close], [data-close-return], [data-open], [data-log-filter], [data-subs-tab]';
 
 function setupDelegation() {
     document.addEventListener('click', (e) => {
         const el = closest(e, DELEGATED);
         if (!el) return;
 
-        const { action, section, close, closeReturn, logFilter, subsTab } = el.dataset;
+        const { action, section, close, closeReturn, open, logFilter, subsTab } = el.dataset;
 
         if (action && CLICK_ACTIONS[action]) CLICK_ACTIONS[action](el);
         // Before the section switch, so the dashboard card lands on the right tab
@@ -115,6 +88,8 @@ function setupDelegation() {
         if (section) switchSection(section);
         if (close) closeModal(close);
         if (closeReturn) closeModalReturning(closeReturn);
+        // After any close, so a menu row can swap its sheet for the dialog it names
+        if (open) openModal(open);
         if (logFilter) filterLogs(logFilter);
     });
 
@@ -177,7 +152,6 @@ function init() {
     setupControls();
     setupDelegation();
     setupFilters();
-    setupNav();
     setupProxyForm();
     enhanceSelects();
     updatePauseButton();
@@ -191,8 +165,6 @@ function init() {
         // Same as pressing Cancel, so a child dialog returns to its menu
         const modal = topmostModal();
         if (modal) return closeModalReturning(modal.id);
-
-        if (closeNav) closeNav();
     });
 
     fetchData(); // Initial load runs even though auto-refresh starts paused
