@@ -159,25 +159,8 @@
     white-space: nowrap;
 }
 
-/* Share of the leader's subscriber count */
-.popular-meter {
-    height: 4px;
-    margin-top: 6px;
-    border-radius: 2px;
-    background: var(--surface-3);
-    overflow: hidden;
-}
-
-.popular-meter span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--text);
-}
-
 .popular-count {
     flex: 0 0 auto;
-    min-width: 7.5rem;
     display: flex;
     align-items: baseline;
     justify-content: flex-end;
@@ -194,11 +177,35 @@
     color: var(--text-dim);
 }
 
-/* Refresh Controls */
+/* Refresh Controls — a quiet toolbar, so its buttons are smaller than regular ones */
 .refresh-bar {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+}
+
+.refresh-bar .btn {
+    min-height: 28px;
+}
+
+.refresh-bar .btn-icon {
+    width: 28px;
+}
+
+.refresh-bar .btn-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Still a comfortable target for a finger */
+@media (pointer: coarse) {
+    .refresh-bar .btn {
+        min-height: 36px;
+    }
+
+    .refresh-bar .btn-icon {
+        width: 36px;
+    }
 }
 
 .refresh-label {
@@ -207,8 +214,8 @@
 }
 
 .timer-circle {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: 2px solid var(--border-strong);
     display: flex;
