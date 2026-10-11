@@ -3,7 +3,7 @@
 import { $field } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
-import { toast, openModal, closeModal, setReturnTo, clearReturnTo, showConfirm } from './ui.js';
+import { toast, openModal, closeModal, setReturnTo, clearReturnTo, showConfirm, focusField } from './ui.js';
 import { setSelectValue } from './select.js';
 import { BROADCAST_AUDIENCE_LABELS } from './format.js';
 
@@ -23,7 +23,7 @@ export function openBroadcastModal() {
     $field('broadcast-msg').value = '';
     setSelectValue('broadcast-target', 'all');
     openModal('broadcast-modal');
-    $field('broadcast-msg').focus();
+    focusField($field('broadcast-msg'));
 }
 
 export function sendBroadcast() {

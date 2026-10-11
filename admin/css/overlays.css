@@ -253,3 +253,8 @@
         transform: scale(0.97);
     }
 }
+
+/* The dialog itself takes focus on touch screens (see openModal); no ring needed */
+.modal-content:focus {
+    outline: none;
+}

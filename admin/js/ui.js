@@ -30,9 +30,25 @@ const focusBeforeOpen = new Map();
 
 /** @param {HTMLElement} modal */
 function focusables(modal) {
+    // tabIndex -1 rules out e.g. the native <select> hidden behind a custom dropdown:
+    // focusing it opens the OS picker on iOS the moment the dialog appears
     return /** @type {HTMLElement[]} */ ([...modal.querySelectorAll(FOCUSABLE)]).filter(
-        (el) => !el.hasAttribute('disabled') && el.offsetParent !== null
+        (el) => !el.hasAttribute('disabled') && el.offsetParent !== null && el.tabIndex !== -1
     );
+}
+
+const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
+const isTypingField = (el) => el.matches('input, textarea, select');
+
+/**
+ * Focus a field for typing, except on touch screens: there focus opens the
+ * on-screen keyboard (or the OS picker) and scrolls the page under it, which a
+ * user who just opened a dialog did not ask for.
+ *
+ * @param {HTMLElement | null} el
+ */
+export function focusField(el) {
+    if (el && !isTouch()) el.focus();
 }
 
 /**
@@ -70,7 +86,14 @@ export function openModal(id) {
     modal.addEventListener('keydown', trapTab);
 
     const first = focusables(modal)[0];
-    if (first) first.focus();
+    if (first && !(isTouch() && isTypingField(first))) {
+        first.focus();
+    } else {
+        // Keep focus inside the dialog for screen readers without raising the keyboard
+        const content = /** @type {HTMLElement} */ (modal.querySelector('.modal-content') || modal);
+        content.tabIndex = -1;
+        content.focus({ preventScroll: true });
+    }
 }
 
 /** @param {string} id */

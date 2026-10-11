@@ -3,7 +3,7 @@
 import { $, setText, escapeHtml, $field } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
-import { toast, openModal, closeModal, setReturnTo, clearReturnTo } from './ui.js';
+import { toast, openModal, closeModal, setReturnTo, clearReturnTo, focusField } from './ui.js';
 import { chatLabel } from './format.js';
 import { chatsById } from './store.js';
 
@@ -93,8 +93,8 @@ function blockUser(chatId, label) {
     };
 
     openModal('block-modal');
-    input.focus();
-    input.select();
+    focusField(input);
+    if (document.activeElement === input) input.select();
 }
 
 const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POST' }, 'Chat unblocked');
@@ -116,7 +116,7 @@ function openAddContentModal(chatId, label) {
     $('content-selected').style.display = 'none';
 
     openModal('add-content-modal');
-    $field('content-search-input').focus();
+    focusField($field('content-search-input'));
 }
 
 export async function searchContent(query) {
