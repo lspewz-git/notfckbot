@@ -1,7 +1,7 @@
 /** The three data tables: filters, skeletons and row rendering. */
 
 import { $, $field, all, escapeHtml } from './dom.js';
-import { chatDisplayName, chatLabel, seriesStatusBadge, MODE_LABELS } from './format.js';
+import { chatDisplayName, chatLabel, seriesStatusBadge, formatReleaseDate, MODE_LABELS } from './format.js';
 import { chatsById, subsByKey, subKey, refill } from './store.js';
 import { isUnchanged, invalidate } from './render.js';
 
@@ -103,12 +103,27 @@ const TABLES = {
         body: 'watchlist-body',
         filter: 'watchlist-filter',
         columns: ['User', 'Film Title', 'Year', 'Release', 'Actions'],
+        table: 'watchlist-table',
+        tabs: {
+            active: {
+                label: 'Waiting',
+                matches: (item) => !item.notified,
+                empty: 'No films waiting for release.'
+            },
+            // Released and announced to the chat; kept as a record
+            archive: {
+                label: 'Released',
+                matches: (item) => Boolean(item.notified),
+                empty: 'No released films yet.',
+                hint: 'films-archive-hint'
+            }
+        },
         row: (item) => `
             <tr>
                 <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
-                <td data-label="Film Title">${escapeHtml(item.title)}</td>
-                <td data-label="Year">${item.year || 'N/A'}</td>
-                <td data-label="Release">${item.premiere_digital || 'Unknown'}</td>
+                <td data-label="Film Title" class="link-cell" data-action="film" data-id="${escapeHtml(item.tmdb_id)}"><span class="link-text">${escapeHtml(item.title)}</span></td>
+                <td data-label="Year">${item.year || '—'}</td>
+                <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}</td>
                 <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="${item.id}">${ICON.trash}Delete</button></td>
             </tr>
         `
@@ -159,7 +174,7 @@ export function setTableTab(type, name) {
     Object.entries(table.tabs).forEach(([tabName, tab]) => {
         if (tab.hint && $(tab.hint)) $(tab.hint).hidden = tabName !== name;
     });
-    const el = $(`${type}-table`);
+    const el = $(table.table || `${type}-table`);
     if (el) el.dataset.tab = name;
 
     // Re-slice what is on screen; before the first response, keep the skeleton in step with the columns

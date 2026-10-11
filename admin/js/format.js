@@ -34,6 +34,14 @@ export function seriesStatusBadge(status) {
     return `<span class="badge ${known.cls}" title="TMDB: ${escapeHtml(status)}">${known.label}</span>`;
 }
 
+/** "2026-12-15" -> "15 Dec 2026"; "TBA" while TMDB has no date. Plain text — escape it for HTML. */
+export function formatReleaseDate(iso) {
+    if (!iso) return 'TBA';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export const MODE_LABELS = {
     episode: 'Every episode',
     season: 'Whole season',

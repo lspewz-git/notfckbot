@@ -258,3 +258,52 @@
 .modal-content:focus {
     outline: none;
 }
+
+/* Series / film card */
+.detail {
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    gap: var(--space-5);
+    align-items: start;
+}
+
+.detail-poster {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.detail-poster[hidden] {
+    display: none;
+}
+
+.detail:has(.detail-poster[hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.detail-meta {
+    margin-top: var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.detail-desc {
+    margin: var(--space-3) 0 var(--space-4);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+}
+
+.detail-loading {
+    padding: var(--space-6) 0;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+@media (max-width: 560px) {
+    .detail {
+        grid-template-columns: 6rem minmax(0, 1fr);
+        gap: var(--space-4);
+    }
+}

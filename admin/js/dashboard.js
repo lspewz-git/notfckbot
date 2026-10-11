@@ -13,7 +13,12 @@ export function updateStats(stats) {
         archived.hidden = !stats.archivedSubsCount;
         archived.innerText = `+ ${stats.archivedSubsCount ?? 0} archived`;
     }
-    setText('films-count', stats.filmsCount);
+    setText('films-count', stats.activeFilmsCount ?? stats.filmsCount);
+    const released = $('films-released-count');
+    if (released) {
+        released.hidden = !stats.releasedFilmsCount;
+        released.innerText = `+ ${stats.releasedFilmsCount ?? 0} released`;
+    }
     setText('series-count', stats.seriesCount);
 }
 

@@ -5,30 +5,77 @@ import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm } from './ui.js';
 import { setSelectValue } from './select.js';
-import { chatLabel, MODE_LABELS } from './format.js';
+import { chatLabel, formatReleaseDate, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
 
-export async function openSeriesDetails(tmdbId) {
+/** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
+const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
+
+/**
+ * Opens the card and fills it from `load()`.
+ * @param {() => Promise<{ title: string, meta: string, desc: string, count: string, poster: string }>} load
+ */
+let detailRequest = 0;
+
+async function openDetails(load) {
+    // Only the latest card may fill the dialog: a slow earlier response is dropped
+    const request = ++detailRequest;
+    $('detail-loading').innerText = 'Loading details…';
     $('detail-loading').style.display = 'block';
     $('detail-ready').style.display = 'none';
     openModal('detail-modal');
 
     try {
-        const data = await api(`/series/${tmdbId}`);
-        setText('detail-title', data.name);
-        setText('detail-desc', data.overview || 'No description available.');
-        setText('detail-meta', `Rating: ⭐️ ${data.vote_average.toFixed(1)} • Seasons: ${data.number_of_seasons}`);
-        setText('detail-subs-count', `${data.subCount} Subscribers`);
-        $img('detail-poster').src = data.poster_path
-            ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
-            : 'https://via.placeholder.com/200x300';
+        const card = await load();
+        if (request !== detailRequest) return;
+        setText('detail-title', card.title);
+        setText('detail-meta', card.meta);
+        setText('detail-desc', card.desc || 'No description available.');
+        setText('detail-subs-count', card.count);
+
+        const img = $img('detail-poster');
+        img.hidden = !card.poster;
+        img.onerror = () => {
+            img.hidden = true;
+        };
+        img.src = card.poster;
 
         $('detail-loading').style.display = 'none';
-        $('detail-ready').style.display = 'block';
+        $('detail-ready').style.display = '';
     } catch (e) {
-        $('detail-loading').innerText = 'Failed to load details.';
+        if (request === detailRequest) $('detail-loading').innerText = 'Failed to load details.';
     }
 }
+
+export const openSeriesDetails = (tmdbId) =>
+    openDetails(async () => {
+        const data = await api(`/series/${tmdbId}`);
+        const rating = data.vote_average ? `⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated yet';
+        const n = data.subCount;
+        return {
+            title: data.name,
+            meta: `${rating} • ${data.number_of_seasons} season${data.number_of_seasons === 1 ? '' : 's'}`,
+            desc: data.overview,
+            count: `${n} subscriber${n === 1 ? '' : 's'}`,
+            poster: posterUrl(data.poster_path)
+        };
+    });
+
+export const openFilmDetails = (tmdbId) =>
+    openDetails(async () => {
+        const data = await api(`/movie/${tmdbId}`);
+        const rating = data.vote_average ? `⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated yet';
+        const release = data.release_date ? formatReleaseDate(data.release_date) : 'Release date TBA';
+        return {
+            title: data.title || data.original_title,
+            meta: `${rating} • ${release} • ${data.status || 'Unknown status'}`,
+            desc: data.overview,
+            count: data.notified
+                ? `${data.waiting} waiting • ${data.notified} already notified`
+                : `${data.waiting} waiting for release`,
+            poster: posterUrl(data.poster_path)
+        };
+    });
 
 export function openModeModal(key) {
     const sub = subsByKey.get(key);

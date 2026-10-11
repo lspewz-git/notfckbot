@@ -61,13 +61,38 @@ const searchMulti = async (query) => {
     }
 };
 
+// TMDB release types: 3 theatrical, 4 digital, 5 physical, 6 TV
+const DIGITAL = 4;
+
+/**
+ * The digital release date ("2026-03-04"), or null when TMDB has none. Russia's
+ * date is preferred, then the US, then the earliest anywhere.
+ */
+function digitalReleaseDate(releaseDates) {
+    const byCountry = (releaseDates && releaseDates.results) || [];
+    const digitalIn = (country) =>
+        (country.release_dates || [])
+            .filter((r) => r.type === DIGITAL && r.release_date)
+            .map((r) => r.release_date.slice(0, 10))
+            .sort()[0] || null;
+
+    for (const code of ['RU', 'US']) {
+        const country = byCountry.find((c) => c.iso_3166_1 === code);
+        const date = country && digitalIn(country);
+        if (date) return date;
+    }
+    return byCountry.map(digitalIn).filter(Boolean).sort()[0] || null;
+}
+
 const getDetails = async (id, media_type) => {
     try {
         const response = await apiClient.get(`/${media_type}/${id}`, {
             params: {
                 language: 'ru-RU',
-                // external_ids carries the IMDb ID, used to look up the Kinopoisk ID
-                append_to_response: 'credits,external_ids'
+                // external_ids carries the IMDb ID, used to look up the Kinopoisk ID;
+                // release_dates (films only) carries the digital release
+                append_to_response:
+                    media_type === 'movie' ? 'credits,external_ids,release_dates' : 'credits,external_ids'
             }
         });
         const data = response.data;
@@ -82,6 +107,7 @@ const getDetails = async (id, media_type) => {
         }
 
         data.imdb_id = data.imdb_id || (data.external_ids && data.external_ids.imdb_id) || null;
+        if (media_type === 'movie') data.digital_release_date = digitalReleaseDate(data.release_dates);
 
         return data;
     } catch (error) {

@@ -489,7 +489,7 @@ const buildSeriesCard = (series, notifyType, loc) => {
 };
 
 const buildMovieCard = (item, loc) => ({
-    text: `🎬 <b>${escapeHtml(item.title)}</b>${item.year ? ` (${item.year})` : ''}\n\n📅 Цифровой релиз: ${formatDigitalDate(item.premiere_digital)}\n\nПришлю уведомление, когда фильм выйдет в цифре.`,
+    text: `🎬 <b>${escapeHtml(item.title)}</b>${item.year ? ` (${item.year})` : ''}\n\n📅 Выход: ${formatDigitalDate(item.premiere_digital)}\n\nПришлю уведомление, когда фильм выйдет.`,
     keyboard: Markup.inlineKeyboard([
         [
             Markup.button.callback('❌ Удалить', `subs_cm_${item.id}_${loc}`),
@@ -578,7 +578,7 @@ const sendHelp = async (ctx) => {
 
 <b>Фильмы:</b>
 • При поиске фильма нажми <b>✨ Подписаться</b> — добавлю в список ожидания.
-• Когда фильм выйдет в цифре — пришлю ссылку для просмотра 🎬
+• Когда фильм выйдет — пришлю ссылки для просмотра 🎬
 
 В разделе 📺 <b>Мои подписки</b> или по команде /subs ты можешь:
 • Просмотреть сериалы и фильмы из списка ожидания.
@@ -953,12 +953,17 @@ bot.action(/^watchlist_add_([a-z0-9_]+)$/, async (ctx) => {
         setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
 
         const dateLabel = formatRuDate(digitalDate) || 'пока не объявлена';
+        const digitalLine = data.digital_release_date
+            ? `💻 Цифровой релиз: <b>${formatRuDate(data.digital_release_date)}</b>\n`
+            : '';
 
         await ctx.answerCbQuery('Добавлено в список ожидания! 📌');
         await ctx.editMessageText(
             `📌 <b>«${escapeHtml(title)}»</b> добавлен в список ожидания!\n\n` +
-                `📅 Цифровой релиз: <b>${dateLabel}</b>\n\n` +
-                `<i>Как только фильм выйдет в цифру — пришлю ссылку для просмотра.</i>`,
+                `📅 Выход: <b>${dateLabel}</b>\n` +
+                digitalLine +
+                '\n' +
+                `<i>Как только фильм выйдет — пришлю ссылки для просмотра.</i>`,
             {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])

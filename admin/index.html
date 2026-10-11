@@ -249,9 +249,16 @@
                                     <span class="stat-foot-sub">New episodes are announced</span>
                                 </div>
                             </div>
-                            <div class="stat-card" data-section="watchlist" role="button" tabindex="0">
+                            <div
+                                class="stat-card"
+                                data-section="watchlist"
+                                data-films-tab="active"
+                                role="button"
+                                tabindex="0"
+                            >
                                 <div class="stat-head">
                                     <span class="stat-title">Watchlist</span>
+                                    <span id="films-released-count" class="stat-badge" hidden>+ 0 released</span>
                                 </div>
                                 <span id="films-count" class="stat-value">-</span>
                                 <div class="stat-foot">
@@ -261,7 +268,7 @@
                                             <rect x="2" y="2" width="20" height="20" rx="2" />
                                             <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" /></svg
                                     ></span>
-                                    <span class="stat-foot-sub">Notified on digital release</span>
+                                    <span class="stat-foot-sub">Notified on release</span>
                                 </div>
                             </div>
                             <div class="stat-card" data-static>
@@ -341,9 +348,20 @@
 
                     <section id="watchlist-section" class="section">
                         <header>
-                            <h1>Watchlist Films</h1>
+                            <h1>Watchlist</h1>
                         </header>
                         <div class="glass-card">
+                            <div class="tab-filters" role="group" aria-label="Which films to show">
+                                <button class="btn btn-ghost active" data-films-tab="active" aria-pressed="true">
+                                    Waiting
+                                </button>
+                                <button class="btn btn-ghost" data-films-tab="archive" aria-pressed="false">
+                                    Released
+                                </button>
+                            </div>
+                            <p id="films-archive-hint" class="tab-hint" hidden>
+                                Films that came out and were announced to the chat. Kept as a record.
+                            </p>
                             <div class="search-box">
                                 <input
                                     type="text"
@@ -352,7 +370,7 @@
                                 />
                             </div>
                             <div class="table-wrap">
-                                <table id="watchlist-table">
+                                <table id="watchlist-table" data-tab="active">
                                     <thead>
                                         <tr>
                                             <th>User</th>
@@ -528,22 +546,22 @@
         <!-- Series Detail Modal -->
         <div id="detail-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
             <div class="modal-content modal-wide">
-                <div id="detail-loading">Loading details...</div>
-                <div id="detail-ready" style="display: none">
-                    <div style="display: flex; gap: 2rem">
-                        <img id="detail-poster" src="" alt="" style="width: 200px; border-radius: var(--radius)" />
-                        <div class="btn-grow">
-                            <h2 id="detail-title">Series Title</h2>
-                            <div id="detail-meta" style="margin: 0.5rem 0; color: var(--primary)">S01E01 • ⭐️ 8.9</div>
-                            <p
-                                id="detail-desc"
-                                style="color: var(--text-dim); font-size: 0.9rem; margin: 1rem 0; line-height: 1.6"
-                            ></p>
-                            <div class="badge ok" id="detail-subs-count">12 Subscribers</div>
-                        </div>
+                <div id="detail-loading" class="detail-loading">Loading details…</div>
+                <div id="detail-ready" class="detail" style="display: none">
+                    <img id="detail-poster" class="detail-poster" src="" alt="" />
+                    <div class="detail-body">
+                        <h3 id="detail-title">Title</h3>
+                        <p id="detail-meta" class="detail-meta"></p>
+                        <p id="detail-desc" class="detail-desc"></p>
+                        <span id="detail-subs-count" class="stat-badge"></span>
                     </div>
-                    <button data-close="detail-modal" class="btn btn-ghost btn-block mt-xl">Close</button>
                 </div>
+                <button data-close="detail-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 

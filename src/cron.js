@@ -155,7 +155,7 @@ const notifyNewEpisodes = async (bot, item, data) => {
 };
 
 // ============================================================
-// Watchlist: movie digital release check
+// Watchlist: movie release check (digital date added to the message when known)
 // ============================================================
 const checkWatchlistReleases = async (bot) => {
     // Load all unnotified watchlist entries with their chat
@@ -187,6 +187,21 @@ const checkWatchlistReleases = async (bot) => {
             if (!data) continue;
 
             const firstEntry = filmEntries[0];
+
+            // The date was stored once, when the film was added — often before TMDB had
+            // one. Keep it (and the year) current so the panel and the bot can show it.
+            const freshDate = data.release_date || null;
+            const freshYear = freshDate ? parseInt(freshDate.slice(0, 4), 10) : null;
+            // Titles change too, e.g. "Мстители: Судный день" -> "Мстители: Доктор Дум"
+            const freshTitle = data.title || null;
+            for (const entry of filmEntries) {
+                const changes = {};
+                if (entry.premiere_digital !== freshDate) changes.premiere_digital = freshDate;
+                if (freshYear && entry.year !== freshYear) changes.year = freshYear;
+                if (freshTitle && entry.title !== freshTitle) changes.title = freshTitle;
+                if (Object.keys(changes).length) await entry.update(changes);
+            }
+
             let isReleased = false;
             let displayDate = null;
 
@@ -197,8 +212,8 @@ const checkWatchlistReleases = async (bot) => {
                 if (!isNaN(releaseDate) && releaseDate <= now) {
                     isReleased = true;
                 }
-                displayDate = data.release_date;
             }
+            displayDate = data.release_date || null;
 
             if (!isReleased) {
                 console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
@@ -208,6 +223,12 @@ const checkWatchlistReleases = async (bot) => {
             // 🎉 Film is released! Notify all users waiting for it
             console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
             const formattedDate = formatRuDate(displayDate);
+            // The notification still goes out on the main release; the digital one is
+            // added for information, since that's when it can usually be streamed
+            const digital = data.digital_release_date;
+            const digitalLine = digital
+                ? `💻 Цифровой релиз: <b>${formatRuDate(digital)}</b>${new Date(digital) > now ? ' (ожидается)' : ''}\n`
+                : '';
             // A release happens once per film, so the ID is looked up here rather than ahead of time
             const kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
             const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
@@ -221,7 +242,9 @@ const checkWatchlistReleases = async (bot) => {
                         `🎬 <b>Фильм доступен!</b>\n\n` +
                         `🍿 <b>${escapeHtml(entry.title)}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
                         `${directorInfo}` +
-                        `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n\n` +
+                        `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n` +
+                        digitalLine +
+                        '\n' +
                         links;
 
                     if (entry.poster_url) {

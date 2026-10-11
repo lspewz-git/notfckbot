@@ -9,7 +9,7 @@ import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
 import { openChatActions, searchContent, selectContent, submitAddContent } from './chats.js';
-import { openSeriesDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
+import { openSeriesDetails, openFilmDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
 import { triggerCheck, openBroadcastModal, sendBroadcast, confirmWipeAll } from './maintenance.js';
 
 const REFRESH_SECONDS = 10;
@@ -64,6 +64,7 @@ function startTimer() {
 const CLICK_ACTIONS = {
     'chat-actions': (el) => openChatActions(el.dataset.id),
     series: (el) => openSeriesDetails(el.dataset.id),
+    film: (el) => openFilmDetails(el.dataset.id),
     mode: (el) => openModeModal(el.dataset.key),
     'delete-sub': (el) => deleteSub(el.dataset.chat, el.dataset.series),
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
@@ -73,18 +74,19 @@ const CLICK_ACTIONS = {
 };
 
 const DELEGATED =
-    '[data-action], [data-section], [data-close], [data-close-return], [data-open], [data-log-filter], [data-subs-tab]';
+    '[data-action], [data-section], [data-close], [data-close-return], [data-open], [data-log-filter], [data-subs-tab], [data-films-tab]';
 
 function setupDelegation() {
     document.addEventListener('click', (e) => {
         const el = closest(e, DELEGATED);
         if (!el) return;
 
-        const { action, section, close, closeReturn, open, logFilter, subsTab } = el.dataset;
+        const { action, section, close, closeReturn, open, logFilter, subsTab, filmsTab } = el.dataset;
 
         if (action && CLICK_ACTIONS[action]) CLICK_ACTIONS[action](el);
         // Before the section switch, so the dashboard card lands on the right tab
         if (subsTab) setTableTab('subs', subsTab);
+        if (filmsTab) setTableTab('films', filmsTab);
         if (section) switchSection(section);
         if (close) closeModal(close);
         if (closeReturn) closeModalReturning(closeReturn);

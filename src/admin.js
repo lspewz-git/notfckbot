@@ -4,7 +4,14 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { Op } = require('sequelize');
-const { buildProxyAgent, applyProxyToBot, redactProxyUrl, hasProxyPassword, withSavedPassword } = require('./proxy');
+const {
+    getProxyAgent,
+    buildProxyAgent,
+    applyProxyToBot,
+    redactProxyUrl,
+    hasProxyPassword,
+    withSavedPassword
+} = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('./constants');
@@ -52,19 +59,32 @@ const FINISHED_SERIES_STATUSES = Object.keys(FINISHED_STATUS_LABELS);
 
 app.get('/api/stats', async (req, res) => {
     try {
-        const [chatsCount, seriesCount, subsCount, archivedSubsCount, filmsCount] = await Promise.all([
-            Chat.count(),
-            Series.count(),
-            Subscription.count(),
-            Subscription.count({
-                include: [{ model: Series, attributes: [], required: true }],
-                where: { '$Series.status$': { [Op.in]: FINISHED_SERIES_STATUSES } }
-            }),
-            Watchlist.count()
-        ]);
+        const [chatsCount, seriesCount, subsCount, archivedSubsCount, filmsCount, releasedFilmsCount] =
+            await Promise.all([
+                Chat.count(),
+                Series.count(),
+                Subscription.count(),
+                Subscription.count({
+                    include: [{ model: Series, attributes: [], required: true }],
+                    where: { '$Series.status$': { [Op.in]: FINISHED_SERIES_STATUSES } }
+                }),
+                Watchlist.count(),
+                // Released films stay in the table as a record of what was announced
+                Watchlist.count({ where: { notified: true } })
+            ]);
         // A null (not yet checked) status counts as active, hence the subtraction
         const activeSubsCount = subsCount - archivedSubsCount;
-        res.json({ chatsCount, seriesCount, subsCount, activeSubsCount, archivedSubsCount, filmsCount });
+        const activeFilmsCount = filmsCount - releasedFilmsCount;
+        res.json({
+            chatsCount,
+            seriesCount,
+            subsCount,
+            activeSubsCount,
+            archivedSubsCount,
+            filmsCount,
+            activeFilmsCount,
+            releasedFilmsCount
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -158,6 +178,51 @@ app.get('/api/series/:tmdbId', async (req, res) => {
         res.json({ ...details, subCount: subs });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Film card: TMDB details plus how many chats wait for it / were told it's out
+app.get('/api/movie/:tmdbId', async (req, res) => {
+    try {
+        const numericId = String(req.params.tmdbId).replace('movie_', '');
+        if (!/^\d+$/.test(numericId)) return res.status(400).json({ error: 'Bad film id' });
+        // Older rows may still hold the bare id (see fix-watchlist-ids.js)
+        const ids = [`movie_${numericId}`, numericId];
+        const [details, waiting, notified] = await Promise.all([
+            tmdb.getDetails(numericId, 'movie'),
+            // Chats, not rows: a chat can hold the same film twice (old duplicates)
+            Watchlist.count({ where: { tmdb_id: ids, notified: false }, distinct: true, col: 'chatId' }),
+            Watchlist.count({ where: { tmdb_id: ids, notified: true }, distinct: true, col: 'chatId' })
+        ]);
+        res.json({ ...details, waiting, notified });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// TMDB posters through this server: image.tmdb.org is blocked on some networks the
+// panel is opened from, while the server can reach it. Fixed host, strict path.
+const POSTER_SIZES = new Set(['w185', 'w342', 'w500']);
+app.get('/api/poster/:size/:file', async (req, res) => {
+    const { size, file } = req.params;
+    if (!POSTER_SIZES.has(size) || !/^[A-Za-z0-9]+\.(jpg|png)$/.test(file)) return res.status(400).end();
+    try {
+        const upstream = await axios.get(`https://image.tmdb.org/t/p/${size}/${file}`, {
+            responseType: 'stream',
+            timeout: 10000,
+            httpsAgent: getProxyAgent(),
+            proxy: false
+        });
+        res.set('Content-Type', upstream.headers['content-type'] || 'image/jpeg');
+        // Poster files never change under the same name
+        res.set('Cache-Control', 'public, max-age=604800, immutable');
+        // Without a listener, a connection dropped mid-download is an unhandled
+        // 'error' event, and that takes the whole process down
+        upstream.data.on('error', () => res.destroy());
+        res.on('close', () => upstream.data.destroy());
+        upstream.data.pipe(res);
+    } catch (err) {
+        res.status(err.response ? err.response.status : 502).end();
     }
 });
 
@@ -398,12 +463,18 @@ app.post('/api/watchlist', async (req, res) => {
         const chat = await Chat.findByPk(chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
-        // Check for duplicate
-        const existing = await Watchlist.findOne({ where: { chatId, tmdb_id: String(tmdbId) } });
-        if (existing) return res.status(409).json({ error: 'Film already in watchlist for this chat' });
+        // Rows are stored as "movie_<id>"; comparing against the bare id never matched,
+        // which is how the same film ended up in one chat's watchlist twice
+        const numericId = String(tmdbId).replace('movie_', '');
+        if (!/^\d+$/.test(numericId)) return res.status(400).json({ error: 'Bad film id' });
+        const fullTmdbId = `movie_${numericId}`;
+        const rows = await Watchlist.findAll({ where: { chatId, tmdb_id: [fullTmdbId, numericId] } });
+        if (rows.some((r) => !r.notified)) {
+            return res.status(409).json({ error: 'Film already in watchlist for this chat' });
+        }
 
         // Fetch movie details from TMDB
-        const details = await tmdb.getDetails(tmdbId, 'movie');
+        const details = await tmdb.getDetails(numericId, 'movie');
 
         let isReleased = false;
         if (details.status === 'Released') {
@@ -415,7 +486,10 @@ app.post('/api/watchlist', async (req, res) => {
             }
         }
 
-        const fullTmdbId = String(tmdbId).startsWith('movie_') ? String(tmdbId) : `movie_${tmdbId}`;
+        // A released film is stored straight into Released; one record there is enough
+        if (isReleased && rows.length) {
+            return res.status(409).json({ error: "Film is already in this chat's Released list" });
+        }
 
         const entry = await Watchlist.create({
             chatId,
@@ -423,6 +497,7 @@ app.post('/api/watchlist', async (req, res) => {
             title: details.title || details.original_title,
             poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
             year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
+            premiere_digital: details.release_date || null,
             notified: isReleased // If already released, mark as notified so cron doesn't pick it up
         });
 
