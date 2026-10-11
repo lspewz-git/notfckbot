@@ -8,17 +8,21 @@
     margin-bottom: 0.5rem;
 }
 
+/* Same box as the generic input rule in utilities.css, so a text, number and
+   password field side by side line up */
 .select-field,
 .input-field {
     width: 100%;
-    padding: 0.7rem 1rem;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
+    min-height: var(--control-h);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     color: var(--text);
     font-family: inherit;
-    font-size: 0.85rem;
-    font-weight: 500;
+    /* 16px stops iOS Safari from zooming into the field on focus */
+    font-size: max(16px, var(--text-base));
+    font-weight: 400;
     transition:
         border-color 0.2s,
         box-shadow 0.2s;
@@ -42,8 +46,8 @@
 .select-field:focus,
 .input-field:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--primary-text);
+    box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 /* Custom dropdown — the native <select> popup is drawn by the OS and cannot
@@ -66,8 +70,8 @@
 }
 
 .custom-select-trigger[aria-expanded='true'] {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--primary-text);
+    box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .custom-select-panel {

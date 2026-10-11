@@ -17,7 +17,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=optional"
             rel="stylesheet"
         />
     </head>
@@ -235,7 +235,7 @@
                             >
                                 <div class="stat-head">
                                     <span class="stat-title">Active subscriptions</span>
-                                    <span id="subs-archived-count" class="stat-badge" hidden></span>
+                                    <span id="subs-archived-count" class="stat-badge" hidden>+ 0 archived</span>
                                 </div>
                                 <span id="subs-count" class="stat-value">-</span>
                                 <div class="stat-foot">
@@ -653,7 +653,7 @@
         <!-- TMDB proxy settings -->
         <div id="proxy-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="proxy-modal-title">
             <div class="modal-content modal-medium">
-                <h3 id="proxy-modal-title">🌐 TMDB Proxy</h3>
+                <h3 id="proxy-modal-title">Proxy</h3>
                 <div class="proxy-note">
                     <p>
                         <strong>Covers</strong> everything the bot sends out — TMDB and the Telegram Bot API. Applied
@@ -723,8 +723,13 @@
                 <div class="modal-actions mt-lg">
                     <button id="proxy-test" class="btn btn-ghost">Test</button>
                     <button id="proxy-save" class="btn btn-primary btn-grow">Save</button>
-                    <button data-close="proxy-modal" class="btn btn-ghost">Cancel</button>
                 </div>
+                <button data-close="proxy-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 

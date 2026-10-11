@@ -86,6 +86,12 @@
     box-sizing: border-box;
 }
 
+/* Keep room for the scrollbar from the start: otherwise it appears once the
+   data makes the page taller, and everything shifts sideways by its width */
+html {
+    scrollbar-gutter: stable;
+}
+
 body {
     font-family: var(--font-sans);
     font-size: var(--text-base);

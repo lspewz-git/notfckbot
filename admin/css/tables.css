@@ -59,6 +59,13 @@ tbody tr:hover td {
     color: var(--text-dim);
 }
 
+/* Health indicators: a fixed minimum width, so "TG: ..." turning into "TG: OK"
+   doesn't nudge its right-aligned neighbours */
+.status-badges .badge {
+    min-width: 6.25rem;
+    justify-content: flex-start;
+}
+
 /* Health indicators get a status dot */
 .status-badges .badge::before {
     content: '';

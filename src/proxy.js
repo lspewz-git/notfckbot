@@ -55,8 +55,57 @@ const applyProxyToBot = (bot) => {
     }
 
     bot.telegram.options.agent = getProxyAgent();
-    console.log(`[Proxy] Telegram client now using: ${process.env.TMDB_PROXY_URL || 'direct connection'}`);
+    // Logs are readable in the admin panel, so never print the password
+    console.log(
+        `[Proxy] Telegram client now using: ${redactProxyUrl(process.env.TMDB_PROXY_URL) || 'direct connection'}`
+    );
     return true;
 };
 
-module.exports = { getProxyAgent, buildProxyAgent, applyProxyToBot };
+/** The proxy URL without its password, for anything that leaves the server. */
+function redactProxyUrl(url) {
+    if (!url) return '';
+    try {
+        const u = new URL(url);
+        u.password = '';
+        return u.toString().replace(/\/$/, '');
+    } catch {
+        return url.replace(/:[^:@/]*@/, '@');
+    }
+}
+
+const hasProxyPassword = (url) => {
+    try {
+        return Boolean(url && new URL(url).password);
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * The panel never receives the saved password, so a form sent back with the
+ * password left empty means "keep it": put the saved one back, as long as it is
+ * for the same user on the same host.
+ */
+function withSavedPassword(newUrl, savedUrl) {
+    if (!newUrl || !savedUrl) return newUrl;
+    try {
+        const next = new URL(newUrl);
+        const saved = new URL(savedUrl);
+        if (next.password || !saved.password) return newUrl;
+        if (next.username !== saved.username || next.host !== saved.host) return newUrl;
+        next.password = saved.password;
+        return next.toString().replace(/\/$/, '');
+    } catch {
+        return newUrl;
+    }
+}
+
+module.exports = {
+    getProxyAgent,
+    buildProxyAgent,
+    applyProxyToBot,
+    redactProxyUrl,
+    hasProxyPassword,
+    withSavedPassword
+};

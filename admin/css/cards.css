@@ -74,7 +74,14 @@
     font-weight: 500;
 }
 
-/* Outlined pill in the card corner, like the trend badge in shadcn's dashboard */
+/* Outlined pill in the card corner, like the trend badge in shadcn's dashboard.
+   While hidden it still holds its place, so the figure below doesn't jump when
+   the count arrives. */
+.stat-badge[hidden] {
+    display: inline-flex;
+    visibility: hidden;
+}
+
 .stat-badge {
     display: inline-flex;
     align-items: center;

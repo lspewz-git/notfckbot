@@ -1,13 +1,12 @@
 /* Animations */
+/* Opacity only: a section that slides in reads as the layout jumping */
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(4px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 

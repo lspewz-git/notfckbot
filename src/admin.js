@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { Op } = require('sequelize');
-const { buildProxyAgent, applyProxyToBot } = require('./proxy');
+const { buildProxyAgent, applyProxyToBot, redactProxyUrl, hasProxyPassword, withSavedPassword } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('./constants');
@@ -492,7 +492,8 @@ app.get('/api/config', (req, res) => {
     // The panel has no login, so secrets only ever leave the server masked
     res.json({
         tmdbApiKey: maskToken(process.env.TMDB_API_KEY),
-        tmdbProxyUrl: process.env.TMDB_PROXY_URL || ''
+        tmdbProxyUrl: redactProxyUrl(process.env.TMDB_PROXY_URL),
+        proxyHasPassword: hasProxyPassword(process.env.TMDB_PROXY_URL)
     });
 });
 
@@ -635,7 +636,8 @@ app.post('/api/config', (req, res) => {
     const { tmdbProxyUrl } = req.body;
 
     if (tmdbProxyUrl !== undefined) {
-        const newProxy = typeof tmdbProxyUrl === 'string' ? tmdbProxyUrl.trim() : '';
+        const typed = typeof tmdbProxyUrl === 'string' ? tmdbProxyUrl.trim() : '';
+        const newProxy = withSavedPassword(typed, process.env.TMDB_PROXY_URL);
         if (!isSafeEnvValue(newProxy) || /\s/.test(newProxy)) {
             return res.status(400).json({ error: 'Proxy URL must be a single line without spaces' });
         }
@@ -655,7 +657,7 @@ app.post('/api/config', (req, res) => {
     res.json({
         success: true,
         tmdbApiKey: maskToken(process.env.TMDB_API_KEY),
-        tmdbProxyUrl: process.env.TMDB_PROXY_URL
+        tmdbProxyUrl: redactProxyUrl(process.env.TMDB_PROXY_URL)
     });
 });
 
@@ -673,7 +675,8 @@ app.post('/api/clear-all', async (req, res) => {
 });
 
 app.post('/api/config/test-proxy', async (req, res) => {
-    const url = (req.body.url || '').trim();
+    const typed = typeof req.body.url === 'string' ? req.body.url.trim() : '';
+    const url = withSavedPassword(typed, process.env.TMDB_PROXY_URL);
 
     if (!isSupportedProxyUrl(url)) {
         return res.json({ success: false, error: 'Unsupported scheme' });

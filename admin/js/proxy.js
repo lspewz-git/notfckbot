@@ -55,7 +55,8 @@ function fillForm(url) {
         $field('proxy-host').value = parsed.hostname;
         $field('proxy-port').value = parsed.port;
         $field('proxy-user').value = decodeURIComponent(parsed.username || '');
-        $field('proxy-pass').value = decodeURIComponent(parsed.password || '');
+        // The server never sends the password; an empty field keeps the saved one
+        $field('proxy-pass').value = '';
     } catch (e) {
         // Hand-edited .env value we can't parse — start from a clean form
         toast('Stored proxy URL could not be parsed', 'warning');
@@ -71,6 +72,7 @@ export async function openProxyModal() {
     try {
         const cfg = await api('/config');
         fillForm(cfg.tmdbProxyUrl || '');
+        $field('proxy-pass').placeholder = cfg.proxyHasPassword ? '•••••• saved — leave empty to keep' : '';
     } catch (e) {
         toast('Could not load current proxy settings', 'error');
     }
