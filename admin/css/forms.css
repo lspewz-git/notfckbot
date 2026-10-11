@@ -23,6 +23,9 @@
     /* 16px stops iOS Safari from zooming into the field on focus */
     font-size: max(16px, var(--text-base));
     font-weight: 400;
+    /* Set explicitly: a <button> trigger would inherit the body's 1.5 while an
+       <input> uses "normal", and the custom dropdown came out 3px taller */
+    line-height: 1.25;
     transition:
         border-color 0.2s,
         box-shadow 0.2s;

@@ -85,6 +85,20 @@ const sendToChat = (bot, item, chatId, msg) =>
         ? bot.telegram.sendPhoto(chatId, item.poster_url, { caption: msg, parse_mode: 'HTML' })
         : bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
 
+/**
+ * The three series notifications, as sent to subscribers. Exported so the admin
+ * panel's test message is the real one, not a copy that can drift.
+ */
+function buildSeriesMessages({ title, season, episode, episodeName, links }) {
+    const t = escapeHtml(title);
+    const ep = escapeHtml(episodeName || 'Без названия');
+    return {
+        episode: `⚡️ Новая серия! <b>${t}</b> — Сезон ${season}, Серия ${episode}: ${ep}\n\n${links}`,
+        premiere: `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${t}</b>\n🎞 Сезон ${season}, Серия 1: ${ep}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`,
+        complete: `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${t}</b>\n📦 Сезон ${season} полностью доступен (${episode} сер.).\n\n${links}`
+    };
+}
+
 const notifyNewEpisodes = async (bot, item, data) => {
     const lastE = data.last_episode_to_air;
     if (!lastE) return; // No episodes aired yet
@@ -119,26 +133,27 @@ const notifyNewEpisodes = async (bot, item, data) => {
             (announceComplete ? ', season complete' : '')
     );
     const epName = lastE.name || 'Без названия';
-    const title = escapeHtml(item.title);
-    const safeEpName = escapeHtml(epName);
     const links = formatWatchLinks({ title: item.title, kinopoiskId: item.kinopoisk_id, mediaType: 'tv' });
-
-    const episodeMsg = `⚡️ Новая серия! <b>${title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n${links}`;
-    const premiereMsg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
-    const completeMsg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).\n\n${links}`;
+    const messages = buildSeriesMessages({
+        title: item.title,
+        season: currentSeason,
+        episode: currentEpisode,
+        episodeName: epName,
+        links
+    });
 
     for (const chat of item.Chats || []) {
         try {
             const mode = chat.Subscription.notify_type;
             let msg = null;
             if (mode === 'episode') {
-                if (hasNewContent) msg = episodeMsg;
+                if (hasNewContent) msg = messages.episode;
             } else if (mode === 'season') {
-                if (announceComplete) msg = completeMsg;
+                if (announceComplete) msg = messages.complete;
             } else if (mode === 'first_and_full') {
                 // A one-episode season is both premiere and finale: one message is enough
-                if (hasNewContent && currentEpisode === 1) msg = premiereMsg;
-                else if (announceComplete) msg = completeMsg;
+                if (hasNewContent && currentEpisode === 1) msg = messages.premiere;
+                else if (announceComplete) msg = messages.complete;
             }
             if (msg) await sendToChat(bot, item, chat.id, msg);
         } catch (err) {
@@ -300,4 +315,4 @@ const setupCron = (bot) => {
     console.log('[Cron] Scheduled: every 3 hours.');
 };
 
-module.exports = { setupCron, checkUpdates };
+module.exports = { setupCron, checkUpdates, buildSeriesMessages };

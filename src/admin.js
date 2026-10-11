@@ -13,8 +13,8 @@ const {
     withSavedPassword
 } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
-const { checkUpdates } = require('./cron');
-const { FINISHED_STATUS_LABELS, isFinishedStatus, escapeHtml, formatWatchLinks } = require('./constants');
+const { checkUpdates, buildSeriesMessages } = require('./cron');
+const { FINISHED_STATUS_LABELS, isFinishedStatus, formatWatchLinks } = require('./constants');
 const { getKinopoiskStatus, checkKinopoiskKey, findKinopoiskIdQuick } = require('./api/kinopoisk');
 const tmdb = require('./api/tmdb');
 
@@ -408,7 +408,12 @@ app.post('/api/test-notification', async (req, res) => {
                 const lastE = details.last_episode_to_air;
                 if (!season && lastE) currentSeason = lastE.season_number || currentSeason;
                 if (!episode && lastE) currentEpisode = lastE.episode_number || currentEpisode;
-                if (!epName && lastE && lastE.season_number === currentSeason && lastE.episode_number === currentEpisode) {
+                if (
+                    !epName &&
+                    lastE &&
+                    lastE.season_number === currentSeason &&
+                    lastE.episode_number === currentEpisode
+                ) {
                     epName = lastE.name || '';
                 }
 
@@ -431,18 +436,17 @@ app.post('/api/test-notification', async (req, res) => {
             return res.status(404).json({ error: 'Series details could not be found' });
         }
 
-        const safeTitle = escapeHtml(title);
-        const safeEpName = escapeHtml(epName || `Серия ${currentEpisode}`);
         const links = formatWatchLinks({ title, kinopoiskId, mediaType: 'tv' });
-
-        let msg = '';
-        if (mode === 'season') {
-            msg = `🧪 <b>[Тестовое уведомление]</b>\n\n✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${safeTitle}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).\n\n${links}`;
-        } else if (mode === 'first_and_full') {
-            msg = `🧪 <b>[Тестовое уведомление]</b>\n\n🆕 <b>Премьера сезона!</b>\n\n📺 <b>${safeTitle}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
-        } else {
-            msg = `🧪 <b>[Тестовое уведомление]</b>\n\n⚡️ Новая серия! <b>${safeTitle}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n${links}`;
-        }
+        const messages = buildSeriesMessages({
+            title,
+            season: currentSeason,
+            episode: currentEpisode,
+            episodeName: epName || `Серия ${currentEpisode}`,
+            links
+        });
+        const real =
+            mode === 'season' ? messages.complete : mode === 'first_and_full' ? messages.premiere : messages.episode;
+        const msg = `🧪 <b>[Тестовое уведомление]</b>\n\n${real}`;
 
         if (posterUrl) {
             try {

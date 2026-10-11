@@ -4,7 +4,7 @@ import { $, $field, all, closest, setText, debounce, target } from './dom.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters, setTableTab } from './tables.js';
 import { filterLogs } from './logs.js';
-import { openModal, closeModal, closeModalReturning, topmostModal } from './ui.js';
+import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
@@ -144,6 +144,7 @@ function setupControls() {
     $('broadcast-btn').onclick = openBroadcastModal;
     $('test-notify-btn').onclick = () => {
         closeModal('actions-modal');
+        setReturnTo(() => openModal('actions-modal'));
         openTestNotifyModal();
     };
     $('send-broadcast').onclick = sendBroadcast;

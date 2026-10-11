@@ -854,9 +854,7 @@
                         <button type="button" class="btn btn-ghost active" id="tab-test-series-db">
                             Tracked series
                         </button>
-                        <button type="button" class="btn btn-ghost" id="tab-test-series-search">
-                            Search TMDB
-                        </button>
+                        <button type="button" class="btn btn-ghost" id="tab-test-series-search">Search TMDB</button>
                     </div>
 
                     <div class="series-picker-slot">
@@ -893,11 +891,17 @@
                 <div style="display: flex; gap: 0.75rem">
                     <div class="field-block-tight" style="flex: 1">
                         <label class="field-label" for="test-notify-season">Season</label>
-                        <input type="number" id="test-notify-season" class="input-field" value="1" min="1" />
+                        <input type="number" id="test-notify-season" class="input-field" min="1" placeholder="Latest" />
                     </div>
                     <div class="field-block-tight" style="flex: 1">
                         <label class="field-label" for="test-notify-episode">Episode</label>
-                        <input type="number" id="test-notify-episode" class="input-field" value="1" min="1" />
+                        <input
+                            type="number"
+                            id="test-notify-episode"
+                            class="input-field"
+                            min="1"
+                            placeholder="Latest"
+                        />
                     </div>
                 </div>
 

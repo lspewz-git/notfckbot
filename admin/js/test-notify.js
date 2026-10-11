@@ -2,17 +2,23 @@
 
 import { $, $field, escapeHtml, debounce } from './dom.js';
 import { api } from './api.js';
-import { toast, openModal, closeModal } from './ui.js';
+import { toast, openModal, closeModal, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
 import { chatLabel } from './format.js';
 import { chatsById } from './store.js';
 
 let trackedSeries = [];
 let searchResults = [];
-let selectedSeries = null;
+// The pick from the search tab; the tracked tab reads its <select> directly, so
+// neither tab's choice can be sent from the other
+let searchPick = null;
 let isSearchMode = false;
+// Only the latest search may render (debounced requests can finish out of order)
+let searchRequest = 0;
 
 export async function openTestNotifyModal(chatId = null, seriesId = null) {
+    searchPick = null;
+    searchResults = [];
     // 1. Populate chats
     const chatSelect = $field('test-notify-chat-select');
     chatSelect.innerHTML = '';
@@ -96,15 +102,9 @@ function onTrackedSeriesChange(seriesId) {
     const s = trackedSeries.find((item) => item.tmdb_id === seriesId);
     if (!s) return;
 
-    selectedSeries = {
-        id: s.tmdb_id,
-        title: s.title,
-        season: s.last_season || 1,
-        episode: s.last_episode || 1
-    };
-
-    $field('test-notify-season').value = String(selectedSeries.season);
-    $field('test-notify-episode').value = String(selectedSeries.episode);
+    // The stored latest episode, when the bot has one; empty means "latest" on the server
+    $field('test-notify-season').value = s.last_season ? String(s.last_season) : '';
+    $field('test-notify-episode').value = s.last_episode ? String(s.last_episode) : '';
 }
 
 export function switchSeriesTab(mode) {
@@ -118,11 +118,18 @@ export function switchSeriesTab(mode) {
     if (!isSearchMode && trackedSeries.length > 0) {
         const val = $field('test-notify-series-select').value;
         onTrackedSeriesChange(val);
+    } else if (isSearchMode) {
+        // Episode numbers from the tracked tab don't apply to a searched series
+        $field('test-notify-season').value = '';
+        $field('test-notify-episode').value = '';
     }
 }
 
 export async function searchTmdbSeries(query) {
     const box = $('test-series-search-results');
+    const request = ++searchRequest;
+    // Typing again un-picks: what is sent must match what the field shows
+    if (!searchPick || query !== searchPick.title) searchPick = null;
     if (query.length < 2) {
         searchResults = [];
         box.innerHTML = '';
@@ -131,6 +138,7 @@ export async function searchTmdbSeries(query) {
     }
     try {
         const res = await api(`/tmdb/search?q=${encodeURIComponent(query)}`);
+        if (request !== searchRequest) return;
         searchResults = res.filter((r) => r.media_type === 'tv');
         renderSearchResults();
     } catch (err) {
@@ -149,9 +157,9 @@ function renderSearchResults() {
     box.innerHTML = searchResults
         .map((item, idx) => {
             const year = item.first_air_date ? item.first_air_date.split('-')[0] : 'N/A';
-            const isChosen = selectedSeries && selectedSeries.id === item.id;
+            const isChosen = searchPick && searchPick.id === item.id;
             return `
-            <div class="popular-item" data-action="select-test-search-series" data-index="${idx}" style="${isChosen ? 'background: var(--surface-3); font-weight: 600;' : ''}">
+            <div class="popular-item" data-action="select-test-search-series" data-index="${idx}" role="button" tabindex="0" style="${isChosen ? 'background: var(--surface-3); font-weight: 600;' : ''}">
                 <span class="result-title">${escapeHtml(item.name || item.original_name)} (${year})</span>
                 <span class="badge ok">📺 Series</span>
             </div>
@@ -165,31 +173,34 @@ export function selectSearchSeries(idx) {
     const item = searchResults[idx];
     if (!item) return;
 
-    selectedSeries = {
-        id: item.id,
-        title: item.name || item.original_name,
-        season: 1,
-        episode: 1
-    };
+    searchPick = { id: item.id, title: item.name || item.original_name };
 
-    $field('test-notify-season').value = '1';
-    $field('test-notify-episode').value = '1';
-    $field('test-series-search-input').value = selectedSeries.title;
+    // Empty = the latest aired episode, filled in by the server
+    $field('test-notify-season').value = '';
+    $field('test-notify-episode').value = '';
+    $field('test-series-search-input').value = searchPick.title;
 
     $('test-series-search-results').style.display = 'none';
-    toast(`Выбран сериал: ${selectedSeries.title}`, 'info');
+    toast(`Выбран сериал: ${searchPick.title}`, 'info');
 }
 
 export async function sendTestNotification() {
     const chatId = $field('test-notify-chat-select').value;
     if (!chatId) return toast('Please select a recipient chat', 'warning');
 
-    const seriesId = isSearchMode ? selectedSeries?.id : $field('test-notify-series-select').value;
-    if (!seriesId) return toast('Please select a series', 'warning');
+    const seriesId = isSearchMode ? searchPick?.id : $field('test-notify-series-select').value;
+    if (!seriesId) {
+        return toast(isSearchMode ? 'Pick a series from the search results' : 'Please select a series', 'warning');
+    }
 
     const mode = $field('test-notify-mode-select').value || 'episode';
-    const season = parseInt($field('test-notify-season').value, 10) || 1;
-    const episode = parseInt($field('test-notify-episode').value, 10) || 1;
+    // Left empty: the server uses the latest aired episode
+    const num = (id) => {
+        const n = parseInt($field(id).value, 10);
+        return n > 0 ? n : undefined;
+    };
+    const season = num('test-notify-season');
+    const episode = num('test-notify-episode');
 
     const btn = $field('send-test-notify-btn');
     btn.disabled = true;
@@ -207,6 +218,8 @@ export async function sendTestNotification() {
             }
         });
         toast('Тестовое уведомление успешно отправлено! 🚀', 'success');
+        // Done: nothing to return to, and a leftover return would fire on some later dialog
+        clearReturnTo();
         closeModal('test-notify-modal');
     } catch (e) {
         toast('Ошибка отправки: ' + e.message, 'error');
