@@ -8,6 +8,7 @@ const { buildProxyAgent, applyProxyToBot } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('./constants');
+const { getKinopoiskStatus } = require('./api/kinopoisk');
 const tmdb = require('./api/tmdb');
 
 const app = express();
@@ -177,14 +178,14 @@ app.get('/api/tmdb/search', async (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-    const health = { telegram: false, tmdb: false, proxy: 'off' };
+    const health = { telegram: false, tmdb: false, proxy: 'off', kinopoisk: 'off', kinopoiskQuota: null };
     const proxyUrl = process.env.TMDB_PROXY_URL;
 
     if (proxyUrl) {
         health.proxy = 'error'; // Default to error if URL exists
     }
 
-    const [tgResult, tmdbResult, proxyResult] = await Promise.allSettled([
+    const [tgResult, tmdbResult, proxyResult, kpResult] = await Promise.allSettled([
         app.get('bot').telegram.getMe(),
         axios.get('https://api.themoviedb.org/3/authentication', {
             headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
@@ -198,11 +199,22 @@ app.get('/api/health', async (req, res) => {
                   httpsAgent: buildProxyAgent(proxyUrl),
                   proxy: false
               })
-            : Promise.resolve({ status: 200 })
+            : Promise.resolve({ status: 200 }),
+        getKinopoiskStatus()
     ]);
 
     if (tgResult.status === 'fulfilled') health.telegram = true;
     if (tmdbResult.status === 'fulfilled' && tmdbResult.value.status === 200) health.tmdb = true;
+
+    // Kinopoisk API (watch-link lookups): 'off' without a key, else ok/error plus today's quota
+    if (kpResult.status === 'fulfilled') {
+        health.kinopoisk = kpResult.value.state;
+        if (kpResult.value.state === 'ok') {
+            health.kinopoiskQuota = { used: kpResult.value.used, limit: kpResult.value.limit };
+        }
+    } else {
+        health.kinopoisk = 'error';
+    }
 
     if (proxyUrl) {
         if (proxyResult.status === 'fulfilled' && proxyResult.value.status === 200) {

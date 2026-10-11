@@ -68,6 +68,15 @@ tbody tr:hover td {
     background: currentColor;
 }
 
+/* A badge that is a link (KP → status page) keeps badge colours */
+a.badge {
+    text-decoration: none;
+}
+
+a.badge:hover {
+    filter: brightness(1.2);
+}
+
 /* A badge that opens something must be as easy to hit as a button */
 .badge[role='button'] {
     min-height: var(--control-h);

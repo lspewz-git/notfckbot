@@ -39,6 +39,16 @@ const Series = sequelize.define('Series', {
     completed_season: {
         type: DataTypes.INTEGER,
         allowNull: true
+    },
+    // Kinopoisk film ID for the watch links (kinopoisk.ru/film/ID, sspoisk.ru/film/ID).
+    // Null until found; kinopoisk_checked_at spaces out retries for unknown titles.
+    kinopoisk_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    kinopoisk_checked_at: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 });
 

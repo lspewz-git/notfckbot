@@ -66,7 +66,8 @@ const getDetails = async (id, media_type) => {
         const response = await apiClient.get(`/${media_type}/${id}`, {
             params: {
                 language: 'ru-RU',
-                append_to_response: 'credits'
+                // external_ids carries the IMDb ID, used to look up the Kinopoisk ID
+                append_to_response: 'credits,external_ids'
             }
         });
         const data = response.data;
@@ -79,6 +80,8 @@ const getDetails = async (id, media_type) => {
             // For TV shows, we use "created_by" as the equivalent
             data.director_name = data.created_by.map((c) => c.name).join(', ');
         }
+
+        data.imdb_id = data.imdb_id || (data.external_ids && data.external_ids.imdb_id) || null;
 
         return data;
     } catch (error) {

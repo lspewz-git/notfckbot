@@ -51,6 +51,42 @@ const getWatchLink = (title) => {
     return `https://rezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`;
 };
 
+/**
+ * Where to watch or read about a title. With a Kinopoisk ID the Kinopoisk and
+ * SSPoisk links point straight at the title (SSPoisk mirrors Kinopoisk's URLs);
+ * without one, Kinopoisk falls back to a search and SSPoisk is left out, as it
+ * has no search.
+ *
+ * @param {{ title: string, kinopoiskId?: number | null, mediaType?: 'tv' | 'movie' }} opts
+ * @returns {{ label: string, url: string, kind: 'watch' | 'info' }[]}
+ */
+const getWatchLinks = ({ title, kinopoiskId, mediaType }) => {
+    const links = [{ label: 'Смотреть на HDRezka', url: getWatchLink(title), kind: 'watch' }];
+    if (kinopoiskId) {
+        const path = `${mediaType === 'tv' ? 'series' : 'film'}/${kinopoiskId}/`;
+        links.push({ label: 'Смотреть на SSPoisk', url: `https://www.sspoisk.ru/${path}`, kind: 'watch' });
+        links.push({ label: 'Страница на Кинопоиске', url: `https://www.kinopoisk.ru/${path}`, kind: 'info' });
+    } else {
+        const q = encodeURIComponent(title);
+        links.push({
+            label: 'Страница на Кинопоиске',
+            url: `https://www.kinopoisk.ru/index.php?kp_query=${q}`,
+            kind: 'info'
+        });
+    }
+    return links;
+};
+
+/** The links as an HTML block for a notification: watch links, a blank line, the info link. */
+const formatWatchLinks = (opts) => {
+    const links = getWatchLinks(opts);
+    // & must be an entity even inside href for Telegram's HTML parser
+    const line = (l) => `${l.kind === 'watch' ? '▶️' : '🎬'} <a href="${l.url.replace(/&/g, '&amp;')}">${l.label}</a>`;
+    const watch = links.filter((l) => l.kind === 'watch').map(line);
+    const info = links.filter((l) => l.kind === 'info').map(line);
+    return [watch.join('\n'), info.join('\n')].filter(Boolean).join('\n\n');
+};
+
 module.exports = {
     NOTIFY_LABELS,
     NOTIFY_LABELS_SHORT,
@@ -59,5 +95,7 @@ module.exports = {
     isFinishedStatus,
     escapeHtml,
     formatRuDate,
-    getWatchLink
+    getWatchLink,
+    getWatchLinks,
+    formatWatchLinks
 };

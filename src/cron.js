@@ -1,7 +1,8 @@
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
 const { getDetails } = require('./api/tmdb');
-const { getWatchLink, isFinishedStatus, escapeHtml, formatRuDate } = require('./constants');
+const { isFinishedStatus, escapeHtml, formatRuDate, formatWatchLinks } = require('./constants');
+const { ensureKinopoiskId, findKinopoiskId } = require('./api/kinopoisk');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
 let isRunning = false;
@@ -47,6 +48,9 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             const oldStatus = item.status;
             const statusChanged = Boolean(data.status) && data.status !== oldStatus;
             if (statusChanged) await item.update({ status: data.status });
+
+            // Cached on the row after the first hit, so this is a lookup only for new titles
+            await ensureKinopoiskId(item, data.imdb_id);
 
             try {
                 await notifyNewEpisodes(bot, item, data);
@@ -115,11 +119,11 @@ const notifyNewEpisodes = async (bot, item, data) => {
     const epName = lastE.name || 'Без названия';
     const title = escapeHtml(item.title);
     const safeEpName = escapeHtml(epName);
-    const watchLink = getWatchLink(item.title);
+    const links = formatWatchLinks({ title: item.title, kinopoiskId: item.kinopoisk_id, mediaType: 'tv' });
 
-    const episodeMsg = `⚡️ Новая серия! <b>${title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
-    const premiereMsg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
-    const completeMsg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).\n\n▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
+    const episodeMsg = `⚡️ Новая серия! <b>${title}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n${links}`;
+    const premiereMsg = `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${title}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
+    const completeMsg = `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${title}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).\n\n${links}`;
 
     for (const chat of item.Chats || []) {
         try {
@@ -202,7 +206,9 @@ const checkWatchlistReleases = async (bot) => {
             // 🎉 Film is released! Notify all users waiting for it
             console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
             const formattedDate = formatRuDate(displayDate);
-            const watchLink = getWatchLink(firstEntry.title);
+            // A release happens once per film, so the ID is looked up here rather than ahead of time
+            const kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
+            const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
 
             for (const entry of filmEntries) {
                 try {
@@ -214,7 +220,7 @@ const checkWatchlistReleases = async (bot) => {
                         `🍿 <b>${escapeHtml(entry.title)}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
                         `${directorInfo}` +
                         `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n\n` +
-                        `▶️ <a href="${watchLink}">Смотреть онлайн</a>`;
+                        links;
 
                     if (entry.poster_url) {
                         await bot.telegram.sendPhoto(entry.Chat.id, entry.poster_url, {

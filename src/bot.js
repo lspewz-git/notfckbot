@@ -8,8 +8,9 @@ const {
     isFinishedStatus,
     escapeHtml,
     formatRuDate,
-    getWatchLink
+    getWatchLinks
 } = require('./constants');
+const { findKinopoiskIdQuick } = require('./api/kinopoisk');
 const { getProxyAgent } = require('./proxy');
 require('dotenv').config();
 
@@ -109,6 +110,10 @@ const mainMenu = (ctx) => {
 };
 
 const cancelMenu = Markup.keyboard([['❌ Отмена']]).resize();
+
+/** One URL button per watch/info link: HDRezka, SSPoisk (when the Kinopoisk ID is known), Kinopoisk. */
+const watchButtonRows = (opts) =>
+    getWatchLinks(opts).map((l) => [Markup.button.url(`${l.kind === 'watch' ? '▶️' : '🎬'} ${l.label}`, l.url)]);
 
 const getCancelMenu = (ctx) => {
     if (ctx.state && ctx.state.chatData && ctx.state.chatData.menu_enabled === false) {
@@ -641,13 +646,12 @@ const handleRandomMovie = async (ctx) => {
         const caption = `🎲 <b>${escapeHtml(name)}</b> (${year})\n${rating}\n${directorLine}\n<i>${escapeHtml(item.overview) || 'Описание отсутствует.'}</i>`;
         const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
 
-        // Inline keyboard: Add to watchlist OR Watch online directly
-        const watchLink = getWatchLink(name);
-        // Using correct callback format: watchlist_add_movie_{id}
+        // Inline keyboard: watch links, or add to watchlist
         const tmdbId = `movie_${item.id}`;
+        const kinopoiskId = await findKinopoiskIdQuick(tmdbId, fullDetails.imdb_id);
 
         const keyboard = Markup.inlineKeyboard([
-            [Markup.button.url(`▶️ Смотреть онлайн`, watchLink)],
+            ...watchButtonRows({ title: name, kinopoiskId, mediaType: 'movie' }),
             [Markup.button.callback('📌 В список ожидания', `watchlist_add_${tmdbId}`)]
         ]);
 
@@ -754,9 +758,9 @@ bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
 
             if (isAlreadyReleased) {
                 // Film is already out
-                const watchLink = getWatchLink(title);
+                const kinopoiskId = await findKinopoiskIdQuick(tmdbId, data.imdb_id);
                 const keyboard = Markup.inlineKeyboard([
-                    [Markup.button.url(`▶️ Смотреть онлайн`, watchLink)],
+                    ...watchButtonRows({ title, kinopoiskId, mediaType: 'movie' }),
                     [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
                 ]);
                 await ctx.reply(

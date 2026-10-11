@@ -17,6 +17,12 @@ export function updateStats(stats) {
     setText('series-count', stats.seriesCount);
 }
 
+const KINOPOISK_HEALTH = {
+    ok: ['KP: OK', 'ok'],
+    error: ['KP: ERR', 'error'],
+    off: ['KP: OFF', 'ghost']
+};
+
 const PROXY_HEALTH = {
     ok: ['Proxy: OK', 'ok'],
     error: ['Proxy: ERR', 'error']
@@ -27,6 +33,18 @@ export function updateHealth(h) {
     updateBadge('health-tmdb', h.tmdb ? 'TMDB: OK' : 'TMDB: ERR', h.tmdb ? 'ok' : 'error');
     const [proxyText, proxyClass] = PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost'];
     updateBadge('health-proxy', proxyText, proxyClass);
+
+    // Kinopoisk API, used to find Kinopoisk IDs for watch links. The badge links to
+    // the service's status page; the tooltip shows today's request quota.
+    const kp = KINOPOISK_HEALTH[h.kinopoisk] || KINOPOISK_HEALTH.off;
+    updateBadge('health-kp', kp[0], kp[1]);
+    const kpBadge = $('health-kp');
+    if (kpBadge) {
+        const q = h.kinopoiskQuota;
+        kpBadge.title = q
+            ? `Kinopoisk API: ${q.used} of ${q.limit} requests used today. Click for the status page.`
+            : 'Kinopoisk API status page';
+    }
 }
 
 export function updatePopular(list) {
