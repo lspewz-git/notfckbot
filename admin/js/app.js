@@ -11,6 +11,7 @@ import { openServiceModal, setupServiceDialog } from './services.js';
 import { openChatActions, searchContent, selectContent, submitAddContent } from './chats.js';
 import { openSeriesDetails, openFilmDetails, openModeModal, deleteSub, deleteWatchlistItem } from './records.js';
 import { triggerCheck, openBroadcastModal, sendBroadcast, confirmWipeAll } from './maintenance.js';
+import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -69,6 +70,7 @@ const CLICK_ACTIONS = {
     'delete-sub': (el) => deleteSub(el.dataset.chat, el.dataset.series),
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
     'select-content': (el) => selectContent(Number(el.dataset.index)),
+    'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
     service: (el) => openServiceModal(el.dataset.service, el.dataset.label, el.dataset.restarts === 'true')
 };
@@ -140,10 +142,15 @@ function setupControls() {
     $('danger-btn').onclick = () => openModal('danger-modal');
     $('trigger-btn').onclick = triggerCheck;
     $('broadcast-btn').onclick = openBroadcastModal;
+    $('test-notify-btn').onclick = () => {
+        closeModal('actions-modal');
+        openTestNotifyModal();
+    };
     $('send-broadcast').onclick = sendBroadcast;
     $('wipe-all-btn').onclick = confirmWipeAll;
     $('confirm-add-content').onclick = submitAddContent;
     setupServiceDialog();
+    setupTestNotifyDialog();
 
     // One search box covering both series and movies
     $field('content-search-input').oninput = debounce((e) => searchContent(e.target.value.trim()), 500);

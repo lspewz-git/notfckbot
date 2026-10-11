@@ -266,3 +266,23 @@
 .modal-actions [hidden] {
     display: none;
 }
+
+.series-picker-slot {
+    position: relative;
+    width: 100%;
+}
+
+.test-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 0.25rem;
+}

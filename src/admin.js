@@ -14,8 +14,8 @@ const {
 } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
-const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('./constants');
-const { getKinopoiskStatus, checkKinopoiskKey } = require('./api/kinopoisk');
+const { FINISHED_STATUS_LABELS, isFinishedStatus, escapeHtml, formatWatchLinks } = require('./constants');
+const { getKinopoiskStatus, checkKinopoiskKey, findKinopoiskIdQuick } = require('./api/kinopoisk');
 const tmdb = require('./api/tmdb');
 
 const app = express();
@@ -363,6 +363,103 @@ app.post('/api/trigger-check', async (req, res) => {
         res.json({ success: true, message: 'Update check started' });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/test-notification', async (req, res) => {
+    const { chatId, seriesId, mode = 'episode', season, episode, episodeName } = req.body;
+    if (!chatId) {
+        return res.status(400).json({ error: 'chatId is required' });
+    }
+    if (!seriesId) {
+        return res.status(400).json({ error: 'seriesId is required' });
+    }
+
+    const bot = app.get('bot');
+    if (!bot) {
+        return res.status(500).json({ error: 'Bot instance not available' });
+    }
+
+    try {
+        const fullSeriesId = String(seriesId).startsWith('tv_') ? String(seriesId) : `tv_${seriesId}`;
+        const numericId = String(seriesId).replace('tv_', '');
+
+        // 1. Fetch series from DB if present
+        const series = await Series.findByPk(fullSeriesId);
+
+        let title = series?.title;
+        let posterUrl = series?.poster_url;
+        let kinopoiskId = series?.kinopoisk_id;
+        let currentSeason = season ? parseInt(season, 10) : series?.last_season || 1;
+        let currentEpisode = episode ? parseInt(episode, 10) : series?.last_episode || 1;
+        let epName = episodeName || series?.last_episode_name || '';
+
+        // 2. Fetch fresh / missing details from TMDB
+        try {
+            const details = await tmdb.getDetails(numericId, 'tv');
+            if (details) {
+                if (!title) title = details.name || details.original_name;
+                if (!posterUrl && details.poster_path) {
+                    posterUrl = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
+                }
+                if (!kinopoiskId) {
+                    kinopoiskId = await findKinopoiskIdQuick(fullSeriesId, details.imdb_id, 2000);
+                }
+                const lastE = details.last_episode_to_air;
+                if (!season && lastE) currentSeason = lastE.season_number || currentSeason;
+                if (!episode && lastE) currentEpisode = lastE.episode_number || currentEpisode;
+                if (!epName && lastE && lastE.season_number === currentSeason && lastE.episode_number === currentEpisode) {
+                    epName = lastE.name || '';
+                }
+
+                // If episode name is still unknown, try fetching the specific season
+                if (!epName && currentSeason && currentEpisode) {
+                    try {
+                        const sData = await tmdb.getSeasonDetails(numericId, currentSeason);
+                        const epObj = (sData?.episodes || []).find((e) => e.episode_number === currentEpisode);
+                        if (epObj?.name) epName = epObj.name;
+                    } catch (_) {
+                        // Ignore optional season lookup failure
+                    }
+                }
+            }
+        } catch (tmdbErr) {
+            console.log(`[Admin] TMDB fetch note for ${numericId}: ${tmdbErr.message}`);
+        }
+
+        if (!title) {
+            return res.status(404).json({ error: 'Series details could not be found' });
+        }
+
+        const safeTitle = escapeHtml(title);
+        const safeEpName = escapeHtml(epName || `Серия ${currentEpisode}`);
+        const links = formatWatchLinks({ title, kinopoiskId, mediaType: 'tv' });
+
+        let msg = '';
+        if (mode === 'season') {
+            msg = `🧪 <b>[Тестовое уведомление]</b>\n\n✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${safeTitle}</b>\n📦 Сезон ${currentSeason} полностью доступен (${currentEpisode} сер.).\n\n${links}`;
+        } else if (mode === 'first_and_full') {
+            msg = `🧪 <b>[Тестовое уведомление]</b>\n\n🆕 <b>Премьера сезона!</b>\n\n📺 <b>${safeTitle}</b>\n🎞 Сезон ${currentSeason}, Серия 1: ${safeEpName}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`;
+        } else {
+            msg = `🧪 <b>[Тестовое уведомление]</b>\n\n⚡️ Новая серия! <b>${safeTitle}</b> — Сезон ${currentSeason}, Серия ${currentEpisode}: ${safeEpName}\n\n${links}`;
+        }
+
+        if (posterUrl) {
+            try {
+                await bot.telegram.sendPhoto(chatId, posterUrl, { caption: msg, parse_mode: 'HTML' });
+            } catch (photoErr) {
+                console.error(`[Admin] sendPhoto failed (${photoErr.message}), falling back to sendMessage`);
+                await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+            }
+        } else {
+            await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+        }
+
+        console.log(`[Admin] Test notification sent to chat ${chatId} for "${title}" (mode: ${mode})`);
+        res.json({ success: true, message: 'Test notification sent successfully', title, chatId, mode });
+    } catch (err) {
+        console.error('[Admin] Test notification error:', err.message);
+        res.status(500).json({ error: `Не удалось отправить уведомление: ${err.message}` });
     }
 });
 

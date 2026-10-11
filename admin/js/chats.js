@@ -6,6 +6,7 @@ import { mutate } from './data.js';
 import { toast, openModal, closeModal, setReturnTo, clearReturnTo, focusField } from './ui.js';
 import { chatLabel } from './format.js';
 import { chatsById } from './store.js';
+import { openTestNotifyModal } from './test-notify.js';
 
 // --- The per-row menu ---
 // One button per row opens this instead of crowding the Actions column
@@ -30,6 +31,12 @@ export function openChatActions(chatId) {
         closeModal('chat-actions-modal');
         setReturnTo(backToChat);
         openDM(chat.id, label);
+    };
+
+    $('action-test-notify').onclick = () => {
+        closeModal('chat-actions-modal');
+        setReturnTo(backToChat);
+        openTestNotifyModal(chat.id);
     };
 
     const blockBtn = $('action-block');

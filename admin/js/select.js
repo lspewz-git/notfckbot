@@ -110,5 +110,14 @@ export function enhanceSelects() {
 
     document.addEventListener('click', closeDropdown);
     window.addEventListener('resize', closeDropdown);
-    window.addEventListener('scroll', closeDropdown, true);
+    window.addEventListener(
+        'scroll',
+        (e) => {
+            if (openDropdown && e.target && openDropdown.panel.contains(/** @type {Node} */ (e.target))) {
+                return;
+            }
+            closeDropdown();
+        },
+        true
+    );
 }
