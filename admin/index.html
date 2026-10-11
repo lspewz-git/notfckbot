@@ -163,6 +163,7 @@
                                         data-action="service"
                                         data-service="telegram"
                                         data-label="Telegram Bot API"
+                                        data-restarts="true"
                                         role="button"
                                         tabindex="0"
                                         title="Telegram Bot API: token and status"
@@ -680,7 +681,8 @@
                     </select>
                 </div>
 
-                <div id="proxy-fields">
+                <!-- Hidden until a mode other than "Off" is chosen -->
+                <div id="proxy-fields" style="display: none">
                     <div class="field-row">
                         <div class="btn-grow-2">
                             <label class="field-label" for="proxy-host">Host</label>

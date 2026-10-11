@@ -68,14 +68,17 @@ function fillForm(url) {
 }
 
 export async function openProxyModal() {
-    openModal('proxy-modal');
+    // Fill the form before showing it: opening first and filling after made the
+    // host/port fields flash in and collapse once the saved mode arrived
     try {
         const cfg = await api('/config');
         fillForm(cfg.tmdbProxyUrl || '');
         $field('proxy-pass').placeholder = cfg.proxyHasPassword ? '•••••• saved — leave empty to keep' : '';
     } catch (e) {
         toast('Could not load current proxy settings', 'error');
+        syncForm();
     }
+    openModal('proxy-modal');
 }
 
 /** Both buttons need the same "is the form usable" check first. */

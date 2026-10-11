@@ -17,8 +17,10 @@ const saveBtn = () => /** @type {HTMLButtonElement} */ ($('service-save'));
 
 function renderDetails(rows) {
     const list = $('service-details');
-    list.innerHTML = rows.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('');
-    list.hidden = rows.length === 0;
+    list.innerHTML = (rows || []).map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('');
+    // Kept visible while loading (empty, at its reserved height) so the dialog
+    // doesn't grow when the details arrive; hidden only for a service with none
+    list.hidden = rows === null ? false : rows.length === 0;
 }
 
 /** Save is only possible while a new token is being typed in. */
@@ -60,30 +62,38 @@ function render(info) {
     const link = /** @type {HTMLAnchorElement} */ ($('service-status-link'));
     link.href = info.statusUrl;
     link.firstChild.textContent = `${info.statusLabel} `;
-    link.hidden = false;
+    link.style.visibility = '';
 
+    setHint(info.restartOnChange);
+}
+
+/** @param {boolean} restarts whether saving restarts the bot (Telegram) */
+const setHint = (restarts) =>
     setText(
         'service-hint',
-        info.restartOnChange
+        restarts
             ? 'The token is checked with Telegram, then saved to .env. Saving restarts the bot: it is offline for a few seconds.'
             : 'The token is checked with the service, then saved to .env and used straight away.'
     );
-}
 
 /**
  * @param {string} name telegram | tmdb | kinopoisk
  * @param {string} [label] shown until the server's own label arrives
+ * @param {boolean} [restarts] whether saving restarts the bot, for the hint
  */
-export async function openServiceModal(name, label = '') {
+export async function openServiceModal(name, label = '', restarts = false) {
     current = name;
+    // Final wording from the start, so the dialog doesn't grow by a line on load
+    setHint(restarts);
     // Clear everything from the previously opened service before the slow request,
     // so nothing stale (e.g. another service's status link) shows while loading
     setText('service-title', label);
     setText('service-state', 'Checking…');
     $('service-state').className = 'modal-sub';
-    renderDetails([]);
+    renderDetails(null);
     setText('service-current', '…');
-    $('service-status-link').hidden = true;
+    // Invisible but still taking its place: removing it would make the dialog grow on load
+    $('service-status-link').style.visibility = 'hidden';
     openModal('service-modal');
     setEditing(false);
 
@@ -111,7 +121,7 @@ export async function saveServiceToken() {
             return;
         }
         toast('Token saved', 'success');
-        await openServiceModal(current, $('service-title').textContent);
+        await openServiceModal(current, $('service-title').textContent, res.restarting);
         fetchData();
     } catch (e) {
         toast(e.message, 'error');
