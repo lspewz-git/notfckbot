@@ -222,6 +222,11 @@
         flex: 1;
     }
 
+    /* Full-width buttons need an edge, or Delete reads as loose red text */
+    .table-wrap .btn-row-danger {
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
     /* `tr td:first-child` in the base sheet outranks `.table-wrap td`, so the
        pill corners have to be reset with matching specificity. */
     .table-wrap tr td:first-child,

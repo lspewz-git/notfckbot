@@ -8,6 +8,16 @@ import { isUnchanged, invalidate } from './render.js';
 // The API decides (series ended or canceled on TMDB); the panel keeps no status list of its own
 const isArchivedSub = (sub) => Boolean(sub.archived);
 
+// Small line icons for row buttons (Lucide shapes)
+const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const ICON = {
+    more: svg('<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />'),
+    mode: svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />'),
+    trash: svg(
+        '<path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />'
+    )
+};
+
 /**
  * Everything that differs between the three tables, in one place: where the
  * rows go, which input filters them, the column labels (also used as
@@ -38,7 +48,7 @@ const TABLES = {
                     <td data-label="Type"><span class="chat-type">${item.type}</span></td>
                     <td data-label="Status">${status}</td>
                     <td data-label="Actions">
-                        <button class="btn btn-ghost" data-action="chat-actions" data-id="${item.id}">Actions</button>
+                        <button class="btn btn-row" data-action="chat-actions" data-id="${item.id}">${ICON.more}Actions</button>
                     </td>
                 </tr>
             `;
@@ -71,17 +81,17 @@ const TABLES = {
                 : `<td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>`;
             const modeBtn = archived
                 ? ''
-                : `<button class="btn btn-ghost" data-action="mode" data-key="${subKey(item.chatId, item.seriesId)}">Mode</button>`;
+                : `<button class="btn btn-row" data-action="mode" data-key="${subKey(item.chatId, item.seriesId)}">${ICON.mode}Mode</button>`;
             return `
                 <tr>
                     <td data-label="User">${item.Chat ? escapeHtml(chatLabel(item.Chat)) : item.chatId}</td>
-                    <td data-label="Series" class="link-cell" data-action="series" data-id="${item.seriesId}">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</td>
+                    <td data-label="Series" class="link-cell" data-action="series" data-id="${item.seriesId}"><span class="link-text">${item.Series ? escapeHtml(item.Series.title) : 'Unknown'}</span></td>
                     <td data-label="Status">${seriesStatusBadge(item.Series && item.Series.status)}</td>
                     ${mode}
                     <td data-label="Actions">
                         <div class="row-actions">
                             ${modeBtn}
-                            <button class="btn btn-danger" data-action="delete-sub" data-chat="${item.chatId}" data-series="${item.seriesId}">Delete</button>
+                            <button class="btn btn-row btn-row-danger" data-action="delete-sub" data-chat="${item.chatId}" data-series="${item.seriesId}">${ICON.trash}Delete</button>
                         </div>
                     </td>
                 </tr>
@@ -99,7 +109,7 @@ const TABLES = {
                 <td data-label="Film Title">${escapeHtml(item.title)}</td>
                 <td data-label="Year">${item.year || 'N/A'}</td>
                 <td data-label="Release">${item.premiere_digital || 'Unknown'}</td>
-                <td data-label="Actions"><button class="btn btn-danger" data-action="delete-film" data-id="${item.id}">Delete</button></td>
+                <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="${item.id}">${ICON.trash}Delete</button></td>
             </tr>
         `
     }

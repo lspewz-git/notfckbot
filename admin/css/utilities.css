@@ -118,12 +118,16 @@ select:focus {
 .link-cell {
     cursor: pointer;
     font-weight: 500;
+}
+
+/* Underline the title only, not the mobile card's column label beside it */
+.link-cell .link-text {
     text-decoration: underline;
     text-decoration-color: var(--border-strong);
     text-underline-offset: 4px;
 }
 
-.link-cell:hover {
+.link-cell:hover .link-text {
     text-decoration-color: currentColor;
 }
 
