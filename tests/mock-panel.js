@@ -154,6 +154,8 @@ async function mockPanel(page) {
             kinopoiskQuota: { used: 3, limit: 500 }
         }),
         '/api/stats/popular': () => [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
+        '/api/upcoming': () => [],
+        '/api/cron': () => ({ running: false, lastRun: null, nextRunAt: new Date().toISOString(), intervalHours: 3 }),
         '/api/logs': () => [{ type: 'log', time: '12:00:00', text: 'Started' }],
         '/api/data/chats': () => CHATS,
         // Like the real API: the archived flag is derived from Series.status on every response

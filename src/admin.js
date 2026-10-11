@@ -13,7 +13,7 @@ const {
     withSavedPassword
 } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
-const { checkUpdates, buildSeriesMessages } = require('./cron');
+const { checkUpdates, buildSeriesMessages, getCronStatus } = require('./cron');
 const { FINISHED_STATUS_LABELS, isFinishedStatus, formatWatchLinks } = require('./constants');
 const { getKinopoiskStatus, checkKinopoiskKey, findKinopoiskIdQuick } = require('./api/kinopoisk');
 const tmdb = require('./api/tmdb');
@@ -162,6 +162,66 @@ app.get('/api/stats/popular', async (req, res) => {
             include: [{ model: Series }]
         });
         res.json(popular);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// The update check: running now, how the last one went, when the next one fires
+app.get('/api/cron', (req, res) => res.json(getCronStatus()));
+
+const UPCOMING_DAYS = 7;
+const isoDay = (d) => d.toISOString().slice(0, 10);
+
+/**
+ * Episodes and films due in the next week, soonest first. Starts a day back: the
+ * server runs in UTC, and the panel drops what is already past in its own time zone.
+ * Only titles someone still waits for: series with an active subscription, films
+ * not yet announced.
+ */
+app.get('/api/upcoming', async (req, res) => {
+    try {
+        const now = new Date();
+        const from = isoDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+        const to = isoDay(new Date(now.getTime() + UPCOMING_DAYS * 24 * 60 * 60 * 1000));
+
+        const [series, films] = await Promise.all([
+            Series.findAll({
+                where: { next_episode_date: { [Op.between]: [from, to] } },
+                include: [{ model: Chat, attributes: ['id'], through: { attributes: [] }, required: true }]
+            }),
+            Watchlist.findAll({
+                where: { notified: false, premiere_digital: { [Op.between]: [from, to] } },
+                attributes: ['tmdb_id', 'title', 'premiere_digital', 'chatId']
+            })
+        ]);
+
+        const items = series
+            .filter((s) => !isFinishedStatus(s.status))
+            .map((s) => ({
+                kind: 'tv',
+                id: s.tmdb_id,
+                title: s.title,
+                date: s.next_episode_date,
+                episode:
+                    s.next_episode_season !== null && s.next_episode_number !== null
+                        ? `S${s.next_episode_season}E${s.next_episode_number}`
+                        : null,
+                chats: s.Chats.length
+            }));
+
+        // One line per film, however many chats wait for it
+        const byFilm = new Map();
+        for (const w of films) {
+            const id = String(w.tmdb_id).startsWith('movie_') ? w.tmdb_id : `movie_${w.tmdb_id}`;
+            const entry = byFilm.get(id) || { kind: 'movie', id, title: w.title, date: w.premiere_digital, chats: new Set() };
+            entry.chats.add(String(w.chatId));
+            byFilm.set(id, entry);
+        }
+        for (const f of byFilm.values()) items.push({ ...f, chats: f.chats.size });
+
+        items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title)));
+        res.json(items);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

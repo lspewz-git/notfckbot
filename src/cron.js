@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
 const { getDetails, nextEpisodeFields } = require('./api/tmdb');
@@ -6,6 +8,46 @@ const { ensureKinopoiskId, findKinopoiskId } = require('./api/kinopoisk');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
 let isRunning = false;
+
+// ============================================================
+// Run status, for the admin dashboard
+// ============================================================
+// Kept in a file next to the code (a bind mount in Docker), so a restart or a deploy
+// doesn't blank the dashboard until the next check
+const STATUS_FILE = path.join(__dirname, '..', '.cron-status.json');
+
+function loadLastRun() {
+    try {
+        return JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
+let lastRun = loadLastRun();
+// Counters of the run in progress; null between runs
+let current = null;
+
+/** Counts one event of the current run: series, films, sent, failed, errors. */
+const tally = (key) => {
+    if (current) current[key] += 1;
+};
+
+/** When node-cron fires next: minute 0 of the next hour divisible by the interval. */
+function nextRunAt(now = new Date()) {
+    const next = new Date(now);
+    next.setMinutes(0, 0, 0);
+    next.setHours(Math.floor(now.getHours() / UPDATE_INTERVAL_HOURS) * UPDATE_INTERVAL_HOURS + UPDATE_INTERVAL_HOURS);
+    return next;
+}
+
+const getCronStatus = () => ({
+    running: isRunning,
+    startedAt: current ? current.startedAt : null,
+    lastRun,
+    nextRunAt: nextRunAt().toISOString(),
+    intervalHours: UPDATE_INTERVAL_HOURS
+});
 
 // ============================================================
 // TV Series update check
@@ -29,7 +71,9 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
     for (const chat of item.Chats || []) {
         try {
             await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
+            tally('sent');
         } catch (err) {
+            tally('failed');
             console.error(`[Cron] Failed to send status update to chat ${chat.id}:`, err.message);
         }
     }
@@ -37,6 +81,7 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
 
 const checkSeriesUpdates = async (bot, allSeries) => {
     for (const item of allSeries) {
+        tally('series');
         try {
             const [mediaType, filmId] = item.tmdb_id.split('_');
             const data = await getDetails(filmId, mediaType);
@@ -59,11 +104,13 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             try {
                 await notifyNewEpisodes(bot, item, data);
             } catch (err) {
+                tally('errors');
                 console.error(`[Cron] Episode check failed for ${item.tmdb_id} ("${item.title}"):`, err.message);
             }
 
             if (statusChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
         } catch (err) {
+            tally('errors');
             console.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"):`, err.message);
         }
     }
@@ -159,8 +206,12 @@ const notifyNewEpisodes = async (bot, item, data) => {
                 if (hasNewContent && currentEpisode === 1) msg = messages.premiere;
                 else if (announceComplete) msg = messages.complete;
             }
-            if (msg) await sendToChat(bot, item, chat.id, msg);
+            if (msg) {
+                await sendToChat(bot, item, chat.id, msg);
+                tally('sent');
+            }
         } catch (err) {
+            tally('failed');
             console.error(`[Cron] Failed to notify chat ${chat.id}:`, err.message);
         }
     }
@@ -196,6 +247,7 @@ const checkWatchlistReleases = async (bot) => {
     }
 
     for (const [tmdb_id, filmEntries] of Object.entries(byFilm)) {
+        tally('films');
         try {
             let [mediaType, filmId] = tmdb_id.split('_');
             if (!filmId) {
@@ -277,7 +329,9 @@ const checkWatchlistReleases = async (bot) => {
                             disable_web_page_preview: false
                         });
                     }
+                    tally('sent');
                 } catch (err) {
+                    tally('failed');
                     console.error(`[Cron] Failed to notify watchlist chat ${entry.Chat.id}:`, err.message);
                 }
 
@@ -285,6 +339,7 @@ const checkWatchlistReleases = async (bot) => {
                 await entry.update({ notified: true });
             }
         } catch (err) {
+            tally('errors');
             console.error(`[Cron] Error checking watchlist movie ${tmdb_id}:`, err.message);
         }
     }
@@ -300,6 +355,8 @@ const checkUpdates = async (bot) => {
     }
     isRunning = true;
     console.log('[Cron] Running update check...');
+    current = { startedAt: new Date().toISOString(), series: 0, films: 0, sent: 0, failed: 0, errors: 0 };
+    let fatal = null;
 
     try {
         // Load all series WITH their subscribers in one single query
@@ -307,9 +364,23 @@ const checkUpdates = async (bot) => {
         await checkSeriesUpdates(bot, allSeries);
         await checkWatchlistReleases(bot);
     } catch (error) {
+        fatal = error.message;
         console.error('[Cron] Fatal error during update check:', error);
     } finally {
+        const finishedAt = new Date();
+        lastRun = {
+            ...current,
+            finishedAt: finishedAt.toISOString(),
+            durationMs: finishedAt - new Date(current.startedAt),
+            fatal
+        };
+        current = null;
         isRunning = false;
+        try {
+            fs.writeFileSync(STATUS_FILE, JSON.stringify(lastRun));
+        } catch (err) {
+            console.error('[Cron] Could not save run status:', err.message);
+        }
         console.log('[Cron] Update check complete.');
     }
 };
@@ -319,4 +390,4 @@ const setupCron = (bot) => {
     console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS} hours.`);
 };
 
-module.exports = { setupCron, checkUpdates, buildSeriesMessages };
+module.exports = { setupCron, checkUpdates, buildSeriesMessages, getCronStatus };

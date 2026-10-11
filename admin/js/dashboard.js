@@ -1,6 +1,7 @@
-/** The dashboard's counters, health badges and popularity list. */
+/** The dashboard's counters, health badges, upcoming releases, update check and popularity list. */
 
 import { $, setText, updateBadge, escapeHtml } from './dom.js';
+import { formatReleaseDate } from './format.js';
 import { isUnchanged } from './render.js';
 
 export function updateStats(stats) {
@@ -46,6 +47,149 @@ export function updateHealth(h) {
     const kpBadge = $('health-kp');
     const q = h.kinopoiskQuota;
     if (kpBadge && q) kpBadge.title = `Kinopoisk API: ${q.used} of ${q.limit} requests used today`;
+}
+
+// --- Coming up ---
+const DAY = 24 * 60 * 60 * 1000;
+const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const KIND_ICON = {
+    tv: svg('<rect x="2" y="7" width="20" height="15" rx="2" /><polyline points="17 2 12 7 7 2" />'),
+    movie: svg('<rect x="2" y="2" width="20" height="20" rx="2" /><path d="M7 2v20M17 2v20M2 12h20" />')
+};
+
+/** "2026-10-16" as local midnight (not UTC), so day differences follow the viewer's calendar. */
+function localDay(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+}
+
+function dayLabel(iso, today) {
+    const diff = Math.round((localDay(iso) - today) / DAY);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    const weekday = localDay(iso).toLocaleDateString('en-GB', { weekday: 'short' });
+    return `${weekday}, ${formatReleaseDate(iso)}`;
+}
+
+let upcoming = null;
+
+function renderUpcoming() {
+    const container = $('upcoming-list');
+    if (!container || !upcoming) return;
+
+    // The server reaches a day back (it runs in UTC); drop what is past here
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // The date is part of the signature: after midnight "Tomorrow" becomes "Today"
+    if (isUnchanged('upcoming', [today.getTime(), upcoming])) return;
+    const items = upcoming.filter((i) => localDay(i.date) >= today);
+    if (items.length === 0) {
+        container.innerHTML = '<p class="empty-note">Nothing due in the next 7 days.</p>';
+        return;
+    }
+
+    let lastDay = null;
+    container.innerHTML = items
+        .map((item) => {
+            const head =
+                item.date !== lastDay ? `<div class="upcoming-day">${escapeHtml(dayLabel(item.date, today))}</div>` : '';
+            lastDay = item.date;
+            const what = item.kind === 'tv' ? item.episode || 'New episode' : 'Film release';
+            const chats = `${item.chats} ${item.chats === 1 ? 'chat' : 'chats'}`;
+            return `${head}
+        <div class="popular-item upcoming-item" data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0">
+            <span class="upcoming-icon">${KIND_ICON[item.kind] || ''}</span>
+            <div class="popular-body">
+                <div class="popular-title">${escapeHtml(item.title)}</div>
+                <div class="upcoming-sub">${escapeHtml(what)}</div>
+            </div>
+            <span class="popular-sub">${chats}</span>
+        </div>`;
+        })
+        .join('');
+}
+
+export function updateUpcoming(list) {
+    upcoming = list || [];
+    renderUpcoming();
+    startClock();
+}
+
+// --- Update check ---
+let cron = null;
+let clockTimer = null;
+
+/** 41 s, 12 min, 2 h 5 min */
+function duration(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return `${s} s`;
+    const m = Math.round(s / 60);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+}
+
+const clock = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+function renderCron() {
+    if (!cron) return;
+    const now = Date.now();
+    const last = cron.lastRun;
+    const state = $('cron-state');
+
+    if (cron.running) {
+        updateBadge('cron-state', 'Running', 'warn');
+        setText('cron-last', `Running now, started ${duration(now - new Date(cron.startedAt).getTime())} ago`);
+    } else if (!last) {
+        updateBadge('cron-state', 'Not run yet', 'muted');
+        setText('cron-last', 'No check since the bot started');
+    } else {
+        // Undelivered messages are not counted: a chat that blocked the bot fails on every
+        // run and would keep the badge amber for good. They are listed under Notifications.
+        const problems = (last.errors || 0) + (last.fatal ? 1 : 0);
+        if (last.fatal) updateBadge('cron-state', 'Failed', 'error');
+        else if (problems) updateBadge('cron-state', `${problems} ${problems === 1 ? 'error' : 'errors'}`, 'warn');
+        else updateBadge('cron-state', 'OK', 'ok');
+        setText(
+            'cron-last',
+            `${duration(now - new Date(last.finishedAt).getTime())} ago, took ${duration(last.durationMs)}`
+        );
+    }
+    if (state) state.title = last && last.fatal ? `Last check failed: ${last.fatal}` : '';
+
+    if (last) {
+        const errors = last.errors ? `, ${last.errors} ${last.errors === 1 ? 'error' : 'errors'}` : '';
+        setText('cron-checked', `${last.series} series, ${last.films} films${errors}`);
+        // Usually a chat that blocked the bot or was deleted
+        const failed = last.failed ? `, ${last.failed} not delivered` : '';
+        setText('cron-sent', `${last.sent} sent${failed}`);
+    } else {
+        setText('cron-checked', '—');
+        setText('cron-sent', '—');
+    }
+
+    const until = new Date(cron.nextRunAt).getTime() - now;
+    setText(
+        'cron-next',
+        until > 0
+            ? `In ${duration(until)}, at ${clock(cron.nextRunAt)}`
+            : `Due now, every ${cron.intervalHours} h`
+    );
+}
+
+export function updateCron(status) {
+    cron = status;
+    renderCron();
+    startClock();
+}
+
+// "5 min ago" and "Today" have to keep moving even while auto-refresh is paused
+function startClock() {
+    if (clockTimer) return;
+    clockTimer = setInterval(() => {
+        renderCron();
+        renderUpcoming();
+    }, 30_000);
 }
 
 export function updatePopular(list) {

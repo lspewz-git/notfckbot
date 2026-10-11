@@ -289,6 +289,34 @@
                         </div>
 
                         <div class="dashboard-bottom">
+                            <div class="glass-card">
+                                <div class="card-head">
+                                    <div>
+                                        <h3>Coming up</h3>
+                                        <p>Episodes and films due in the next 7 days</p>
+                                    </div>
+                                </div>
+                                <div id="upcoming-list">
+                                    <p class="empty-note">Loading…</p>
+                                </div>
+                            </div>
+
+                            <div class="glass-card">
+                                <div class="card-head">
+                                    <div>
+                                        <h3>Update check</h3>
+                                        <p>New episodes, status changes and film releases</p>
+                                    </div>
+                                    <span id="cron-state" class="badge muted">…</span>
+                                </div>
+                                <dl id="cron-status" class="status-list">
+                                    <div><dt>Last check</dt><dd id="cron-last">—</dd></div>
+                                    <div><dt>Checked</dt><dd id="cron-checked">—</dd></div>
+                                    <div><dt>Notifications</dt><dd id="cron-sent">—</dd></div>
+                                    <div><dt>Next check</dt><dd id="cron-next">—</dd></div>
+                                </dl>
+                            </div>
+
                             <!-- Popularity Block -->
                             <div class="glass-card">
                                 <div class="card-head">

@@ -10,3 +10,6 @@ playwright-report/
 
 # Claude Code (local skills)
 .claude/
+
+# Last update-check run, shown on the admin dashboard
+.cron-status.json
