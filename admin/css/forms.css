@@ -14,7 +14,7 @@
     padding: 0.7rem 1rem;
     background-color: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-sm);
     color: var(--text);
     font-family: inherit;
     font-size: 0.85rem;
@@ -79,9 +79,9 @@
     padding: 0.35rem;
     max-height: 260px;
     overflow-y: auto;
-    background: #0d1117;
+    background: var(--surface-overlay);
     border: 1px solid var(--glass-border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-sm);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
     animation: dropdown-in 0.12s ease-out;
 }
@@ -154,7 +154,7 @@
 }
 
 .proxy-note code {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 0.72rem;
     color: var(--primary);
 }
@@ -167,11 +167,11 @@
     padding: 0.85rem 1rem;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--glass-border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-sm);
 }
 
 .proxy-preview code {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--primary);
     word-break: break-all;

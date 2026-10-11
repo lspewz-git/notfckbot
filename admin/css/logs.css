@@ -2,9 +2,9 @@
 .logs-viewer {
     height: 400px;
     background: rgba(0, 0, 0, 0.4);
-    border-radius: 1rem;
+    border-radius: var(--radius);
     padding: 1rem;
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: 0.85rem;
     overflow-y: auto;
 }
@@ -37,11 +37,11 @@
 }
 
 .log-entry.success .type-tag {
-    background: rgba(16, 185, 129, 0.1);
+    background: var(--success-soft);
     color: var(--success);
 }
 
 .log-entry.error .type-tag {
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--danger-soft);
     color: var(--danger);
 }

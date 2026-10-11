@@ -1,16 +1,78 @@
+/*
+ * Design tokens — the whole palette, type and spacing live here.
+ * See admin/DESIGN.md for the rules behind them. Components use these
+ * variables only; a raw colour or size in another file is a bug.
+ */
 :root {
-    --primary: #6366f1;
-    --primary-glow: rgba(99, 102, 241, 0.4);
-    --bg: #030712;
-    --glass-bg: rgba(17, 24, 39, 0.6);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --text: #f3f4f6;
-    --text-dim: #9ca3af;
-    --success: #10b981;
-    --danger: #ef4444;
-    --warning: #f59e0b;
-    --sidebar-width: 260px;
-    --radius: 1.25rem;
+    color-scheme: dark;
+
+    /* Surfaces: flat and layered by lightness (no glass blur) */
+    --bg: #020617;
+    --surface-1: #0b1120; /* sidebar, cards */
+    --surface-2: #111a2e; /* table rows, inputs, list items */
+    --surface-3: #18233d; /* hover */
+    --surface-overlay: #0d1426; /* modals, toasts, dropdowns */
+    --border: #1e293b;
+    --border-strong: #334155;
+
+    /* Text — both pass WCAG AA on every surface above */
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+
+    /* Brand. --primary is a fill (white text on it is 6.3:1); --primary-text is
+       the same hue light enough to be used as text on dark surfaces (8:1). */
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-text: #a5b4fc;
+    --primary-soft: rgba(99, 102, 241, 0.14);
+    --focus-ring: #a5b4fc;
+
+    /* Status — text colours, each with a soft fill for badges */
+    --success: #4ade80;
+    --success-soft: rgba(34, 197, 94, 0.12);
+    --danger: #f87171;
+    --danger-fill: #dc2626;
+    --danger-soft: rgba(239, 68, 68, 0.12);
+    --warning: #fbbf24;
+    --warning-soft: rgba(245, 158, 11, 0.12);
+    --muted-soft: rgba(148, 163, 184, 0.12);
+
+    /* Type */
+    --font-sans: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'Fira Code', ui-monospace, 'Cascadia Code', monospace;
+    --text-xs: 0.75rem;
+    --text-sm: 0.8125rem;
+    --text-base: 0.875rem;
+    --text-lg: 1rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+
+    /* Spacing — 4px grid */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+
+    /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
+    --control-h: 2.25rem;
+    --sidebar-width: 232px;
+
+    /* Older names still used by a few rules */
+    --glass-bg: var(--surface-1);
+    --glass-border: var(--border);
+}
+
+@media (pointer: coarse) {
+    :root {
+        --control-h: 2.75rem;
+    }
 }
 
 * {
@@ -20,13 +82,43 @@
 }
 
 body {
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
     background-color: var(--bg);
     color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
-    background-image:
-        radial-gradient(at 0% 0%, hsla(250, 100%, 15%, 0.15) 0, transparent 50%),
-        radial-gradient(at 100% 100%, hsla(280, 100%, 15%, 0.15) 0, transparent 50%),
-        radial-gradient(at 50% 50%, hsla(250, 100%, 10%, 1) 0, transparent 100%);
+}
+
+/* Numbers and identifiers line up in columns */
+code,
+.mono,
+.stat-value,
+.timer-circle {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* One visible focus style for everything reachable by keyboard */
+:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+}
+
+/* Honour the OS setting everywhere, not only for the skeleton */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

@@ -20,7 +20,13 @@ let closeNav = null;
 function switchSection(id) {
     setSection(id);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
-    all('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.section === id));
+    all('.nav-item').forEach((n) => {
+        const on = n.dataset.section === id;
+        n.classList.toggle('active', on);
+        // Screen readers announce the current section, not just a coloured row
+        if (on) n.setAttribute('aria-current', 'page');
+        else n.removeAttribute('aria-current');
+    });
     fetchData();
 }
 

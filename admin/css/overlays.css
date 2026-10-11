@@ -14,8 +14,8 @@
     min-width: 260px;
     max-width: 380px;
     padding: 0.9rem 1.1rem;
-    border-radius: 0.9rem;
-    background: #0d1117;
+    border-radius: var(--radius);
+    background: var(--surface-overlay);
     border: 1px solid var(--glass-border);
     border-left: 3px solid var(--primary);
     color: var(--text);
@@ -73,7 +73,7 @@
 }
 
 .action-row-danger {
-    color: rgba(239, 68, 68, 0.8);
+    color: var(--danger);
     border-color: rgba(239, 68, 68, 0.25);
 }
 
@@ -104,7 +104,7 @@
     padding: 1.25rem;
     background: rgba(239, 68, 68, 0.05);
     border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 1rem;
+    border-radius: var(--radius);
 }
 
 .danger-item-title {
@@ -131,9 +131,9 @@
 }
 
 .modal-content {
-    background: #0d1117;
+    background: var(--surface-overlay);
     border: 1px solid var(--glass-border);
-    border-radius: 1.5rem;
+    border-radius: var(--radius-lg);
     width: 90%;
     max-width: 600px;
     max-height: 90vh;

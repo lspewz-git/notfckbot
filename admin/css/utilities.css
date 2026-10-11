@@ -2,12 +2,12 @@
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateX(-10px);
+        transform: translateY(4px);
     }
 
     to {
         opacity: 1;
-        transform: translateX(0);
+        transform: translateY(0);
     }
 }
 
@@ -25,41 +25,44 @@
 
 /* Inputs & Search */
 .search-box {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-4);
 }
 
 input[type='text'],
 textarea,
 select {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    border-radius: 0.75rem;
-    padding: 0.75rem 1.25rem;
+    min-height: var(--control-h);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
     color: var(--text);
     font-family: inherit;
-    font-size: 0.9rem;
+    /* 16px stops iOS Safari from zooming into the field on focus */
+    font-size: max(16px, var(--text-base));
     outline: none;
-    transition: all 0.2s;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
 }
 
 input[type='text']:focus,
 textarea:focus,
 select:focus {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: var(--primary);
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+    border-color: var(--primary-text);
+    box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 ::placeholder {
     color: var(--text-dim);
-    opacity: 0.5;
+    opacity: 0.7;
 }
 
 /* Section Hiding (for navigation) */
 .section {
     display: none;
-    animation: fadeIn 0.4s ease-out;
+    animation: fadeIn 0.2s ease-out;
 }
 
 .section.active {
@@ -84,8 +87,8 @@ select:focus {
 }
 
 .skeleton-btn {
-    height: 2.1rem;
-    border-radius: 0.75rem;
+    height: var(--control-h);
+    border-radius: var(--radius-sm);
 }
 
 /* Stagger the rows so the sweep reads as one surface, not four separate bars */
@@ -114,7 +117,12 @@ select:focus {
 /* Table cell that opens a detail view */
 .link-cell {
     cursor: pointer;
-    color: var(--primary);
+    color: var(--primary-text);
+}
+
+.link-cell:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 /* ============================================================
@@ -133,14 +141,14 @@ select:focus {
 
 .modal-actions {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-3);
     align-items: center;
 }
 
 .modal-sub {
     color: var(--text-dim);
-    font-size: 0.85rem;
-    margin-top: 0.35rem;
+    font-size: var(--text-sm);
+    margin-top: var(--space-1);
 }
 
 .log-filters,
@@ -152,20 +160,20 @@ select:focus {
 /* The selected log filter or table tab */
 .log-filters .btn.active,
 .tab-filters .btn.active {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.12);
+    border-color: var(--primary-text);
+    background: var(--primary-soft);
     color: var(--text);
 }
 
 .tab-filters {
-    margin-bottom: 1.25rem;
+    margin-bottom: var(--space-3);
 }
 
 /* One-line explanation under a tab strip */
 .tab-hint {
     color: var(--text-dim);
-    font-size: 0.85rem;
-    margin-bottom: 1.25rem;
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-3);
 }
 
 .btn-grow {
@@ -189,23 +197,23 @@ select:focus {
 }
 
 .field-block {
-    margin: 1.5rem 0;
+    margin: var(--space-5) 0;
 }
 .field-block-tight {
-    margin-bottom: 1.25rem;
+    margin-bottom: var(--space-4);
 }
 
 .textarea-field {
     width: 100%;
     height: 120px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    border-radius: 1rem;
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     color: var(--text);
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: max(16px, var(--text-base));
 }
 
 /* Empty and placeholder states */
@@ -217,13 +225,14 @@ select:focus {
 
 /* Pieces of generated markup */
 .chat-type {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
+    color: var(--text-dim);
     text-transform: uppercase;
 }
 
 .log-time {
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
 }
 
 .popular-body {
@@ -234,13 +243,13 @@ select:focus {
 }
 
 .popular-sub {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-dim);
 }
 
 .popular-chevron {
-    font-size: 1.2rem;
-    color: var(--primary);
+    font-size: var(--text-xl);
+    color: var(--text-dim);
 }
 
 .result-poster {

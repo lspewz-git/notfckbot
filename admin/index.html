@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>NotFckBot | Soft Glass Admin</title>
+        <title>NotFckBot Admin</title>
         <link rel="stylesheet" href="css/base.css" />
         <link rel="stylesheet" href="css/layout.css" />
         <link rel="stylesheet" href="css/cards.css" />
@@ -17,30 +17,91 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap"
             rel="stylesheet"
         />
     </head>
 
     <body>
         <!-- Shown only on narrow screens; toggles the off-canvas sidebar -->
-        <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+        <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+        </button>
         <div id="nav-backdrop" class="nav-backdrop"></div>
 
         <div class="app-container">
             <!-- Sidebar Navigation -->
             <aside class="sidebar">
                 <div class="sidebar-logo">🎬 NotFck<span>Bot</span></div>
-                <nav class="nav-links">
-                    <li class="nav-item active" data-section="dashboard" role="button" tabindex="0">📊 Dashboard</li>
-                    <li class="nav-item" data-section="chats" role="button" tabindex="0">👤 Users / Chats</li>
-                    <li class="nav-item" data-section="subs" role="button" tabindex="0">📺 Subscriptions</li>
-                    <li class="nav-item" data-section="watchlist" role="button" tabindex="0">🎞 Watchlist</li>
-                    <li class="nav-item" data-section="logs" role="button" tabindex="0">📜 Activity Logs</li>
+                <nav aria-label="Sections">
+                    <ul class="nav-links">
+                        <li>
+                            <button class="nav-item active" data-section="dashboard" aria-current="page">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="3" y="3" width="7" height="9" rx="1" />
+                                    <rect x="14" y="3" width="7" height="5" rx="1" />
+                                    <rect x="14" y="12" width="7" height="9" rx="1" />
+                                    <rect x="3" y="16" width="7" height="5" rx="1" /></svg
+                                >Dashboard
+                            </button>
+                        </li>
+                        <li>
+                            <button class="nav-item" data-section="chats">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg
+                                >Users / Chats
+                            </button>
+                        </li>
+                        <li>
+                            <button class="nav-item" data-section="subs">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="2" y="7" width="20" height="15" rx="2" />
+                                    <polyline points="17 2 12 7 7 2" /></svg
+                                >Subscriptions
+                            </button>
+                        </li>
+                        <li>
+                            <button class="nav-item" data-section="watchlist">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="2" y="2" width="20" height="20" rx="2" />
+                                    <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" /></svg
+                                >Watchlist
+                            </button>
+                        </li>
+                        <li>
+                            <button class="nav-item" data-section="logs">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                    <line x1="16" y1="13" x2="8" y2="13" />
+                                    <line x1="16" y1="17" x2="8" y2="17" /></svg
+                                >Activity Logs
+                            </button>
+                        </li>
+                    </ul>
                 </nav>
                 <div class="sidebar-footer">
-                    <button id="actions-btn" class="btn btn-ghost btn-block">⚡️ Actions</button>
-                    <button id="danger-btn" class="btn btn-danger btn-block">☠️ Danger Zone</button>
+                    <button id="actions-btn" class="btn btn-ghost btn-block">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg
+                        >Actions
+                    </button>
+                    <button id="danger-btn" class="btn btn-danger btn-block">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                            />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" /></svg
+                        >Danger Zone
+                    </button>
                 </div>
             </aside>
 
@@ -51,7 +112,7 @@
                     <header>
                         <div class="header-info">
                             <h1>Dashboard</h1>
-                            <p style="color: var(--text-dim)">Overview of system health and activity.</p>
+                            <p>Overview of system health and activity.</p>
                         </div>
                         <div class="header-status">
                             <div class="refresh-bar">
@@ -117,9 +178,7 @@
                         <!-- Popularity Block -->
                         <div class="glass-card">
                             <h3>🔥 Popular Now</h3>
-                            <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem">
-                                Most subscribed series by your users.
-                            </p>
+                            <p>Most subscribed series by your users.</p>
                             <div id="popular-list">
                                 <!-- Injected via script -->
                                 <p class="empty-cell">Loading popularity stats...</p>
@@ -251,7 +310,7 @@
                 <div id="detail-loading">Loading details...</div>
                 <div id="detail-ready" style="display: none">
                     <div style="display: flex; gap: 2rem">
-                        <img id="detail-poster" src="" style="width: 200px; border-radius: 1rem" />
+                        <img id="detail-poster" src="" alt="" style="width: 200px; border-radius: var(--radius)" />
                         <div class="btn-grow">
                             <h2 id="detail-title">Series Title</h2>
                             <div id="detail-meta" style="margin: 0.5rem 0; color: var(--primary)">S01E01 • ⭐️ 8.9</div>
