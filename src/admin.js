@@ -8,7 +8,7 @@ const { buildProxyAgent, applyProxyToBot } = require('./proxy');
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const { checkUpdates } = require('./cron');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('./constants');
-const { getKinopoiskStatus } = require('./api/kinopoisk');
+const { getKinopoiskStatus, checkKinopoiskKey } = require('./api/kinopoisk');
 const tmdb = require('./api/tmdb');
 
 const app = express();
@@ -455,7 +455,8 @@ const updateEnvFile = (key, value) => {
         let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : '';
         const regex = new RegExp(`^${key}=.*$`, 'm');
         if (regex.test(content)) {
-            content = content.replace(regex, `${key}=${value}`);
+            // A function replacement, so a "$" in a token is not read as a pattern
+            content = content.replace(regex, () => `${key}=${value}`);
         } else {
             content += `\n${key}=${value}`;
         }
@@ -469,10 +470,134 @@ const PROXY_SCHEMES = ['http://', 'https://', 'socks://', 'socks4://', 'socks5:/
 const isSupportedProxyUrl = (url) => !url || PROXY_SCHEMES.some((s) => url.startsWith(s));
 
 app.get('/api/config', (req, res) => {
+    // The panel has no login, so secrets only ever leave the server masked
     res.json({
-        tmdbApiKey: process.env.TMDB_API_KEY || '',
+        tmdbApiKey: maskToken(process.env.TMDB_API_KEY),
         tmdbProxyUrl: process.env.TMDB_PROXY_URL || ''
     });
+});
+
+// --- External services: the TG / TMDB / KP badges open a dialog backed by these ---
+
+/** "ad5dc619-…-73ff6d34659d" -> "ad5d*****659d". Short values are hidden entirely. */
+function maskToken(token) {
+    if (!token) return '';
+    return token.length <= 12 ? '*****' : `${token.slice(0, 4)}*****${token.slice(-4)}`;
+}
+
+const outbound = () => ({ httpsAgent: buildProxyAgent(process.env.TMDB_PROXY_URL), proxy: false, timeout: 8000 });
+
+/**
+ * One entry per external service. `check(token)` throws if the service rejects the
+ * token, otherwise returns what the dialog shows: `details` rows and, where the
+ * service has one, today's `quota`.
+ */
+const SERVICES = {
+    telegram: {
+        label: 'Telegram Bot API',
+        env: 'BOT_TOKEN',
+        statusUrl: 'https://t.me/BotFather',
+        statusLabel: 'Open @BotFather',
+        // Telegraf holds the token for the life of the process
+        restartOnChange: true,
+        check: async (token) => {
+            const res = await axios.get(`https://api.telegram.org/bot${token}/getMe`, outbound());
+            const me = res.data.result;
+            return {
+                details: [
+                    ['Bot', `@${me.username}`],
+                    ['Bot ID', String(me.id)],
+                    ['Quota', 'No daily limit']
+                ]
+            };
+        }
+    },
+    tmdb: {
+        label: 'TMDB API',
+        env: 'TMDB_API_KEY',
+        statusUrl: 'https://status.themoviedb.org',
+        statusLabel: 'Status page',
+        check: async (token) => {
+            await axios.get('https://api.themoviedb.org/3/authentication', {
+                ...outbound(),
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            return { details: [['Quota', 'No daily limit (about 50 requests per second)']] };
+        }
+    },
+    kinopoisk: {
+        label: 'Kinopoisk API',
+        env: 'KINOPOISK_API_KEY',
+        statusUrl: 'https://kinopoiskapiunofficial.tech/status',
+        statusLabel: 'Status page',
+        check: async (token) => {
+            const q = await checkKinopoiskKey(token);
+            return {
+                quota: { used: q.used, limit: q.limit },
+                details: [
+                    ['Account', q.accountType || '—'],
+                    ['Today', `${q.used} of ${q.limit} requests used`]
+                ]
+            };
+        }
+    }
+};
+
+const describeError = (err) =>
+    err.response
+        ? `${err.response.status} ${err.response.data?.description || err.response.statusText || ''}`.trim()
+        : err.message;
+
+app.get('/api/services/:name', async (req, res) => {
+    const service = SERVICES[req.params.name];
+    if (!service) return res.status(404).json({ error: 'Unknown service' });
+
+    const token = process.env[service.env];
+    const out = {
+        name: req.params.name,
+        label: service.label,
+        configured: Boolean(token),
+        masked: maskToken(token),
+        statusUrl: service.statusUrl,
+        statusLabel: service.statusLabel,
+        restartOnChange: Boolean(service.restartOnChange),
+        ok: false,
+        details: []
+    };
+    if (!token) return res.json(out);
+
+    try {
+        Object.assign(out, await service.check(token), { ok: true });
+    } catch (err) {
+        out.error = describeError(err);
+    }
+    res.json(out);
+});
+
+app.post('/api/services/:name', async (req, res) => {
+    const service = SERVICES[req.params.name];
+    if (!service) return res.status(404).json({ error: 'Unknown service' });
+
+    const token = typeof req.body.token === 'string' ? req.body.token.trim() : '';
+    // Printable ASCII only: the value is written into .env as one line
+    if (!/^[\x21-\x7e]{8,256}$/.test(token)) {
+        return res.status(400).json({ error: 'Token must be 8–256 characters, no spaces' });
+    }
+
+    try {
+        await service.check(token);
+    } catch (err) {
+        return res.status(400).json({ error: `${service.label} rejected the token: ${describeError(err)}` });
+    }
+
+    process.env[service.env] = token;
+    updateEnvFile(service.env, token);
+    console.log(`[Admin] ${service.env} updated (${maskToken(token)}).`);
+
+    res.json({ success: true, masked: maskToken(token), restarting: Boolean(service.restartOnChange) });
+
+    // docker-compose's restart policy brings the process straight back with the new .env
+    if (service.restartOnChange) setTimeout(() => process.exit(0), 800);
 });
 
 // Update configuration at runtime and persist to .env
@@ -501,7 +626,7 @@ app.post('/api/config', (req, res) => {
     console.log('[Admin] Configuration updated successfully.');
     res.json({
         success: true,
-        tmdbApiKey: process.env.TMDB_API_KEY,
+        tmdbApiKey: maskToken(process.env.TMDB_API_KEY),
         tmdbProxyUrl: process.env.TMDB_PROXY_URL
     });
 });

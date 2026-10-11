@@ -167,17 +167,39 @@
                                     </button>
                                 </div>
                                 <div class="status-badges">
-                                    <div id="health-tg" class="badge">TG: ...</div>
-                                    <div id="health-tmdb" class="badge">TMDB: ...</div>
-                                    <a
+                                    <div
+                                        id="health-tg"
+                                        class="badge"
+                                        data-action="service"
+                                        data-service="telegram"
+                                        role="button"
+                                        tabindex="0"
+                                        title="Telegram Bot API: token and status"
+                                    >
+                                        TG: ...
+                                    </div>
+                                    <div
+                                        id="health-tmdb"
+                                        class="badge"
+                                        data-action="service"
+                                        data-service="tmdb"
+                                        role="button"
+                                        tabindex="0"
+                                        title="TMDB API: key and status"
+                                    >
+                                        TMDB: ...
+                                    </div>
+                                    <div
                                         id="health-kp"
                                         class="badge"
-                                        href="https://kinopoiskapiunofficial.tech/status"
-                                        target="_blank"
-                                        rel="noopener"
-                                        title="Kinopoisk API status page"
-                                        >KP: ...</a
+                                        data-action="service"
+                                        data-service="kinopoisk"
+                                        role="button"
+                                        tabindex="0"
+                                        title="Kinopoisk API: key, quota and status"
                                     >
+                                        KP: ...
+                                    </div>
                                     <div
                                         id="health-proxy"
                                         class="badge"
@@ -749,6 +771,53 @@
                     <button id="confirm-block" class="btn btn-danger btn-grow">Block</button>
                     <button data-close-return="block-modal" class="btn btn-ghost">Cancel</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- External service: token and status (opened from the TG / TMDB / KP badges) -->
+        <div id="service-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="service-title">
+            <div class="modal-content modal-medium">
+                <h3 id="service-title">Service</h3>
+                <p class="modal-sub" id="service-state">Checking…</p>
+
+                <dl id="service-details" class="kv-list"></dl>
+
+                <div class="field-block">
+                    <span class="field-label">Current token</span>
+                    <code id="service-current" class="token-masked">—</code>
+                </div>
+
+                <div class="field-block">
+                    <label class="field-label" for="service-token">New token</label>
+                    <input
+                        type="text"
+                        id="service-token"
+                        class="input-field"
+                        placeholder="Paste a new token to replace the current one"
+                        autocomplete="off"
+                        spellcheck="false"
+                    />
+                    <p class="field-hint" id="service-hint">
+                        The token is checked with the service before it is saved.
+                    </p>
+                </div>
+
+                <div class="modal-actions">
+                    <a id="service-status-link" class="btn btn-ghost" href="#" target="_blank" rel="noopener"
+                        >Status page
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 3h6v6" />
+                            <path d="M10 14 21 3" />
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg
+                    ></a>
+                    <button id="service-save" class="btn btn-primary btn-grow">Save token</button>
+                </div>
+                <button data-close="service-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 

@@ -34,17 +34,13 @@ export function updateHealth(h) {
     const [proxyText, proxyClass] = PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost'];
     updateBadge('health-proxy', proxyText, proxyClass);
 
-    // Kinopoisk API, used to find Kinopoisk IDs for watch links. The badge links to
-    // the service's status page; the tooltip shows today's request quota.
+    // Kinopoisk API, used to find Kinopoisk IDs for watch links. Clicking any of
+    // these badges opens the service dialog; the tooltip shows today's quota.
     const kp = KINOPOISK_HEALTH[h.kinopoisk] || KINOPOISK_HEALTH.off;
     updateBadge('health-kp', kp[0], kp[1]);
     const kpBadge = $('health-kp');
-    if (kpBadge) {
-        const q = h.kinopoiskQuota;
-        kpBadge.title = q
-            ? `Kinopoisk API: ${q.used} of ${q.limit} requests used today. Click for the status page.`
-            : 'Kinopoisk API status page';
-    }
+    const q = h.kinopoiskQuota;
+    if (kpBadge && q) kpBadge.title = `Kinopoisk API: ${q.used} of ${q.limit} requests used today`;
 }
 
 export function updatePopular(list) {

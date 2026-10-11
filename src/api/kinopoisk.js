@@ -102,16 +102,31 @@ async function ensureKinopoiskId(row, imdbId) {
 const findKinopoiskIdQuick = (tmdbId, imdbId, ms = 3000) =>
     Promise.race([findKinopoiskId(tmdbId, imdbId), new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
 
-/** For the admin health badge. The key-info endpoint does not count against the quota. */
-async function getKinopoiskStatus() {
-    const key = process.env.KINOPOISK_API_KEY;
-    if (!key) return { state: 'off' };
+/**
+ * Validates a key and reads its quota. The key-info endpoint does not count
+ * against the quota, so it is safe for health checks.
+ */
+async function checkKinopoiskKey(key) {
     const res = await axios.get(`${KP_API}/api/v1/api_keys/${encodeURIComponent(key)}`, {
-        headers: kpHeaders(),
+        headers: { 'X-API-KEY': key },
         timeout: 5000
     });
     const daily = res.data?.dailyQuota || {};
-    return { state: 'ok', used: daily.used, limit: daily.value };
+    return { used: daily.used, limit: daily.value, accountType: res.data?.accountType };
 }
 
-module.exports = { findKinopoiskId, findKinopoiskIdQuick, ensureKinopoiskId, getKinopoiskStatus };
+/** For the admin health badge. */
+async function getKinopoiskStatus() {
+    const key = process.env.KINOPOISK_API_KEY;
+    if (!key) return { state: 'off' };
+    const { used, limit } = await checkKinopoiskKey(key);
+    return { state: 'ok', used, limit };
+}
+
+module.exports = {
+    findKinopoiskId,
+    findKinopoiskIdQuick,
+    ensureKinopoiskId,
+    checkKinopoiskKey,
+    getKinopoiskStatus
+};

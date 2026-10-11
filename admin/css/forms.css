@@ -176,3 +176,50 @@
     color: var(--primary);
     word-break: break-all;
 }
+
+/* Service dialog: key/value rows, the masked token, a hint under a field */
+.kv-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-2) var(--space-4);
+    margin: var(--space-4) 0 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+}
+
+.kv-list dt {
+    color: var(--text-dim);
+}
+
+.kv-list dd {
+    margin: 0;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.token-masked {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    letter-spacing: 0.03em;
+    color: var(--text);
+}
+
+.field-hint {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+
+/* Compound selectors: .modal-sub sets its own colour later in the cascade */
+.modal-sub.state-ok {
+    color: var(--success);
+}
+
+.modal-sub.state-error {
+    color: var(--danger);
+}

@@ -1,4 +1,6 @@
-require('dotenv').config();
+// .env wins over the environment docker-compose baked in at container creation: the
+// admin panel edits .env (tokens, proxy), and those edits must survive a restart.
+require('dotenv').config({ override: true });
 const { initDb } = require('./db');
 const bot = require('./bot');
 const { setupCron } = require('./cron');
