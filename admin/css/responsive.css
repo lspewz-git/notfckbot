@@ -146,6 +146,23 @@
         border-spacing: 0;
     }
 
+    /* Size on the left, range and arrows on the right */
+    .pager {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: var(--space-2);
+    }
+
+    /* One row on a phone; the select keeps its aria-label */
+    .pager-label {
+        display: none;
+    }
+
+    .pager-info {
+        min-width: 0;
+        margin-left: auto;
+    }
+
     .sort-bar {
         display: flex;
         align-items: center;

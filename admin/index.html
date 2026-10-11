@@ -401,6 +401,26 @@
                                     <tbody id="watchlist-body"></tbody>
                                 </table>
                             </div>
+                            <div class="pager" id="films-pager" hidden>
+                                <div class="pager-size">
+                                    <span class="pager-label">Rows per page</span>
+                                    <select class="select-field" data-page-size="films" aria-label="Films per page">
+                                        <option value="10">10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                                <span class="pager-info" aria-live="polite"></span>
+                                <div class="pager-nav">
+                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="films" data-step="-1" aria-label="Previous page">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                                    </button>
+                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="films" data-step="1" aria-label="Next page">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
@@ -438,6 +458,26 @@
                                     </thead>
                                     <tbody id="subs-body"></tbody>
                                 </table>
+                            </div>
+                            <div class="pager" id="subs-pager" hidden>
+                                <div class="pager-size">
+                                    <span class="pager-label">Rows per page</span>
+                                    <select class="select-field" data-page-size="subs" aria-label="Subscriptions per page">
+                                        <option value="10">10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                                <span class="pager-info" aria-live="polite"></span>
+                                <div class="pager-nav">
+                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="subs" data-step="-1" aria-label="Previous page">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                                    </button>
+                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="subs" data-step="1" aria-label="Next page">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </section>

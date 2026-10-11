@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { Series, Chat, Watchlist } = require('./db');
 const { getDetails, nextEpisodeFields } = require('./api/tmdb');
-const { isFinishedStatus, escapeHtml, formatRuDate, formatWatchLinks } = require('./constants');
+const { isFinishedStatus, escapeHtml, formatRuDate, formatWatchLinks, UPDATE_INTERVAL_HOURS } = require('./constants');
 const { ensureKinopoiskId, findKinopoiskId } = require('./api/kinopoisk');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
@@ -315,8 +315,8 @@ const checkUpdates = async (bot) => {
 };
 
 const setupCron = (bot) => {
-    cron.schedule('0 */3 * * *', () => checkUpdates(bot));
-    console.log('[Cron] Scheduled: every 3 hours.');
+    cron.schedule(`0 */${UPDATE_INTERVAL_HOURS} * * *`, () => checkUpdates(bot));
+    console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS} hours.`);
 };
 
 module.exports = { setupCron, checkUpdates, buildSeriesMessages };

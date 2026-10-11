@@ -87,7 +87,11 @@ const formatWatchLinks = (opts) => {
     return [watch.join('\n'), info.join('\n')].filter(Boolean).join('\n\n');
 };
 
+// How often the cron checks TMDB for new episodes and releases
+const UPDATE_INTERVAL_HOURS = 3;
+
 module.exports = {
+    UPDATE_INTERVAL_HOURS,
     NOTIFY_LABELS,
     NOTIFY_LABELS_SHORT,
     NOTIFY_CYCLE,

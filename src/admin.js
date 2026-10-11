@@ -171,8 +171,10 @@ app.get('/api/series/:tmdbId', async (req, res) => {
     try {
         const { tmdbId } = req.params;
         const numericId = tmdbId.replace('tv_', '');
+        if (!/^\d+$/.test(numericId)) return res.status(400).json({ error: 'Bad series id' });
         const [details, subs] = await Promise.all([
-            tmdb.getDetails(numericId, 'tv'),
+            // Cached: the update check refreshes it for every tracked series
+            tmdb.getDetailsCached(numericId, 'tv'),
             Subscription.count({ where: { seriesId: tmdbId } })
         ]);
         res.json({ ...details, subCount: subs });
@@ -189,7 +191,7 @@ app.get('/api/movie/:tmdbId', async (req, res) => {
         // Older rows may still hold the bare id (see fix-watchlist-ids.js)
         const ids = [`movie_${numericId}`, numericId];
         const [details, waiting, notified] = await Promise.all([
-            tmdb.getDetails(numericId, 'movie'),
+            tmdb.getDetailsCached(numericId, 'movie'),
             // Chats, not rows: a chat can hold the same film twice (old duplicates)
             Watchlist.count({ where: { tmdb_id: ids, notified: false }, distinct: true, col: 'chatId' }),
             Watchlist.count({ where: { tmdb_id: ids, notified: true }, distinct: true, col: 'chatId' })

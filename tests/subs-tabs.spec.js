@@ -12,8 +12,10 @@ const { mockPanel } = require('./mock-panel');
 
 const ACTIVE = 17;
 const ARCHIVED = 6;
+// Rows per page until the user picks another size
+const PAGE = 10;
 
-/** Rows are hidden with inline display:none, which older Playwright cannot filter on. */
+/** Rows are hidden (by the filter or the pager) with inline display:none, which older Playwright cannot filter on. */
 function visibleRows(page) {
     return page.locator('#subs-body tr').evaluateAll((rows) => rows.filter((r) => r.style.display !== 'none').length);
 }
@@ -123,7 +125,73 @@ test('the text filter works within the selected tab', async ({ page }) => {
     await expect.poll(() => visibleRows(page)).toBe(3);
 
     await page.locator('#subs-filter').fill('');
-    await expect.poll(() => visibleRows(page)).toBe(ACTIVE);
+    await expect.poll(() => visibleRows(page)).toBe(PAGE);
+});
+
+test.describe('pages', () => {
+    const pager = (page) => page.locator('#subs-pager');
+    const info = (page) => pager(page).locator('.pager-info');
+    const prev = (page) => pager(page).locator('[data-step="-1"]');
+    const next = (page) => pager(page).locator('[data-step="1"]');
+
+    async function pickSize(page, size) {
+        await pager(page).locator('.custom-select-trigger').click();
+        await page.locator('.custom-select-panel [role="option"]', { hasText: new RegExp(`^${size}$`) }).click();
+    }
+
+    test('ten rows a page, arrows move between pages', async ({ page }) => {
+        await goToSubs(page);
+        await expect(info(page)).toHaveText(`1–${PAGE} of ${ACTIVE}`);
+        await expect.poll(() => visibleRows(page)).toBe(PAGE);
+        await expect(prev(page)).toBeDisabled();
+        await expect(next(page)).toBeEnabled();
+
+        await next(page).click();
+        await expect(info(page)).toHaveText(`${PAGE + 1}–${ACTIVE} of ${ACTIVE}`);
+        await expect.poll(() => visibleRows(page)).toBe(ACTIVE - PAGE);
+        await expect(next(page)).toBeDisabled();
+
+        await prev(page).click();
+        await expect(info(page)).toHaveText(`1–${PAGE} of ${ACTIVE}`);
+    });
+
+    test('the filter, a tab switch and a new size start again from page one', async ({ page }) => {
+        await goToSubs(page);
+        await next(page).click();
+
+        await page.locator('#subs-filter').fill('Stranger');
+        await expect(info(page)).toHaveText('1–3 of 3');
+        await page.locator('#subs-filter').fill('');
+        await expect(info(page)).toHaveText(`1–${PAGE} of ${ACTIVE}`);
+
+        await next(page).click();
+        await tab(page, 'archive').click();
+        await expect(info(page)).toHaveText(`1–${ARCHIVED} of ${ARCHIVED}`);
+        await tab(page, 'active').click();
+        await expect(info(page)).toHaveText(`1–${PAGE} of ${ACTIVE}`);
+
+        await next(page).click();
+        await pickSize(page, 25);
+        await expect(info(page)).toHaveText(`1–${ACTIVE} of ${ACTIVE}`);
+        await expect.poll(() => visibleRows(page)).toBe(ACTIVE);
+        await expect(next(page)).toBeDisabled();
+    });
+
+    test('the chosen size is remembered', async ({ page }) => {
+        await goToSubs(page);
+        await pickSize(page, 50);
+        await page.reload();
+        await goToSubs(page);
+        await expect(pager(page).locator('.custom-select-trigger')).toHaveText('50');
+        await expect(info(page)).toHaveText(`1–${ACTIVE} of ${ACTIVE}`);
+    });
+
+    test('no pager when there is nothing to show', async ({ page }) => {
+        panel.subs = panel.subs.filter((s) => !['Ended', 'Canceled'].includes(s.Series.status));
+        await goToSubs(page);
+        await tab(page, 'archive').click();
+        await expect(pager(page)).toBeHidden();
+    });
 });
 
 test('the selected tab survives the auto-refresh, with or without new data', async ({ page }) => {

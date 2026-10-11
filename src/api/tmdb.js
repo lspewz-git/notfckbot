@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { getProxyAgent } = require('../proxy');
+const { UPDATE_INTERVAL_HOURS } = require('../constants');
 require('dotenv').config();
 
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -95,7 +96,7 @@ function nextEpisodeFields(data) {
     };
 }
 
-const getDetails = async (id, media_type) => {
+const fetchDetails = async (id, media_type) => {
     try {
         const response = await apiClient.get(`/${media_type}/${id}`, {
             params: {
@@ -125,6 +126,47 @@ const getDetails = async (id, media_type) => {
         console.error(`TMDB API Error (getDetails ${media_type}/${id}):`, error.message);
         throw error;
     }
+};
+
+// --- Details cache ---
+// Every fetch is stored, so the update check keeps the cache fresh for the tracked titles
+// and the admin panel's cards are served from it. Two intervals of lifetime: one failed
+// check doesn't send the panel back to TMDB.
+const DETAILS_TTL_MS = 2 * UPDATE_INTERVAL_HOURS * 60 * 60 * 1000;
+const DETAILS_CACHE_MAX = 500;
+const detailsCache = new Map(); // "tv:1399" -> { data, at }; Map order = oldest first
+const inFlight = new Map(); // "tv:1399" -> pending fetch, shared by concurrent callers
+
+const cacheKey = (id, media_type) => `${media_type}:${id}`;
+
+function remember(key, data) {
+    detailsCache.delete(key); // re-insert, so the entry moves to the newest end
+    detailsCache.set(key, { data, at: Date.now() });
+    if (detailsCache.size > DETAILS_CACHE_MAX) detailsCache.delete(detailsCache.keys().next().value);
+}
+
+/**
+ * Always asks TMDB (the update check needs current data) and refreshes the cache.
+ * Concurrent calls for the same title share one request. Failures are not cached.
+ */
+const getDetails = (id, media_type) => {
+    const key = cacheKey(id, media_type);
+    if (inFlight.has(key)) return inFlight.get(key);
+    const request = fetchDetails(id, media_type)
+        .then((data) => {
+            remember(key, data);
+            return data;
+        })
+        .finally(() => inFlight.delete(key));
+    inFlight.set(key, request);
+    return request;
+};
+
+/** The cached details when fresh enough, otherwise a fetch. For display only. */
+const getDetailsCached = (id, media_type) => {
+    const hit = detailsCache.get(cacheKey(id, media_type));
+    if (hit && Date.now() - hit.at < DETAILS_TTL_MS) return Promise.resolve(hit.data);
+    return getDetails(id, media_type);
 };
 
 // Returns season details including episodes
@@ -175,6 +217,7 @@ const getRandomMovie = async () => {
 module.exports = {
     searchMulti,
     getDetails,
+    getDetailsCached,
     nextEpisodeFields,
     getSeasonDetails,
     getRandomMovie

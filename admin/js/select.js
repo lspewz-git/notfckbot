@@ -46,9 +46,13 @@ function enhanceSelect(select) {
     trigger.setAttribute('aria-expanded', 'false');
     wrap.appendChild(trigger);
 
+    // Without a visible <label for>, the native select's aria-label names the trigger,
+    // together with the value it shows ("Films per page: 10")
+    const name = select.getAttribute('aria-label');
     const syncLabel = () => {
         const opt = select.options[select.selectedIndex];
         trigger.innerText = opt ? opt.text : '';
+        if (name) trigger.setAttribute('aria-label', opt ? `${name}: ${opt.text}` : name);
     };
     syncLabel();
     select.addEventListener('change', syncLabel);

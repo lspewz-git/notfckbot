@@ -36,6 +36,7 @@ const ICON = {
  * data-tab, the row simply leaves the <td> out).
  *
  * `sorts` lists the keys a table can be ordered by (asc/desc, empty values last).
+ * `paged` splits the rows into pages (see the pager below the table).
  *
  * Row handlers are wired by delegation in app.js, so markup carries only
  * data-* attributes — no value is ever interpolated into executable code.
@@ -67,6 +68,7 @@ const TABLES = {
     subs: {
         body: 'subs-body',
         filter: 'subs-filter',
+        paged: true,
         columns: ['User', 'Series', 'Status', 'Next Episode', 'Mode', 'Actions'],
         tabs: {
             active: {
@@ -117,6 +119,7 @@ const TABLES = {
         filter: 'watchlist-filter',
         columns: ['User', 'Film Title', 'Year', 'Release', 'Actions'],
         table: 'watchlist-table',
+        paged: true,
         sorts: {
             // Within a year, by release date
             year: (item) => (item.year ? `${item.year}|${item.premiere_digital || '~'}` : null),
@@ -158,6 +161,80 @@ const selectedTab = Object.fromEntries(
 
 // Last payload per table, so a tab switch can re-slice it without a request
 const lastData = {};
+
+// --- Pages ---
+const PAGE_SIZES = [10, 25, 50, 100];
+const PAGE_SIZE_KEY = 'admin.pageSize.';
+
+function storedPageSize(type) {
+    try {
+        const n = Number(localStorage.getItem(PAGE_SIZE_KEY + type));
+        return PAGE_SIZES.includes(n) ? n : PAGE_SIZES[0];
+    } catch {
+        return PAGE_SIZES[0];
+    }
+}
+
+// Per paged table: { page (1-based), size }
+const pageState = Object.fromEntries(
+    Object.entries(TABLES)
+        .filter(([, t]) => t.paged)
+        .map(([type]) => [type, { page: 1, size: storedPageSize(type) }])
+);
+
+const resetPage = (type) => {
+    if (pageState[type]) pageState[type].page = 1;
+};
+
+/** "11–20 of 34" and the arrows; hidden while there is nothing to page through. */
+function renderPager(type, total) {
+    const el = $(`${type}-pager`);
+    const state = pageState[type];
+    if (!el || !state) return;
+    el.hidden = total === 0;
+    const pages = Math.max(1, Math.ceil(total / state.size));
+    const start = (state.page - 1) * state.size;
+    el.querySelector('.pager-info').textContent = `${start + 1}–${Math.min(start + state.size, total)} of ${total}`;
+    el.querySelectorAll('[data-step]').forEach((btn) => {
+        const step = Number(/** @type {HTMLElement} */ (btn).dataset.step);
+        /** @type {HTMLButtonElement} */ (btn).disabled = step < 0 ? state.page <= 1 : state.page >= pages;
+    });
+}
+
+export function setTablePage(type, step) {
+    const state = pageState[type];
+    if (!state) return;
+    // Read before the re-render: once disabled, the arrow just pressed is no longer activeElement
+    const pressed = /** @type {HTMLButtonElement | null} */ (document.activeElement);
+    state.page = Math.max(1, state.page + step);
+    applyTableFilter(type);
+
+    // On a phone the pager sits several screens below the first card of the new page
+    const card = $(TABLES[type].body).closest('.glass-card');
+    // An instant jump, like turning a page; a smooth scroll over several screens only delays it
+    if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start' });
+
+    // The arrow just pressed may now be disabled, which drops focus to <body>; hand it to the other one
+    if (pressed && pressed.disabled && pressed.dataset.step) {
+        const other = /** @type {HTMLButtonElement | null} */ (
+            $(`${type}-pager`).querySelector(`[data-step="${-Number(pressed.dataset.step)}"]`)
+        );
+        if (other && !other.disabled) other.focus({ preventScroll: true });
+    }
+}
+
+function setPageSize(type, size) {
+    const state = pageState[type];
+    if (!state || !PAGE_SIZES.includes(size)) return;
+    state.size = size;
+    state.page = 1;
+    try {
+        localStorage.setItem(PAGE_SIZE_KEY + type, String(size));
+    } catch {
+        // Private mode: the choice just isn't remembered
+    }
+    applyTableFilter(type);
+}
 
 // --- Sorting ---
 // Per table: { key, dir }, or absent for the API's order
@@ -203,6 +280,7 @@ export function setTableSort(type, key) {
     else delete sortState[type];
 
     updateSortButtons(type);
+    resetPage(type);
     if (lastData[type]) {
         invalidate(`table:${type}`);
         renderTable(type, lastData[type]);
@@ -233,6 +311,7 @@ export function setTableTab(type, name) {
     const table = TABLES[type];
     if (!table || !table.tabs || !table.tabs[name]) return;
     selectedTab[type] = name;
+    resetPage(type);
 
     tabButtons(type).forEach((btn) => {
         const on = btn.dataset[`${type}Tab`] === name;
@@ -252,6 +331,11 @@ export function setTableTab(type, name) {
 }
 
 // --- Filtering ---
+// textContent, not innerText: rows on other pages are display:none, and innerText of an
+// unrendered row reads differently from a rendered one
+const rowText = (row) => row.textContent.replace(/\s+/g, ' ').toLowerCase();
+
+/** Shows the rows that match the filter and fall on the current page; hides the rest. */
 export function applyTableFilter(type) {
     const table = TABLES[type];
     const input = $field(table.filter);
@@ -259,15 +343,41 @@ export function applyTableFilter(type) {
     if (!input || !body) return;
 
     const q = input.value.trim().toLowerCase();
-    body.querySelectorAll('tr').forEach((row) => {
-        row.style.display = !q || row.innerText.toLowerCase().includes(q) ? '' : 'none';
+    const rows = /** @type {HTMLElement[]} */ ([...body.querySelectorAll('tr')]);
+    // Skeletons and the "no records" line are placeholders, not rows to page through
+    const placeholder = Boolean(body.querySelector('.skeleton-row, .empty-cell'));
+    const matched = placeholder ? rows : rows.filter((row) => !q || rowText(row).includes(q));
+
+    let shown = matched;
+    const state = pageState[type];
+    if (state && !placeholder) {
+        // Clamp: an auto-refresh or a delete can leave fewer pages than before
+        state.page = Math.min(state.page, Math.max(1, Math.ceil(matched.length / state.size)));
+        const start = (state.page - 1) * state.size;
+        shown = matched.slice(start, start + state.size);
+    }
+    const visible = new Set(shown);
+    rows.forEach((row) => {
+        row.style.display = visible.has(row) ? '' : 'none';
     });
+    renderPager(type, placeholder ? 0 : matched.length);
 }
 
 export function setupFilters() {
     Object.entries(TABLES).forEach(([type, { filter }]) => {
         const el = $(filter);
-        if (el) el.oninput = () => applyTableFilter(type);
+        if (el)
+            el.oninput = () => {
+                resetPage(type);
+                applyTableFilter(type);
+            };
+    });
+    // Before enhanceSelects(), so the styled dropdown starts on the remembered size
+    all('[data-page-size]').forEach((el) => {
+        const select = /** @type {HTMLSelectElement} */ (el);
+        const type = select.dataset.pageSize;
+        if (pageState[type]) select.value = String(pageState[type].size);
+        select.addEventListener('change', () => setPageSize(type, Number(select.value)));
     });
 }
 
@@ -277,6 +387,7 @@ function fillBody(type, html) {
     if (!body) return null;
     invalidate(`table:${type}`);
     body.innerHTML = html;
+    renderPager(type, 0);
     return body;
 }
 
@@ -337,6 +448,7 @@ export function renderTable(type, data) {
 
     if (rows.length === 0) {
         body.innerHTML = fullWidthRow(type, tab ? tab.empty : 'No records found.');
+        renderPager(type, 0);
         return;
     }
 
