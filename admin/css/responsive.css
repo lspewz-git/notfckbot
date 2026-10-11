@@ -1,6 +1,6 @@
 /* Laptops — reclaim horizontal padding */
 @media (max-width: 1280px) {
-    .main-content {
+    .main-inner {
         padding: var(--space-6);
     }
 }
@@ -34,23 +34,23 @@
     .main-content {
         margin-left: 0;
         /* top padding clears the fixed nav button */
-        padding: 4.25rem var(--space-6) var(--space-6);
+        padding: 4.25rem var(--space-2) var(--space-2);
+    }
+
+    .main-inner {
+        min-height: calc(100vh - 4.75rem);
+        padding: var(--space-5);
     }
 }
 
 /* Short viewports — the drawer must fit logo, 5 items and 2 buttons */
 @media (max-width: 1024px) and (max-height: 820px) {
-    .sidebar-logo {
-        font-size: 1.25rem;
-        margin-bottom: 1.5rem;
+    .sidebar-brand {
+        margin-bottom: var(--space-2);
     }
 
-    .nav-links {
-        gap: 0.25rem;
-    }
-
-    .sidebar-logo {
-        margin-bottom: var(--space-4);
+    .nav-group + .nav-group {
+        margin-top: var(--space-3);
     }
 
     .sidebar-footer {
@@ -81,6 +81,10 @@
     }
 
     /* Tabs become one full-width segmented control with thumb-sized targets */
+    .tab-filters {
+        display: flex;
+    }
+
     .tab-filters .btn {
         flex: 1;
         min-height: 2.75rem;
@@ -102,8 +106,26 @@
         margin-bottom: var(--space-4);
     }
 
+    .stat-card {
+        padding: var(--space-4);
+    }
+
     .stat-value {
         font-size: var(--text-2xl);
+    }
+
+    /* Two columns are too narrow for title and badge side by side */
+    .stat-head {
+        flex-wrap: wrap;
+    }
+
+    .stat-foot {
+        margin-top: var(--space-3);
+        font-size: var(--text-xs);
+    }
+
+    .stat-foot-main .icon {
+        display: none;
     }
 
     .logs-viewer {
@@ -156,6 +178,7 @@
         gap: 1rem;
         padding: var(--space-2) var(--space-3);
         background: transparent;
+        border-bottom: none;
         border-radius: 0;
         word-break: break-word;
     }
@@ -214,8 +237,16 @@
 
 /* Small phones — full-bleed modals and toasts */
 @media (max-width: 640px) {
+    /* The panel runs edge to edge; a frame around it would only eat width */
     .main-content {
-        padding: 4.25rem var(--space-4) var(--space-6);
+        padding: 4rem 0 0;
+    }
+
+    .main-inner {
+        min-height: calc(100vh - 4rem);
+        border-width: 1px 0 0;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: var(--space-5) var(--space-4) var(--space-6);
     }
 
     .modal {

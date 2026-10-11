@@ -7,9 +7,8 @@
 .sidebar {
     width: var(--sidebar-width);
     overflow-y: auto;
-    background: var(--surface-1);
-    border-right: 1px solid var(--border);
-    padding: var(--space-5) var(--space-3);
+    background: var(--bg);
+    padding: var(--space-3) var(--space-3) var(--space-4);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -25,6 +24,15 @@
     flex: 1;
     min-width: 0;
     margin-left: var(--sidebar-width);
+    padding: var(--space-2) var(--space-2) var(--space-2) 0;
+}
+
+/* The content sits on an inset panel, a step lighter than the sidebar */
+.main-inner {
+    min-height: calc(100vh - var(--space-4));
+    background: var(--inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: var(--space-6) var(--space-8);
 }
 
@@ -50,7 +58,7 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(2, 6, 23, 0.7);
+    background: rgba(0, 0, 0, 0.6);
     z-index: 90;
 }
 
@@ -83,34 +91,68 @@
 }
 
 /* Sidebar Nav */
-.sidebar-logo {
-    font-size: var(--text-xl);
-    font-weight: 700;
-    margin: 0 var(--space-2) var(--space-6);
+.sidebar-brand {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-3);
+    padding: var(--space-2);
+    margin-bottom: var(--space-4);
 }
 
-.sidebar-logo span {
-    color: var(--primary-text);
+.brand-mark {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: var(--primary);
+    color: var(--on-primary);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+
+.brand-name {
+    font-weight: 600;
+}
+
+.brand-sub {
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+
+.nav-group + .nav-group {
+    margin-top: var(--space-5);
+}
+
+.nav-group-label {
+    display: block;
+    padding: 0 var(--space-2) var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-dim);
 }
 
 .nav-links {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: 2px;
 }
 
 .nav-item {
     width: 100%;
     min-height: var(--control-h);
-    padding: 0 var(--space-3);
+    padding: 0 var(--space-2);
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--text-dim);
+    color: var(--text);
     font-size: var(--text-base);
     font-weight: 500;
     text-align: left;
@@ -120,18 +162,21 @@
         color 0.15s;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-2);
+}
+
+.nav-item .icon {
+    width: 16px;
+    height: 16px;
 }
 
 .nav-item:hover {
-    background: var(--surface-3);
-    color: var(--text);
+    background: var(--surface-1);
 }
 
 .nav-item.active {
-    background: var(--primary-soft);
-    color: var(--text);
-    box-shadow: inset 3px 0 0 var(--primary-text);
+    background: var(--surface-3);
+    font-weight: 500;
 }
 
 /* Line icons inherit the text colour */
@@ -146,6 +191,11 @@
     stroke-linejoin: round;
 }
 
+.icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
 /* Dashboard Header */
 header {
     margin-bottom: var(--space-5);
@@ -158,13 +208,15 @@ header {
 h1,
 .header-info h1 {
     font-size: var(--text-2xl);
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     line-height: 1.25;
 }
 
 .header-info p {
     color: var(--text-dim);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
+    margin-top: var(--space-1);
 }
 
 h3 {

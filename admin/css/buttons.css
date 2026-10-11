@@ -10,7 +10,7 @@
     border: 1px solid transparent;
     cursor: pointer;
     font-family: inherit;
-    font-weight: 600;
+    font-weight: 500;
     font-size: var(--text-sm);
     white-space: nowrap;
     transition:
@@ -26,22 +26,22 @@
 
 .btn-primary {
     background: var(--primary);
-    color: #fff;
+    color: var(--on-primary);
 }
 
 .btn-primary:hover {
     background: var(--primary-hover);
 }
 
+/* shadcn "outline" button */
 .btn-ghost {
-    background: transparent;
+    background: var(--bg);
     border-color: var(--border-strong);
-    color: var(--text-dim);
+    color: var(--text);
 }
 
 .btn-ghost:hover {
     background: var(--surface-3);
-    color: var(--text);
 }
 
 .btn-danger {

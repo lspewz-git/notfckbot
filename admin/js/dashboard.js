@@ -14,6 +14,7 @@ export function updateStats(stats) {
         archived.innerText = `+ ${stats.archivedSubsCount ?? 0} archived`;
     }
     setText('films-count', stats.filmsCount);
+    setText('series-count', stats.seriesCount);
 }
 
 const PROXY_HEALTH = {
@@ -37,18 +38,24 @@ export function updatePopular(list) {
         return;
     }
 
+    // Share of the leader, so the top series always fills its bar
+    const top = Math.max(...list.map((item) => Number(item.subCount) || 0), 1);
     container.innerHTML = list
-        .map(
-            (item, idx) => `
-        <div class="popular-item" data-action="series" data-id="${item.seriesId}">
+        .map((item, idx) => {
+            const count = Number(item.subCount) || 0;
+            return `
+        <div class="popular-item" data-action="series" data-id="${item.seriesId}" role="button" tabindex="0">
             <div class="popular-rank">${idx + 1}</div>
             <div class="popular-body">
                 <div class="popular-title">${escapeHtml(item.Series.title)}</div>
-                <div class="popular-sub">${item.subCount} subscribers</div>
+                <div class="popular-meter" aria-hidden="true"><span style="width:${Math.round((count / top) * 100)}%"></span></div>
             </div>
-            <div class="popular-chevron">›</div>
+            <div class="popular-count">
+                <span class="popular-value">${count}</span>
+                <span class="popular-sub">${count === 1 ? 'subscriber' : 'subscribers'}</span>
+            </div>
         </div>
-    `
-        )
+    `;
+        })
         .join('');
 }

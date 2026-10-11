@@ -6,26 +6,29 @@
 :root {
     color-scheme: dark;
 
-    /* Surfaces: flat and layered by lightness (no glass blur) */
-    --bg: #020617;
-    --surface-1: #0b1120; /* sidebar, cards */
-    --surface-2: #111a2e; /* table rows, inputs, list items */
-    --surface-3: #18233d; /* hover */
-    --surface-overlay: #0d1426; /* modals, toasts, dropdowns */
-    --border: #1e293b;
-    --border-strong: #334155;
+    /* Surfaces — shadcn "neutral" dark: near-black page, an inset content panel,
+       cards one step lighter. Depth comes from these steps and 1px borders. */
+    --bg: #0a0a0a; /* page and sidebar */
+    --inset: #111111; /* main content panel */
+    --surface-1: #171717; /* cards */
+    --surface-2: #1f1f1f; /* rows, inputs, list items */
+    --surface-3: #262626; /* hover, selected nav item, secondary buttons */
+    --surface-overlay: #171717; /* modals, toasts, dropdowns */
+    --border: #262626;
+    --border-strong: #333333;
 
     /* Text — both pass WCAG AA on every surface above */
-    --text: #f8fafc;
-    --text-dim: #94a3b8;
+    --text: #fafafa;
+    --text-dim: #a3a3a3;
 
-    /* Brand. --primary is a fill (white text on it is 6.3:1); --primary-text is
-       the same hue light enough to be used as text on dark surfaces (8:1). */
-    --primary: #4f46e5;
-    --primary-hover: #4338ca;
-    --primary-text: #a5b4fc;
-    --primary-soft: rgba(99, 102, 241, 0.14);
-    --focus-ring: #a5b4fc;
+    /* The primary action is inverted (white on black), as in shadcn. Links and the
+       active tab use plain foreground; colour is reserved for status. */
+    --primary: #fafafa;
+    --primary-hover: #e5e5e5;
+    --on-primary: #171717;
+    --primary-text: #fafafa;
+    --primary-soft: rgba(255, 255, 255, 0.08);
+    --focus-ring: #a3a3a3;
 
     /* Status — text colours, each with a soft fill for badges */
     --success: #4ade80;
@@ -35,11 +38,11 @@
     --danger-soft: rgba(239, 68, 68, 0.12);
     --warning: #fbbf24;
     --warning-soft: rgba(245, 158, 11, 0.12);
-    --muted-soft: rgba(148, 163, 184, 0.12);
+    --muted-soft: rgba(255, 255, 255, 0.06);
 
     /* Type */
-    --font-sans: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-mono: 'Fira Code', ui-monospace, 'Cascadia Code', monospace;
+    --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Code', monospace;
     --text-xs: 0.75rem;
     --text-sm: 0.8125rem;
     --text-base: 0.875rem;
@@ -56,13 +59,13 @@
     --space-6: 1.5rem;
     --space-8: 2rem;
 
-    --radius-sm: 6px;
+    --radius-sm: 8px;
     --radius: 10px;
-    --radius-lg: 14px;
+    --radius-lg: 12px;
 
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;
-    --sidebar-width: 232px;
+    --sidebar-width: 240px;
 
     /* Older names still used by a few rules */
     --glass-bg: var(--surface-1);
@@ -89,14 +92,18 @@ body {
     color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* Numbers and identifiers line up in columns */
 code,
-.mono,
+.mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
 .stat-value,
 .timer-circle {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
 }
 
