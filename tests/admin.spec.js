@@ -62,7 +62,7 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#chats-count')).toHaveText(/^\d+$/);
     await expect(page.locator('#subs-count')).toHaveText(/^\d+$/);
     await expect(page.locator('#health-tg')).toHaveText(/TG: (OK|ERR)/);
-    await expect(page.locator('#popular-list .popular-item').first()).toBeVisible();
+    await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 
 test('every module loads', async ({ page }) => {

@@ -296,8 +296,13 @@
                                         <p>The next episodes and film releases</p>
                                     </div>
                                 </div>
-                                <div id="upcoming-list">
-                                    <p class="empty-note">Loading…</p>
+                                <!-- Five placeholder rows, so the card has its final size before the data -->
+                                <div id="upcoming-list" class="dash-list" aria-busy="true">
+                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:62%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
+                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:48%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
+                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:70%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
+                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:55%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
+                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:40%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
                                 </div>
                             </div>
 
@@ -325,9 +330,12 @@
                                         <p>Most subscribed series by your users</p>
                                     </div>
                                 </div>
-                                <div id="popular-list">
-                                    <!-- Injected via script -->
-                                    <p class="empty-cell">Loading popularity stats...</p>
+                                <div id="popular-list" class="dash-list" aria-busy="true">
+                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:62%"></span></div>
+                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:48%"></span></div>
+                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:70%"></span></div>
+                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:55%"></span></div>
+                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:40%"></span></div>
                                 </div>
                             </div>
                         </div>

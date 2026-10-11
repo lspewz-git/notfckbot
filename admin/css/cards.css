@@ -148,6 +148,25 @@
     margin-bottom: var(--space-2);
 }
 
+/* Five rows tall whatever is inside (placeholders, data or an empty note), so the
+   cards don't jump when the data arrives */
+.dash-list {
+    min-height: 12.5rem;
+}
+
+.skeleton-item {
+    cursor: default;
+}
+
+.skeleton-item:hover {
+    background: none;
+}
+
+.skeleton-item .skeleton-sub {
+    margin-top: 6px;
+    height: 0.7rem;
+}
+
 .card-head .badge {
     flex: none;
 }

@@ -80,6 +80,7 @@ const UPCOMING_SHOWN = 5;
 function renderUpcoming() {
     const container = $('upcoming-list');
     if (!container || !upcoming) return;
+    container.removeAttribute('aria-busy');
 
     // The server reaches a day back (it runs in UTC); drop what is past here
     const now = new Date();
@@ -196,6 +197,7 @@ export function updatePopular(list) {
     if (isUnchanged('popular', list)) return;
 
     const container = $('popular-list');
+    container.removeAttribute('aria-busy');
     if (!list || list.length === 0) {
         container.innerHTML = '<p class="empty-note">No data yet.</p>';
         return;
