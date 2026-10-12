@@ -17,105 +17,78 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=optional"
+            href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=optional"
             rel="stylesheet"
         />
     </head>
 
     <body>
         <div class="app-container">
-            <!-- Sidebar Navigation -->
+            <!-- Icon rail: labels show on hover and keyboard focus; phones use the tab bar instead -->
             <aside class="sidebar">
-                <div class="sidebar-brand">
-                    <span class="brand-mark"
-                        ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
-                            <path d="m6.2 5.3 3.1 3.9" />
-                            <path d="m12.4 3.4 3.1 4" />
-                            <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg
-                    ></span>
-                    <span class="brand-text">
-                        <span class="brand-name">NotFckBot</span>
-                        <span class="brand-sub">Admin panel</span>
-                    </span>
+                <div class="rail-logo" title="NotFckBot · Admin panel">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
+                        <path d="m6.2 5.3 3.1 3.9M12.4 3.4l3.1 4M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+                    </svg>
                 </div>
-                <nav aria-label="Sections">
-                    <div class="nav-group">
-                        <span class="nav-group-label">Overview</span>
-                        <ul class="nav-links">
-                            <li>
-                                <button class="nav-item active" aria-current="page" data-section="dashboard">
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="3" y="3" width="7" height="9" rx="1" />
-                                        <rect x="14" y="3" width="7" height="5" rx="1" />
-                                        <rect x="14" y="12" width="7" height="9" rx="1" />
-                                        <rect x="3" y="16" width="7" height="5" rx="1" /></svg
-                                    >Dashboard
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="nav-group">
-                        <span class="nav-group-label">Data</span>
-                        <ul class="nav-links">
-                            <li>
-                                <button class="nav-item" data-section="chats">
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                        <circle cx="9" cy="7" r="4" />
-                                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg
-                                    >Users / Chats
-                                </button>
-                            </li>
-                            <li>
-                                <button class="nav-item" data-section="subs">
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="2" y="7" width="20" height="15" rx="2" />
-                                        <polyline points="17 2 12 7 7 2" /></svg
-                                    >Serials
-                                </button>
-                            </li>
-                            <li>
-                                <button class="nav-item" data-section="watchlist">
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="2" y="2" width="20" height="20" rx="2" />
-                                        <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" /></svg
-                                    >Movies
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="nav-group">
-                        <span class="nav-group-label">System</span>
-                        <ul class="nav-links">
-                            <li>
-                                <button class="nav-item" data-section="logs">
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                        <polyline points="14 2 14 8 20 8" />
-                                        <line x1="16" y1="13" x2="8" y2="13" />
-                                        <line x1="16" y1="17" x2="8" y2="17" /></svg
-                                    >Activity Logs
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-                </nav>
-                <div class="sidebar-footer">
-                    <button id="actions-btn" class="btn btn-ghost btn-block">
+                <nav class="rail-nav" aria-label="Sections">
+                    <button class="nav-item active" aria-current="page" data-section="dashboard" aria-label="Dashboard">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg
-                        >Actions
+                            <rect x="3" y="3" width="7" height="9" rx="1.5" />
+                            <rect x="14" y="3" width="7" height="5" rx="1.5" />
+                            <rect x="14" y="12" width="7" height="9" rx="1.5" />
+                            <rect x="3" y="16" width="7" height="5" rx="1.5" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Dashboard</span>
                     </button>
-                    <button id="danger-btn" class="btn btn-danger btn-block">
+                    <span class="rail-divider" aria-hidden="true"></span>
+                    <button class="nav-item" data-section="chats" aria-label="Users / Chats">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Users / Chats</span>
+                    </button>
+                    <button class="nav-item" data-section="subs" aria-label="Serials">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="2" y="7" width="20" height="15" rx="2" />
+                            <polyline points="17 2 12 7 7 2" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Serials</span>
+                    </button>
+                    <button class="nav-item" data-section="watchlist" aria-label="Movies">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Movies</span>
+                    </button>
+                    <span class="rail-divider" aria-hidden="true"></span>
+                    <button class="nav-item" data-section="logs" aria-label="Activity Logs">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Activity Logs</span>
+                    </button>
+                </nav>
+                <div class="rail-bottom">
+                    <button class="nav-item" id="actions-btn" aria-label="Actions">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Actions</span>
+                    </button>
+                    <button class="nav-item nav-item-danger" id="danger-btn" aria-label="Danger Zone">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path
                                 d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
                             />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" /></svg
-                        >Danger Zone
+                            <path d="M12 9v4M12 17h.01" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Danger Zone</span>
                     </button>
                 </div>
             </aside>
@@ -125,37 +98,12 @@
                 <div class="main-inner">
                     <!-- Dashboard Section -->
                     <section id="dashboard-section" class="section active">
-                        <header>
+                        <header class="dash-header">
                             <div class="header-info">
                                 <h1>Dashboard</h1>
                                 <p>Overview of system health and activity.</p>
                             </div>
-                            <div class="header-status">
-                                <div class="refresh-bar">
-                                    <div id="refresh-timer" class="timer-circle">—</div>
-                                    <span class="refresh-label">Auto-refresh</span>
-                                    <button id="pause-refresh" class="btn btn-ghost btn-compact">Resume</button>
-                                    <button
-                                        id="refresh-btn"
-                                        class="btn btn-ghost btn-icon"
-                                        title="Refresh now"
-                                        aria-label="Refresh now"
-                                    >
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            width="16"
-                                            height="16"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        >
-                                            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                                            <polyline points="21 3 21 9 15 9" />
-                                        </svg>
-                                    </button>
-                                </div>
+                            <div class="header-tools">
                                 <div class="status-badges">
                                     <div
                                         id="health-tg"
@@ -216,25 +164,46 @@
                                         Proxy
                                     </div>
                                 </div>
+                                <span class="header-divider" aria-hidden="true"></span>
+                                <button id="auto-refresh" class="switch" role="switch" aria-checked="false">
+                                    <span class="switch-track" aria-hidden="true"
+                                        ><span class="switch-knob"></span
+                                    ></span>
+                                    <span class="switch-label">Auto-refresh</span>
+                                </button>
+                                <button
+                                    id="refresh-btn"
+                                    class="icon-button"
+                                    title="Refresh now"
+                                    aria-label="Refresh now"
+                                >
+                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                        <polyline points="21 3 21 9 15 9" />
+                                    </svg>
+                                </button>
                             </div>
                         </header>
 
+                        <!-- Shown while any service reports an error -->
+                        <div id="service-alert" class="alert-banner" role="status" hidden>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                    d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                                />
+                                <path d="M12 9v4M12 17h.01" />
+                            </svg>
+                            <span id="service-alert-text" class="alert-text"></span>
+                            <button class="alert-action" data-section="logs">View logs</button>
+                        </div>
+
                         <div class="stats-grid">
                             <div class="stat-card" data-section="chats" role="button" tabindex="0">
-                                <div class="stat-head">
-                                    <span class="stat-title">Total chats</span>
-                                </div>
-                                <span id="chats-count" class="stat-value">-</span>
-                                <div class="stat-foot">
-                                    <span class="stat-foot-main"
-                                        >Users and groups
-                                        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                            <circle cx="9" cy="7" r="4" />
-                                            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg
-                                    ></span>
-                                    <span class="stat-foot-sub">Everyone who has started the bot</span>
+                                <span class="stat-label">Total chats</span>
+                                <div class="stat-figure"><span id="chats-count" class="stat-value">-</span></div>
+                                <div class="stat-text">
+                                    <span class="stat-title">Users and groups</span>
+                                    <span class="stat-desc">Everyone who has started the bot</span>
                                 </div>
                             </div>
                             <div
@@ -244,19 +213,14 @@
                                 role="button"
                                 tabindex="0"
                             >
-                                <div class="stat-head">
-                                    <span class="stat-title">Active subscriptions</span>
-                                    <span id="subs-archived-count" class="stat-badge" hidden>+ 0 archived</span>
+                                <span class="stat-label">Active subscriptions</span>
+                                <div class="stat-figure">
+                                    <span id="subs-count" class="stat-value">-</span>
+                                    <span id="subs-archived-count" class="stat-secondary" hidden></span>
                                 </div>
-                                <span id="subs-count" class="stat-value">-</span>
-                                <div class="stat-foot">
-                                    <span class="stat-foot-main"
-                                        >Series still on air
-                                        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true">
-                                            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-                                            <polyline points="16 7 22 7 22 13" /></svg
-                                    ></span>
-                                    <span class="stat-foot-sub">New episodes are announced</span>
+                                <div class="stat-text">
+                                    <span class="stat-title">Series still on air</span>
+                                    <span class="stat-desc">New episodes are announced</span>
                                 </div>
                             </div>
                             <div
@@ -266,114 +230,91 @@
                                 role="button"
                                 tabindex="0"
                             >
-                                <div class="stat-head">
-                                    <span class="stat-title">Movies</span>
-                                    <span id="films-released-count" class="stat-badge" hidden>+ 0 released</span>
+                                <span class="stat-label">Movies</span>
+                                <div class="stat-figure">
+                                    <span id="films-count" class="stat-value">-</span>
+                                    <span id="films-released-count" class="stat-secondary" hidden></span>
                                 </div>
-                                <span id="films-count" class="stat-value">-</span>
-                                <div class="stat-foot">
-                                    <span class="stat-foot-main"
-                                        >Films awaiting release
-                                        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true">
-                                            <rect x="2" y="2" width="20" height="20" rx="2" />
-                                            <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" /></svg
-                                    ></span>
-                                    <span class="stat-foot-sub">Notified on release</span>
+                                <div class="stat-text">
+                                    <span class="stat-title">Films awaiting release</span>
+                                    <span class="stat-desc">Notified on release</span>
                                 </div>
                             </div>
                             <div class="stat-card" data-static>
-                                <div class="stat-head">
-                                    <span class="stat-title">Series tracked</span>
-                                </div>
-                                <span id="series-count" class="stat-value">-</span>
-                                <div class="stat-foot">
-                                    <span class="stat-foot-main"
-                                        >Checked every 3 hours
-                                        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <polyline points="12 6 12 12 16 14" /></svg
-                                    ></span>
-                                    <span class="stat-foot-sub">Episodes and status from TMDB</span>
+                                <span class="stat-label">Series tracked</span>
+                                <div class="stat-figure"><span id="series-count" class="stat-value">-</span></div>
+                                <div class="stat-text">
+                                    <span id="series-interval" class="stat-title">Checked every 3 hours</span>
+                                    <span class="stat-desc">Episodes and status from TMDB</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="dashboard-bottom">
-                            <div class="glass-card">
+                        <div class="dash-row">
+                            <section class="glass-card panel panel-wide" aria-labelledby="upcoming-title">
                                 <div class="card-head">
                                     <div>
-                                        <h3>Coming up</h3>
+                                        <h3 id="upcoming-title">Coming up</h3>
                                         <p>The next episodes and film releases</p>
                                     </div>
+                                    <button class="panel-link" data-section="subs" data-subs-tab="active">
+                                        View all
+                                    </button>
                                 </div>
                                 <!-- Five placeholder rows, so the card has its final size before the data -->
                                 <div id="upcoming-list" class="dash-list" aria-busy="true">
-                                    <div class="popular-item skeleton-item">
-                                        <div class="popular-body">
+                                    <div class="upcoming-row skeleton-item">
+                                        <span class="skeleton" style="width: 52px"></span>
+                                        <span></span>
+                                        <div class="up-body">
                                             <span class="skeleton" style="width: 62%"></span
                                             ><span class="skeleton skeleton-sub" style="width: 30%"></span>
                                         </div>
+                                        <span class="skeleton" style="width: 56px"></span>
                                     </div>
-                                    <div class="popular-item skeleton-item">
-                                        <div class="popular-body">
+                                    <div class="upcoming-row skeleton-item">
+                                        <span class="skeleton" style="width: 52px"></span>
+                                        <span></span>
+                                        <div class="up-body">
                                             <span class="skeleton" style="width: 48%"></span
                                             ><span class="skeleton skeleton-sub" style="width: 30%"></span>
                                         </div>
+                                        <span class="skeleton" style="width: 56px"></span>
                                     </div>
-                                    <div class="popular-item skeleton-item">
-                                        <div class="popular-body">
+                                    <div class="upcoming-row skeleton-item">
+                                        <span class="skeleton" style="width: 52px"></span>
+                                        <span></span>
+                                        <div class="up-body">
                                             <span class="skeleton" style="width: 70%"></span
                                             ><span class="skeleton skeleton-sub" style="width: 30%"></span>
                                         </div>
+                                        <span class="skeleton" style="width: 56px"></span>
                                     </div>
-                                    <div class="popular-item skeleton-item">
-                                        <div class="popular-body">
+                                    <div class="upcoming-row skeleton-item">
+                                        <span class="skeleton" style="width: 52px"></span>
+                                        <span></span>
+                                        <div class="up-body">
                                             <span class="skeleton" style="width: 55%"></span
                                             ><span class="skeleton skeleton-sub" style="width: 30%"></span>
                                         </div>
+                                        <span class="skeleton" style="width: 56px"></span>
                                     </div>
-                                    <div class="popular-item skeleton-item">
-                                        <div class="popular-body">
+                                    <div class="upcoming-row skeleton-item">
+                                        <span class="skeleton" style="width: 52px"></span>
+                                        <span></span>
+                                        <div class="up-body">
                                             <span class="skeleton" style="width: 40%"></span
                                             ><span class="skeleton skeleton-sub" style="width: 30%"></span>
                                         </div>
+                                        <span class="skeleton" style="width: 56px"></span>
                                     </div>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div class="glass-card">
+                            <section class="glass-card panel" aria-labelledby="popular-title">
                                 <div class="card-head">
                                     <div>
-                                        <h3>Update check</h3>
-                                        <p>New episodes, status changes and film releases</p>
-                                    </div>
-                                    <span id="cron-state" class="badge muted">…</span>
-                                </div>
-                                <dl id="cron-status" class="status-list">
-                                    <div>
-                                        <dt>Last check</dt>
-                                        <dd id="cron-last">—</dd>
-                                    </div>
-                                    <div>
-                                        <dt>Checked</dt>
-                                        <dd id="cron-checked">—</dd>
-                                    </div>
-                                    <div>
-                                        <dt>Notifications</dt>
-                                        <dd id="cron-sent">—</dd>
-                                    </div>
-                                    <div>
-                                        <dt>Next check</dt>
-                                        <dd id="cron-next">—</dd>
-                                    </div>
-                                </dl>
-                            </div>
-
-                            <!-- Popularity Block -->
-                            <div class="glass-card">
-                                <div class="card-head">
-                                    <div>
-                                        <h3>Popular now</h3>
+                                        <h3 id="popular-title">Popular now</h3>
                                         <p>Most subscribed series by your users</p>
                                     </div>
                                 </div>
@@ -394,8 +335,34 @@
                                         <span class="skeleton" style="width: 40%"></span>
                                     </div>
                                 </div>
-                            </div>
+                            </section>
                         </div>
+
+                        <section class="glass-card update-strip" aria-label="Update check">
+                            <div class="strip-head">
+                                <span class="strip-name">Update check</span>
+                                <span id="cron-state" class="badge loading" aria-busy="true">…</span>
+                            </div>
+                            <dl id="cron-status" class="strip-pairs">
+                                <div>
+                                    <dt>Last check</dt>
+                                    <dd id="cron-last">—</dd>
+                                </div>
+                                <div>
+                                    <dt>Checked</dt>
+                                    <dd id="cron-checked">—</dd>
+                                </div>
+                                <div>
+                                    <dt>Notifications</dt>
+                                    <dd id="cron-sent">—</dd>
+                                </div>
+                                <div>
+                                    <dt>Next check</dt>
+                                    <dd id="cron-next">—</dd>
+                                </div>
+                            </dl>
+                            <button id="run-check" class="btn btn-outline">Run now</button>
+                        </section>
                     </section>
 
                     <!-- Chats Section -->

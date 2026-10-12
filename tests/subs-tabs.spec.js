@@ -47,7 +47,7 @@ test.afterEach(async ({ page }) => {
 test('the dashboard counts only active subscriptions and notes the archived ones', async ({ page }) => {
     await expect(page.locator('#subs-count')).toHaveText(String(ACTIVE));
     await expect(page.locator('#subs-archived-count')).toBeVisible();
-    await expect(page.locator('#subs-archived-count')).toHaveText(`+ ${ARCHIVED} archived`);
+    await expect(page.locator('#subs-archived-count')).toHaveText(`+${ARCHIVED} archived`);
 });
 
 test('the tabs show counts and split the rows', async ({ page }) => {
@@ -198,8 +198,8 @@ test('the selected tab survives the auto-refresh, with or without new data', asy
     // Drive the real 10-second poll instead of waiting for it
     await page.clock.install();
     await page.reload();
-    await page.locator('#pause-refresh').click();
-    await expect(page.locator('#pause-refresh')).toHaveText('Pause');
+    await page.locator('#auto-refresh').click();
+    await expect(page.locator('#auto-refresh')).toHaveAttribute('aria-checked', 'true');
 
     await goToSubs(page);
     await tab(page, 'archive').click();

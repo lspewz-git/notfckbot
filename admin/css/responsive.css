@@ -1,14 +1,11 @@
-/* Laptops — reclaim horizontal padding */
-@media (max-width: 1280px) {
-    .main-inner {
-        padding: var(--space-6);
-    }
-}
-
 /* Tablets and below — the sidebar gives way to a bottom tab bar */
 @media (max-width: 1024px) {
     .sidebar {
         display: none;
+    }
+
+    .app-container {
+        padding: 0;
     }
 
     .tabbar {
@@ -21,7 +18,7 @@
         bottom: 0;
         z-index: 500;
         padding: 6px var(--space-2) calc(6px + env(safe-area-inset-bottom, 0px));
-        background: rgba(10, 10, 10, 0.86);
+        background: rgba(14, 13, 12, 0.86);
         backdrop-filter: blur(20px) saturate(160%);
         -webkit-backdrop-filter: blur(20px) saturate(160%);
         border-top: 1px solid var(--border);
@@ -54,20 +51,74 @@
 
     .header-info h1,
     header h1 {
-        font-size: 1.5rem;
+        font-size: 1.75rem;
     }
 
-    .header-status {
-        align-items: stretch;
+    /* Statuses on one line, the switch and refresh on the next */
+    .header-tools {
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .header-divider {
+        display: none;
     }
 
     .status-badges {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        flex-basis: 100%;
     }
 
-    .status-badges .badge {
-        justify-content: flex-start;
+    /* Dashboard: the header stacks from the left */
+    .dash-header {
+        align-items: stretch;
+    }
+
+    #dashboard-section .stats-grid {
+        margin-bottom: 0;
+    }
+
+    #dashboard-section .stat-value {
+        font-size: 2rem;
+    }
+
+    .panel {
+        padding: 18px var(--space-4);
+    }
+
+    /* Coming up: date | title and meta | when; the type icon goes, the meta stays on one line */
+    .upcoming-row {
+        grid-template-columns: 52px minmax(0, 1fr) auto;
+        column-gap: var(--space-3);
+    }
+
+    .up-icon {
+        display: none;
+    }
+
+    .up-meta {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Update check: title, then label | value rows, then the button */
+    .update-strip {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 18px var(--space-4);
+    }
+
+    .strip-pairs {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .strip-pairs > div {
+        display: contents;
+    }
+
+    .update-strip .btn-outline {
+        align-self: flex-start;
     }
 
     .log-filters {
@@ -106,20 +157,6 @@
 
     .stat-value {
         font-size: var(--text-2xl);
-    }
-
-    /* Two columns are too narrow for title and badge side by side */
-    .stat-head {
-        flex-wrap: wrap;
-    }
-
-    .stat-foot {
-        margin-top: var(--space-3);
-        font-size: var(--text-xs);
-    }
-
-    .stat-foot-main .icon {
-        display: none;
     }
 
     .logs-viewer {
@@ -260,7 +297,7 @@
 
     /* Full-width buttons need an edge, or Delete reads as loose red text */
     .table-wrap .btn-row-danger {
-        border-color: rgba(248, 113, 113, 0.3);
+        border-color: var(--danger-border);
     }
 
     /* `tr td:first-child` in the base sheet outranks `.table-wrap td`, so the
@@ -451,10 +488,6 @@
     .toast {
         min-width: 0;
         max-width: none;
-    }
-
-    .refresh-bar {
-        flex-wrap: wrap;
     }
 }
 

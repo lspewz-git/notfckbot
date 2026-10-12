@@ -51,17 +51,26 @@ const SERIES = [
 }));
 
 // TMDB's next announced episode: one dated, one numbered but undated, one special (season 0)
-Object.assign(SERIES.find((s) => s.title === 'Severance'), {
-    next_episode_date: '2026-10-15',
-    next_episode_season: 3,
-    next_episode_number: 2
-});
-Object.assign(SERIES.find((s) => s.title === 'The Boys'), { next_episode_season: 5, next_episode_number: 1 });
-Object.assign(SERIES.find((s) => s.title === 'Stranger Things'), {
-    next_episode_date: '2026-12-25',
-    next_episode_season: 0,
-    next_episode_number: 3
-});
+Object.assign(
+    SERIES.find((s) => s.title === 'Severance'),
+    {
+        next_episode_date: '2026-10-15',
+        next_episode_season: 3,
+        next_episode_number: 2
+    }
+);
+Object.assign(
+    SERIES.find((s) => s.title === 'The Boys'),
+    { next_episode_season: 5, next_episode_number: 1 }
+);
+Object.assign(
+    SERIES.find((s) => s.title === 'Stranger Things'),
+    {
+        next_episode_date: '2026-12-25',
+        next_episode_season: 0,
+        next_episode_number: 3
+    }
+);
 
 const film = (id, title, year, premiere_digital, notified = false) => ({
     id,
@@ -140,26 +149,62 @@ function stats(subs) {
 /**
  * Routes every request of `page` and opens the panel. Returns the mutable fixture so a test can
  * change what the next poll sees (e.g. `panel.subs.push(...)`).
+ *
+ * @param {{ health?: object }} [options] `health`: overrides per service, e.g. { kinopoisk: 'error' }
  */
-async function mockPanel(page) {
-    const panel = { subs: buildSubs(), sub, series };
+async function mockPanel(page, options = {}) {
+    const panel = {
+        subs: buildSubs(),
+        sub,
+        series,
+        health: { telegram: true, tmdb: true, proxy: 'off', kinopoisk: 'ok', ...options.health },
+        // The update check: "Run now" starts it, and it reports running for two polls
+        cron: {
+            running: false,
+            lastRun: null,
+            nextRunAt: new Date(Date.now() + 3600e3).toISOString(),
+            intervalHours: 3
+        },
+        pollsUntilDone: 0
+    };
+
+    function cronStatus() {
+        if (panel.cron.running && --panel.pollsUntilDone <= 0) {
+            const finishedAt = new Date().toISOString();
+            panel.cron = {
+                ...panel.cron,
+                running: false,
+                startedAt: null,
+                lastRun: {
+                    finishedAt,
+                    durationMs: 4000,
+                    series: 11,
+                    films: 6,
+                    sent: 2,
+                    failed: 0,
+                    errors: 0,
+                    fatal: null
+                }
+            };
+        }
+        return panel.cron;
+    }
 
     const api = {
         '/api/stats': () => stats(panel.subs),
-        '/api/health': () => ({
-            telegram: true,
-            tmdb: true,
-            proxy: 'off',
-            kinopoisk: 'ok',
-            kinopoiskQuota: { used: 3, limit: 500 }
-        }),
-        '/api/health/telegram': () => ({ telegram: true }),
-        '/api/health/tmdb': () => ({ tmdb: true }),
-        '/api/health/proxy': () => ({ proxy: 'off' }),
-        '/api/health/kinopoisk': () => ({ kinopoisk: 'ok', kinopoiskQuota: { used: 3, limit: 500 } }),
+        '/api/health': () => ({ ...panel.health, kinopoiskQuota: { used: 3, limit: 500 } }),
+        '/api/health/telegram': () => ({ telegram: panel.health.telegram }),
+        '/api/health/tmdb': () => ({ tmdb: panel.health.tmdb }),
+        '/api/health/proxy': () => ({ proxy: panel.health.proxy }),
+        '/api/health/kinopoisk': () => ({ kinopoisk: panel.health.kinopoisk, kinopoiskQuota: { used: 3, limit: 500 } }),
+        '/api/trigger-check': () => {
+            panel.cron = { ...panel.cron, running: true, startedAt: new Date().toISOString() };
+            panel.pollsUntilDone = 2;
+            return { success: true };
+        },
         '/api/stats/popular': () => [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
         '/api/upcoming': () => [],
-        '/api/cron': () => ({ running: false, lastRun: null, nextRunAt: new Date().toISOString(), intervalHours: 3 }),
+        '/api/cron': cronStatus,
         '/api/logs': () => [{ type: 'log', time: '12:00:00', text: 'Started' }],
         '/api/data/chats': () => CHATS,
         // Like the real API: the archived flag is derived from Series.status on every response

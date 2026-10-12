@@ -139,7 +139,7 @@
 }
 
 .action-row-danger .action-icon {
-    border-color: rgba(248, 113, 113, 0.35);
+    border-color: var(--danger-border);
 }
 
 .poster-stub {

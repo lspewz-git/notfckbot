@@ -1,72 +1,64 @@
 # Admin panel design system
 
-Dark, dense and neutral, in the style of shadcn/ui's dashboard. The tokens live in `css/base.css`;
-every other stylesheet uses them, so a raw colour, size or radius anywhere else is a bug.
+Dark, warm and calm: a near-black page, cards one step lighter, hairline borders, no shadows.
+The tokens live in `css/base.css`; every other stylesheet uses them, so a raw colour, size or
+radius anywhere else is a bug.
 
 ## Colour
 
-| Token                              | Value                         | Use                                                   |
-| ---------------------------------- | ----------------------------- | ----------------------------------------------------- |
-| `--bg`                             | `#0a0a0a`                     | Page and sidebar                                      |
-| `--inset`                          | `#111111`                     | Main content panel                                    |
-| `--surface-1`                      | `#171717`                     | Cards                                                 |
-| `--surface-2`                      | `#1f1f1f`                     | Row hover, inputs, list items                         |
-| `--surface-3`                      | `#262626`                     | Selected nav item, tab track, hover on buttons        |
-| `--surface-overlay`                | `#171717`                     | Modals, toasts, dropdowns                             |
-| `--border` / `--border-strong`     | `#262626` / `#333333`         | Card edges and row lines / control edges              |
-| `--text` / `--text-dim`            | `#fafafa` / `#a3a3a3`         | Body / secondary text                                 |
-| `--primary` / `--on-primary`       | `#fafafa` / `#171717`         | Primary button: inverted, white with dark text        |
-| `--success` `--warning` `--danger` | `#4ade80` `#fbbf24` `#f87171` | Status text, with a matching `*-soft` fill for badges |
+| Token                                     | Value                                 | Use                                                  |
+| ----------------------------------------- | ------------------------------------- | ---------------------------------------------------- |
+| `--bg`                                    | `#0e0d0c`                             | Page and icon rail (the content has no inset panel)  |
+| `--surface-1`                             | `#161513`                             | Cards                                                |
+| `--surface-2`                             | `#1f1e1b`                             | Hover, rows, inputs                                  |
+| `--surface-3`                             | `#26241f`                             | Selected items, tooltips, secondary buttons          |
+| `--border` / `--border-row` / `--border-strong` | white at 6% / 5% / 10%          | Card edges / lines between list rows / control edges |
+| `--text` / `--text-secondary`             | `#f3f1ec` / `#c9c5bd`                 | Body / quieter labels (statuses, switch)             |
+| `--text-dim` / `--text-faint`             | `#a29e96` / `#75716a`                 | Descriptions, meta / ranks, icons, "off" states      |
+| `--accent` / `--on-accent`                | `#f5b14c` / `#1a1206`                 | The logo and a switch that is on. Nothing else       |
+| `--primary` / `--on-primary`              | `#f3f1ec` / `#161513`                 | Primary button: inverted, light with dark text       |
+| `--success` / `--danger` / `--danger-dot` | `#6fd394` / `#ff8a7f` / `#ff6b5e`     | Status text and dots; `*-soft` fills where needed    |
 
-The palette is grey on purpose: colour appears only in status badges. Links are underlined
-foreground text, not a brand colour.
+Colour means status. The accent is used sparingly; links and the active nav item use plain
+foreground.
 
-**Contrast.** Every text token passes WCAG AA (4.5:1) on every surface. The lowest pairs are
-`--danger` on `--surface-3` at 5.5:1 and white on `--danger-fill` at 4.8:1.
+**Contrast.** `--text`, `--text-secondary` and `--text-dim` pass WCAG AA (4.5:1) on every
+surface. `--text-faint` does not and is kept for decoration and disabled states only.
 
 ## Type
 
-- **Geist** for the UI, **Geist Mono** for IDs and logs (`code`). Figures use tabular
-  numbers.
-- The scale is `--text-xs` 12, `--text-sm` 13, `--text-base` 14 (body), `--text-lg` 16,
-  `--text-xl` 20 and `--text-2xl` 24 (page titles, bold, -0.02em).
+- **Onest** for the UI (it covers Cyrillic), **JetBrains Mono** for IDs and logs (`code`).
+  Numbers and dates use tabular figures.
+- Base 14px / 1.4. Page titles 36px, weight 600, -0.03em. Stat figures 44px, -0.035em. Card
+  titles 17px / 600. Small text 13px, captions 12px.
 - Inputs use at least 16px so iOS Safari does not zoom in on focus.
 
 ## Spacing and shape
 
-- **Spacing:** a 4px grid, `--space-1` to `--space-8`. Cards are padded `--space-5` / `--space-6`
-  (`--space-4` on phones), with `--space-4` gaps between them.
-- **Radius:** `--radius-sm` 8px for controls, rows and badges; `--radius-lg` 12px for cards, the
-  content panel and modals.
-- **Control height:** `--control-h` sets the height of every button, input and nav item. It is
-  36px with a mouse and 44px on touch screens (`pointer: coarse`). A compact button gets less
-  padding but the same height, so a hit area never shrinks.
+- **Spacing:** a 4px grid, `--space-1` to `--space-8`. The page and every gap between blocks is
+  12px; cards are padded 20–24px, list rows 12–15px.
+- **Radius:** 8 tooltips and small buttons, 10 buttons, 12 rail items and the logo, 14 banners,
+  20 cards (`--radius-lg`), 999 switches.
+- **Control height:** `--control-h` sets the height of buttons, inputs and rows. It is 36px with a
+  mouse and 44px on touch screens (`pointer: coarse`).
 
 ## Components
 
-- **Stat card:** a muted title with an optional outlined badge in the corner, a 30px figure, and a
-  two-line footer (a bold line with an icon, then a muted line). Show only real numbers. There is
-  no history, so don't invent trend percentages.
-- **Tabs:** a `--surface-3` track. The selected trigger is raised to the panel colour with a border.
-- **Data table:** no row fills; rows are split by `--border` lines and tinted on hover.
-- **Buttons:** primary is inverted, secondary is an outline on `--bg`, destructive is red.
+- **Icon rail:** 56px wide, sticky, on the page background. 44px items with 19px icons; the label
+  is a tooltip on hover and keyboard focus. Actions and Danger Zone sit at the bottom. Below
+  1024px the rail gives way to a bottom tab bar.
+- **Service statuses:** a 7px dot and a short label ("TG", "KP: ERR", a hollow dot for "Proxy:
+  OFF"). Each opens its dialog. Any error raises a banner above the stats.
+- **Stat card:** label, 44px figure with an optional quiet secondary ("+6 archived"), then a title
+  and a description. Show only real numbers; there is no history to make trends from.
+- **Lists on cards:** rows split by `--border-row`, no fills; the title underlines on hover.
+- **Tabs:** a `--surface-3` track. The selected trigger is raised to the panel colour.
+- **Buttons:** primary is inverted, outline for secondary actions on cards, destructive is red.
 
 ## Interaction
 
 - **Focus:** one focus ring for everything, `:focus-visible` with a 2px `--focus-ring` outline
   and a 2px offset.
-- **Hover:** changes the background or border colour over 150ms. Nothing moves.
-- **Navigation:** nav items are real `<button>`s grouped under labels (Overview, Data, System)
-  inside `<nav>`. The current section carries `aria-current="page"`.
-- **Icons:** inline SVG line icons (`.icon`, 18px; 16px in the nav). Don't use emoji as icons.
-- **Reduced motion:** `prefers-reduced-motion` turns off all animation and transitions.
-
-## Layout
-
-- **Desktop:** a fixed 240px sidebar on `--bg`. The content sits on a rounded `--inset` panel
-  with an 8px gap around it.
-- **1024px and below:** the sidebar becomes an off-canvas drawer opened by a 44px button.
-- **768px and below:** stats sit two per row, the header stacks and tabs span the full width.
-- **760px and below:** table rows become labelled cards, built from each cell's `data-label`.
-- **640px and below:** the panel runs edge to edge.
-- **Width:** no breakpoint may cause horizontal page scroll.
+- **Hover:** changes the background or colour over 150–200ms. Nothing moves.
+- **Navigation:** rail items are real `<button>`s with `aria-label`, inside `<nav>`. The current
+  section carries `aria-current="page"`.

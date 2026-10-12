@@ -1,6 +1,7 @@
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
-import { $, $field, all, closest, setText, debounce, target } from './dom.js';
+import { $, $field, all, closest, debounce, target } from './dom.js';
+import { runCheckNow } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
 import { filterLogs } from './logs.js';
@@ -38,20 +39,20 @@ function switchSection(id) {
     fetchData();
 }
 
-// --- Refresh timer ---
+// --- Auto-refresh ---
+// Off by default; the choice is remembered in this browser
+const AUTO_REFRESH_KEY = 'admin.autoRefresh';
 let secondsLeft = REFRESH_SECONDS;
 let isPaused = true;
+try {
+    isPaused = localStorage.getItem(AUTO_REFRESH_KEY) !== 'on';
+} catch {
+    // Private mode: start paused
+}
 
-function updatePauseButton() {
-    const btn = $('pause-refresh');
-    if (!btn) return;
-    btn.innerText = isPaused ? 'Resume' : 'Pause';
-    // Both are single-class selectors, so leaving .btn-ghost on would win on
-    // source order and the paused state would show no highlight at all.
-    btn.classList.toggle('btn-primary', isPaused);
-    btn.classList.toggle('btn-ghost', !isPaused);
-    // Countdown is meaningless while paused
-    setText('refresh-timer', isPaused ? '—' : secondsLeft);
+function updateAutoRefreshSwitch() {
+    const sw = $('auto-refresh');
+    if (sw) sw.setAttribute('aria-checked', String(!isPaused));
 }
 
 function startTimer() {
@@ -62,7 +63,6 @@ function startTimer() {
             secondsLeft = REFRESH_SECONDS;
             fetchData();
         }
-        setText('refresh-timer', secondsLeft);
     }, 1000);
 }
 
@@ -137,11 +137,17 @@ function setupDelegation() {
 }
 
 function setupControls() {
-    $('pause-refresh').onclick = () => {
+    $('auto-refresh').onclick = () => {
         isPaused = !isPaused;
         if (!isPaused) secondsLeft = REFRESH_SECONDS;
-        updatePauseButton();
+        try {
+            localStorage.setItem(AUTO_REFRESH_KEY, isPaused ? 'off' : 'on');
+        } catch {
+            // Private mode: the choice just isn't remembered
+        }
+        updateAutoRefreshSwitch();
     };
+    $('run-check').onclick = () => runCheckNow(fetchData);
 
     $('refresh-btn').onclick = async (e) => {
         const btn = target(e);
@@ -180,7 +186,7 @@ function init() {
     setupFilters();
     setupProxyForm();
     enhanceSelects();
-    updatePauseButton();
+    updateAutoRefreshSwitch();
     startTimer();
 
     // One Escape handler for every dismissible layer, innermost first

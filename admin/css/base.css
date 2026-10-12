@@ -6,43 +6,53 @@
 :root {
     color-scheme: dark;
 
-    /* Surfaces — shadcn "neutral" dark: near-black page, an inset content panel,
-       cards one step lighter. Depth comes from these steps and 1px borders. */
-    --bg: #0a0a0a; /* page and sidebar */
-    --inset: #111111; /* main content panel */
-    --surface-1: #171717; /* cards */
-    --surface-2: #1f1f1f; /* rows, inputs, list items */
-    --surface-3: #262626; /* hover, selected nav item, secondary buttons */
-    --surface-overlay: #171717; /* modals, toasts, dropdowns */
-    --border: #262626;
-    --border-strong: #333333;
+    /* Surfaces — warm near-black: the page, cards one step up, then hover and tooltips.
+       Depth comes from these steps and hairline borders; no shadows. */
+    --bg: #0e0d0c; /* page, icon rail */
+    --inset: #0e0d0c; /* content area: no separate panel, cards sit on the page */
+    --surface-1: #161513; /* cards */
+    --surface-2: #1f1e1b; /* hover, rows, inputs */
+    --surface-3: #26241f; /* selected, tooltips, secondary buttons */
+    --surface-overlay: #161513; /* modals, toasts, dropdowns */
+    --border: rgba(255, 255, 255, 0.06);
+    --border-row: rgba(255, 255, 255, 0.05); /* between list rows */
+    --border-strong: rgba(255, 255, 255, 0.1);
 
-    /* Text — both pass WCAG AA on every surface above */
-    --text: #fafafa;
-    --text-dim: #a3a3a3;
+    /* Text — four steps, all AA on the surfaces above except --text-faint (decoration only) */
+    --text: #f3f1ec;
+    --text-secondary: #c9c5bd;
+    --text-dim: #a29e96;
+    --text-faint: #75716a;
+    --rail-icon: #8f8b83;
 
-    /* The primary action is inverted (white on black), as in shadcn. Links and the
-       active tab use plain foreground; colour is reserved for status. */
-    --primary: #fafafa;
-    --primary-hover: #e5e5e5;
-    --on-primary: #171717;
-    --primary-text: #fafafa;
+    /* Accent: the logo and an "on" switch. Used sparingly; colour otherwise means status. */
+    --accent: #f5b14c;
+    --on-accent: #1a1206;
+
+    /* The primary action is inverted (light on dark). */
+    --primary: #f3f1ec;
+    --primary-hover: #ffffff;
+    --on-primary: #161513;
+    --primary-text: #f3f1ec;
     --primary-soft: rgba(255, 255, 255, 0.08);
-    --focus-ring: #a3a3a3;
+    --focus-ring: #a29e96;
 
-    /* Status — text colours, each with a soft fill for badges */
-    --success: #4ade80;
-    --success-soft: rgba(34, 197, 94, 0.12);
-    --danger: #f87171;
-    --danger-fill: #dc2626;
-    --danger-soft: rgba(239, 68, 68, 0.12);
-    --warning: #fbbf24;
-    --warning-soft: rgba(245, 158, 11, 0.12);
+    /* Status — text colours, each with a soft fill */
+    --success: #6fd394;
+    --success-soft: rgba(111, 211, 148, 0.12);
+    --danger: #ff8a7f;
+    --danger-dot: #ff6b5e;
+    --danger-muted: #c97a72;
+    --danger-fill: #e5483b;
+    --danger-soft: rgba(255, 107, 94, 0.08);
+    --danger-border: rgba(255, 107, 94, 0.18);
+    --warning: #f5b14c;
+    --warning-soft: rgba(245, 177, 76, 0.12);
     --muted-soft: rgba(255, 255, 255, 0.06);
 
     /* Type */
-    --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Code', monospace;
+    --font-sans: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
     --text-xs: 0.75rem;
     --text-sm: 0.8125rem;
     --text-base: 0.875rem;
@@ -61,12 +71,14 @@
 
     --radius-sm: 8px;
     --radius: 10px;
-    --radius-lg: 12px;
+    --radius-md: 12px; /* rail items, logo */
+    --radius-banner: 14px;
+    --radius-lg: 20px; /* cards */
 
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;
     --control-h-sm: 2rem; /* buttons inside table rows */
-    --sidebar-width: 240px;
+    --rail-width: 56px;
 
     /* Older names still used by a few rules */
     --glass-bg: var(--surface-1);
@@ -95,7 +107,7 @@ html {
 body {
     font-family: var(--font-sans);
     font-size: var(--text-base);
-    line-height: 1.5;
+    line-height: 1.4;
     background-color: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -109,8 +121,7 @@ code {
     font-variant-numeric: tabular-nums;
 }
 
-.stat-value,
-.timer-circle {
+.stat-value {
     font-variant-numeric: tabular-nums;
 }
 

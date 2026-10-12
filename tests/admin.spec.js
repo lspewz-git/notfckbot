@@ -61,7 +61,8 @@ test.afterEach(async ({ page }) => {
 test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#chats-count')).toHaveText(/^\d+$/);
     await expect(page.locator('#subs-count')).toHaveText(/^\d+$/);
-    await expect(page.locator('#health-tg')).toHaveText(/TG: (OK|ERR)/);
+    // "TG" when fine, "TG: ERR" when not
+    await expect(page.locator('#health-tg')).toHaveText(/^TG(: ERR)?$/);
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 

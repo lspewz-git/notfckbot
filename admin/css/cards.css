@@ -1,10 +1,10 @@
-/* Cards — shadcn-style: one step lighter than the panel, 1px border, soft top sheen */
+/* Cards: one surface step above the page, a hairline border, 20px corners, no shadow */
 .glass-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 120px), var(--surface-1);
+    background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: var(--space-5) var(--space-6);
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-3);
 }
 
 /* Title + description block at the top of a card */
@@ -16,10 +16,15 @@
     margin-bottom: var(--space-4);
 }
 
+.card-head h3 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+}
+
 .glass-card > h3 + p,
 .card-head p {
     color: var(--text-dim);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     margin-top: 2px;
 }
 
@@ -27,25 +32,293 @@
     margin-bottom: var(--space-4);
 }
 
-/* Stats Grid */
+/* A list row that picks something (search results in dialogs) */
+.popular-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 3.25rem;
+    padding: var(--space-2) var(--space-3);
+    margin: 0 calc(-1 * var(--space-3));
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.popular-item:hover {
+    background: var(--surface-2);
+}
+
+/* ============================================================
+   Dashboard
+   ============================================================ */
+
+/* Every block 12px apart; the cards carry no margins of their own here */
+#dashboard-section.active {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+#dashboard-section .glass-card {
+    margin-bottom: 0;
+}
+
+/* --- Header --- */
+.dash-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-5);
+    margin-bottom: 0;
+    padding: var(--space-2) 0 var(--space-3);
+}
+
+.dash-header h1 {
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+}
+
+.dash-header .header-info p {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 0.9375rem;
+}
+
+.header-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-5);
+}
+
+.header-divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Service statuses: a dot and a label, no pill. Each still opens its dialog.
+   Three classes deep to outrank the generic .badge.ok / .badge.error fills in tables.css. */
+.status-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.header-tools .status-badges .badge {
+    min-width: 0;
+    min-height: 0;
+    gap: 7px;
+    padding: var(--space-1) 2px;
+    background: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    transition: color 0.15s ease;
+}
+
+.status-badges .badge:hover {
+    color: var(--text);
+}
+
+.status-badges .badge::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+}
+
+.status-badges .badge.error {
+    color: var(--danger);
+}
+
+.status-badges .badge.error::before {
+    background: var(--danger-dot);
+}
+
+/* Off: a hollow dot */
+.status-badges .badge.ghost,
+.status-badges .badge.muted {
+    color: var(--text-faint);
+}
+
+.status-badges .badge.ghost::before,
+.status-badges .badge.muted::before {
+    background: none;
+    border: 1.5px solid var(--text-faint);
+    box-sizing: border-box;
+}
+
+/* Before the first answer: the dot is a spinning ring */
+.status-badges .badge.loading {
+    color: var(--text-faint);
+}
+
+.status-badges .badge.loading::before,
+.update-strip .badge.loading::before {
+    width: 8px;
+    height: 8px;
+    background: none;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    box-sizing: border-box;
+    animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-badges .badge.loading::before,
+    .update-strip .badge.loading::before {
+        animation: none;
+        border-top-color: currentColor;
+        opacity: 0.6;
+    }
+}
+
+/* Auto-refresh switch: the whole group is the control */
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--space-1) 2px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.switch-track {
+    position: relative;
+    width: 34px;
+    height: 20px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    transition: background-color 0.2s ease;
+}
+
+.switch-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text);
+    transition: left 0.2s ease;
+}
+
+.switch[aria-checked='true'] .switch-track {
+    background: var(--accent);
+}
+
+.switch[aria-checked='true'] .switch-knob {
+    left: 17px;
+}
+
+/* A borderless square icon button (refresh) */
+.icon-button {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.icon-button .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.icon-button:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.icon-button.spinning .icon {
+    animation: spin 0.8s linear infinite;
+}
+
+/* --- Error banner --- */
+.alert-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 10px 10px 10px var(--space-4);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-banner);
+    background: rgba(255, 107, 94, 0.07);
+    color: var(--danger);
+}
+
+.alert-banner[hidden] {
+    display: none;
+}
+
+.alert-banner .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.alert-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-action {
+    height: 30px;
+    padding: 0 var(--space-3);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--danger);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.alert-action:hover {
+    background: rgba(255, 107, 94, 0.1);
+}
+
+/* --- Stat cards --- */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-3);
 }
 
 .stat-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 70%), var(--surface-1);
-    border: 1px solid var(--border);
-    padding: var(--space-5) var(--space-6);
-    border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
+    gap: 14px;
+    padding: var(--space-5) 22px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
     cursor: pointer;
     transition:
-        border-color 0.15s,
-        background-color 0.15s;
+        border-color 0.15s ease,
+        background-color 0.15s ease;
 }
 
 .stat-card:hover {
@@ -60,106 +333,206 @@
     border-color: var(--border);
 }
 
-.stat-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-2);
-    min-height: 1.5rem;
-}
-
-.stat-title {
+.stat-label {
     color: var(--text-dim);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-base);
 }
 
-/* Outlined pill in the card corner, like the trend badge in shadcn's dashboard.
-   While hidden it still holds its place, so the figure below doesn't jump when
-   the count arrives. */
-.stat-badge[hidden] {
-    display: inline-flex;
-    visibility: hidden;
-}
-
-.stat-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding: 0.125rem var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    white-space: nowrap;
+.stat-figure {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
 }
 
 .stat-value {
-    margin-top: var(--space-1);
-    font-size: 1.875rem;
+    font-size: 2.75rem;
     font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    line-height: 1;
+    letter-spacing: -0.035em;
 }
 
-.stat-foot {
-    margin-top: var(--space-5);
+/* "+6 archived": keeps its place while hidden, so the figure doesn't shift when it appears */
+.stat-secondary {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+
+.stat-secondary[hidden] {
+    display: inline;
+    visibility: hidden;
+}
+
+.stat-text {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    font-size: var(--text-sm);
 }
 
-.stat-foot-main {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+.stat-title {
+    font-size: var(--text-base);
     font-weight: 500;
 }
 
-.stat-foot-sub {
+.stat-desc {
     color: var(--text-dim);
+    font-size: var(--text-sm);
 }
 
-/* Secondary Data (Popular Series) */
-.dashboard-bottom {
-    display: grid;
-    /* min(100%, …): one column on a phone; a long title ellipsizes instead of widening it */
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
-    gap: var(--space-4);
+/* --- Coming up + Popular now --- */
+.dash-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
 }
 
-/* Side by side, the cards are one size: every row as tall as the tallest card (Popular now,
-   five rows). Stacked on a phone, each keeps its own height. */
-@media (min-width: 761px) {
-    .dashboard-bottom {
-        grid-auto-rows: 1fr;
-    }
+.panel {
+    flex: 2 1 380px;
+    min-width: 0;
+    padding: 22px var(--space-6);
 }
 
-/* Dashboard lists: tighter rows than the generic .popular-item (also used in search
-   results), so the three cards are shorter. A two-line Coming up row fits the same height. */
-.dashboard-bottom .popular-item {
-    min-height: 2.5rem;
-    padding: var(--space-1) var(--space-3);
+.panel-wide {
+    flex: 3 1 560px;
 }
 
-.dashboard-bottom .card-head {
+.panel .card-head {
     margin-bottom: var(--space-2);
+}
+
+.panel-link {
+    flex: 0 0 auto;
+    padding: var(--space-1) 0;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.panel-link:hover {
+    color: var(--text);
 }
 
 /* Five rows tall whatever is inside (placeholders, data or an empty note), so the
    cards don't jump when the data arrives */
 .dash-list {
-    min-height: 12.5rem;
+    min-height: 15rem;
 }
 
-.skeleton-item {
-    cursor: default;
+.upcoming-row,
+.panel .popular-item {
+    border-top: 1px solid var(--border-row);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
 }
 
-.skeleton-item:hover {
+/* Date | type | title and meta | relative time */
+.upcoming-row {
+    display: grid;
+    grid-template-columns: 76px 20px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: var(--space-3) 0;
+}
+
+.up-date {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+
+.up-day {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.up-weekday,
+.up-meta,
+.up-when {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.up-icon {
+    display: inline-flex;
+    color: var(--text-faint);
+}
+
+.up-icon .icon {
+    width: 17px;
+    height: 17px;
+}
+
+.up-body {
+    min-width: 0;
+}
+
+.up-title,
+.pop-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.up-when {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.panel .popular-item {
+    gap: 14px;
+    min-height: 0;
+    margin: 0;
+    padding: 15px 0;
+    border-radius: 0;
+}
+
+.upcoming-row:hover,
+.panel .popular-item:hover {
     background: none;
+}
+
+.upcoming-row:hover .up-title,
+.panel .popular-item:hover .pop-title {
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 3px;
+}
+
+.pop-rank {
+    width: 16px;
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.pop-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.pop-count {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+
+.pop-count b {
+    color: var(--text);
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Placeholder rows: no hover, no pointer (two classes, to outrank .panel .popular-item) */
+.skeleton-item,
+.panel .skeleton-item {
+    cursor: default;
 }
 
 .skeleton-item .skeleton-sub {
@@ -167,162 +540,92 @@
     height: 0.7rem;
 }
 
-.card-head .badge {
-    flex: none;
-}
-
-/* Coming up: rows like Popular now, the day on the right */
-.upcoming-when {
-    flex: none;
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-    font-variant-numeric: tabular-nums;
-}
-
-.upcoming-icon {
-    display: inline-flex;
-    flex: none;
-    color: var(--text-dim);
-}
-
-/* Two lines in the height of one Popular now row, so five rows match five rows */
-.upcoming-item .popular-title,
-.upcoming-sub {
-    line-height: 1.2;
-}
-
-.upcoming-sub {
-    font-size: var(--text-xs);
-    color: var(--text-dim);
-}
-
-/* Update check: label on the left, value on the right */
-.status-list {
-    margin: 0;
-}
-
-.status-list > div {
+/* --- Update check strip --- */
+.update-strip {
     display: flex;
-    justify-content: space-between;
-    gap: var(--space-4);
-    padding: var(--space-2) 0;
-    border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-8);
+    padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
 }
 
-.status-list > div:first-child {
-    border-top: 0;
-}
-
-.status-list dt {
-    color: var(--text-dim);
-}
-
-.status-list dd {
-    margin: 0;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.popular-item {
+.strip-head {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    min-height: 3.25rem;
-    padding: var(--space-2) var(--space-3);
-    margin: 0 calc(-1 * var(--space-3));
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background-color 0.15s;
+    gap: var(--space-3);
 }
 
-.popular-item:hover {
-    background: var(--surface-2);
-}
-
-.popular-rank {
-    width: 1.5rem;
-    flex: 0 0 auto;
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-}
-
-.popular-body {
-    flex: 1;
-    min-width: 0;
-}
-
-.popular-title {
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.popular-count {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: baseline;
-    justify-content: flex-end;
-    gap: var(--space-1);
-}
-
-.popular-value {
+.strip-name {
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
 }
 
-.popular-sub {
+/* The state: a dot and a word, like the service statuses (an id outranks the .badge fills) */
+#dashboard-section .update-strip .badge {
+    min-width: 0;
+    gap: 6px;
+    padding: 0;
+    background: none;
     font-size: var(--text-xs);
-    color: var(--text-dim);
+    font-weight: 500;
 }
 
-/* Refresh Controls — a quiet toolbar, so its buttons are smaller than regular ones */
-.refresh-bar {
+.update-strip .badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.update-strip .badge.ok {
+    color: var(--success);
+}
+
+.update-strip .badge.error {
+    color: var(--danger);
+}
+
+.update-strip .badge.warn {
+    color: var(--warning);
+}
+
+.update-strip .badge.muted,
+.update-strip .badge.loading {
+    color: var(--text-faint);
+}
+
+.strip-pairs {
+    flex: 1;
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2) 28px;
+    margin: 0;
+    font-size: var(--text-sm);
+}
+
+.strip-pairs > div {
+    display: flex;
     gap: var(--space-2);
 }
 
-.refresh-bar .btn {
-    min-height: 28px;
-}
-
-.refresh-bar .btn-icon {
-    width: 28px;
-}
-
-.refresh-bar .btn-icon svg {
-    width: 14px;
-    height: 14px;
-}
-
-/* Still a comfortable target for a finger */
-@media (pointer: coarse) {
-    .refresh-bar .btn {
-        min-height: 36px;
-    }
-
-    .refresh-bar .btn-icon {
-        width: 36px;
-    }
-}
-
-.refresh-label {
-    font-size: var(--text-xs);
+.strip-pairs dt {
     color: var(--text-dim);
 }
 
-.timer-circle {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid var(--border-strong);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--text-xs);
-    font-weight: 600;
+.strip-pairs dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A finger needs a taller target than the text line */
+@media (pointer: coarse) {
+    .status-badges .badge,
+    .switch {
+        min-height: 2.75rem;
+    }
+
+    .icon-button {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
 }

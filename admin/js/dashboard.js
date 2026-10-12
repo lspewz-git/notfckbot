@@ -1,6 +1,8 @@
-/** The dashboard's counters, health badges, upcoming releases, update check and popularity list. */
+/** The dashboard: counters, service statuses and the error banner, upcoming releases, popularity, the update check. */
 
 import { $, setText, updateBadge, escapeHtml } from './dom.js';
+import { api } from './api.js';
+import { toast } from './ui.js';
 import { isUnchanged } from './render.js';
 
 export function updateStats(stats) {
@@ -11,42 +13,59 @@ export function updateStats(stats) {
     const archived = $('subs-archived-count');
     if (archived) {
         archived.hidden = !stats.archivedSubsCount;
-        archived.innerText = `+ ${stats.archivedSubsCount ?? 0} archived`;
+        archived.innerText = `+${stats.archivedSubsCount ?? 0} archived`;
     }
     setText('films-count', stats.activeFilmsCount ?? stats.filmsCount);
     const released = $('films-released-count');
     if (released) {
         released.hidden = !stats.releasedFilmsCount;
-        released.innerText = `+ ${stats.releasedFilmsCount ?? 0} released`;
+        released.innerText = `+${stats.releasedFilmsCount ?? 0} released`;
     }
     setText('series-count', stats.seriesCount);
 }
 
-const KINOPOISK_HEALTH = {
-    ok: ['KP: OK', 'ok'],
-    error: ['KP: ERR', 'error'],
-    off: ['KP: OFF', 'ghost']
-};
+// --- Service statuses ---
+// A dot and a short label: "TG" when fine, "KP: ERR" when not, "Proxy: OFF" when unused
 
-const PROXY_HEALTH = {
-    ok: ['Proxy: OK', 'ok'],
-    error: ['Proxy: ERR', 'error']
-};
+/** ok | error | off per service, for the banner; a service not yet answered is absent */
+const serviceState = {};
+const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', kinopoisk: 'KP', proxy: 'Proxy' };
 
-/** Takes all of /api/health or one service's part of it; updates only the badges it covers. */
+function setService(key, badgeId, state) {
+    serviceState[key] = state;
+    const name = SERVICE_NAMES[key];
+    const [text, cls] =
+        state === 'ok' ? [name, 'ok'] : state === 'error' ? [`${name}: ERR`, 'error'] : [`${name}: OFF`, 'ghost'];
+    updateBadge(badgeId, text, cls);
+}
+
+/** "KP is reporting an error" / "KP and TMDB are reporting errors"; hidden when all is well. */
+function renderServiceAlert() {
+    const banner = $('service-alert');
+    if (!banner) return;
+    const failing = Object.keys(SERVICE_NAMES)
+        .filter((k) => serviceState[k] === 'error')
+        .map((k) => SERVICE_NAMES[k]);
+    banner.hidden = failing.length === 0;
+    if (!failing.length) return;
+    const names =
+        failing.length === 1 ? failing[0] : `${failing.slice(0, -1).join(', ')} and ${failing[failing.length - 1]}`;
+    const text = `${names} ${failing.length === 1 ? 'is reporting an error' : 'are reporting errors'}`;
+    // The banner is a live region: rewriting the same words would make screen readers repeat them
+    const el = $('service-alert-text');
+    if (el.textContent !== text) el.textContent = text;
+}
+
+/** Takes all of /api/health or one service's part of it; updates only the statuses it covers. */
 export function updateHealth(h) {
-    if ('telegram' in h) updateBadge('health-tg', h.telegram ? 'TG: OK' : 'TG: ERR', h.telegram ? 'ok' : 'error');
-    if ('tmdb' in h) updateBadge('health-tmdb', h.tmdb ? 'TMDB: OK' : 'TMDB: ERR', h.tmdb ? 'ok' : 'error');
-    if ('proxy' in h) {
-        const [proxyText, proxyClass] = PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost'];
-        updateBadge('health-proxy', proxyText, proxyClass);
-    }
+    if ('telegram' in h) setService('telegram', 'health-tg', h.telegram ? 'ok' : 'error');
+    if ('tmdb' in h) setService('tmdb', 'health-tmdb', h.tmdb ? 'ok' : 'error');
+    if ('proxy' in h) setService('proxy', 'health-proxy', h.proxy === 'ok' || h.proxy === 'error' ? h.proxy : 'off');
 
-    // Kinopoisk API, used to find Kinopoisk IDs for watch links. Clicking any of
-    // these badges opens the service dialog; the tooltip shows today's quota.
+    // Kinopoisk API, used to find Kinopoisk IDs for watch links. Clicking a status opens
+    // the service dialog; the tooltip shows today's quota.
     if ('kinopoisk' in h) {
-        const kp = KINOPOISK_HEALTH[h.kinopoisk] || KINOPOISK_HEALTH.off;
-        updateBadge('health-kp', kp[0], kp[1]);
+        setService('kinopoisk', 'health-kp', h.kinopoisk === 'ok' || h.kinopoisk === 'error' ? h.kinopoisk : 'off');
         const kpBadge = $('health-kp');
         const q = h.kinopoiskQuota;
         if (kpBadge)
@@ -54,6 +73,7 @@ export function updateHealth(h) {
                 ? `Kinopoisk API: ${q.used} of ${q.limit} requests used today`
                 : 'Kinopoisk API: key, quota and status';
     }
+    renderServiceAlert();
 }
 
 // --- Coming up ---
@@ -61,7 +81,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 const KIND_ICON = {
     tv: svg('<rect x="2" y="7" width="20" height="15" rx="2" /><polyline points="17 2 12 7 7 2" />'),
-    movie: svg('<rect x="2" y="2" width="20" height="20" rx="2" /><path d="M7 2v20M17 2v20M2 12h20" />')
+    movie: svg(
+        '<rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4" />'
+    )
 };
 
 /** "2026-10-16" as local midnight (not UTC), so day differences follow the viewer's calendar. */
@@ -70,19 +92,33 @@ function localDay(iso) {
     return new Date(y, m - 1, d);
 }
 
-function dayLabel(iso, today) {
+/** The date column: "15 Oct" over "Thu"; a date in another year shows the year instead. */
+function dateParts(iso, today) {
+    const day = localDay(iso);
+    return {
+        day: day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        sub:
+            day.getFullYear() === today.getFullYear()
+                ? day.toLocaleDateString('en-GB', { weekday: 'short' })
+                : String(day.getFullYear())
+    };
+}
+
+/** "today", "tomorrow", "in 3 days", "in 2 weeks", "in 9 months", "in 1 year", "in 2 years" */
+function relativeDay(iso, today) {
     const diff = Math.round((localDay(iso).getTime() - today.getTime()) / DAY);
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Tomorrow';
-    // "Thu 15 Oct" for the coming months; "8 Jul 2027" only once the date is far enough
-    // off that the month alone would be ambiguous (not for 2 Jan seen on 30 Dec)
-    return diff < 180
-        ? localDay(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-        : localDay(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (diff === 0) return 'today';
+    if (diff === 1) return 'tomorrow';
+    if (diff < 14) return `in ${diff} days`;
+    if (diff < 60) return `in ${Math.round(diff / 7)} weeks`;
+    // Months up to a year and a half; beyond that whole years read better than "in 20 months"
+    if (diff < 548) return `in ${Math.round(diff / 30.4)} months`;
+    const years = Math.round(diff / 365);
+    return `in ${years} ${years === 1 ? 'year' : 'years'}`;
 }
 
 let upcoming = null;
-// As many as Popular now lists, so the cards side by side stay the same size
+// As many as Popular now lists, so the two panels side by side match
 const UPCOMING_SHOWN = 5;
 
 function renderUpcoming() {
@@ -93,7 +129,7 @@ function renderUpcoming() {
     // The server reaches a day back (it runs in UTC); drop what is past here
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    // The date is part of the signature: after midnight "Tomorrow" becomes "Today"
+    // The date is part of the signature: after midnight "tomorrow" becomes "today"
     if (isUnchanged('upcoming', [today.getTime(), upcoming])) return;
     const items = upcoming.filter((i) => localDay(i.date) >= today);
     if (items.length === 0) {
@@ -101,20 +137,21 @@ function renderUpcoming() {
         return;
     }
 
-    // The five nearest, like the five rows of Popular now
     container.innerHTML = items
         .slice(0, UPCOMING_SHOWN)
         .map((item) => {
             const what = item.kind === 'tv' ? item.episode || 'New episode' : 'Film release';
             const chats = `${item.chats} ${item.chats === 1 ? 'chat' : 'chats'}`;
+            const { day, sub } = dateParts(item.date, today);
             return `
-        <div class="popular-item upcoming-item" data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0">
-            <span class="upcoming-icon">${KIND_ICON[item.kind] || ''}</span>
-            <div class="popular-body">
-                <div class="popular-title">${escapeHtml(item.title)}</div>
-                <div class="upcoming-sub">${escapeHtml(`${what} · ${chats}`)}</div>
+        <div class="upcoming-row" data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0">
+            <div class="up-date"><span class="up-day">${escapeHtml(day)}</span><span class="up-weekday">${escapeHtml(sub)}</span></div>
+            <span class="up-icon">${KIND_ICON[item.kind] || ''}</span>
+            <div class="up-body">
+                <div class="up-title">${escapeHtml(item.title)}</div>
+                <div class="up-meta">${escapeHtml(`${what} · ${chats}`)}</div>
             </div>
-            <span class="upcoming-when">${escapeHtml(dayLabel(item.date, today))}</span>
+            <span class="up-when">${escapeHtml(relativeDay(item.date, today))}</span>
         </div>`;
         })
         .join('');
@@ -126,9 +163,35 @@ export function updateUpcoming(list) {
     startClock();
 }
 
+// --- Popular now ---
+export function updatePopular(list) {
+    if (isUnchanged('popular', list)) return;
+
+    const container = $('popular-list');
+    container.removeAttribute('aria-busy');
+    if (!list || list.length === 0) {
+        container.innerHTML = '<p class="empty-note">No data yet.</p>';
+        return;
+    }
+
+    container.innerHTML = list
+        .map((item, idx) => {
+            const count = Number(item.subCount) || 0;
+            return `
+        <div class="popular-item" data-action="series" data-id="${escapeHtml(item.seriesId)}" role="button" tabindex="0">
+            <span class="pop-rank">${idx + 1}</span>
+            <span class="pop-title">${escapeHtml(item.Series.title)}</span>
+            <span class="pop-count"><b>${count}</b> ${count === 1 ? 'subscriber' : 'subscribers'}</span>
+        </div>`;
+        })
+        .join('');
+}
+
 // --- Update check ---
 let cron = null;
 let clockTimer = null;
+// Set while "Run now" waits for the check it started
+let runPending = false;
 
 /** 41 s, 12 min, 2 h 5 min */
 function duration(ms) {
@@ -141,6 +204,14 @@ function duration(ms) {
 }
 
 const clock = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+function renderRunButton() {
+    const btn = /** @type {HTMLButtonElement} */ ($('run-check'));
+    if (!btn) return;
+    const busy = runPending || Boolean(cron && cron.running);
+    btn.disabled = busy;
+    btn.textContent = busy ? 'Running…' : 'Run now';
+}
 
 function renderCron() {
     if (!cron) return;
@@ -156,7 +227,7 @@ function renderCron() {
         setText('cron-last', 'No check since the bot started');
     } else {
         // Undelivered messages are not counted: a chat that blocked the bot fails on every
-        // run and would keep the badge amber for good. They are listed under Notifications.
+        // run and would keep the state amber for good. They are listed under Notifications.
         const problems = (last.errors || 0) + (last.fatal ? 1 : 0);
         if (last.fatal) updateBadge('cron-state', 'Failed', 'error');
         else if (problems) updateBadge('cron-state', `${problems} ${problems === 1 ? 'error' : 'errors'}`, 'warn');
@@ -179,11 +250,14 @@ function renderCron() {
         setText('cron-sent', '—');
     }
 
+    // The server's schedule, independent of the panel's auto-refresh
     const until = new Date(cron.nextRunAt).getTime() - now;
     setText(
         'cron-next',
         until > 0 ? `In ${duration(until)}, at ${clock(cron.nextRunAt)}` : `Due now, every ${cron.intervalHours} h`
     );
+    setText('series-interval', `Checked every ${cron.intervalHours} hours`);
+    renderRunButton();
 }
 
 export function updateCron(status) {
@@ -192,40 +266,42 @@ export function updateCron(status) {
     startClock();
 }
 
-// "5 min ago" and "Today" have to keep moving even while auto-refresh is paused
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Starts an update check and follows it to the end, then refreshes the dashboard.
+ * @param {() => Promise<unknown>} refresh reloads the dashboard's data
+ */
+export async function runCheckNow(refresh) {
+    if (runPending) return;
+    runPending = true;
+    renderRunButton();
+    try {
+        await api('/trigger-check', { method: 'POST' });
+        // A check takes seconds to a few minutes; stop watching after ten, and say so honestly
+        let running = true;
+        for (let i = 0; i < 300 && running; i++) {
+            await sleep(2000);
+            const status = await api('/cron');
+            updateCron(status);
+            running = status.running;
+        }
+        if (running) toast('The update check is still running; the dashboard will show it when it ends', 'info');
+        else toast('Update check finished', 'success');
+    } catch (e) {
+        toast(`Update check failed to start: ${e.message}`, 'error');
+    } finally {
+        runPending = false;
+        renderRunButton();
+        await refresh();
+    }
+}
+
+// "5 min ago" and "today" have to keep moving even while auto-refresh is paused
 function startClock() {
     if (clockTimer) return;
     clockTimer = setInterval(() => {
         renderCron();
         renderUpcoming();
     }, 30_000);
-}
-
-export function updatePopular(list) {
-    if (isUnchanged('popular', list)) return;
-
-    const container = $('popular-list');
-    container.removeAttribute('aria-busy');
-    if (!list || list.length === 0) {
-        container.innerHTML = '<p class="empty-note">No data yet.</p>';
-        return;
-    }
-
-    container.innerHTML = list
-        .map((item, idx) => {
-            const count = Number(item.subCount) || 0;
-            return `
-        <div class="popular-item" data-action="series" data-id="${item.seriesId}" role="button" tabindex="0">
-            <div class="popular-rank">${idx + 1}</div>
-            <div class="popular-body">
-                <div class="popular-title">${escapeHtml(item.Series.title)}</div>
-            </div>
-            <div class="popular-count">
-                <span class="popular-value">${count}</span>
-                <span class="popular-sub">${count === 1 ? 'subscriber' : 'subscribers'}</span>
-            </div>
-        </div>
-    `;
-        })
-        .join('');
 }

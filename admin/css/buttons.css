@@ -59,7 +59,7 @@
 /* Quiet destructive action — deliberately less prominent than the safe choice */
 .btn-danger-quiet {
     background: transparent;
-    border-color: rgba(248, 113, 113, 0.4);
+    border-color: var(--danger-border);
     color: var(--danger);
     font-weight: 500;
 }
@@ -103,6 +103,22 @@
 .btn-row-danger:hover {
     background: var(--danger-soft);
     border-color: transparent;
+}
+
+/* Outline: a secondary action on a card (Run now) */
+.btn-outline {
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--text-sm);
+    transition: background-color 0.15s ease;
+}
+
+.btn-outline:hover:not(:disabled) {
+    background: var(--surface-2);
 }
 
 /* Narrower padding, same height — the hit area never shrinks */
