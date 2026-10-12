@@ -28,7 +28,8 @@ setInterval(
         }
     },
     10 * 60 * 1000
-); // Run cleanup every 10 minutes
+    // Every 10 minutes. unref: the bot keeps the process alive anyway; a test using this module can exit
+).unref();
 
 /** Forgets everything about this user in this chat, e.g. on /start or an auto-block. */
 const clearState = (ctx) => {

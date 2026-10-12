@@ -33,15 +33,8 @@ router.post('/api/subscription', async (req, res) => {
         let series = await Series.findByPk(fulltmdbId);
         if (!series) {
             const details = await tmdb.getDetails(numericTmdbId, 'tv');
-            series = await Series.create({
-                tmdb_id: fulltmdbId,
-                title: details.name || details.original_name,
-                last_season: details.number_of_seasons || 0,
-                last_episode: 0,
-                poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
-                status: details.status || null,
-                ...tmdb.nextEpisodeFields(details)
-            });
+            // From the latest aired episode, as the bot does: never announce what is already out
+            series = await Series.create({ tmdb_id: fulltmdbId, ...tmdb.newSeriesFields(details) });
         }
 
         // 3. Create or update subscription

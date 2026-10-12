@@ -22,7 +22,8 @@ setInterval(() => {
             delete commandTracking[userId];
         }
     }
-}, 60_000);
+    // unref: the bot keeps the process alive anyway; a test loading the bot can exit
+}, 60_000).unref();
 
 function register(bot) {
     bot.use(async (ctx, next) => {

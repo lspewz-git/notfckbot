@@ -1,63 +1,20 @@
-/** Search: results with paging, a title's card, subscribing to a series, adding a film. */
+/**
+ * Search: one message that is the results list or a title's card, subscribing to a series and
+ * adding a film. The views themselves are in search-views.js.
+ */
 const { Markup } = require('telegraf');
-const { searchMulti, getDetails, nextEpisodeFields } = require('../api/tmdb');
-const { findKinopoiskIdQuick } = require('../api/kinopoisk');
+const { searchMulti, getDetails, getDetailsCached, newSeriesFields } = require('../api/tmdb');
+const { findKinopoiskId, findKinopoiskIdQuick } = require('../api/kinopoisk');
+const { isMovieReleased } = require('../cron/films');
 const { Series, Subscription, Watchlist } = require('../db');
-const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate, formatDigitalDate } = require('../constants');
+const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
-const { mainMenu, watchButtonRows } = require('./keyboards');
+const { mainMenu } = require('./keyboards');
+const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
 
-const showSearchPage = async (ctx, chatId, page = 0) => {
-    const state = getState(ctx);
-    const results = state.results || [];
-    const total = results.length;
-    const perPage = 2;
-    const start = page * perPage;
-    const end = start + perPage;
-    const items = results.slice(start, end);
+const mainMenuButton = Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]]);
 
-    if (items.length === 0) {
-        setState(ctx, { state: 'idle' });
-        return ctx.reply('Больше ничего не найдено.', mainMenu(ctx));
-    }
-
-    const messageIds = [];
-    for (const item of items) {
-        const year = (item.release_date || item.first_air_date || '').substring(0, 4) || 'н/д';
-        const name = item.title || item.name || item.original_title || item.original_name || 'Без названия';
-
-        const caption = `<b>${escapeHtml(name)}</b> (${year})`;
-        const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
-        const keyboard = Markup.inlineKeyboard([
-            [Markup.button.callback('✨ Подписаться', `sub_${item.media_type}_${item.id}`)]
-        ]);
-
-        let sentMsg;
-        if (posterUrl) {
-            try {
-                sentMsg = await ctx.replyWithPhoto(posterUrl, { caption, parse_mode: 'HTML', ...keyboard });
-            } catch {
-                sentMsg = await ctx.replyWithHTML(caption, keyboard);
-            }
-        } else {
-            sentMsg = await ctx.replyWithHTML(caption, keyboard);
-        }
-        messageIds.push(sentMsg.message_id);
-    }
-
-    const navRow = [];
-    if (page > 0) navRow.push(Markup.button.callback('⬅️ Назад', `page_${page - 1}`));
-    navRow.push(Markup.button.callback('❌ Стоп', 'cancel_search'));
-    if (end < total) navRow.push(Markup.button.callback('Вперед ➡️', `page_${page + 1}`));
-
-    const navMsg = await ctx.reply(
-        `Результаты ${start + 1}-${Math.min(end, total)} из ${total}`,
-        Markup.inlineKeyboard([navRow])
-    );
-    messageIds.push(navMsg.message_id);
-    setState(ctx, { currentPage: page, lastMessageIds: messageIds });
-};
-
+/** Deletes the search's message(s) still on screen; ids are kept in the state. */
 const clearLastMessages = async (ctx, chatId) => {
     const state = getState(ctx);
     if (!state.lastMessageIds) return;
@@ -70,13 +27,140 @@ const clearLastMessages = async (ctx, chatId) => {
     }
 };
 
+/**
+ * Whether the pressed message is this user's search. The state is per user, so in a group a
+ * press on someone else's search (or on one this user's state no longer knows, after a restart)
+ * would page or replace a list it doesn't own: answer with a note and leave it alone.
+ */
+async function ownSearch(ctx) {
+    const id = ctx.callbackQuery && ctx.callbackQuery.message && ctx.callbackQuery.message.message_id;
+    if ((getState(ctx).lastMessageIds || []).includes(id)) return true;
+    await ctx.answerCbQuery('Этот поиск устарел или его начал другой участник. Начните свой: 🔍 Поиск', {
+        show_alert: true
+    });
+    return false;
+}
+
+/**
+ * Runs before every button of a search: the press must be on this user's search (see ownSearch),
+ * and only one at a time. A double tap would otherwise open two cards or subscribe twice; a press
+ * while another is being handled is answered quietly and dropped.
+ */
+async function searchGuard(ctx, next) {
+    if (!(await ownSearch(ctx))) return;
+    if (getState(ctx).busy) return ctx.answerCbQuery();
+    setState(ctx, { busy: true });
+    try {
+        await next();
+    } finally {
+        setState(ctx, { busy: false });
+    }
+}
+
+/** The message a button was pressed on is the search's message from now on. */
+const remember = (ctx, message) => setState(ctx, { lastMessageIds: [message.message_id] });
+
+/**
+ * Puts text in place of the message whose button was pressed. A text message is edited in place;
+ * a photo (a card) can't become text, so it is replaced. Returns the message now on screen.
+ */
+async function showText(ctx, text, keyboard) {
+    const current = ctx.callbackQuery && ctx.callbackQuery.message;
+    if (current && !current.photo) {
+        try {
+            await ctx.editMessageText(text, { parse_mode: 'HTML', ...keyboard });
+            return current;
+        } catch (err) {
+            // "message is not modified": the same page pressed again
+            if (/not modified/.test(err.message)) return current;
+            throw err;
+        }
+    }
+    if (current) await ctx.deleteMessage().catch(() => {});
+    return ctx.reply(text, { parse_mode: 'HTML', ...keyboard });
+}
+
+/** The results list for `page`, in place of the pressed message (or as a new one). */
+async function showList(ctx, page) {
+    const { results = [], query = '' } = getState(ctx);
+    if (!results.length) {
+        // The state lapsed (30 min idle, or the bot restarted): nothing to go back to
+        const msg = await showText(ctx, 'Результаты поиска устарели. Начните поиск заново: 🔍 Поиск.', mainMenuButton);
+        remember(ctx, msg);
+        return;
+    }
+    const list = resultsList(results, page, query);
+    const msg = await showText(ctx, list.text, list.keyboard);
+    setState(ctx, { currentPage: list.page, lastMessageIds: [msg.message_id] });
+    prefetch(results.slice(list.page * PER_PAGE, (list.page + 1) * PER_PAGE));
+}
+
+/**
+ * While the list is being read, fetches what the page's cards will need, so a tap opens one at
+ * once: TMDB details (into its cache) and, for a film that is out, the Kinopoisk ID (into the
+ * lookup's cache). Fire and forget; a failure only means that card asks again when opened.
+ */
+function prefetch(items) {
+    for (const item of items) {
+        getDetailsCached(item.id, item.media_type)
+            .then((data) => {
+                if (item.media_type === 'movie' && isMovieReleased(data)) {
+                    return findKinopoiskId(`movie_${item.id}`, data.imdb_id);
+                }
+                return null;
+            })
+            .catch(() => {});
+    }
+}
+
+// Telegram's own id for each poster it has already fetched: sending that again skips the
+// download from TMDB, the slowest part of opening a card. Bounded, oldest out first.
+const posterFileIds = new Map();
+const POSTER_IDS_MAX = 500;
+
+function rememberPoster(url, message) {
+    const sizes = message && message.photo;
+    if (!sizes || !sizes.length) return;
+    if (posterFileIds.size >= POSTER_IDS_MAX) posterFileIds.delete(posterFileIds.keys().next().value);
+    posterFileIds.set(url, sizes[sizes.length - 1].file_id);
+}
+
+/** A card (with its poster when there is one) in place of the list. */
+async function showCard(ctx, card) {
+    let msg = null;
+    if (card.posterUrl) {
+        const extra = { caption: card.caption, parse_mode: 'HTML', ...card.keyboard };
+        const known = posterFileIds.get(card.posterUrl);
+        try {
+            msg = await ctx.replyWithPhoto(known || card.posterUrl, extra);
+        } catch {
+            // A stale file id: once more by URL. A poster Telegram can't fetch at all: as text below.
+            if (known) msg = await ctx.replyWithPhoto(card.posterUrl, extra).catch(() => null);
+        }
+        rememberPoster(card.posterUrl, msg);
+    }
+    if (!msg) msg = await ctx.replyWithHTML(card.caption, card.keyboard);
+    // The list goes once the card is there, so the chat is never empty in between
+    ctx.deleteMessage().catch(() => {});
+    remember(ctx, msg);
+}
+
+/** A series row for the update check, created on the first subscription. */
+async function ensureSeries(tmdbId, data) {
+    const [series] = await Series.findOrCreate({ where: { tmdb_id: tmdbId }, defaults: newSeriesFields(data) });
+    return series;
+}
+
 function register(bot) {
     bot.action('cancel_search', async (ctx) => {
         await clearLastMessages(ctx, ctx.chat.id);
-        setState(ctx, { state: 'idle', results: [] });
+        setState(ctx, { state: 'idle', results: [], lastMessageIds: [] });
         await ctx.reply('Поиск завершен.', mainMenu(ctx));
         await ctx.answerCbQuery();
     });
+
+    // The "2 / 3" button between the arrows only shows where you are
+    bot.action('noop', (ctx) => ctx.answerCbQuery());
 
     bot.on('text', async (ctx, next) => {
         const text = ctx.message.text;
@@ -95,6 +179,8 @@ function register(bot) {
 
         try {
             console.log(`[Bot] Search query: "${text}" from ${ctx.from.id}`);
+            // "typing…" in the chat header while TMDB searches (up to a second)
+            ctx.sendChatAction('typing').catch(() => {});
             const results = await searchMulti(text);
             if (!results || results.length === 0) {
                 setState(ctx, { state: 'idle' });
@@ -103,8 +189,10 @@ function register(bot) {
                     Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
                 );
             }
-            setState(ctx, { results, state: 'searching' });
-            await showSearchPage(ctx, ctx.chat.id, 0);
+            // A previous search's message goes: the chat keeps one search at a time
+            await clearLastMessages(ctx, ctx.chat.id);
+            setState(ctx, { results, query: text, state: 'searching', lastMessageIds: [] });
+            await showList(ctx, 0);
         } catch (error) {
             console.error('[Bot] Search error:', error);
             await ctx.reply('Ошибка при поиске. Попробуйте позже.', mainMenu(ctx));
@@ -112,146 +200,57 @@ function register(bot) {
         }
     });
 
-    bot.action(/^page_(\d+)$/, async (ctx) => {
-        const page = parseInt(ctx.match[1]);
-        await clearLastMessages(ctx, ctx.chat.id);
-        await showSearchPage(ctx, ctx.chat.id, page);
+    bot.action(/^page_(\d+)$/, searchGuard, async (ctx) => {
         await ctx.answerCbQuery();
+        await showList(ctx, parseInt(ctx.match[1], 10));
     });
 
-    bot.action(/^sub_(movie|tv)_(\d+)$/, async (ctx) => {
+    bot.action('back_to_results', searchGuard, async (ctx) => {
+        await ctx.answerCbQuery();
+        await showList(ctx, getState(ctx).currentPage || 0);
+    });
+
+    // A result's card. "sub_" is what the buttons were called before the list, on older messages.
+    bot.action(/^(?:card|sub)_(movie|tv)_(\d+)$/, searchGuard, async (ctx) => {
         const mediaType = ctx.match[1];
-        const filmId = ctx.match[2];
-        const tmdbId = `${mediaType}_${filmId}`;
+        const id = ctx.match[2];
+        const tmdbId = `${mediaType}_${id}`;
         try {
-            const data = await getDetails(filmId, mediaType);
+            // Usually prefetched while the list was on screen (see prefetch), so no wait here
+            const data = await getDetailsCached(id, mediaType);
             if (!data) return ctx.answerCbQuery('Данные не найдены.');
+            await ctx.answerCbQuery();
 
             if (mediaType === 'movie') {
-                // ——— MOVIE: smart release detection ———
-                await clearLastMessages(ctx, ctx.chat.id);
-                setState(ctx, { lastMessageIds: [] });
-
-                const title = data.title || data.original_title || 'Без названия';
-                const movieYear = data.release_date ? data.release_date.substring(0, 4) : null;
-                const status = data.status; // e.g. 'Released', 'Post Production'
-
-                let isAlreadyReleased = false;
-                let releaseDateLabel = null;
-
-                if (data.release_date) {
-                    const releaseDate = new Date(data.release_date);
-                    if (!isNaN(releaseDate) && releaseDate <= new Date()) {
-                        isAlreadyReleased = true;
-                        releaseDateLabel = formatRuDate(releaseDate);
-                    }
-                }
-                if (status === 'Released') isAlreadyReleased = true;
-
-                if (isAlreadyReleased) {
-                    // Film is already out
-                    const kinopoiskId = await findKinopoiskIdQuick(tmdbId, data.imdb_id);
-                    const keyboard = Markup.inlineKeyboard([
-                        ...watchButtonRows({ title, kinopoiskId, mediaType: 'movie' }),
-                        [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
-                    ]);
-                    await ctx.reply(
-                        `🎬 <b>${escapeHtml(title)}</b>${movieYear ? ` (${movieYear})` : ''}\n\n` +
-                            `✅ Фильм уже вышел${releaseDateLabel ? ` — <b>${releaseDateLabel}</b>` : ''}.\n`,
-                        { parse_mode: 'HTML', ...keyboard }
-                    );
-                    return ctx.answerCbQuery();
-                }
-
-                // Film is upcoming — offer to add to watchlist
-                const comingDateLabel = formatDigitalDate(data.release_date);
-
-                const keyboard = Markup.inlineKeyboard([
-                    [Markup.button.callback('📌 В список ожидания', `watchlist_add_${tmdbId}`)],
-                    [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
+                const [onWatchlist, kinopoiskId] = await Promise.all([
+                    Watchlist.findOne({ where: { chatId: ctx.chat.id, tmdb_id: tmdbId, notified: false } }).then(
+                        Boolean
+                    ),
+                    // Only a film that is out shows watch links, the only thing that needs the ID
+                    isMovieReleased(data) ? findKinopoiskIdQuick(tmdbId, data.imdb_id) : null
                 ]);
-
-                const directorLabel = data.director_name
-                    ? `🎬 Режиссер: <b>${escapeHtml(data.director_name)}</b>\n`
-                    : '';
-
-                await ctx.reply(
-                    `🎬 <b>${escapeHtml(title)}</b>${movieYear ? ` (${movieYear})` : ''}\n${directorLabel}\n` +
-                        `Это фильм, который ещё не вышел.\n` +
-                        `📅 Релиз: <b>${comingDateLabel}</b>\n\n` +
-                        `Добавить в список ожидания? Как только выйдет — пришлю уведомление.`,
-                    { parse_mode: 'HTML', ...keyboard }
-                );
-                return ctx.answerCbQuery();
+                return showCard(ctx, filmCard(data, { kinopoiskId, onWatchlist }));
             }
 
-            // ——— TV SERIES: existing subscription flow ———
-            const [series] = await Series.findOrCreate({
-                where: { tmdb_id: tmdbId },
-                defaults: {
-                    title: data.name || data.original_name || 'Без названия',
-                    last_season: 0,
-                    last_episode: 0,
-                    poster_url: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
-                    status: data.status || null,
-                    ...nextEpisodeFields(data)
-                }
-            });
-
-            const currentSub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: series.tmdb_id } });
-            if (currentSub) return ctx.answerCbQuery('Вы уже подписаны!', { show_alert: true });
-
-            const directorLabel = data.director_name ? `🎬 Создатель: <b>${escapeHtml(data.director_name)}</b>\n` : '';
-
-            // A finished show won't air anything, so instead of a mode picker explain that and let
-            // the user subscribe anyway — the subscription lands straight in the archive and only
-            // matters if the show gets renewed.
-            if (isFinishedStatus(data.status)) {
-                const what = data.status === 'Canceled' ? 'отменён' : 'завершён';
-                await ctx.reply(
-                    `<b>«${escapeHtml(series.title)}»</b>\n${directorLabel}\n` +
-                        `⚠️ Сериал ${what} — новых серий не будет.\n\n` +
-                        'Если всё же подписаться, сериал попадёт в 📺 Мои подписки → 🗄 Завершённые, ' +
-                        'и я сообщу, если его продлят.',
-                    {
-                        parse_mode: 'HTML',
-                        ...Markup.inlineKeyboard([
-                            [Markup.button.callback('🔔 Всё равно подписаться', `sub_set_${tmdbId}_episode`)],
-                            [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
-                        ])
-                    }
-                );
-                return ctx.answerCbQuery();
-            }
-
-            const keyboard = Markup.inlineKeyboard([
-                [
-                    Markup.button.callback('🔔 Каждую серию', `sub_set_${tmdbId}_episode`),
-                    Markup.button.callback('📦 Весь сезон', `sub_set_${tmdbId}_season`)
-                ],
-                [Markup.button.callback('🆕 1-я серия + Сезон', `sub_set_${tmdbId}_first_and_full`)],
-                [Markup.button.callback('⬅️ К результатам', 'back_to_results')]
-            ]);
-
-            await ctx.reply(`<b>«${escapeHtml(series.title)}»</b>\n${directorLabel}\nВыберите режим уведомлений:`, {
-                parse_mode: 'HTML',
-                ...keyboard
-            });
-            await ctx.answerCbQuery();
+            const sub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
+            return showCard(ctx, seriesCard(data, { subscribedMode: sub ? sub.notify_type : null }));
         } catch (error) {
-            console.error('[Bot] Subscription error:', error);
-            await ctx.answerCbQuery('Ошибка подписки.');
+            console.error('[Bot] Card error:', error);
+            await ctx.answerCbQuery('Не удалось открыть карточку.').catch(() => {});
         }
     });
 
-    bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, async (ctx) => {
+    bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, searchGuard, async (ctx) => {
         const tmdbId = ctx.match[1];
         const notifyType = ctx.match[2];
         const chatId = ctx.chat.id;
 
         try {
-            const series = await Series.findByPk(tmdbId);
-            if (!series) return ctx.answerCbQuery('Сериал не найден.');
+            const [mediaType, filmId] = tmdbId.split('_');
+            const data = await getDetails(filmId, mediaType);
+            if (!data) return ctx.answerCbQuery('Сериал не найден.');
+            // Saved now, not when the card was opened: a card looked at and left adds nothing
+            const series = await ensureSeries(tmdbId, data);
 
             const [subscription, created] = await Subscription.findOrCreate({
                 where: { chatId, seriesId: tmdbId },
@@ -263,70 +262,38 @@ function register(bot) {
                 `[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`
             );
 
-            // Initialize the baseline episode tracking on first subscribe
-            if (series.last_season === 0) {
-                const [mediaType, filmId] = tmdbId.split('_');
-                const data = await getDetails(filmId, mediaType);
-                if (data && data.last_episode_to_air) {
-                    await series.update({
-                        last_season: data.last_episode_to_air.season_number,
-                        last_episode: data.last_episode_to_air.episode_number,
-                        last_episode_name: data.last_episode_to_air.name || ''
-                    });
-                }
-            }
+            // No catch-up here for a series already tracked: its position belongs to the update
+            // check, and moving it forward for a newcomer would skip an episode its other
+            // subscribers are still to be told about
 
             const typeLabel = NOTIFY_LABELS_SHORT[notifyType] || notifyType;
-
-            // Fetch seasons to find the next episode
+            const finished = isFinishedStatus(data.status);
             let nextEpisodeText = 'информации о ближайшей серии пока нет';
-            let finished = isFinishedStatus(series.status);
-            try {
-                const [mediaType, filmId] = tmdbId.split('_');
-                const data = await getDetails(filmId, mediaType);
-
-                if (data) {
-                    finished = isFinishedStatus(data.status);
-                    if (finished) {
-                        nextEpisodeText = 'Сериал завершён/закрыт';
-                    } else if (data.next_episode_to_air) {
-                        const nextEp = data.next_episode_to_air;
-                        if (nextEp.air_date) {
-                            const dateStr = formatRuDate(nextEp.air_date);
-                            nextEpisodeText = `Ближайшая серия (${nextEp.season_number} сезон, ${nextEp.episode_number} серия) ожидается <b>${dateStr}</b>`;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error('[Bot] Failed to get next episode info:', e);
+            const nextEp = data.next_episode_to_air;
+            if (nextEp && nextEp.air_date) {
+                nextEpisodeText = `Ближайшая серия (${nextEp.season_number} сезон, ${nextEp.episode_number} серия) ожидается <b>${formatRuDate(nextEp.air_date)}</b>`;
             }
 
-            // FIX: Delete all search result cards (posters + nav) to keep chat clean
-            await clearLastMessages(ctx, chatId);
-            setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
-
-            await ctx.answerCbQuery('Успешно подписаны! ✅');
+            await ctx.answerCbQuery(created ? 'Успешно подписаны! ✅' : 'Режим обновлён ✅');
             const details = finished
                 ? '🗄 Сериал завершён, поэтому подписка лежит в 📺 Мои подписки → 🗄 Завершённые. Если его продлят — сообщу.'
                 : `🔔 Режим уведомлений: <b>${typeLabel}</b>\n\n📅 ${nextEpisodeText}`;
-            await ctx.editMessageText(
-                `✅ Вы успешно подписались на <b>«${escapeHtml(series.title)}»</b>\n\n${details}`,
-                {
-                    parse_mode: 'HTML',
-                    ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
-                }
-            );
+            const heading = created
+                ? `✅ Вы успешно подписались на <b>«${escapeHtml(series.title)}»</b>`
+                : `✅ Режим уведомлений для <b>«${escapeHtml(series.title)}»</b> обновлён`;
+            await showText(ctx, `${heading}\n\n${details}`, mainMenuButton);
+            setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
         } catch (error) {
             console.error('[Bot] Finalize subscription error:', error);
-            await ctx.answerCbQuery('Ошибка сохранения подписки.');
+            await ctx.answerCbQuery('Ошибка сохранения подписки.').catch(() => {});
         }
     });
 
     // ============================================================
-    // Watchlist add / remove
+    // Watchlist add
     // ============================================================
 
-    bot.action(/^watchlist_add_([a-z0-9_]+)$/, async (ctx) => {
+    bot.action(/^watchlist_add_([a-z0-9_]+)$/, searchGuard, async (ctx) => {
         const tmdbId = ctx.match[1];
         const [mediaType, filmId] = tmdbId.split('_');
         try {
@@ -347,37 +314,26 @@ function register(bot) {
                 return ctx.answerCbQuery('Уже в списке ожидания! 📌', { show_alert: false });
             }
 
-            await clearLastMessages(ctx, ctx.chat.id);
-            setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
-
             const dateLabel = formatRuDate(digitalDate) || 'пока не объявлена';
             const digitalLine = data.digital_release_date
                 ? `💻 Цифровой релиз: <b>${formatRuDate(data.digital_release_date)}</b>\n`
                 : '';
 
             await ctx.answerCbQuery('Добавлено в список ожидания! 📌');
-            await ctx.editMessageText(
+            await showText(
+                ctx,
                 `📌 <b>«${escapeHtml(title)}»</b> добавлен в список ожидания!\n\n` +
                     `📅 Выход: <b>${dateLabel}</b>\n` +
                     digitalLine +
                     '\n' +
                     `<i>Как только фильм выйдет — пришлю ссылки для просмотра.</i>`,
-                {
-                    parse_mode: 'HTML',
-                    ...Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
-                }
+                mainMenuButton
             );
+            setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
         } catch (error) {
             console.error('[Bot] Watchlist add error:', error);
-            await ctx.answerCbQuery('Ошибка при добавлении.');
+            await ctx.answerCbQuery('Ошибка при добавлении.').catch(() => {});
         }
-    });
-
-    bot.action('back_to_results', async (ctx) => {
-        await ctx.deleteMessage();
-        const state = getState(ctx);
-        await showSearchPage(ctx, ctx.chat.id, state.currentPage || 0);
-        await ctx.answerCbQuery();
     });
 }
 

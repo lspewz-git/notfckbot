@@ -85,6 +85,25 @@ function digitalReleaseDate(releaseDates) {
     return byCountry.map(digitalIn).filter(Boolean).sort()[0] || null;
 }
 
+/**
+ * The columns of a newly tracked series. It starts at the latest episode already aired, so the
+ * first update check announces only what comes after; with nothing aired yet, at season 0, so
+ * the first episode counts as new. Starting anywhere else made that check announce episodes
+ * that were out long before (a season's finale, "the whole season is out").
+ */
+function newSeriesFields(details) {
+    const last = details.last_episode_to_air;
+    return {
+        title: details.name || details.original_name || 'Без названия',
+        last_season: last ? last.season_number : 0,
+        last_episode: last ? last.episode_number : 0,
+        last_episode_name: (last && last.name) || '',
+        poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
+        status: details.status || null,
+        ...nextEpisodeFields(details)
+    };
+}
+
 /** Series columns for TMDB's next announced episode; all null when none is announced. */
 function nextEpisodeFields(data) {
     const next = data && data.next_episode_to_air;
@@ -190,5 +209,6 @@ module.exports = {
     getDetails,
     getDetailsCached,
     nextEpisodeFields,
+    newSeriesFields,
     getSeasonDetails
 };

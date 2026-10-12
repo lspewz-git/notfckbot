@@ -56,6 +56,9 @@ async function fromKinopoiskApi(imdbId) {
 const cache = new Map();
 const CACHE_MAX = 1000;
 const MISS_TTL_MS = 6 * 60 * 60 * 1000;
+// A source that couldn't be asked (down, rejected the key): short, so it is tried again soon
+const FAIL_TTL_MS = 10 * 60 * 1000;
+const inFlight = new Map(); // tmdbId -> pending lookup
 
 /**
  * @param {string} tmdbId e.g. "tv_1399" or "movie_603"
@@ -65,30 +68,41 @@ const MISS_TTL_MS = 6 * 60 * 60 * 1000;
  */
 async function lookupKinopoiskId(tmdbId, imdbId) {
     const hit = cache.get(tmdbId);
-    if (hit && (hit.id || Date.now() - hit.at < MISS_TTL_MS)) return { id: hit.id, failed: false };
-
-    const [mediaType, numericId] = String(tmdbId).split('_');
-    let failed = false;
-    for (const lookup of [() => fromWikidata(numericId, mediaType), () => fromKinopoiskApi(imdbId)]) {
-        try {
-            const id = await lookup();
-            if (id) {
-                remember(tmdbId, id);
-                return { id, failed: false };
-            }
-        } catch (err) {
-            failed = true;
-            console.error(`[Kinopoisk] Lookup failed for ${tmdbId}:`, err.message);
-        }
+    if (hit) {
+        // A found ID is kept; a miss and a failure are retried after a while
+        const ttl = hit.id ? Infinity : hit.failed ? FAIL_TTL_MS : MISS_TTL_MS;
+        if (Date.now() - hit.at < ttl) return { id: hit.id, failed: Boolean(hit.failed) };
     }
-    // A miss is only worth remembering when both sources actually answered
-    if (!failed) remember(tmdbId, null);
-    return { id: null, failed };
+    // A card opened while the search list was still prefetching the same title: one lookup
+    if (inFlight.has(tmdbId)) return inFlight.get(tmdbId);
+
+    const run = (async () => {
+        const [mediaType, numericId] = String(tmdbId).split('_');
+        let failed = false;
+        for (const lookup of [() => fromWikidata(numericId, mediaType), () => fromKinopoiskApi(imdbId)]) {
+            try {
+                const id = await lookup();
+                if (id) {
+                    remember(tmdbId, id);
+                    return { id, failed: false };
+                }
+            } catch (err) {
+                failed = true;
+                console.error(`[Kinopoisk] Lookup failed for ${tmdbId}:`, err.message);
+            }
+        }
+        // A failure is remembered too, briefly: otherwise every page of search results would
+        // ask a dead API again (and log it again) for each film Wikidata doesn't know
+        remember(tmdbId, null, failed);
+        return { id: null, failed };
+    })().finally(() => inFlight.delete(tmdbId));
+    inFlight.set(tmdbId, run);
+    return run;
 }
 
-function remember(tmdbId, id) {
+function remember(tmdbId, id, failed = false) {
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
-    cache.set(tmdbId, { id, at: Date.now() });
+    cache.set(tmdbId, { id, at: Date.now(), failed });
 }
 
 /** @returns {Promise<number | null>} null when the title is unknown or a source was unreachable */
