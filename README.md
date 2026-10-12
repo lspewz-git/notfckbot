@@ -196,8 +196,13 @@ ADMIN_URL=http://<host>/ npm test
 **Бэкенд**
 
 - `src/index.js` — точка входа: инициализация БД, бота, cron и панели.
-- `src/bot.js` — логика бота и обработка команд.
-- `src/admin.js` — HTTP API и раздача панели.
+- `src/bot/` — Telegram-бот. Модули подключаются в `index.js` в порядке, в котором Telegraf их проверяет:
+  - `middleware.js` — антиспам, учёт чатов, блокировка;
+  - `commands.js` — команды и кнопки нижнего меню;
+  - `search.js` — поиск, карточка тайтла, подписка на сериал, добавление фильма;
+  - `subscriptions.js` — «Мои подписки»: обзор, настройки, архив, отписка;
+  - `state.js` (состояние диалога), `keyboards.js` (клавиатуры и кнопки ссылок).
+- `src/admin/` — сервер панели: `index.js` (Express, статика, подключение маршрутов), `env.js` (запись в `.env`, маскирование токенов), `log-buffer.js` (логи для панели) и `routes/` — по файлу на раздел API: `stats`, `data`, `details`, `logs`, `health`, `services`, `config`, `records`, `actions`.
 - `src/cron.js` — фоновая проверка обновлений.
 - `src/proxy.js` — единая точка сборки прокси-агента для TMDB и Telegram.
 - `src/api/tmdb.js` — клиент TMDB.

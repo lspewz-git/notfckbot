@@ -39,6 +39,9 @@ const formatRuDate = (value) => {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
+/** A release date for the bot's messages, or a note that there isn't one yet. */
+const formatDigitalDate = (date) => formatRuDate(date) || 'дата не объявлена';
+
 const getWatchLink = (title) => {
     // HDRezka search URL:
     return `https://rezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`;
@@ -91,6 +94,7 @@ module.exports = {
     isFinishedStatus,
     escapeHtml,
     formatRuDate,
+    formatDigitalDate,
     getWatchLink,
     getWatchLinks,
     formatWatchLinks
