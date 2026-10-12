@@ -19,6 +19,14 @@ const Chat = sequelize.define('Chat', {
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
+    // Who may press the bot's inline buttons in a group: 'owner', only whoever called up that
+    // message (a search, the subscriptions menu); 'all', anyone in the chat. Private chats
+    // have one user, so it doesn't apply there.
+    buttons_mode: {
+        type: DataTypes.ENUM('owner', 'all'),
+        allowNull: false,
+        defaultValue: 'owner'
+    },
     blockedUntil: {
         type: DataTypes.DATE,
         allowNull: true

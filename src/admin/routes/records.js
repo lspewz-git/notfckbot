@@ -70,6 +70,30 @@ router.post('/api/chat/:chatId/block', async (req, res) => {
     }
 });
 
+// The chat's bot settings, the same ones its ⚙️ Settings screen in Telegram changes
+const BUTTONS_MODES = ['owner', 'all'];
+router.patch('/api/chat/:chatId/settings', async (req, res) => {
+    const { buttons_mode: buttonsMode, menu_enabled: menuEnabled } = req.body || {};
+    const changes = {};
+    if (buttonsMode !== undefined) {
+        if (!BUTTONS_MODES.includes(buttonsMode)) return res.status(400).json({ error: 'Bad buttons_mode' });
+        changes.buttons_mode = buttonsMode;
+    }
+    if (menuEnabled !== undefined) {
+        if (typeof menuEnabled !== 'boolean') return res.status(400).json({ error: 'Bad menu_enabled' });
+        changes.menu_enabled = menuEnabled;
+    }
+    if (!Object.keys(changes).length) return res.status(400).json({ error: 'Nothing to change' });
+    try {
+        const chat = await Chat.findByPk(req.params.chatId);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+        await chat.update(changes);
+        res.json({ success: true, buttons_mode: chat.buttons_mode, menu_enabled: chat.menu_enabled });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/api/chat/:chatId/unblock', async (req, res) => {
     const { chatId } = req.params;
     try {

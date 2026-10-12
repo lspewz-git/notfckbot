@@ -866,6 +866,23 @@
                                 <polyline points="9 18 15 12 9 6" /></svg
                         ></span>
                     </button>
+                    <button id="action-settings" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+                                /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Settings</span>
+                            <span class="action-desc">Who presses the bot's buttons, bottom menu</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
                     <button id="action-block" class="action-row">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -937,6 +954,44 @@
                 <!-- A corner ×, not a Cancel button under everything: on a phone that one sat below the
                      fold, past the results and the Add button -->
                 <button data-close-return="add-content-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- A chat's bot settings: the same as its ⚙️ Settings screen in Telegram -->
+        <div
+            id="chat-settings-modal"
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-settings-title"
+        >
+            <div class="modal-content modal-medium">
+                <h3 id="chat-settings-title">Settings</h3>
+                <p class="modal-sub" id="chat-settings-sub"></p>
+                <!-- Groups only: a private chat has one person to press anything -->
+                <div class="field-block" id="chat-settings-buttons-field">
+                    <label class="field-label" for="chat-settings-buttons">Who can press the bot's buttons</label>
+                    <select id="chat-settings-buttons" class="select-field">
+                        <option value="owner">Only whoever called them up</option>
+                        <option value="all">Everyone in the chat</option>
+                    </select>
+                    <p class="field-hint">A search or the subscriptions menu called up by one member.</p>
+                </div>
+                <div class="field-block">
+                    <label class="field-label" for="chat-settings-menu">Bottom menu</label>
+                    <select id="chat-settings-menu" class="select-field">
+                        <option value="on">On</option>
+                        <option value="off">Off</option>
+                    </select>
+                    <p class="field-hint">Shows up in the chat with the bot's next reply there.</p>
+                </div>
+                <button id="chat-settings-save" class="btn btn-primary btn-block">Save</button>
+                <button data-close-return="chat-settings-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />

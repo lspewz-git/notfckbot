@@ -14,7 +14,11 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 });
 
 require('./middleware').register(bot);
+// Right after the middleware, which loads the chat's settings: decides who may press buttons
+require('./access').register(bot);
 require('./commands').register(bot);
+// Before the search: its free-text handler would otherwise see "⚙️ Настройки" first
+require('./settings').register(bot);
 require('./search').register(bot);
 require('./subscriptions').register(bot);
 
@@ -35,6 +39,7 @@ bot.telegram
         { command: 'search', description: 'Найти фильм или сериал' },
         { command: 'subs', description: 'Мои подписки и список ожидания' },
         { command: 'help', description: 'Как пользоваться ботом' },
+        { command: 'settings', description: 'Настройки чата' },
         { command: 'cancel', description: 'Отменить текущее действие' },
         { command: 'menu_on', description: 'Включить нижнее меню' },
         { command: 'menu_off', description: 'ОТКЛЮЧИТЬ нижнее меню' }

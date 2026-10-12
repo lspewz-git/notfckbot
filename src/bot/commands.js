@@ -1,5 +1,4 @@
 /** Slash commands and the reply-keyboard buttons. */
-const { Markup } = require('telegraf');
 const { setState, clearState } = require('./state');
 const { mainMenu, getCancelMenu } = require('./keyboards');
 const { clearLastMessages } = require('./search');
@@ -28,14 +27,14 @@ function register(bot) {
 
 <b>Сериалы:</b>
 1. Нажми 🔍 <b>Поиск</b> или используй команду /search и введи название.
-2. Выбери нужный сериал из списка и нажми <b>✨ Подписаться</b>.
+2. Выбери нужный сериал из списка — откроется его карточка.
 3. Выбери режим уведомлений:
    • 🔔 <b>Каждую серию</b> — уведомление сразу после выхода новой серии.
    • 📦 <b>Весь сезон</b> — одно уведомление, когда весь сезон станет доступен.
    • 🆕 <b>1-я серия + Сезон</b> — уведомление о первой серии и когда сезон выйдет целиком.
 
 <b>Фильмы:</b>
-• При поиске фильма нажми <b>✨ Подписаться</b> — добавлю в список ожидания.
+• В карточке фильма нажми <b>📌 В список ожидания</b>.
 • Когда фильм выйдет — пришлю ссылки для просмотра 🎬
 
 В разделе 📺 <b>Мои подписки</b> или по команде /subs ты можешь:
@@ -43,6 +42,8 @@ function register(bot) {
 • Изменить режим уведомлений и отписаться.
 
 💡 <i>Бот проверяет обновления каждые несколько часов.</i>
+
+⚙️ <b>Настройки</b> или /settings: кто может нажимать кнопки бота в группе и нижнее меню. В группе их меняют только админы.
 
 <b>Дополнительные команды:</b>
  • /menu_off — Отключить нижнее меню (кнопки).
@@ -70,22 +71,7 @@ function register(bot) {
     bot.command('subs', sendSubscriptionList);
     bot.hears('📺 Мои подписки', sendSubscriptionList);
 
-    bot.command('menu_off', async (ctx) => {
-        if (ctx.state.chatData) {
-            await ctx.state.chatData.update({ menu_enabled: false });
-            await ctx.reply(
-                'Нижнее меню отключено. Теперь используйте команды: /search, /subs, /help',
-                Markup.removeKeyboard()
-            );
-        }
-    });
-
-    bot.command('menu_on', async (ctx) => {
-        if (ctx.state.chatData) {
-            await ctx.state.chatData.update({ menu_enabled: true });
-            await ctx.reply('Нижнее меню включено!', mainMenu(ctx));
-        }
-    });
+    // /menu_on and /menu_off live in settings.js, next to the settings screen
 
     // "Случайный фильм" was removed. Chats still have the old keyboard with its button (Telegram
     // keeps a reply keyboard until the bot sends another), and someone may type /random: answer

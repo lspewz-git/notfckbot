@@ -24,7 +24,14 @@ const CONTENT_TYPES = {
     '.ico': 'image/x-icon'
 };
 
-const chat = (id, username, type = 'private') => ({ id, username, type, blockedUntil: null });
+const chat = (id, username, type = 'private') => ({
+    id,
+    username,
+    type,
+    blockedUntil: null,
+    menu_enabled: true,
+    buttons_mode: 'owner'
+});
 
 const CHATS = [chat(101, 'alice'), chat(102, 'bob'), chat(-1003, 'Movie Club', 'supergroup')];
 
@@ -293,6 +300,14 @@ async function mockPanel(page, options = {}) {
             }
         ],
         [
+            // A chat's settings: what the dialog sent last, for tests to check
+            /^\/api\/chat\/(-?\d+)\/settings$/,
+            ([, id], req) => {
+                panel.lastSettings = { chatId: id, body: req.postDataJSON() };
+                return { success: true };
+            }
+        ],
+        [
             /^\/api\/kinopoisk\/(tv|movie)\/(\d+)$/,
             async ([, type]) => {
                 await options.kinopoiskHold;
@@ -316,7 +331,7 @@ async function mockPanel(page, options = {}) {
 
         if (url.pathname.startsWith('/api/')) {
             const card = cards.map(([re, fn]) => [url.pathname.match(re), fn]).find(([m]) => m);
-            const handler = api[url.pathname] || (card && (() => card[1](card[0])));
+            const handler = api[url.pathname] || (card && ((req) => card[1](card[0], req)));
             if (!handler) return route.fulfill({ status: 404, json: { error: 'Not mocked' } });
             if (options.hold) await options.hold;
             const answer = await handler(route.request());

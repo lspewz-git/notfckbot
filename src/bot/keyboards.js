@@ -6,7 +6,10 @@ const mainMenu = (ctx) => {
     if (ctx.state && ctx.state.chatData && ctx.state.chatData.menu_enabled === false) {
         return Markup.removeKeyboard();
     }
-    return Markup.keyboard([['🔍 Поиск', '📺 Мои подписки'], ['ℹ️ Помощь']]).resize();
+    return Markup.keyboard([
+        ['🔍 Поиск', '📺 Мои подписки'],
+        ['⚙️ Настройки', 'ℹ️ Помощь']
+    ]).resize();
 };
 
 const cancelMenu = Markup.keyboard([['❌ Отмена']]).resize();

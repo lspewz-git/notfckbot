@@ -102,6 +102,7 @@ function fakeChat() {
     const ctxFor = (message, extra = {}) => ({
         chat: { id: 555 },
         from: { id: 777 },
+        state: {},
         callbackQuery: message ? { message } : undefined,
         answerCbQuery: async (text, opts) => {
             if (opts && opts.show_alert) alerts.push(text);
@@ -234,28 +235,30 @@ test('a button on a search this user no longer has (expired, or before a restart
     assert.match(chat.alerts.at(-1), /поиск устарел/);
 });
 
-test("in a group, another participant's presses don't page or replace someone's search", async () => {
+test('the search lives with its message: another participant can page it (who may is access.js)', async () => {
     const bot = fakeBot();
     const chat = fakeChat();
     const { setState } = require('../../src/bot/state');
     const userCtx = chat.ctxFor(null, { message: { text: 'курьер' } });
     setState(userCtx, { state: 'waiting_for_search' });
     await bot.onText()(userCtx, async () => {});
-    const list = only(chat);
 
-    for (const data of ['page_1', 'card_movie_1']) {
-        await press(bot, chat, list.id, data, 888);
-        assert.deepEqual(only(chat), list, `${data} by someone else changes nothing`);
-        assert.match(chat.alerts.at(-1), /начал другой участник/);
-    }
-    // The owner still can
-    await press(bot, chat, list.id, 'page_1');
+    await press(bot, chat, only(chat).id, 'page_1', 888);
     assert.match(
         only(chat)
             .buttons.map((b) => b.text)
             .join(' '),
         /2 \/ 2/
     );
+    await press(bot, chat, only(chat).id, 'page_0', 888);
+    await press(bot, chat, only(chat).id, 'card_tv_3', 888);
+    assert.match(only(chat).text, /Как уведомлять/);
+    // The card someone else opened is still the starter's, should the chat go back to "owner"
+    const { ownerOf } = require('../../src/bot/access');
+    assert.equal(ownerOf(555, only(chat).id), 777);
+    // ...and the one who started it can still go back to the list
+    await press(bot, chat, only(chat).id, 'back_to_results');
+    assert.match(only(chat).text, /«курьер»/);
 });
 
 test('a poster opened before is sent by its Telegram file id, not downloaded again', async () => {

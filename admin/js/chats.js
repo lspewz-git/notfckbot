@@ -40,6 +40,12 @@ export function openChatActions(chatId) {
         openTestNotifyModal(chat.id);
     };
 
+    $('action-settings').onclick = () => {
+        closeModal('chat-actions-modal');
+        setReturnTo(backToChat);
+        openChatSettings(chat, label);
+    };
+
     const blockBtn = $('action-block');
     blockBtn.querySelector('.action-title').textContent = isBlocked ? 'Unblock' : 'Block';
     blockBtn.querySelector('.action-desc').textContent = isBlocked
@@ -106,6 +112,36 @@ function blockUser(chatId, label) {
 }
 
 const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POST' }, 'Chat unblocked');
+
+// --- Settings ---
+/** The chat's bot settings: who presses its buttons (groups only) and the bottom menu. */
+function openChatSettings(chat, label) {
+    const group = chat.type !== 'private';
+    setText('chat-settings-sub', label);
+    $('chat-settings-buttons-field').hidden = !group;
+    setSelectValue('chat-settings-buttons', chat.buttons_mode === 'all' ? 'all' : 'owner');
+    setSelectValue('chat-settings-menu', chat.menu_enabled === false ? 'off' : 'on');
+
+    const save = /** @type {HTMLButtonElement} */ ($('chat-settings-save'));
+    save.onclick = async () => {
+        if (save.disabled) return;
+        const body = { menu_enabled: $field('chat-settings-menu').value === 'on' };
+        if (group) body.buttons_mode = $field('chat-settings-buttons').value;
+        save.disabled = true;
+        save.setAttribute('aria-busy', 'true');
+        try {
+            const ok = await mutate(`/chat/${chat.id}/settings`, { method: 'PATCH', body }, 'Settings saved');
+            if (ok) {
+                clearReturnTo();
+                closeModal('chat-settings-modal');
+            }
+        } finally {
+            save.disabled = false;
+            save.removeAttribute('aria-busy');
+        }
+    };
+    openModal('chat-settings-modal');
+}
 
 // --- Adding a series or a film ---
 // One search covering both; the branch happens on submit.

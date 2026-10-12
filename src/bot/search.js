@@ -11,54 +11,73 @@ const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = requ
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
+const { recordOwner } = require('./access');
 
 const mainMenuButton = Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]]);
 
-/** Deletes the search's message(s) still on screen; ids are kept in the state. */
+// One search is one message on screen, the list or a card, and its state lives with that message
+// rather than with a user: in a chat whose buttons are open to everyone (see access.js) anyone may
+// page it. Who may press at all is decided there; here only whether the search still exists.
+const sessions = new Map(); // "chatId:messageId" -> { chatId, messageId, starter, results, query, page, busy, at }
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const sessionKey = (chatId, messageId) => `${chatId}:${messageId}`;
+
+setInterval(
+    () => {
+        const cutoff = Date.now() - SESSION_TTL_MS;
+        for (const [key, session] of sessions) if (session.at < cutoff) sessions.delete(key);
+    },
+    10 * 60 * 1000
+    // unref: the bot keeps the process alive anyway; a test using this module can exit
+).unref();
+
+/** The search whose message a button was pressed on, or undefined if it has lapsed. */
+function sessionOf(ctx) {
+    const message = ctx.callbackQuery && ctx.callbackQuery.message;
+    const session = message && sessions.get(sessionKey(ctx.chat.id, message.message_id));
+    if (session) session.at = Date.now();
+    return session;
+}
+
+/** The search now lives on `message` (the list was edited, or replaced by a card or back). */
+function moveSession(session, message) {
+    sessions.delete(sessionKey(session.chatId, session.messageId));
+    session.messageId = message.message_id;
+    sessions.set(sessionKey(session.chatId, session.messageId), session);
+    // A search stays its starter's, even when someone else (in a chat open to all) opened the
+    // card it now shows: switch the chat to "owner" later, and the starter can still use it
+    recordOwner(session.chatId, message.message_id, session.starter);
+}
+
+/** Removes this user's searches in this chat from the screen, e.g. before a new one or on /cancel. */
 const clearLastMessages = async (ctx, chatId) => {
-    const state = getState(ctx);
-    if (!state.lastMessageIds) return;
-    for (const msgId of state.lastMessageIds) {
-        try {
-            await ctx.telegram.deleteMessage(chatId, msgId);
-        } catch {
-            /* already deleted */
-        }
+    const userId = ctx.from && ctx.from.id;
+    for (const [key, session] of sessions) {
+        if (session.chatId !== chatId || session.starter !== userId) continue;
+        sessions.delete(key);
+        await ctx.telegram.deleteMessage(chatId, session.messageId).catch(() => {});
     }
 };
 
 /**
- * Whether the pressed message is this user's search. The state is per user, so in a group a
- * press on someone else's search (or on one this user's state no longer knows, after a restart)
- * would page or replace a list it doesn't own: answer with a note and leave it alone.
- */
-async function ownSearch(ctx) {
-    const id = ctx.callbackQuery && ctx.callbackQuery.message && ctx.callbackQuery.message.message_id;
-    if ((getState(ctx).lastMessageIds || []).includes(id)) return true;
-    await ctx.answerCbQuery('Этот поиск устарел или его начал другой участник. Начните свой: 🔍 Поиск', {
-        show_alert: true
-    });
-    return false;
-}
-
-/**
- * Runs before every button of a search: the press must be on this user's search (see ownSearch),
- * and only one at a time. A double tap would otherwise open two cards or subscribe twice; a press
- * while another is being handled is answered quietly and dropped.
+ * Runs before every button of a search: the search must still exist (it lapses after 30 min, or
+ * with a restart), and it takes one press at a time. A double tap would otherwise open two cards
+ * or subscribe twice; a press while another is being handled is answered quietly and dropped.
  */
 async function searchGuard(ctx, next) {
-    if (!(await ownSearch(ctx))) return;
-    if (getState(ctx).busy) return ctx.answerCbQuery();
-    setState(ctx, { busy: true });
+    const session = sessionOf(ctx);
+    if (!session) {
+        return ctx.answerCbQuery('Этот поиск устарел. Начните новый: 🔍 Поиск', { show_alert: true });
+    }
+    if (session.busy) return ctx.answerCbQuery();
+    session.busy = true;
+    ctx.state.search = session;
     try {
         await next();
     } finally {
-        setState(ctx, { busy: false });
+        session.busy = false;
     }
 }
-
-/** The message a button was pressed on is the search's message from now on. */
-const remember = (ctx, message) => setState(ctx, { lastMessageIds: [message.message_id] });
 
 /**
  * Puts text in place of the message whose button was pressed. A text message is edited in place;
@@ -81,18 +100,12 @@ async function showText(ctx, text, keyboard) {
 }
 
 /** The results list for `page`, in place of the pressed message (or as a new one). */
-async function showList(ctx, page) {
-    const { results = [], query = '' } = getState(ctx);
-    if (!results.length) {
-        // The state lapsed (30 min idle, or the bot restarted): nothing to go back to
-        const msg = await showText(ctx, 'Результаты поиска устарели. Начните поиск заново: 🔍 Поиск.', mainMenuButton);
-        remember(ctx, msg);
-        return;
-    }
-    const list = resultsList(results, page, query);
+async function showList(ctx, session, page) {
+    const list = resultsList(session.results, page, session.query);
     const msg = await showText(ctx, list.text, list.keyboard);
-    setState(ctx, { currentPage: list.page, lastMessageIds: [msg.message_id] });
-    prefetch(results.slice(list.page * PER_PAGE, (list.page + 1) * PER_PAGE));
+    session.page = list.page;
+    moveSession(session, msg);
+    prefetch(session.results.slice(list.page * PER_PAGE, (list.page + 1) * PER_PAGE));
 }
 
 /**
@@ -126,7 +139,7 @@ function rememberPoster(url, message) {
 }
 
 /** A card (with its poster when there is one) in place of the list. */
-async function showCard(ctx, card) {
+async function showCard(ctx, session, card) {
     let msg = null;
     if (card.posterUrl) {
         const extra = { caption: card.caption, parse_mode: 'HTML', ...card.keyboard };
@@ -142,7 +155,7 @@ async function showCard(ctx, card) {
     if (!msg) msg = await ctx.replyWithHTML(card.caption, card.keyboard);
     // The list goes once the card is there, so the chat is never empty in between
     ctx.deleteMessage().catch(() => {});
-    remember(ctx, msg);
+    moveSession(session, msg);
 }
 
 /** A series row for the update check, created on the first subscription. */
@@ -151,10 +164,24 @@ async function ensureSeries(tmdbId, data) {
     return series;
 }
 
+/** The search is done (subscribed, added): its message is now a confirmation, not a search. */
+function endSearch(ctx) {
+    const session = ctx.state.search;
+    if (session) sessions.delete(sessionKey(session.chatId, session.messageId));
+    if (session && session.starter === ctx.from.id) setState(ctx, { state: 'idle' });
+}
+
 function register(bot) {
     bot.action('cancel_search', async (ctx) => {
+        // ✖️ on a list or card ends that search (whoever started it); "main menu" under a
+        // confirmation has none, and ends whatever this user still has open
+        const session = sessionOf(ctx);
+        if (session) {
+            sessions.delete(sessionKey(session.chatId, session.messageId));
+            await ctx.deleteMessage().catch(() => {});
+        }
         await clearLastMessages(ctx, ctx.chat.id);
-        setState(ctx, { state: 'idle', results: [], lastMessageIds: [] });
+        setState(ctx, { state: 'idle' });
         await ctx.reply('Поиск завершен.', mainMenu(ctx));
         await ctx.answerCbQuery();
     });
@@ -170,6 +197,7 @@ function register(bot) {
             '❌ Отмена',
             'ℹ️ Помощь',
             '❓ Помощь',
+            '⚙️ Настройки',
             '🎲 Случайный фильм'
         ];
         if (BUTTON_TEXTS.includes(text) || text.startsWith('/')) return next();
@@ -191,8 +219,16 @@ function register(bot) {
             }
             // A previous search's message goes: the chat keeps one search at a time
             await clearLastMessages(ctx, ctx.chat.id);
-            setState(ctx, { results, query: text, state: 'searching', lastMessageIds: [] });
-            await showList(ctx, 0);
+            setState(ctx, { state: 'searching' });
+            const session = {
+                chatId: ctx.chat.id,
+                starter: ctx.from.id,
+                results,
+                query: text,
+                page: 0,
+                at: Date.now()
+            };
+            await showList(ctx, session, 0);
         } catch (error) {
             console.error('[Bot] Search error:', error);
             await ctx.reply('Ошибка при поиске. Попробуйте позже.', mainMenu(ctx));
@@ -202,12 +238,12 @@ function register(bot) {
 
     bot.action(/^page_(\d+)$/, searchGuard, async (ctx) => {
         await ctx.answerCbQuery();
-        await showList(ctx, parseInt(ctx.match[1], 10));
+        await showList(ctx, ctx.state.search, parseInt(ctx.match[1], 10));
     });
 
     bot.action('back_to_results', searchGuard, async (ctx) => {
         await ctx.answerCbQuery();
-        await showList(ctx, getState(ctx).currentPage || 0);
+        await showList(ctx, ctx.state.search, ctx.state.search.page);
     });
 
     // A result's card. "sub_" is what the buttons were called before the list, on older messages.
@@ -229,11 +265,11 @@ function register(bot) {
                     // Only a film that is out shows watch links, the only thing that needs the ID
                     isMovieReleased(data) ? findKinopoiskIdQuick(tmdbId, data.imdb_id) : null
                 ]);
-                return showCard(ctx, filmCard(data, { kinopoiskId, onWatchlist }));
+                return showCard(ctx, ctx.state.search, filmCard(data, { kinopoiskId, onWatchlist }));
             }
 
             const sub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
-            return showCard(ctx, seriesCard(data, { subscribedMode: sub ? sub.notify_type : null }));
+            return showCard(ctx, ctx.state.search, seriesCard(data, { subscribedMode: sub ? sub.notify_type : null }));
         } catch (error) {
             console.error('[Bot] Card error:', error);
             await ctx.answerCbQuery('Не удалось открыть карточку.').catch(() => {});
@@ -282,7 +318,7 @@ function register(bot) {
                 ? `✅ Вы успешно подписались на <b>«${escapeHtml(series.title)}»</b>`
                 : `✅ Режим уведомлений для <b>«${escapeHtml(series.title)}»</b> обновлён`;
             await showText(ctx, `${heading}\n\n${details}`, mainMenuButton);
-            setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
+            endSearch(ctx);
         } catch (error) {
             console.error('[Bot] Finalize subscription error:', error);
             await ctx.answerCbQuery('Ошибка сохранения подписки.').catch(() => {});
@@ -329,7 +365,7 @@ function register(bot) {
                     `<i>Как только фильм выйдет — пришлю ссылки для просмотра.</i>`,
                 mainMenuButton
             );
-            setState(ctx, { results: [], lastMessageIds: [], state: 'idle' });
+            endSearch(ctx);
         } catch (error) {
             console.error('[Bot] Watchlist add error:', error);
             await ctx.answerCbQuery('Ошибка при добавлении.').catch(() => {});
