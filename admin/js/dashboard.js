@@ -33,19 +33,27 @@ const PROXY_HEALTH = {
     error: ['Proxy: ERR', 'error']
 };
 
+/** Takes all of /api/health or one service's part of it; updates only the badges it covers. */
 export function updateHealth(h) {
-    updateBadge('health-tg', h.telegram ? 'TG: OK' : 'TG: ERR', h.telegram ? 'ok' : 'error');
-    updateBadge('health-tmdb', h.tmdb ? 'TMDB: OK' : 'TMDB: ERR', h.tmdb ? 'ok' : 'error');
-    const [proxyText, proxyClass] = PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost'];
-    updateBadge('health-proxy', proxyText, proxyClass);
+    if ('telegram' in h) updateBadge('health-tg', h.telegram ? 'TG: OK' : 'TG: ERR', h.telegram ? 'ok' : 'error');
+    if ('tmdb' in h) updateBadge('health-tmdb', h.tmdb ? 'TMDB: OK' : 'TMDB: ERR', h.tmdb ? 'ok' : 'error');
+    if ('proxy' in h) {
+        const [proxyText, proxyClass] = PROXY_HEALTH[h.proxy] || ['Proxy: OFF', 'ghost'];
+        updateBadge('health-proxy', proxyText, proxyClass);
+    }
 
     // Kinopoisk API, used to find Kinopoisk IDs for watch links. Clicking any of
     // these badges opens the service dialog; the tooltip shows today's quota.
-    const kp = KINOPOISK_HEALTH[h.kinopoisk] || KINOPOISK_HEALTH.off;
-    updateBadge('health-kp', kp[0], kp[1]);
-    const kpBadge = $('health-kp');
-    const q = h.kinopoiskQuota;
-    if (kpBadge && q) kpBadge.title = `Kinopoisk API: ${q.used} of ${q.limit} requests used today`;
+    if ('kinopoisk' in h) {
+        const kp = KINOPOISK_HEALTH[h.kinopoisk] || KINOPOISK_HEALTH.off;
+        updateBadge('health-kp', kp[0], kp[1]);
+        const kpBadge = $('health-kp');
+        const q = h.kinopoiskQuota;
+        if (kpBadge)
+            kpBadge.title = q
+                ? `Kinopoisk API: ${q.used} of ${q.limit} requests used today`
+                : 'Kinopoisk API: key, quota and status';
+    }
 }
 
 // --- Coming up ---

@@ -34,7 +34,10 @@ export async function fetchData() {
     const jobs = [];
     if (currentSection === 'dashboard') {
         jobs.push(api('/stats').then(updateStats));
-        jobs.push(api('/health').then(updateHealth));
+        // One request per service: each badge updates as soon as its own service answers
+        for (const service of ['telegram', 'tmdb', 'kinopoisk', 'proxy']) {
+            jobs.push(api(`/health/${service}`).then(updateHealth));
+        }
         jobs.push(api('/stats/popular').then(updatePopular));
         jobs.push(api('/upcoming').then(updateUpcoming));
         jobs.push(api('/cron').then(updateCron));

@@ -82,7 +82,13 @@ const CLICK_ACTIONS = {
     'select-content': (el) => selectContent(Number(el.dataset.index)),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
-    service: (el) => openServiceModal(el.dataset.service, el.dataset.label, el.dataset.restarts === 'true')
+    service: (el) =>
+        openServiceModal(el.dataset.service, {
+            label: el.dataset.label,
+            restarts: el.dataset.restarts === 'true',
+            statusUrl: el.dataset.statusUrl,
+            statusLabel: el.dataset.statusLabel
+        })
 };
 
 const DELEGATED =

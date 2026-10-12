@@ -75,6 +75,29 @@ tbody tr:hover td {
     background: currentColor;
 }
 
+/* Before the first health answer: a muted badge whose dot is a spinning ring */
+.status-badges .badge.loading {
+    background: var(--muted-soft);
+    color: var(--text-dim);
+}
+
+.status-badges .badge.loading::before {
+    width: 8px;
+    height: 8px;
+    background: none;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-badges .badge.loading::before {
+        animation: none;
+        border-top-color: currentColor;
+        opacity: 0.6;
+    }
+}
+
 /* A badge that is a link (KP → status page) keeps badge colours */
 a.badge {
     text-decoration: none;

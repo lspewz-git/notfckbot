@@ -213,7 +213,13 @@ app.get('/api/upcoming', async (req, res) => {
         const byFilm = new Map();
         for (const w of films) {
             const id = String(w.tmdb_id).startsWith('movie_') ? w.tmdb_id : `movie_${w.tmdb_id}`;
-            const entry = byFilm.get(id) || { kind: 'movie', id, title: w.title, date: w.premiere_digital, chats: new Set() };
+            const entry = byFilm.get(id) || {
+                kind: 'movie',
+                id,
+                title: w.title,
+                date: w.premiere_digital,
+                chats: new Set()
+            };
             entry.chats.add(String(w.chatId));
             byFilm.set(id, entry);
         }
@@ -303,67 +309,92 @@ app.get('/api/tmdb/search', async (req, res) => {
     }
 });
 
-// The dashboard polls every 10 s, and each check calls three external services.
-// A short cache keeps that to a few calls a minute; saving a token clears it.
+// The dashboard polls every 10 s. Each service is checked on its own, with its own
+// cache, so a slow or dead one (a timeout takes seconds) holds up only its own badge.
+// Saving a token or the proxy clears the cache.
 const HEALTH_TTL_MS = 30_000;
-let healthCache = null;
-const invalidateHealth = () => {
-    healthCache = null;
+const HEALTH_TIMEOUT_MS = 5000;
+
+const viaProxy = () => ({ httpsAgent: buildProxyAgent(process.env.TMDB_PROXY_URL), proxy: false });
+
+/** Each returns its part of the /api/health answer; none throws. */
+const HEALTH_CHECKS = {
+    telegram: async () => {
+        try {
+            // Telegraf has no request timeout of its own: without this a hung connection
+            // would keep the badge spinning, and every poll would reuse the stuck check
+            await Promise.race([
+                app.get('bot').telegram.getMe(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), HEALTH_TIMEOUT_MS))
+            ]);
+            return { telegram: true };
+        } catch {
+            return { telegram: false };
+        }
+    },
+    tmdb: async () => {
+        try {
+            const res = await axios.get('https://api.themoviedb.org/3/authentication', {
+                headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+                timeout: HEALTH_TIMEOUT_MS,
+                ...viaProxy()
+            });
+            return { tmdb: res.status === 200 };
+        } catch {
+            return { tmdb: false };
+        }
+    },
+    proxy: async () => {
+        if (!process.env.TMDB_PROXY_URL) return { proxy: 'off' };
+        try {
+            const res = await axios.get('https://google.com', { timeout: HEALTH_TIMEOUT_MS, ...viaProxy() });
+            return { proxy: res.status === 200 ? 'ok' : 'error' };
+        } catch {
+            return { proxy: 'error' };
+        }
+    },
+    // Kinopoisk API (watch-link lookups): 'off' without a key, else ok/error plus today's quota
+    kinopoisk: async () => {
+        try {
+            const kp = await getKinopoiskStatus();
+            return {
+                kinopoisk: kp.state,
+                kinopoiskQuota: kp.state === 'ok' ? { used: kp.used, limit: kp.limit } : null
+            };
+        } catch {
+            return { kinopoisk: 'error', kinopoiskQuota: null };
+        }
+    }
 };
 
+const healthCache = new Map(); // name -> { at, value }
+const healthInFlight = new Map(); // name -> pending check, shared by concurrent requests
+const invalidateHealth = () => healthCache.clear();
+
+function checkHealth(name) {
+    const hit = healthCache.get(name);
+    if (hit && Date.now() - hit.at < HEALTH_TTL_MS) return Promise.resolve(hit.value);
+    if (healthInFlight.has(name)) return healthInFlight.get(name);
+    const run = HEALTH_CHECKS[name]()
+        .then((value) => {
+            healthCache.set(name, { at: Date.now(), value });
+            return value;
+        })
+        .finally(() => healthInFlight.delete(name));
+    healthInFlight.set(name, run);
+    return run;
+}
+
+// One service: what the dashboard badges use, so each shows up as soon as it's known
+app.get('/api/health/:name', async (req, res) => {
+    if (!Object.hasOwn(HEALTH_CHECKS, req.params.name)) return res.status(404).json({ error: 'Unknown service' });
+    res.json(await checkHealth(req.params.name));
+});
+
+// All services at once (waits for the slowest)
 app.get('/api/health', async (req, res) => {
-    if (healthCache && Date.now() - healthCache.at < HEALTH_TTL_MS) return res.json(healthCache.value);
-
-    const health = { telegram: false, tmdb: false, proxy: 'off', kinopoisk: 'off', kinopoiskQuota: null };
-    const proxyUrl = process.env.TMDB_PROXY_URL;
-
-    if (proxyUrl) {
-        health.proxy = 'error'; // Default to error if URL exists
-    }
-
-    const [tgResult, tmdbResult, proxyResult, kpResult] = await Promise.allSettled([
-        app.get('bot').telegram.getMe(),
-        axios.get('https://api.themoviedb.org/3/authentication', {
-            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
-            timeout: 5000,
-            httpsAgent: buildProxyAgent(proxyUrl),
-            proxy: false
-        }),
-        proxyUrl
-            ? axios.get('https://google.com', {
-                  timeout: 5000,
-                  httpsAgent: buildProxyAgent(proxyUrl),
-                  proxy: false
-              })
-            : Promise.resolve({ status: 200 }),
-        getKinopoiskStatus()
-    ]);
-
-    if (tgResult.status === 'fulfilled') health.telegram = true;
-    if (tmdbResult.status === 'fulfilled' && tmdbResult.value.status === 200) health.tmdb = true;
-
-    // Kinopoisk API (watch-link lookups): 'off' without a key, else ok/error plus today's quota
-    if (kpResult.status === 'fulfilled') {
-        health.kinopoisk = kpResult.value.state;
-        if (kpResult.value.state === 'ok') {
-            health.kinopoiskQuota = { used: kpResult.value.used, limit: kpResult.value.limit };
-        }
-    } else {
-        health.kinopoisk = 'error';
-    }
-
-    if (proxyUrl) {
-        if (proxyResult.status === 'fulfilled' && proxyResult.value.status === 200) {
-            health.proxy = 'ok';
-        } else {
-            health.proxy = 'error';
-        }
-    } else {
-        health.proxy = 'off';
-    }
-
-    healthCache = { at: Date.now(), value: health };
-    res.json(health);
+    const parts = await Promise.all(Object.keys(HEALTH_CHECKS).map(checkHealth));
+    res.json(Object.assign({}, ...parts));
 });
 
 app.get('/api/chats', async (req, res) => {
@@ -816,28 +847,41 @@ const describeError = (err) =>
 // Own keys only, so "constructor" and friends are not services
 const findService = (name) => (Object.hasOwn(SERVICES, name) ? SERVICES[name] : null);
 
-app.get('/api/services/:name', async (req, res) => {
+// What the server knows on its own (from .env): instant, so the dialog shows the token
+// right away. The service itself is asked separately, below.
+app.get('/api/services/:name', (req, res) => {
     const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
 
     const token = process.env[service.env];
-    const out = {
+    res.json({
         name: req.params.name,
         label: service.label,
         configured: Boolean(token),
         masked: maskToken(token),
         statusUrl: service.statusUrl,
         statusLabel: service.statusLabel,
-        restartOnChange: Boolean(service.restartOnChange),
-        ok: false,
-        details: []
-    };
+        restartOnChange: Boolean(service.restartOnChange)
+    });
+});
+
+// Asks the service whether the current token works: as slow as the service (seconds on a timeout)
+app.get('/api/services/:name/check', async (req, res) => {
+    const service = findService(req.params.name);
+    if (!service) return res.status(404).json({ error: 'Unknown service' });
+
+    const token = process.env[service.env];
+    const out = { configured: Boolean(token), ok: false, details: [] };
     if (!token) return res.json(out);
 
     try {
         Object.assign(out, await service.check(token), { ok: true });
     } catch (err) {
-        out.error = describeError(err);
+        // Not `error`: the panel treats a body with `error` as a failed request
+        out.checkError = describeError(err);
+        // The status the service answered with (e.g. 401 for a revoked token); absent when
+        // it didn't answer at all: a timeout, a refused or dropped connection
+        if (err.response) out.status = err.response.status;
     }
     res.json(out);
 });

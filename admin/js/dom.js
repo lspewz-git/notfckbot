@@ -66,6 +66,7 @@ export function updateBadge(id, text, type) {
     if (!el) return;
     el.innerText = text;
     el.className = `badge ${type}`;
+    el.removeAttribute('aria-busy');
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };

@@ -153,6 +153,10 @@ async function mockPanel(page) {
             kinopoisk: 'ok',
             kinopoiskQuota: { used: 3, limit: 500 }
         }),
+        '/api/health/telegram': () => ({ telegram: true }),
+        '/api/health/tmdb': () => ({ tmdb: true }),
+        '/api/health/proxy': () => ({ proxy: 'off' }),
+        '/api/health/kinopoisk': () => ({ kinopoisk: 'ok', kinopoiskQuota: { used: 3, limit: 500 } }),
         '/api/stats/popular': () => [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
         '/api/upcoming': () => [],
         '/api/cron': () => ({ running: false, lastRun: null, nextRunAt: new Date().toISOString(), intervalHours: 3 }),
