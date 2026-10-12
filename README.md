@@ -220,7 +220,7 @@ ADMIN_URL=http://<host>/ npm test
   - `subscriptions.js` — «Мои подписки»: обзор, настройки, архив, отписка;
   - `state.js` (состояние диалога), `keyboards.js` (клавиатуры и кнопки ссылок).
 - `src/admin/` — сервер панели: `index.js` (Express, статика, подключение маршрутов), `env.js` (запись в `.env`, маскирование токенов), `log-buffer.js` (логи для панели) и `routes/` — по файлу на раздел API: `stats`, `data`, `details`, `logs`, `health`, `services`, `config`, `records`, `actions`.
-- `src/cron.js` — фоновая проверка обновлений.
+- `src/cron/` — фоновая проверка обновлений: `index.js` (расписание и запуск), `series.js` (новые серии, завершённые сезоны, смена статуса), `films.js` (вышедшие фильмы), `messages.js` (тексты уведомлений), `status.js` (статус проверки для панели).
 - `src/proxy.js` — единая точка сборки прокси-агента для TMDB и Telegram.
 - `src/api/tmdb.js` — клиент TMDB.
 - `src/api/kinopoisk.js` — поиск ID Кинопоиска (Wikidata, kinopoiskapiunofficial.tech, с кешем) и статус API.
@@ -231,9 +231,10 @@ ADMIN_URL=http://<host>/ npm test
 **Фронтенд панели** (`admin/`)
 
 - `index.html` — разметка; обработчики навешиваются делегированием, инлайновых `onclick` нет.
-- `js/` — 17 ES-модулей с однонаправленными зависимостями:
-  `dom` · `api` · `store` · `render` · `format` → `ui` · `select` → `tables` · `dashboard` · `logs` → `data` → `chats` · `records` · `maintenance` · `proxy` · `services` → `app`.
-- `css/` — 10 файлов, подключаются в порядке каскада: `base` (токены дизайна), `layout`, `cards`, `logs`, `tables`, `buttons`, `forms`, `overlays`, `utilities`, `responsive`.
+- `js/` — 21 ES-модуль с однонаправленными зависимостями:
+  `dom` · `api` · `store` · `render` · `format` → `ui` · `select` · `table-defs` → `pager` · `table-sort` → `tables` · `dashboard` · `logs` → `data` → `chats` · `records` · `maintenance` · `proxy` · `services` · `test-notify` → `app`.
+  Таблицы: `table-defs` (колонки, вкладки, вид строки), `pager` (страницы), `table-sort` (сортировка), `tables` (вкладки, фильтр, отрисовка).
+- `css/` — 11 файлов, подключаются в порядке каскада: `base` (токены дизайна), `layout`, `cards`, `logs`, `tables`, `buttons`, `forms`, `overlays`, `utilities`, `responsive`, `dashboard` (дашборд целиком, включая телефон; последним, чтобы перекрывать общие стили).
 - `DESIGN.md` — дизайн-система: палитра, типографика, отступы, компоненты.
 - `jsconfig.json` — настройки проверки типов.
 
