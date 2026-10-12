@@ -198,7 +198,8 @@
                                 <path d="M12 9v4M12 17h.01" />
                             </svg>
                             <span id="service-alert-text" class="alert-text"></span>
-                            <button class="alert-action" data-section="logs">View logs</button>
+                            <!-- Opens the failing service's dialog, which says why (a rejected token, a timeout) -->
+                            <button id="service-alert-action" class="alert-action">Details</button>
                         </div>
 
                         <div class="stats-grid">
@@ -933,7 +934,14 @@
                     </div>
                     <button id="confirm-add-content" class="btn btn-primary btn-block">Add</button>
                 </div>
-                <button data-close-return="add-content-modal" class="btn btn-ghost btn-block mt-md">Cancel</button>
+                <!-- A corner ×, not a Cancel button under everything: on a phone that one sat below the
+                     fold, past the results and the Add button -->
+                <button data-close-return="add-content-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </div>
 

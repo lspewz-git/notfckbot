@@ -13,6 +13,13 @@ const HEALTH_TIMEOUT_MS = 5000;
 
 const viaProxy = () => ({ httpsAgent: buildProxyAgent(process.env.TMDB_PROXY_URL), proxy: false });
 
+/**
+ * "HTTP 401", "timeout of 5000ms exceeded": the HTTP status when an axios request got an answer,
+ * else the message. Telegraf's errors carry a `response` too, but with no `status`; their message
+ * already reads "401: Unauthorized".
+ */
+const reasonOf = (err) => (err.response && err.response.status ? `HTTP ${err.response.status}` : err.message);
+
 /** Each returns its part of the /api/health answer; none throws. Telegram gets the bot. */
 const HEALTH_CHECKS = {
     telegram: async (bot) => {
@@ -24,8 +31,8 @@ const HEALTH_CHECKS = {
                 new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), HEALTH_TIMEOUT_MS))
             ]);
             return { telegram: true };
-        } catch {
-            return { telegram: false };
+        } catch (err) {
+            return { telegram: false, reason: reasonOf(err) };
         }
     },
     tmdb: async () => {
@@ -36,8 +43,8 @@ const HEALTH_CHECKS = {
                 ...viaProxy()
             });
             return { tmdb: res.status === 200 };
-        } catch {
-            return { tmdb: false };
+        } catch (err) {
+            return { tmdb: false, reason: reasonOf(err) };
         }
     },
     proxy: async () => {
@@ -45,8 +52,8 @@ const HEALTH_CHECKS = {
         try {
             const res = await axios.get('https://google.com', { timeout: HEALTH_TIMEOUT_MS, ...viaProxy() });
             return { proxy: res.status === 200 ? 'ok' : 'error' };
-        } catch {
-            return { proxy: 'error' };
+        } catch (err) {
+            return { proxy: 'error', reason: reasonOf(err) };
         }
     },
     // Kinopoisk API (watch-link lookups): 'off' without a key, else ok/error plus today's quota
@@ -57,11 +64,27 @@ const HEALTH_CHECKS = {
                 kinopoisk: kp.state,
                 kinopoiskQuota: kp.state === 'ok' ? { used: kp.used, limit: kp.limit } : null
             };
-        } catch {
-            return { kinopoisk: 'error', kinopoiskQuota: null };
+        } catch (err) {
+            return { kinopoisk: 'error', kinopoiskQuota: null, reason: reasonOf(err) };
         }
     }
 };
+
+// Whether each check failed, as last seen, so the log gets one line per change rather than one
+// per poll: "[Health] KP: error (HTTP 401)" when it breaks, "[Health] KP: ok again" when it heals
+const LOG_NAMES = { telegram: 'TG', tmdb: 'TMDB', proxy: 'Proxy', kinopoisk: 'KP' };
+const lastFailed = new Map();
+
+function logChange(name, value) {
+    const failed = value[name] === false || value[name] === 'error';
+    const before = lastFailed.get(name);
+    lastFailed.set(name, failed);
+    // The first check after a start only speaks up if something is wrong
+    if (before === failed || (before === undefined && !failed)) return;
+    if (failed) console.error(`[Health] ${LOG_NAMES[name]}: error (${value.reason || 'no details'})`);
+    // A failing proxy or key that was then removed is "off", not "ok"
+    else console.log(`[Health] ${LOG_NAMES[name]}: ${value[name] === 'off' ? 'off' : 'ok again'}`);
+}
 
 const healthCache = new Map(); // name -> { at, value }
 const healthInFlight = new Map(); // name -> pending check, shared by concurrent requests
@@ -74,6 +97,7 @@ function checkHealth(name, bot) {
     const run = HEALTH_CHECKS[name](bot)
         .then((value) => {
             healthCache.set(name, { at: Date.now(), value });
+            logChange(name, value);
             return value;
         })
         .finally(() => healthInFlight.delete(name));
@@ -93,4 +117,4 @@ router.get('/api/health', async (req, res) => {
     res.json(Object.assign({}, ...parts));
 });
 
-module.exports = { router, invalidateHealth };
+module.exports = { router, invalidateHealth, reasonOf, logChange };

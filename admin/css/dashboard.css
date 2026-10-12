@@ -592,6 +592,8 @@
 
 /* --- Footer: the deployed commit, quiet, at the very bottom --- */
 .build-info {
+    /* A flex child of the section would stretch to the full width, tooltip and all */
+    align-self: flex-start;
     padding: var(--space-1) var(--space-1) 0;
     color: var(--text-dim);
     font-size: var(--text-sm);

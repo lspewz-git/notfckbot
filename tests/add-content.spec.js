@@ -205,3 +205,48 @@ test('a search answer that arrives after the dialog was reopened does not fill i
     await page.waitForTimeout(500);
     await expect(page.locator('#content-search-results [data-action="select-content"]')).toHaveCount(0);
 });
+
+test('after picking a result the Add button is in view without scrolling, and × closes the dialog', async ({
+    page
+}) => {
+    await mockPanel(page);
+    await openSection(page, 'watchlist');
+    await page.locator('#watchlist-section [data-action="add-content"]').click();
+    await page.locator('#content-search-input').fill('long title');
+    await page.locator('#content-search-results [data-index="0"]').click();
+
+    // Six results would push it below the fold on a phone if the dialog scrolled as a whole
+    await expect(page.locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('#add-content-modal button', { hasText: 'Cancel' })).toHaveCount(0);
+
+    await page.locator('#add-content-modal .modal-x').click();
+    await expect(page.locator('#add-content-modal')).toBeHidden();
+});
+
+test('on a phone held sideways the dialog scrolls, so the Add button can still be reached', async ({ page }) => {
+    await page.setViewportSize({ width: 812, height: 375 });
+    await mockPanel(page);
+    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
+    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="subs"]`).click();
+    await page.locator('#subs-section [data-action="add-content"]').click();
+    await page.locator('#content-search-input').fill('long title');
+    // A series: its notification mode makes the picked block taller
+    await page.locator('#content-search-results [data-index="0"]').click();
+
+    const dialog = page.locator('#add-content-modal .modal-content');
+    // Taller than the screen, so it has to scroll: scrollIntoView would work even on a clipped
+    // box, so check what a user can do instead
+    const { overflowY, overflows } = await dialog.evaluate((el) => ({
+        overflowY: getComputedStyle(el).overflowY,
+        overflows: el.scrollHeight > el.clientHeight
+    }));
+    expect(overflows).toBe(true);
+    expect(overflowY).toBe('auto');
+    if (test.info().project.name === 'desktop') {
+        // A wheel over the dialog brings the button up (mobile WebKit has no wheel)
+        const box = await dialog.boundingBox();
+        await page.mouse.move(box.x + box.width / 2, box.y + 40);
+        await page.mouse.wheel(0, 600);
+        await expect(page.locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
+    }
+});

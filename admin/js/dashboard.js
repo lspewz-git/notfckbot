@@ -30,6 +30,8 @@ export function updateStats(stats) {
 /** ok | error | off per service, for the banner; a service not yet answered is absent */
 const serviceState = {};
 const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', kinopoisk: 'KP', proxy: 'Proxy' };
+// The badge of each service; clicking one opens its dialog
+const SERVICE_BADGES = { telegram: 'health-tg', tmdb: 'health-tmdb', kinopoisk: 'health-kp', proxy: 'health-proxy' };
 
 function setService(key, badgeId, state) {
     serviceState[key] = state;
@@ -39,15 +41,20 @@ function setService(key, badgeId, state) {
     updateBadge(badgeId, text, cls);
 }
 
-/** "KP is reporting an error" / "KP and TMDB are reporting errors"; hidden when all is well. */
+/**
+ * "KP is reporting an error" / "KP and TMDB are reporting errors"; hidden when all is well.
+ * Its button opens the (first) failing service's dialog, which shows why.
+ */
 function renderServiceAlert() {
     const banner = $('service-alert');
     if (!banner) return;
-    const failing = Object.keys(SERVICE_NAMES)
-        .filter((k) => serviceState[k] === 'error')
-        .map((k) => SERVICE_NAMES[k]);
+    const failingKeys = Object.keys(SERVICE_NAMES).filter((k) => serviceState[k] === 'error');
+    const failing = failingKeys.map((k) => SERVICE_NAMES[k]);
     banner.hidden = failing.length === 0;
     if (!failing.length) return;
+    const action = $('service-alert-action');
+    action.textContent = `Open ${failing[0]}`;
+    action.dataset.badge = SERVICE_BADGES[failingKeys[0]];
     const names =
         failing.length === 1 ? failing[0] : `${failing.slice(0, -1).join(', ')} and ${failing[failing.length - 1]}`;
     const text = `${names} ${failing.length === 1 ? 'is reporting an error' : 'are reporting errors'}`;
@@ -57,6 +64,12 @@ function renderServiceAlert() {
 }
 
 /** Takes all of /api/health or one service's part of it; updates only the statuses it covers. */
+/** The banner's button: the same as clicking the failing service's badge. */
+export function openFailingService() {
+    const badge = $($('service-alert-action').dataset.badge || '');
+    if (badge) badge.click();
+}
+
 export function updateHealth(h) {
     if ('telegram' in h) setService('telegram', 'health-tg', h.telegram ? 'ok' : 'error');
     if ('tmdb' in h) setService('tmdb', 'health-tmdb', h.tmdb ? 'ok' : 'error');

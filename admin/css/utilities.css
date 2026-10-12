@@ -329,7 +329,31 @@ tbody tr:hover .avatar-mark {
     font-size: var(--text-xs);
 }
 
+/* The add dialog: a column whose results list gives up height first, so the picked title and
+   its Add button stay in view on a short phone screen instead of below the fold. Still
+   scrollable: on a phone held sideways even a short list doesn't leave room for everything. */
+#add-content-modal .modal-content {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+#add-content-modal .modal-content > * {
+    flex-shrink: 0;
+}
+
 /* The add dialog's search results: scrolls down, never sideways */
+#add-content-modal .search-results {
+    flex: 0 1 auto;
+    /* About a row and a half: shrinking further would hide what there is to pick */
+    min-height: 7rem;
+}
+
+/* The search box right below brings its own top margin */
+#content-chat-field {
+    margin-bottom: 0;
+}
+
 .search-results {
     max-height: 320px;
     margin-top: var(--space-4);

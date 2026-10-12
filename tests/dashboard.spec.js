@@ -27,14 +27,43 @@ test('statuses read "TG" when fine, "KP: ERR" and "Proxy: OFF" otherwise; no ban
     await expect(page.locator('#service-alert')).toBeHidden();
 });
 
-test('a failing service raises the banner, and "View logs" opens the logs', async ({ page }) => {
+test("a failing service raises the banner, and its button opens that service's dialog", async ({ page }) => {
     await mockPanel(page, { health: { kinopoisk: 'error', tmdb: false } });
     await expect(page.locator('#health-kp')).toHaveText('KP: ERR');
     await expect(page.locator('#service-alert')).toBeVisible();
     await expect(page.locator('#service-alert-text')).toHaveText('TMDB and KP are reporting errors');
 
-    await page.locator('#service-alert .alert-action').click();
-    await expect(page.locator('#logs-section')).toHaveClass(/active/);
+    // The first failing service: the same dialog its badge opens
+    const action = page.locator('#service-alert-action');
+    await expect(action).toHaveText('Open TMDB');
+    await page.route('**/api/services/tmdb*', (route) =>
+        route.fulfill({
+            json: {
+                name: 'tmdb',
+                label: 'TMDB API',
+                configured: true,
+                masked: 'abcd*****wxyz',
+                statusUrl: 'https://status.themoviedb.org',
+                statusLabel: 'Status page'
+            }
+        })
+    );
+    await page.route('**/api/services/tmdb/check', (route) =>
+        route.fulfill({ json: { configured: true, ok: false, details: [], checkError: 'HTTP 401', status: 401 } })
+    );
+    await action.click();
+    await expect(page.locator('#service-modal')).toBeVisible();
+    await expect(page.locator('#service-title')).toHaveText('TMDB API');
+});
+
+test('the version footer is only as wide as its text', async ({ page }) => {
+    await mockPanel(page);
+    const footer = page.locator('#build-info');
+    await expect(footer).toBeVisible();
+    const width = await footer.evaluate((el) => el.getBoundingClientRect().width);
+    const section = await page.locator('#dashboard-section').evaluate((el) => el.getBoundingClientRect().width);
+    // Stretched it would be the section's full width; its text is far shorter on any screen
+    expect(width).toBeLessThan(section * 0.8);
 });
 
 test('the banner is not rewritten when a refresh brings the same news', async ({ page }) => {

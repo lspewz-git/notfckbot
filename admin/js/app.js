@@ -1,7 +1,7 @@
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
 import { $, $field, all, closest, debounce } from './dom.js';
-import { runCheckNow, renderDashboardPlaceholders } from './dashboard.js';
+import { runCheckNow, renderDashboardPlaceholders, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
 import { filterLogs } from './logs.js';
@@ -176,6 +176,7 @@ function setupControls() {
         updateAutoRefreshSwitch();
     };
     $('run-check').onclick = () => runCheckNow(fetchData);
+    $('service-alert-action').onclick = openFailingService;
 
     $('refresh-btn').onclick = refreshNow;
 
