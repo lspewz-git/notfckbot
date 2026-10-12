@@ -144,3 +144,24 @@ test('the dashboard cards have their final height before the scripts run, and wi
     await expect(page.locator('#upcoming-list .empty-note')).toBeVisible();
     expectSame(await listHeights(page), loaded);
 });
+
+test('the deployed commit is shown under the title, linked to GitHub', async ({ page }) => {
+    await mockPanel(page);
+    const info = page.locator('#build-info');
+    await expect(info).toContainText('Version abc1234');
+    await expect(info).toHaveAttribute('title', 'Test commit');
+    const link = info.getByRole('link', { name: 'Commit abc1234 on GitHub' });
+    await expect(link).toHaveAttribute('href', /github\.com\/owner\/repo\/commit\/abc1234/);
+    await expect(link).toHaveAttribute('target', '_blank');
+});
+
+test('the version line goes away when the server has no .git to read', async ({ page }) => {
+    // The line starts hidden, so it has to be shown first for its hiding to prove anything
+    const options = {};
+    await mockPanel(page, options);
+    await expect(page.locator('#build-info')).toBeVisible();
+
+    options.version = { commit: null, short: null, subject: null, date: null, url: null };
+    await page.locator('#refresh-btn').click();
+    await expect(page.locator('#build-info')).toBeHidden();
+});

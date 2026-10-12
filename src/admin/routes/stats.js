@@ -2,6 +2,7 @@
 const { Op } = require('sequelize');
 const { Chat, Series, Subscription, Watchlist } = require('../../db');
 const { getCronStatus } = require('../../cron');
+const { getVersion } = require('../version');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('../../constants');
 
 const router = require('express').Router();
@@ -60,6 +61,9 @@ router.get('/api/stats/popular', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// The commit checked out on the server, so the dashboard shows what is deployed
+router.get('/api/version', (req, res) => res.json(getVersion()));
 
 // The update check: running now, how the last one went, when the next one fires
 router.get('/api/cron', (req, res) => res.json(getCronStatus()));

@@ -37,6 +37,26 @@
     font-size: 0.9375rem;
 }
 
+/* The deployed commit, under the description */
+.build-info {
+    margin-top: var(--space-2);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.build-info a {
+    color: var(--text-secondary);
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 3px;
+    transition: color 0.15s ease;
+}
+
+.build-info a:hover {
+    color: var(--text);
+}
+
 .header-tools {
     display: flex;
     flex-wrap: wrap;

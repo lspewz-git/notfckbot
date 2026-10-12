@@ -3,7 +3,7 @@
 import { api } from './api.js';
 import { toast } from './ui.js';
 import { renderTable, renderSkeleton, renderTableMessage } from './tables.js';
-import { updateStats, updateHealth, updatePopular, updateUpcoming, updateCron } from './dashboard.js';
+import { updateStats, updateHealth, updatePopular, updateUpcoming, updateCron, updateVersion } from './dashboard.js';
 import { setLogs, renderLogs } from './logs.js';
 
 // Which /api/data/:type each section needs, if any
@@ -41,6 +41,7 @@ export async function fetchData() {
         jobs.push(api('/stats/popular').then(updatePopular));
         jobs.push(api('/upcoming').then(updateUpcoming));
         jobs.push(api('/cron').then(updateCron));
+        jobs.push(api('/version').then(updateVersion));
     }
     if (currentSection === 'logs') {
         jobs.push(

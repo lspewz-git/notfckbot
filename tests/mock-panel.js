@@ -150,9 +150,10 @@ function stats(subs) {
  * Routes every request of `page` and opens the panel. Returns the mutable fixture so a test can
  * change what the next poll sees (e.g. `panel.subs.push(...)`).
  *
- * @param {{ health?: object, upcoming?: object[], popular?: object[], hold?: Promise<void> }} [options]
+ * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, hold?: Promise<void> }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
- *   dashboard lists; `hold`: API answers wait for it, so a test can see the loading state
+ *   dashboard lists; `version`: /api/version;
+ *   `hold`: API answers wait for it, so a test can see the loading state
  */
 async function mockPanel(page, options = {}) {
     const panel = {
@@ -204,10 +205,17 @@ async function mockPanel(page, options = {}) {
             panel.pollsUntilDone = 2;
             return { success: true };
         },
-        '/api/stats/popular': () =>
-            options.popular || [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
+        '/api/stats/popular': () => options.popular || [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
         '/api/upcoming': () => options.upcoming || [],
         '/api/cron': cronStatus,
+        '/api/version': () =>
+            options.version || {
+                commit: 'abc1234def5678abc1234def5678abc1234def56',
+                short: 'abc1234',
+                subject: 'Test commit',
+                date: '2026-10-12T14:15:30Z',
+                url: 'https://github.com/owner/repo/commit/abc1234def5678abc1234def5678abc1234def56'
+            },
         '/api/logs': () => [{ type: 'log', time: '12:00:00', text: 'Started' }],
         '/api/data/chats': () => CHATS,
         // Like the real API: the archived flag is derived from Series.status on every response
