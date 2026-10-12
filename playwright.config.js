@@ -11,6 +11,8 @@ const { defineConfig, devices } = require('@playwright/test');
  */
 module.exports = defineConfig({
     testDir: './tests',
+    // tests/unit is node:test (npm run test:unit), not Playwright
+    testIgnore: ['unit/**'],
     // Overridable because some mounts refuse mkdir at the project root
     outputDir: process.env.PW_OUTPUT || 'test-results',
     fullyParallel: false,

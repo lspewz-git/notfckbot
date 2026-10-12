@@ -216,6 +216,7 @@ const getRandomMovie = async () => {
 
 module.exports = {
     searchMulti,
+    digitalReleaseDate,
     getDetails,
     getDetailsCached,
     nextEpisodeFields,

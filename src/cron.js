@@ -33,11 +33,17 @@ const tally = (key) => {
     if (current) current[key] += 1;
 };
 
-/** When node-cron fires next: minute 0 of the next hour divisible by the interval. */
-function nextRunAt(now = new Date()) {
+/**
+ * When node-cron fires next: minute 0 of the next hour divisible by the interval. "*\/N"
+ * restarts at midnight, so after the day's last slot comes 00:00, not last slot + N
+ * (they differ when N doesn't divide 24).
+ */
+function nextRunAt(now = new Date(), interval = UPDATE_INTERVAL_HOURS) {
     const next = new Date(now);
     next.setMinutes(0, 0, 0);
-    next.setHours(Math.floor(now.getHours() / UPDATE_INTERVAL_HOURS) * UPDATE_INTERVAL_HOURS + UPDATE_INTERVAL_HOURS);
+    const hour = Math.floor(now.getHours() / interval) * interval + interval;
+    // setHours(24) rolls over to 00:00 of the next day
+    next.setHours(Math.min(hour, 24));
     return next;
 }
 
@@ -227,6 +233,38 @@ const notifyNewEpisodes = async (bot, item, data) => {
 // ============================================================
 // Watchlist: movie release check (digital date added to the message when known)
 // ============================================================
+
+/** Out once TMDB says Released, or once its release date has passed. */
+const isMovieReleased = (data, now = new Date()) => {
+    if (data.status === 'Released') return true;
+    if (!data.release_date) return false;
+    const releaseDate = new Date(data.release_date);
+    return !isNaN(releaseDate) && releaseDate <= now;
+};
+
+/**
+ * The "film is out" message for one watchlist entry. The notification goes out on the
+ * main release; the digital date is added for information, since that's when it can
+ * usually be streamed.
+ */
+function buildFilmMessage({ entry, data, links, now = new Date() }) {
+    const formattedDate = formatRuDate(data.release_date || null);
+    const digital = data.digital_release_date;
+    const digitalLine = digital
+        ? `💻 Цифровой релиз: <b>${formatRuDate(digital)}</b>${new Date(digital) > now ? ' (ожидается)' : ''}\n`
+        : '';
+    const directorInfo = data.director_name ? `🎬 Режиссер: <b>${escapeHtml(data.director_name)}</b>\n` : '';
+    return (
+        `🎬 <b>Фильм доступен!</b>\n\n` +
+        `🍿 <b>${escapeHtml(entry.title)}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
+        `${directorInfo}` +
+        `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n` +
+        digitalLine +
+        '\n' +
+        links
+    );
+}
+
 const checkWatchlistReleases = async (bot) => {
     // Load all unnotified watchlist entries with their chat
     const entries = await Watchlist.findAll({
@@ -269,50 +307,20 @@ const checkWatchlistReleases = async (bot) => {
                 if (Object.keys(changes).length) await entry.update(changes);
             }
 
-            let isReleased = false;
-            let displayDate = null;
-
-            if (data.status === 'Released') {
-                isReleased = true;
-            } else if (data.release_date) {
-                const releaseDate = new Date(data.release_date);
-                if (!isNaN(releaseDate) && releaseDate <= now) {
-                    isReleased = true;
-                }
-            }
-            displayDate = data.release_date || null;
-
-            if (!isReleased) {
+            if (!isMovieReleased(data, now)) {
                 console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
                 continue;
             }
 
             // 🎉 Film is released! Notify all users waiting for it
             console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
-            const formattedDate = formatRuDate(displayDate);
-            // The notification still goes out on the main release; the digital one is
-            // added for information, since that's when it can usually be streamed
-            const digital = data.digital_release_date;
-            const digitalLine = digital
-                ? `💻 Цифровой релиз: <b>${formatRuDate(digital)}</b>${new Date(digital) > now ? ' (ожидается)' : ''}\n`
-                : '';
             // A release happens once per film, so the ID is looked up here rather than ahead of time
             const kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
             const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
 
             for (const entry of filmEntries) {
                 try {
-                    const directorInfo = data.director_name
-                        ? `🎬 Режиссер: <b>${escapeHtml(data.director_name)}</b>\n`
-                        : '';
-                    const msg =
-                        `🎬 <b>Фильм доступен!</b>\n\n` +
-                        `🍿 <b>${escapeHtml(entry.title)}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
-                        `${directorInfo}` +
-                        `📅 Дата релиза: <b>${formattedDate || 'уже вышел'}</b>\n` +
-                        digitalLine +
-                        '\n' +
-                        links;
+                    const msg = buildFilmMessage({ entry, data, links, now });
 
                     if (entry.poster_url) {
                         await bot.telegram.sendPhoto(entry.Chat.id, entry.poster_url, {
@@ -386,4 +394,16 @@ const setupCron = (bot) => {
     console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS} hours.`);
 };
 
-module.exports = { setupCron, checkUpdates, buildSeriesMessages, getCronStatus };
+module.exports = {
+    setupCron,
+    checkUpdates,
+    buildSeriesMessages,
+    getCronStatus,
+    // The decisions behind each notification, for tests/unit
+    notifyNewEpisodes,
+    notifyStatusChange,
+    isSeasonComplete,
+    isMovieReleased,
+    buildFilmMessage,
+    nextRunAt
+};
