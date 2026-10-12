@@ -226,6 +226,13 @@ async function mockPanel(page, options = {}) {
         '/api/data/subs': () =>
             panel.subs.map((s) => ({ ...s, archived: FINISHED.includes(s.Series && s.Series.status) })),
         '/api/data/films': () => FILMS,
+        '/api/data/series': () =>
+            SERIES.map((x) => ({ tmdb_id: x.tmdb_id, title: x.title, last_season: 2, last_episode: 5 })),
+        // Test notifications: what the dialog sent last
+        '/api/test-notification': (req) => {
+            panel.lastTest = req.postDataJSON();
+            return { success: true };
+        },
         // The add dialog: a search with long titles, and adding a film (POST)
         '/api/tmdb/search': () =>
             [1, 2, 3, 4, 5, 6].map((n) => ({

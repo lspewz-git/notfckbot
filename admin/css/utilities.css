@@ -329,6 +329,16 @@ tbody tr:hover .avatar-mark {
     font-size: var(--text-xs);
 }
 
+/* Two fields side by side (season and episode) */
+.field-pair {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.field-pair[hidden] {
+    display: none;
+}
+
 /* The add dialog: a column whose results list gives up height first, so the picked title and
    its Add button stay in view on a short phone screen instead of below the fold. Still
    scrollable: on a phone held sideways even a short list doesn't leave room for everything. */

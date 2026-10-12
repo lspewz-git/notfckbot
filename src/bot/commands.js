@@ -1,10 +1,7 @@
 /** Slash commands and the reply-keyboard buttons. */
 const { Markup } = require('telegraf');
-const { getDetails, getRandomMovie } = require('../api/tmdb');
-const { findKinopoiskIdQuick } = require('../api/kinopoisk');
-const { escapeHtml } = require('../constants');
 const { setState, clearState } = require('./state');
-const { mainMenu, getCancelMenu, watchButtonRows } = require('./keyboards');
+const { mainMenu, getCancelMenu } = require('./keyboards');
 const { clearLastMessages } = require('./search');
 const { sendSubscriptionList } = require('./subscriptions');
 
@@ -90,51 +87,12 @@ function register(bot) {
         }
     });
 
-    const handleRandomMovie = async (ctx) => {
-        setState(ctx, { state: 'idle' });
-        try {
-            const item = await getRandomMovie();
-            if (!item) return ctx.reply('Не удалось найти подходящий фильм. Попробуйте еще раз!', mainMenu(ctx));
-
-            const year = (item.release_date || '').substring(0, 4) || 'н/д';
-            const name = item.title || item.original_title || 'Без названия';
-            const rating = item.vote_average ? `⭐️ ${item.vote_average.toFixed(1)}/10` : '';
-
-            // Random movie uses discover, but we need details for director
-            const fullDetails = await getDetails(item.id, 'movie');
-            const directorLine = fullDetails.director_name
-                ? `🎬 Режиссер: ${escapeHtml(fullDetails.director_name)}\n`
-                : '';
-
-            const caption = `🎲 <b>${escapeHtml(name)}</b> (${year})\n${rating}\n${directorLine}\n<i>${escapeHtml(item.overview) || 'Описание отсутствует.'}</i>`;
-            const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null;
-
-            // Inline keyboard: watch links, or add to watchlist
-            const tmdbId = `movie_${item.id}`;
-            const kinopoiskId = await findKinopoiskIdQuick(tmdbId, fullDetails.imdb_id);
-
-            const keyboard = Markup.inlineKeyboard([
-                ...watchButtonRows({ title: name, kinopoiskId, mediaType: 'movie' }),
-                [Markup.button.callback('📌 В список ожидания', `watchlist_add_${tmdbId}`)]
-            ]);
-
-            if (posterUrl) {
-                try {
-                    await ctx.replyWithPhoto(posterUrl, { caption, parse_mode: 'HTML', ...keyboard });
-                } catch {
-                    await ctx.replyWithHTML(caption, keyboard);
-                }
-            } else {
-                await ctx.replyWithHTML(caption, keyboard);
-            }
-        } catch (error) {
-            console.error('[Bot] Random movie error:', error);
-            await ctx.reply('Ошибка получения случайного фильма.', mainMenu(ctx));
-        }
-    };
-
-    bot.command('random', handleRandomMovie);
-    bot.hears('🎲 Случайный фильм', handleRandomMovie);
+    // "Случайный фильм" was removed. Chats still have the old keyboard with its button (Telegram
+    // keeps a reply keyboard until the bot sends another), and someone may type /random: answer
+    // both with the current menu, so the button disappears instead of turning into a search
+    const handleRemovedRandom = (ctx) => ctx.reply('Этой функции больше нет. Обновил меню.', mainMenu(ctx));
+    bot.command('random', handleRemovedRandom);
+    bot.hears('🎲 Случайный фильм', handleRemovedRandom);
 
     const handleCancel = async (ctx) => {
         await clearLastMessages(ctx, ctx.chat.id);

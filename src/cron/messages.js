@@ -18,12 +18,13 @@ function buildSeriesMessages({ title, season, episode, episodeName, links }) {
 /** A show crossed the running/finished line: cancelled, finished, or renewed. */
 function buildStatusMessage(title, newStatus) {
     const t = escapeHtml(title);
+    // The title on a line of its own, as in the episode alerts: inside a sentence it got lost
     return isFinishedStatus(newStatus)
         ? `${newStatus === 'Canceled' ? '⛔ <b>Сериал отменён</b>' : '🏁 <b>Сериал завершён</b>'}\n\n` +
-              `📺 <b>${t}</b> — новых серий не будет.\n\n` +
-              'Перенёс его в 📺 Мои подписки → 🗄 Завершённые. Если сериал продлят, я сообщу.'
-        : `🎉 <b>Сериал продлили!</b>\n\n📺 <b>${t}</b> снова в активных подписках — ` +
-              'уведомления о новых сериях придут как обычно.';
+              `📺 <b>${t}</b>\n\n` +
+              'Новых серий не будет. Перенёс его в 📺 Мои подписки → 🗄 Завершённые. Если сериал продлят, я сообщу.'
+        : `🎉 <b>Сериал продлили!</b>\n\n📺 <b>${t}</b>\n\n` +
+              'Он снова в активных подписках — уведомления о новых сериях придут как обычно.';
 }
 
 /**
@@ -49,4 +50,36 @@ function buildFilmMessage({ entry, data, links, now = new Date() }) {
     );
 }
 
-module.exports = { buildSeriesMessages, buildStatusMessage, buildFilmMessage };
+// --- Test notifications ---
+// Every alert the bot sends, by the name the admin panel uses for it. A test message is built by
+// the same function as the real one, so it shows exactly what subscribers would get.
+const EPISODE_MODES = ['episode', 'first_and_full', 'season'];
+// The status each status alert is about: finished, cancelled, back on air
+const STATUS_MODES = { ended: 'Ended', canceled: 'Canceled', renewed: 'Returning Series' };
+const TEST_MODES = [...EPISODE_MODES, ...Object.keys(STATUS_MODES), 'film'];
+const TEST_PREFIX = '🧪 <b>[Тестовое уведомление]</b>\n\n';
+
+/**
+ * The real message for `mode`, marked as a test.
+ * @param {string} mode one of TEST_MODES
+ * @param {{ title?: string, season?: number, episode?: number, episodeName?: string, links?: string,
+ *   film?: { entry: object, data: object } }} parts what that mode's message is made of
+ */
+function buildTestMessage(mode, { title, season, episode, episodeName, links, film }) {
+    if (mode === 'film') return TEST_PREFIX + buildFilmMessage({ entry: film.entry, data: film.data, links });
+    if (STATUS_MODES[mode]) return TEST_PREFIX + buildStatusMessage(title, STATUS_MODES[mode]);
+    const messages = buildSeriesMessages({ title, season, episode, episodeName, links });
+    const real =
+        mode === 'season' ? messages.complete : mode === 'first_and_full' ? messages.premiere : messages.episode;
+    return TEST_PREFIX + real;
+}
+
+module.exports = {
+    buildSeriesMessages,
+    buildStatusMessage,
+    buildFilmMessage,
+    buildTestMessage,
+    TEST_MODES,
+    EPISODE_MODES,
+    STATUS_MODES
+};

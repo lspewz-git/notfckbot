@@ -184,42 +184,11 @@ const getSeasonDetails = async (tv_id, season_number) => {
     }
 };
 
-// Retrieves a highly-rated random movie
-const getRandomMovie = async () => {
-    try {
-        // Random page from 1 to 50
-        const randomPage = Math.floor(Math.random() * 50) + 1;
-        const response = await apiClient.get('/discover/movie', {
-            params: {
-                language: 'ru-RU',
-                page: randomPage,
-                sort_by: 'popularity.desc',
-                'vote_count.gte': 500,
-                'vote_average.gte': 7.0
-            }
-        });
-
-        const results = response.data.results || [];
-        if (results.length === 0) return null;
-
-        // Pick a random movie from the results array (usually 20 items per page)
-        const randomIndex = Math.floor(Math.random() * results.length);
-        const movie = results[randomIndex];
-        // Ensure its tagged as a movie for our handler
-        movie.media_type = 'movie';
-        return movie;
-    } catch (error) {
-        console.error('TMDB API Error (getRandomMovie):', error.message);
-        throw error;
-    }
-};
-
 module.exports = {
     searchMulti,
     digitalReleaseDate,
     getDetails,
     getDetailsCached,
     nextEpisodeFields,
-    getSeasonDetails,
-    getRandomMovie
+    getSeasonDetails
 };

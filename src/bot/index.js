@@ -26,7 +26,6 @@ bot.telegram
         { command: 'start', description: 'Перезапустить бота' },
         { command: 'search', description: 'Найти фильм или сериал' },
         { command: 'subs', description: 'Мои подписки и список ожидания' },
-        { command: 'random', description: 'Случайный фильм на вечер' },
         { command: 'help', description: 'Как пользоваться ботом' },
         { command: 'cancel', description: 'Отменить текущее действие' },
         { command: 'menu_on', description: 'Включить нижнее меню' },
