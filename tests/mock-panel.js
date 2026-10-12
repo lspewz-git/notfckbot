@@ -237,8 +237,14 @@ async function mockPanel(page, options = {}) {
                 first_air_date: '2025-01-01',
                 poster_path: null
             })),
-        '/api/watchlist': async () => {
+        // What the add dialog sent last, for tests to check: { path, body }
+        '/api/subscription': (req) => {
+            panel.lastAdd = { path: '/api/subscription', body: req.postDataJSON() };
+            return { success: true, created: true };
+        },
+        '/api/watchlist': async (req) => {
             panel.added = (panel.added || 0) + 1;
+            panel.lastAdd = { path: '/api/watchlist', body: req.postDataJSON() };
             await options.addHold;
             if (options.addError) return { status: 409, body: { error: options.addError } };
             return { success: true, isReleased: false };
@@ -306,7 +312,7 @@ async function mockPanel(page, options = {}) {
             const handler = api[url.pathname] || (card && (() => card[1](card[0])));
             if (!handler) return route.fulfill({ status: 404, json: { error: 'Not mocked' } });
             if (options.hold) await options.hold;
-            const answer = await handler();
+            const answer = await handler(route.request());
             // A handler may pick the status: { status, body }
             if (answer && answer.status && answer.body)
                 return route.fulfill({ status: answer.status, json: answer.body });

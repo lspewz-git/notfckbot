@@ -54,6 +54,12 @@
         font-size: 1.75rem;
     }
 
+    /* Serials and Movies: the title and its Add button stay on one row */
+    header.section-header {
+        flex-direction: row;
+        align-items: center;
+    }
+
     .log-filters {
         flex-wrap: wrap;
     }

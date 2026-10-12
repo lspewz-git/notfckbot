@@ -13,3 +13,6 @@ playwright-report/
 
 # Last update-check run, shown on the admin dashboard
 .cron-status.json
+
+# Claude Code: local working rules (server address, deploy steps)
+CLAUDE.md

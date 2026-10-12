@@ -171,6 +171,9 @@
                                         ><span class="switch-knob"></span
                                     ></span>
                                     <span class="switch-label">Auto-refresh</span>
+                                    <!-- Seconds to the next refresh while on; the space is kept while off, so
+                                         turning it on moves nothing. Too chatty for screen readers. -->
+                                    <span id="refresh-countdown" class="switch-countdown" aria-hidden="true"></span>
                                 </button>
                                 <button
                                     id="refresh-btn"
@@ -354,8 +357,13 @@
                     </section>
 
                     <section id="watchlist-section" class="section">
-                        <header>
+                        <header class="section-header">
                             <h1>Movies</h1>
+                            <button class="btn btn-primary" data-action="add-content" data-kind="movie">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 5v14M5 12h14" /></svg
+                                >Add movie
+                            </button>
                         </header>
                         <div class="glass-card">
                             <div class="tab-filters" role="group" aria-label="Which films to show">
@@ -488,8 +496,13 @@
                     </section>
 
                     <section id="subs-section" class="section">
-                        <header>
+                        <header class="section-header">
                             <h1>Serials</h1>
+                            <button class="btn btn-primary" data-action="add-content" data-kind="tv">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 5v14M5 12h14" /></svg
+                                >Add serial
+                            </button>
                         </header>
                         <div class="glass-card">
                             <div class="tab-filters" role="group" aria-label="Which subscriptions to show">
@@ -813,7 +826,7 @@
                                 <line x1="5" y1="12" x2="19" y2="12" /></svg
                         ></span>
                         <span class="action-text">
-                            <span class="action-title">Add series or film</span>
+                            <span class="action-title">Add serial or movie</span>
                             <span class="action-desc">Subscribe this chat to something</span>
                         </span>
                         <span class="action-chevron"
@@ -886,7 +899,15 @@
             aria-labelledby="add-content-modal-title"
         >
             <div class="modal-content">
-                <h3 id="add-content-modal-title">Add for <span id="add-content-target"></span></h3>
+                <!-- "Add for alice" from a chat's menu; "Add serial" / "Add movie" from those sections -->
+                <h3 id="add-content-modal-title">
+                    <span id="add-content-heading">Add for</span> <span id="add-content-target"></span>
+                </h3>
+                <!-- Only when opened from Serials or Movies: there the chat isn't known yet -->
+                <div class="field-block mt-md" id="content-chat-field" hidden>
+                    <label class="field-label" for="content-chat-select">Chat</label>
+                    <select id="content-chat-select" class="select-field"></select>
+                </div>
                 <div class="search-box mt-md">
                     <input type="text" id="content-search-input" placeholder="Search series or movies..." />
                 </div>

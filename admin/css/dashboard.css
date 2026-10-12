@@ -144,6 +144,14 @@
     cursor: pointer;
 }
 
+.switch-countdown {
+    /* Room for "10 s", kept even while empty */
+    min-width: 4ch;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+}
+
 .switch-track {
     position: relative;
     width: 34px;

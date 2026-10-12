@@ -170,3 +170,46 @@ test('the version line goes away when the server has no .git to read', async ({ 
     await page.locator('#refresh-btn').click();
     await expect(page.locator('#build-info')).toBeHidden();
 });
+
+test('auto-refresh counts down next to the switch and turns the refresh icon when it reloads', async ({ page }) => {
+    await mockPanel(page);
+    let statsRequests = 0;
+    page.on('request', (r) => r.url().endsWith('/api/stats') && statsRequests++);
+    const sw = page.locator('#auto-refresh');
+    const countdown = page.locator('#refresh-countdown');
+    await expect(countdown).toHaveText('');
+    const widthOff = (await sw.boundingBox()).width;
+
+    await sw.click();
+    await expect(countdown).toHaveText('10 s');
+    expect((await sw.boundingBox()).width, 'turning it on moves nothing').toBe(widthOff);
+    await expect(countdown).toHaveText('9 s');
+
+    const before = statsRequests;
+    await expect(page.locator('#refresh-btn')).toHaveClass(/spinning/, { timeout: 12_000 });
+    await expect(countdown).toHaveText('10 s');
+    expect(statsRequests).toBeGreaterThan(before);
+
+    await sw.click();
+    await expect(countdown).toHaveText('');
+});
+
+test('a refresh pressed while one is running joins it instead of sending everything twice', async ({ page }) => {
+    await mockPanel(page);
+    // Settle the first load, then slow the next stats answer down
+    await expect(page.locator('#health-tg')).toHaveText('TG');
+    let statsRequests = 0;
+    await page.route('**/api/stats', async (route) => {
+        statsRequests++;
+        await new Promise((r) => setTimeout(r, 1500));
+        await route.fallback();
+    });
+
+    const btn = page.locator('#refresh-btn');
+    await btn.click();
+    await expect(btn).toHaveClass(/spinning/);
+    await btn.click();
+    await btn.click();
+    await expect(btn).not.toHaveClass(/spinning/, { timeout: 5000 });
+    expect(statsRequests).toBe(1);
+});

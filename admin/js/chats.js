@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { mutate } from './data.js';
 import { toast, openModal, closeModal, setReturnTo, clearReturnTo, focusField } from './ui.js';
 import { chatLabel } from './format.js';
+import { setSelectValue } from './select.js';
 import { chatsById } from './store.js';
 import { openTestNotifyModal } from './test-notify.js';
 
@@ -117,31 +118,87 @@ let dialogSession = 0;
 // While an add waits for the server
 let adding = false;
 
+// Opened from Serials or Movies: only that kind is searched, and the chat is picked in the
+// dialog. Null when opened from a chat's menu: both kinds, for that chat.
+let contentKind = null;
+
+const SEARCH_PLACEHOLDER = { tv: 'Search serials...', movie: 'Search movies...' };
+
 const addLabel = () => (selected && selected.mediaType === 'tv' ? 'Add Subscription' : 'Add to Watchlist');
 
-function openAddContentModal(chatId, label) {
+/** The dialog's state for a fresh opening; `kind` and `heading` set what it searches and says. */
+function resetAddContent(kind, heading, target) {
     dialogSession += 1;
-    targetChatId = chatId;
+    contentKind = kind;
     selected = null;
     searchResults = [];
 
-    setText('add-content-target', label || chatId);
-    $field('content-search-input').value = '';
+    setText('add-content-heading', heading);
+    setText('add-content-target', target);
+    $('content-chat-field').hidden = !kind;
+    const input = $field('content-search-input');
+    input.value = '';
+    input.placeholder = SEARCH_PLACEHOLDER[kind] || 'Search series or movies...';
     $('content-search-results').innerHTML = '';
     $('content-selected').style.display = 'none';
+}
+
+function openAddContentModal(chatId, label) {
+    resetAddContent(null, 'Add for', label || chatId);
+    targetChatId = chatId;
 
     openModal('add-content-modal');
     focusField($field('content-search-input'));
 }
 
+/**
+ * From Serials (`tv`) or Movies (`movie`): add that kind for a chat picked in the dialog.
+ * @param {'tv' | 'movie'} kind
+ */
+export async function openAddContentFor(kind) {
+    resetAddContent(kind, kind === 'tv' ? 'Add serial' : 'Add movie', '');
+
+    const select = $field('content-chat-select');
+    let chats = Array.from(chatsById.values());
+    if (!chats.length) {
+        // The Chats table hasn't been loaded in this visit yet
+        try {
+            chats = await api('/data/chats');
+        } catch {
+            chats = [];
+        }
+    }
+    // No chat is preselected: one picked by default is easy to miss, and that chat would then
+    // get notifications it never asked for
+    const options = chats.map(
+        (c) =>
+            `<option value="${escapeHtml(String(c.id))}">${escapeHtml(chatLabel(c))} (${escapeHtml(c.type)})</option>`
+    );
+    select.innerHTML = `<option value="">${chats.length ? 'Choose a chat…' : 'No chats yet'}</option>${options.join('')}`;
+    // Keeps the styled dropdown's label in step with the new options
+    setSelectValue('content-chat-select', '');
+
+    openModal('add-content-modal');
+    focusField($field('content-search-input'));
+}
+
+// Only the latest search may fill the list: an older, slower answer (or one for a dialog
+// that has since been closed and reopened) is dropped
+let searchRequest = 0;
+
 export async function searchContent(query) {
     if (query.length < 2) return;
+    const request = ++searchRequest;
+    const session = dialogSession;
     try {
         const res = await api(`/tmdb/search?q=${encodeURIComponent(query)}`);
-        searchResults = res.filter((r) => r.media_type === 'tv' || r.media_type === 'movie');
+        if (request !== searchRequest || session !== dialogSession) return;
+        searchResults = res.filter((r) =>
+            contentKind ? r.media_type === contentKind : r.media_type === 'tv' || r.media_type === 'movie'
+        );
         renderContentResults();
     } catch (err) {
-        toast('Search failed: ' + err.message, 'error');
+        if (request === searchRequest && session === dialogSession) toast('Search failed: ' + err.message, 'error');
     }
 }
 
@@ -188,7 +245,14 @@ export function selectContent(idx) {
 }
 
 export async function submitAddContent() {
-    if (!selected || !targetChatId) return;
+    // From Serials or Movies the chat is whichever is picked in the dialog
+    const chatId = contentKind ? $field('content-chat-select').value : targetChatId;
+    if (!selected) return;
+    if (!chatId) {
+        toast('Choose a chat first', 'error');
+        /** @type {HTMLElement} */ ($('content-chat-field').querySelector('.custom-select-trigger')).focus();
+        return;
+    }
     // The server asks TMDB for the title first, which can take a few seconds through the
     // proxy: show that it's working, and don't let a second click add it twice
     const btn = /** @type {HTMLButtonElement} */ ($('confirm-add-content'));
@@ -196,7 +260,7 @@ export async function submitAddContent() {
     const session = dialogSession;
 
     const isTv = selected.mediaType === 'tv';
-    const body = { chatId: targetChatId, tmdbId: selected.id };
+    const body = { chatId, tmdbId: selected.id };
     if (isTv) body.notify_type = $field('sub-notify-type').value;
 
     adding = true;
@@ -206,7 +270,8 @@ export async function submitAddContent() {
     let ok;
     try {
         ok = await mutate(isTv ? '/subscription' : '/watchlist', { method: 'POST', body }, (res) => {
-            if (isTv) return 'Подписка добавлена';
+            // The server updates the mode of a subscription the chat already has
+            if (isTv) return res.created === false ? 'Подписка уже была, режим обновлён' : 'Подписка добавлена';
             return res.isReleased ? 'Фильм добавлен, но он уже вышел' : 'Фильм добавлен в список ожидания';
         });
     } finally {

@@ -102,3 +102,106 @@ test('an add that ends after the dialog was reopened for another chat leaves tha
     await expect(page.locator('#add-content-modal')).toBeVisible();
     await expect(page.locator('#add-content-target')).toHaveText('bob');
 });
+
+/** Opens a section by its nav item (the tab bar on phones). */
+async function openSection(page, section) {
+    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
+    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="${section}"]`).click();
+}
+
+test('Serials adds a series for a chat picked in the dialog, searching series only', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openSection(page, 'subs');
+    await page.locator('#subs-section [data-action="add-content"]').click();
+
+    const dialog = page.locator('#add-content-modal');
+    await expect(dialog.locator('#add-content-modal-title')).toHaveText('Add serial');
+    await expect(dialog.locator('#content-chat-field')).toBeVisible();
+    await expect(dialog.locator('#content-search-input')).toHaveAttribute('placeholder', 'Search serials...');
+
+    // The styled dropdown: open it and pick bob
+    await dialog.locator('#content-chat-field .custom-select-trigger').click();
+    await page.locator('.custom-select-option', { hasText: 'bob' }).click();
+    await expect(dialog.locator('#content-chat-field .custom-select-trigger')).toHaveText('bob (private)');
+
+    await dialog.locator('#content-search-input').fill('long title');
+    const results = dialog.locator('#content-search-results [data-action="select-content"]');
+    // Six results come back, two of them series; the films are left out
+    await expect(results).toHaveCount(2);
+    await expect(results.filter({ hasText: 'Movie' })).toHaveCount(0);
+
+    await results.first().click();
+    await dialog.locator('#confirm-add-content').click();
+    await expect(page.locator('.toast')).toContainText('Подписка добавлена');
+    expect(panel.lastAdd.path).toBe('/api/subscription');
+    expect(panel.lastAdd.body).toMatchObject({ chatId: '102', tmdbId: 903 });
+});
+
+test('Movies adds a film, searching films only, once a chat is chosen', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openSection(page, 'watchlist');
+    await page.locator('#watchlist-section [data-action="add-content"]').click();
+
+    const dialog = page.locator('#add-content-modal');
+    await expect(dialog.locator('#add-content-modal-title')).toHaveText('Add movie');
+    await dialog.locator('#content-search-input').fill('long title');
+    const results = dialog.locator('#content-search-results [data-action="select-content"]');
+    await expect(results).toHaveCount(4);
+    await expect(results.filter({ hasText: 'Series' })).toHaveCount(0);
+
+    await results.first().click();
+
+    // No chat is preselected: adding asks for one and sends nothing
+    const trigger = dialog.locator('#content-chat-field .custom-select-trigger');
+    await expect(trigger).toHaveText('Choose a chat…');
+    await dialog.locator('#confirm-add-content').click();
+    await expect(page.locator('.toast')).toContainText('Choose a chat first');
+    await expect(trigger).toBeFocused();
+    expect(panel.lastAdd).toBeUndefined();
+
+    await trigger.click();
+    await page.locator('.custom-select-option', { hasText: 'alice' }).click();
+    await dialog.locator('#confirm-add-content').click();
+    // The "Choose a chat first" toast may still be up
+    await expect(page.locator('.toast', { hasText: 'Фильм добавлен в список ожидания' })).toBeVisible();
+    expect(panel.lastAdd).toMatchObject({ path: '/api/watchlist', body: { chatId: '101', tmdbId: 901 } });
+});
+
+test("a chat's own Add has no chat picker and searches both kinds", async ({ page }) => {
+    await mockPanel(page);
+    // Opened from Serials first, so a leftover picker or filter would show here
+    await openSection(page, 'subs');
+    await page.locator('#subs-section [data-action="add-content"]').click();
+    await page.locator('[data-close-return="add-content-modal"]').click();
+
+    await searchForAlice(page);
+    await expect(page.locator('#add-content-modal-title')).toHaveText('Add for alice');
+    await expect(page.locator('#content-chat-field')).toBeHidden();
+});
+
+test('a search answer that arrives after the dialog was reopened does not fill it', async ({ page }) => {
+    await mockPanel(page);
+    // Hold the first search until the dialog has been closed and reopened from Movies
+    let release;
+    const held = new Promise((r) => (release = r));
+    let first = true;
+    await page.route('**/api/tmdb/search*', async (route) => {
+        if (first) {
+            first = false;
+            await held;
+        }
+        await route.fallback();
+    });
+
+    await openSection(page, 'subs');
+    await page.locator('#subs-section [data-action="add-content"]').click();
+    await page.locator('#content-search-input').fill('long title');
+    await page.waitForTimeout(700); // past the search's debounce, so the held request is out
+    await page.locator('[data-close-return="add-content-modal"]').click();
+
+    await openSection(page, 'watchlist');
+    await page.locator('#watchlist-section [data-action="add-content"]').click();
+    release();
+    await page.waitForTimeout(500);
+    await expect(page.locator('#content-search-results [data-action="select-content"]')).toHaveCount(0);
+});

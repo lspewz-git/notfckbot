@@ -1,6 +1,6 @@
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
-import { $, $field, all, closest, debounce, target } from './dom.js';
+import { $, $field, all, closest, debounce } from './dom.js';
 import { runCheckNow, renderDashboardPlaceholders } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
@@ -9,7 +9,7 @@ import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo }
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
-import { openChatActions, searchContent, selectContent, submitAddContent } from './chats.js';
+import { openChatActions, openAddContentFor, searchContent, selectContent, submitAddContent } from './chats.js';
 import {
     openSeriesDetails,
     openFilmDetails,
@@ -53,16 +53,43 @@ try {
 function updateAutoRefreshSwitch() {
     const sw = $('auto-refresh');
     if (sw) sw.setAttribute('aria-checked', String(!isPaused));
+    renderCountdown();
+}
+
+/** "7 s" next to the switch while it is on: shows that it is counting, and to when. */
+function renderCountdown() {
+    const el = $('refresh-countdown');
+    if (el) el.textContent = isPaused ? '' : `${secondsLeft} s`;
+}
+
+// A refresh is usually over in a blink; the turn of the icon should still be seen
+const MIN_SPIN_MS = 600;
+
+// The refresh in progress, if any: a click or a timer tick during it joins it instead of
+// starting a second one, so requests don't double and the icon stops only at the real end
+let refreshing = null;
+
+/** Reloads what is on screen, turning the refresh icon meanwhile; restarts the countdown. */
+function refreshNow() {
+    secondsLeft = REFRESH_SECONDS;
+    renderCountdown();
+    if (refreshing) return refreshing;
+
+    const btn = $('refresh-btn');
+    btn.classList.add('spinning');
+    refreshing = Promise.all([fetchData(), new Promise((r) => setTimeout(r, MIN_SPIN_MS))]).finally(() => {
+        btn.classList.remove('spinning');
+        refreshing = null;
+    });
+    return refreshing;
 }
 
 function startTimer() {
     setInterval(() => {
         if (isPaused) return;
         secondsLeft--;
-        if (secondsLeft <= 0) {
-            secondsLeft = REFRESH_SECONDS;
-            fetchData();
-        }
+        if (secondsLeft <= 0) refreshNow();
+        else renderCountdown();
     }, 1000);
 }
 
@@ -80,6 +107,7 @@ const CLICK_ACTIONS = {
     sort: (el) => setTableSort(el.dataset.table, el.dataset.sort),
     page: (el) => setTablePage(el.dataset.table, Number(el.dataset.step)),
     'select-content': (el) => selectContent(Number(el.dataset.index)),
+    'add-content': (el) => openAddContentFor(el.dataset.kind === 'tv' ? 'tv' : 'movie'),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
     service: (el) =>
@@ -149,16 +177,7 @@ function setupControls() {
     };
     $('run-check').onclick = () => runCheckNow(fetchData);
 
-    $('refresh-btn').onclick = async (e) => {
-        const btn = target(e);
-        btn.classList.add('spinning');
-        secondsLeft = REFRESH_SECONDS;
-        try {
-            await fetchData();
-        } finally {
-            btn.classList.remove('spinning');
-        }
-    };
+    $('refresh-btn').onclick = refreshNow;
 
     $('actions-btn').onclick = () => openModal('actions-modal');
     $('danger-btn').onclick = () => openModal('danger-modal');
