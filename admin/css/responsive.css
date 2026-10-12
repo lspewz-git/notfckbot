@@ -352,6 +352,28 @@
         text-underline-offset: 3px;
     }
 
+    /* Smaller avatar so the card keeps its height; the mark's ring matches the card */
+    .compact-title .avatar {
+        width: 1.375rem;
+        height: 1.375rem;
+    }
+
+    .table-wrap .avatar-mark {
+        background: var(--surface-2);
+    }
+
+    .compact-title .avatar-mark {
+        right: -3px;
+        bottom: -3px;
+        width: 12px;
+        height: 12px;
+    }
+
+    .compact-title .avatar-mark .icon {
+        width: 8px;
+        height: 8px;
+    }
+
     .compact-head .badge {
         flex: none;
     }
