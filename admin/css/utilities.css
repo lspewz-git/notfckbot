@@ -329,6 +329,19 @@ tbody tr:hover .avatar-mark {
     font-size: var(--text-xs);
 }
 
+/* The add dialog's search results: scrolls down, never sideways */
+.search-results {
+    max-height: 320px;
+    margin-top: var(--space-4);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* Elsewhere a row bleeds into its card's padding; in this box that bleed is what overflowed */
+.search-results .popular-item {
+    margin: 0;
+}
+
 .result-poster {
     width: 40px;
     border-radius: 4px;

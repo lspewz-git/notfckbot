@@ -1,19 +1,63 @@
 /** Acting on one subscription or watchlist entry. */
 
-import { $, $field, $img, setText } from './dom.js';
+import { $, $field, $img, setText, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
-import { chatLabel, formatReleaseDate, MODE_LABELS } from './format.js';
+import { chatLabel, chatDisplayName, formatReleaseDate, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
 
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
 const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
 
 /**
+ * One group of chats on a card: "Subscribers · 2", then a row per chat with its name and
+ * avatar and, for subscriptions, the notification mode.
+ * @param {string} label
+ * @param {{ chat: { id: number, username: string | null, type: string }, mode?: string }[]} rows
+ */
+function peopleGroup(label, rows) {
+    const items = rows
+        .map(({ chat, mode }) => {
+            const tag = mode ? `<span class="people-mode">${escapeHtml(MODE_LABELS[mode] || mode)}</span>` : '';
+            return `<li>${chatDisplayName(chat)}${tag}</li>`;
+        })
+        .join('');
+    return `<div class="people-group"><h4>${escapeHtml(label)} · ${rows.length}</h4><ul class="people-list">${items}</ul></div>`;
+}
+
+/**
+ * Points the Kinopoisk button somewhere: the title's page, or a search by its name. Only the
+ * address changes, never the label: a label swap a moment after the card opens made the
+ * button change width and jump.
+ */
+function setKinopoiskLink(url, direct) {
+    const link = /** @type {HTMLAnchorElement} */ ($('detail-kp'));
+    link.href = url;
+    link.title = direct ? '' : 'Kinopoisk search by title';
+}
+
+/**
+ * The button works from the first moment as a search by title; once the server has the
+ * title's Kinopoisk ID (stored, or looked up in Wikidata), it goes straight to the page.
+ * `request` drops the answer if another card has been opened since.
+ */
+async function fillKinopoisk(type, id, title, request) {
+    setKinopoiskLink(`https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`, false);
+    try {
+        const kp = await api(`/kinopoisk/${type}/${id}`);
+        // Without an ID the server's link is a search too; the one above already has the title
+        if (request === detailRequest && kp.id) setKinopoiskLink(kp.url, true);
+    } catch {
+        // The search link stays
+    }
+}
+
+/**
  * Opens the card and fills it from `load()`.
- * @param {() => Promise<{ title: string, meta: string, desc: string, count: string, poster: string }>} load
+ * @param {() => Promise<{ title: string, meta: string, desc: string, people: string, poster: string,
+ *   kinopoisk: { type: 'tv' | 'movie', id: string } }>} load
  */
 let detailRequest = 0;
 
@@ -31,7 +75,7 @@ async function openDetails(load) {
         setText('detail-title', card.title);
         setText('detail-meta', card.meta);
         setText('detail-desc', card.desc || 'No description available.');
-        setText('detail-subs-count', card.count);
+        $('detail-people').innerHTML = card.people;
 
         const img = $img('detail-poster');
         img.hidden = !card.poster;
@@ -42,6 +86,7 @@ async function openDetails(load) {
 
         $('detail-loading').style.display = 'none';
         $('detail-ready').style.display = '';
+        fillKinopoisk(card.kinopoisk.type, card.kinopoisk.id, card.title, request);
     } catch (e) {
         if (request === detailRequest) $('detail-loading').innerText = 'Failed to load details.';
     }
@@ -50,30 +95,36 @@ async function openDetails(load) {
 export const openSeriesDetails = (tmdbId) =>
     openDetails(async () => {
         const data = await api(`/series/${tmdbId}`);
-        const rating = data.vote_average ? `⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated yet';
-        const n = data.subCount;
+        const rating = data.vote_average ? `TMDB ⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated on TMDB yet';
+        const subs = data.subscribers || [];
         return {
             title: data.name,
             meta: `${rating} • ${data.number_of_seasons} season${data.number_of_seasons === 1 ? '' : 's'}`,
             desc: data.overview,
-            count: `${n} subscriber${n === 1 ? '' : 's'}`,
-            poster: posterUrl(data.poster_path)
+            people: subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>',
+            poster: posterUrl(data.poster_path),
+            kinopoisk: { type: 'tv', id: String(tmdbId).replace('tv_', '') }
         };
     });
 
 export const openFilmDetails = (tmdbId) =>
     openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
-        const rating = data.vote_average ? `⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated yet';
+        const rating = data.vote_average ? `TMDB ⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated on TMDB yet';
         const release = data.release_date ? formatReleaseDate(data.release_date) : 'Release date TBA';
+        const chats = data.chats || [];
+        const waiting = chats.filter((c) => !c.notified);
+        const notified = chats.filter((c) => c.notified);
+        const people =
+            (waiting.length ? peopleGroup('Waiting for release', waiting) : '') +
+            (notified.length ? peopleGroup('Already notified', notified) : '');
         return {
             title: data.title || data.original_title,
             meta: `${rating} • ${release} • ${data.status || 'Unknown status'}`,
             desc: data.overview,
-            count: data.notified
-                ? `${data.waiting} waiting • ${data.notified} already notified`
-                : `${data.waiting} waiting for release`,
-            poster: posterUrl(data.poster_path)
+            people: people || '<p class="people-none">No chat has this film on its list.</p>',
+            poster: posterUrl(data.poster_path),
+            kinopoisk: { type: 'movie', id: String(tmdbId).replace('movie_', '') }
         };
     });
 

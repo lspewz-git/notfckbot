@@ -61,16 +61,20 @@ test('"Run now" waits for the check and then shows its result', async ({ page })
     await mockPanel(page);
     const run = page.locator('#run-check');
     await expect(page.locator('#cron-last')).toHaveText('No check since the bot started');
+    await expect(page.locator('#cron-duration')).toHaveText('—');
 
     await run.click();
     await expect(run).toBeDisabled();
     await expect(run).toHaveText('Running…');
+    await expect(page.locator('#cron-duration')).toHaveText(/^\d+ s so far$/);
 
     await expect(run).toHaveText('Run now', { timeout: 15_000 });
     await expect(run).toBeEnabled();
     await expect(page.locator('#cron-state')).toHaveText('OK');
     await expect(page.locator('#cron-checked')).toHaveText('11 series, 6 films');
     await expect(page.locator('#cron-sent')).toHaveText('2 sent');
+    await expect(page.locator('#cron-duration')).toHaveText('4 s');
+    await expect(page.locator('#cron-last')).toHaveText(/^\d+ s ago$/);
 });
 
 test('the auto-refresh switch is remembered across reloads', async ({ page }) => {
@@ -145,9 +149,10 @@ test('the dashboard cards have their final height before the scripts run, and wi
     expectSame(await listHeights(page), loaded);
 });
 
-test('the deployed commit is shown under the title, linked to GitHub', async ({ page }) => {
+test('the deployed commit is shown in the footer, linked to GitHub', async ({ page }) => {
     await mockPanel(page);
-    const info = page.locator('#build-info');
+    const info = page.locator('#dashboard-section > footer:last-child');
+    await expect(info).toHaveId('build-info');
     await expect(info).toContainText('Version abc1234');
     await expect(info).toHaveAttribute('title', 'Test commit');
     const link = info.getByRole('link', { name: 'Commit abc1234 on GitHub' });

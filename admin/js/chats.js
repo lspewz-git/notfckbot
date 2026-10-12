@@ -111,8 +111,16 @@ const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POS
 let searchResults = [];
 let targetChatId = null;
 let selected = null;
+// Counts openings of the dialog, so an add that finishes after it was closed and opened
+// again (maybe for another chat) leaves the new one alone
+let dialogSession = 0;
+// While an add waits for the server
+let adding = false;
+
+const addLabel = () => (selected && selected.mediaType === 'tv' ? 'Add Subscription' : 'Add to Watchlist');
 
 function openAddContentModal(chatId, label) {
+    dialogSession += 1;
     targetChatId = chatId;
     selected = null;
     searchResults = [];
@@ -150,7 +158,8 @@ function renderContentResults() {
             const title = isTv ? item.name : item.title;
             const year = (isTv ? item.first_air_date : item.release_date)?.split('-')[0] || 'N/A';
             const poster = item.poster_path
-                ? `<img class="result-poster" src="https://image.tmdb.org/t/p/w92${item.poster_path}" alt="">`
+                ? // Through our server, like the cards: image.tmdb.org isn't reachable from every network
+                  `<img class="result-poster" src="/api/poster/w92${escapeHtml(item.poster_path)}" alt="">`
                 : '<div class="poster-stub">?</div>';
             return `
             <div class="popular-item" data-action="select-content" data-index="${idx}">
@@ -173,23 +182,42 @@ export function selectContent(idx) {
     setText('selected-content-title', selected.title);
     // Notification mode only makes sense for series
     $('notify-field').style.display = isTv ? 'block' : 'none';
-    $('confirm-add-content').innerText = isTv ? 'Add Subscription' : 'Add to Watchlist';
+    // Mid-add the button keeps saying "Adding…"; it gets this label when the add ends
+    if (!adding) $('confirm-add-content').innerText = addLabel();
     $('content-selected').style.display = 'block';
 }
 
 export async function submitAddContent() {
     if (!selected || !targetChatId) return;
+    // The server asks TMDB for the title first, which can take a few seconds through the
+    // proxy: show that it's working, and don't let a second click add it twice
+    const btn = /** @type {HTMLButtonElement} */ ($('confirm-add-content'));
+    if (adding) return;
+    const session = dialogSession;
 
     const isTv = selected.mediaType === 'tv';
     const body = { chatId: targetChatId, tmdbId: selected.id };
     if (isTv) body.notify_type = $field('sub-notify-type').value;
 
-    const ok = await mutate(isTv ? '/subscription' : '/watchlist', { method: 'POST', body }, (res) => {
-        if (isTv) return 'Подписка добавлена';
-        return res.isReleased ? 'Фильм добавлен, но он уже вышел' : 'Фильм добавлен в список ожидания';
-    });
+    adding = true;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.textContent = 'Adding…';
+    let ok;
+    try {
+        ok = await mutate(isTv ? '/subscription' : '/watchlist', { method: 'POST', body }, (res) => {
+            if (isTv) return 'Подписка добавлена';
+            return res.isReleased ? 'Фильм добавлен, но он уже вышел' : 'Фильм добавлен в список ожидания';
+        });
+    } finally {
+        adding = false;
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        // For whatever is selected now: another result may have been picked meanwhile
+        btn.textContent = addLabel();
+    }
 
-    if (ok) {
+    if (ok && session === dialogSession) {
         clearReturnTo();
         closeModal('add-content-modal');
     }

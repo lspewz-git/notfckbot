@@ -17,6 +17,8 @@
     --border: rgba(255, 255, 255, 0.06);
     --border-row: rgba(255, 255, 255, 0.05); /* between list rows */
     --border-strong: rgba(255, 255, 255, 0.1);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
 
     /* Text — four steps, all AA on the surfaces above except --text-faint (decoration only) */
     --text: #f3f1ec;
@@ -96,6 +98,33 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+/* Thin, quiet scrollbars instead of the system's grey track and arrow buttons. Chrome,
+   Edge and Firefox read the standard properties; the -webkit- rules cover Safari, which
+   doesn't, and are ignored where the standard ones apply. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--scrollbar-thumb) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover) padding-box;
 }
 
 /* Keep room for the scrollbar from the start: otherwise it appears once the

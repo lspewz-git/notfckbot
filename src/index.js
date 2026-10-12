@@ -5,6 +5,7 @@ const { initDb } = require('./db');
 const bot = require('./bot');
 const { setupCron } = require('./cron');
 const { startAdminServer } = require('./admin');
+const { warmDetailsCache } = require('./warm-cache');
 
 async function start() {
     try {
@@ -26,6 +27,9 @@ async function start() {
 
         // Start Admin Dashboard
         startAdminServer(bot);
+
+        // In the background: the panel's cards are quick from the first one after a restart
+        warmDetailsCache().catch((err) => console.error('[Cache] Warm-up failed:', err.message));
 
         console.log('Launching Telegram bot...');
         bot.launch({ dropPendingUpdates: true })

@@ -289,6 +289,80 @@
     font-size: var(--text-sm);
 }
 
+/* Kinopoisk: a quiet button with the brand mark, between the description and the chats */
+.kp-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-h);
+    margin-bottom: var(--space-5);
+    padding: 0 var(--space-3) 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+.kp-link:hover {
+    background: var(--surface-3);
+}
+
+.kp-logo {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+}
+
+.kp-out {
+    width: 14px;
+    height: 14px;
+    color: var(--text-dim);
+}
+
+/* Who is subscribed / waiting: one row per chat; a long list scrolls inside the card */
+.people-group + .people-group {
+    margin-top: var(--space-4);
+}
+
+.people-group h4 {
+    margin-bottom: var(--space-2);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.people-list {
+    max-height: 12rem;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.people-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border-row);
+    font-size: var(--text-sm);
+}
+
+.people-mode {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.people-none {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
 .detail-desc {
     margin: var(--space-3) 0 var(--space-4);
     font-size: var(--text-sm);

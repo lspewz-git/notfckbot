@@ -150,9 +150,13 @@ function stats(subs) {
  * Routes every request of `page` and opens the panel. Returns the mutable fixture so a test can
  * change what the next poll sees (e.g. `panel.subs.push(...)`).
  *
- * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, hold?: Promise<void> }} [options]
+ * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
+ *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
+ *   addHold?: Promise<void>, addError?: string }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
- *   dashboard lists; `version`: /api/version;
+ *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
+ *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
+ *   `addError`: adding a film fails with this message (409);
  *   `hold`: API answers wait for it, so a test can see the loading state
  */
 async function mockPanel(page, options = {}) {
@@ -221,8 +225,73 @@ async function mockPanel(page, options = {}) {
         // Like the real API: the archived flag is derived from Series.status on every response
         '/api/data/subs': () =>
             panel.subs.map((s) => ({ ...s, archived: FINISHED.includes(s.Series && s.Series.status) })),
-        '/api/data/films': () => FILMS
+        '/api/data/films': () => FILMS,
+        // The add dialog: a search with long titles, and adding a film (POST)
+        '/api/tmdb/search': () =>
+            [1, 2, 3, 4, 5, 6].map((n) => ({
+                id: 900 + n,
+                media_type: n % 3 ? 'movie' : 'tv',
+                title: `A very long film title that would not fit on one line of the dialog ${n}`,
+                name: `A very long series title that would not fit on one line of the dialog ${n}`,
+                release_date: '2026-01-01',
+                first_air_date: '2025-01-01',
+                poster_path: null
+            })),
+        '/api/watchlist': async () => {
+            panel.added = (panel.added || 0) + 1;
+            await options.addHold;
+            if (options.addError) return { status: 409, body: { error: options.addError } };
+            return { success: true, isReleased: false };
+        }
     };
+
+    // Cards: /api/series/:id, /api/movie/:id and their Kinopoisk line
+    const cards = [
+        [
+            /^\/api\/series\/(.+)$/,
+            ([, id]) => {
+                const subs = panel.subs.filter((s) => s.seriesId === id);
+                return {
+                    name: series(id).title,
+                    vote_average: 8.4,
+                    number_of_seasons: 4,
+                    overview: 'A test series.',
+                    poster_path: null,
+                    subCount: subs.length,
+                    subscribers: subs.map((s) => ({ chat: s.Chat, mode: s.notify_type }))
+                };
+            }
+        ],
+        [
+            /^\/api\/movie\/(.+)$/,
+            ([, id]) => {
+                const rows = FILMS.filter((f) => f.tmdb_id === id);
+                return {
+                    title: rows[0].title,
+                    vote_average: 7.1,
+                    release_date: rows[0].premiere_digital,
+                    status: rows[0].notified ? 'Released' : 'Post Production',
+                    overview: 'A test film.',
+                    poster_path: null,
+                    waiting: rows.filter((f) => !f.notified).length,
+                    notified: rows.filter((f) => f.notified).length,
+                    chats: rows.map((f) => ({ chat: f.Chat, notified: f.notified }))
+                };
+            }
+        ],
+        [
+            /^\/api\/kinopoisk\/(tv|movie)\/(\d+)$/,
+            async ([, type]) => {
+                await options.kinopoiskHold;
+                return (
+                    options.kinopoisk || {
+                        id: 435,
+                        url: `https://www.kinopoisk.ru/${type === 'tv' ? 'series' : 'film'}/435/`
+                    }
+                );
+            }
+        ]
+    ];
 
     await page.route('**/*', async (route) => {
         const url = new URL(route.request().url());
@@ -233,10 +302,15 @@ async function mockPanel(page, options = {}) {
         }
 
         if (url.pathname.startsWith('/api/')) {
-            const handler = api[url.pathname];
+            const card = cards.map(([re, fn]) => [url.pathname.match(re), fn]).find(([m]) => m);
+            const handler = api[url.pathname] || (card && (() => card[1](card[0])));
             if (!handler) return route.fulfill({ status: 404, json: { error: 'Not mocked' } });
             if (options.hold) await options.hold;
-            return route.fulfill({ status: 200, json: handler() });
+            const answer = await handler();
+            // A handler may pick the status: { status, body }
+            if (answer && answer.status && answer.body)
+                return route.fulfill({ status: answer.status, json: answer.body });
+            return route.fulfill({ status: 200, json: answer });
         }
 
         const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1));

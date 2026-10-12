@@ -219,7 +219,7 @@ export function updatePopular(list) {
 }
 
 // --- Version ---
-/** "Version 6638430 · 12 Oct, 17:15", the hash linked to the commit; the subject as a tooltip. */
+/** The footer: "Version 6638430 · 12 Oct, 17:15", the hash linked to the commit; the subject as a tooltip. */
 export function updateVersion(v) {
     const el = $('build-info');
     if (!el || isUnchanged('version', v)) return;
@@ -269,11 +269,14 @@ function renderCron() {
     const state = $('cron-state');
 
     if (cron.running) {
+        const elapsed = duration(now - new Date(cron.startedAt).getTime());
         updateBadge('cron-state', 'Running', 'warn');
-        setText('cron-last', `Running now, started ${duration(now - new Date(cron.startedAt).getTime())} ago`);
+        setText('cron-last', `Running now, started ${elapsed} ago`);
+        setText('cron-duration', `${elapsed} so far`);
     } else if (!last) {
         updateBadge('cron-state', 'Not run yet', 'muted');
         setText('cron-last', 'No check since the bot started');
+        setText('cron-duration', '—');
     } else {
         // Undelivered messages are not counted: a chat that blocked the bot fails on every
         // run and would keep the state amber for good. They are listed under Notifications.
@@ -281,10 +284,8 @@ function renderCron() {
         if (last.fatal) updateBadge('cron-state', 'Failed', 'error');
         else if (problems) updateBadge('cron-state', `${problems} ${problems === 1 ? 'error' : 'errors'}`, 'warn');
         else updateBadge('cron-state', 'OK', 'ok');
-        setText(
-            'cron-last',
-            `${duration(now - new Date(last.finishedAt).getTime())} ago, took ${duration(last.durationMs)}`
-        );
+        setText('cron-last', `${duration(now - new Date(last.finishedAt).getTime())} ago`);
+        setText('cron-duration', duration(last.durationMs));
     }
     if (state) state.title = last && last.fatal ? `Last check failed: ${last.fatal}` : '';
 

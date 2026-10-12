@@ -103,8 +103,6 @@
                             <div class="header-info">
                                 <h1>Dashboard</h1>
                                 <p>Overview of system health and activity.</p>
-                                <!-- Filled from /api/version; stays hidden where the server has no .git -->
-                                <div id="build-info" class="build-info" hidden></div>
                             </div>
                             <div class="header-tools">
                                 <div class="status-badges">
@@ -291,6 +289,10 @@
                                     <dd id="cron-last">—</dd>
                                 </div>
                                 <div>
+                                    <dt>Duration</dt>
+                                    <dd id="cron-duration">—</dd>
+                                </div>
+                                <div>
                                     <dt>Checked</dt>
                                     <dd id="cron-checked">—</dd>
                                 </div>
@@ -305,6 +307,9 @@
                             </dl>
                             <button id="run-check" class="btn btn-outline">Run now</button>
                         </section>
+
+                        <!-- Filled from /api/version; stays hidden where the server has no .git -->
+                        <footer id="build-info" class="build-info" hidden></footer>
                     </section>
 
                     <!-- Chats Section -->
@@ -690,7 +695,54 @@
                         <h3 id="detail-title">Title</h3>
                         <p id="detail-meta" class="detail-meta"></p>
                         <p id="detail-desc" class="detail-desc"></p>
-                        <span id="detail-subs-count" class="stat-badge"></span>
+                        <!-- A search link at first; records.js points it at the title once its ID is known -->
+                        <a
+                            id="detail-kp"
+                            class="kp-link"
+                            href="https://www.kinopoisk.ru/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <svg class="kp-logo" viewBox="0 0 300 300" aria-hidden="true">
+                                <!-- The Kinopoisk icon (kinopoisk-icon-main.svg); IDs prefixed to stay unique on the page -->
+                                <mask
+                                    id="kp-logo-mask"
+                                    style="mask-type: alpha"
+                                    maskUnits="userSpaceOnUse"
+                                    x="0"
+                                    y="0"
+                                    width="300"
+                                    height="300"
+                                >
+                                    <circle cx="150" cy="150" r="150" fill="white" />
+                                </mask>
+                                <g mask="url(#kp-logo-mask)">
+                                    <circle cx="150" cy="150" r="150" fill="black" />
+                                    <path
+                                        d="M300 45L145.26 127.827L225.9 45H181.2L126.3 121.203V45H89.9999V255H126.3V178.92L181.2 255H225.9L147.354 174.777L300 255V216L160.776 160.146L300 169.5V130.5L161.658 139.494L300 84V45Z"
+                                        fill="url(#kp-logo-gradient)"
+                                    />
+                                </g>
+                                <defs>
+                                    <radialGradient
+                                        id="kp-logo-gradient"
+                                        cx="0"
+                                        cy="0"
+                                        r="1"
+                                        gradientUnits="userSpaceOnUse"
+                                        gradientTransform="translate(89.9999 45) rotate(45) scale(296.985)"
+                                    >
+                                        <stop offset="0.5" stop-color="#FF5500" />
+                                        <stop offset="1" stop-color="#BBFF00" />
+                                    </radialGradient>
+                                </defs>
+                            </svg>
+                            <span>Open on Kinopoisk</span>
+                            <svg class="icon kp-out" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M7 17 17 7M8 7h9v9" />
+                            </svg>
+                        </a>
+                        <div id="detail-people" class="detail-people"></div>
                     </div>
                 </div>
                 <button data-close="detail-modal" class="modal-x" aria-label="Close">
@@ -838,11 +890,7 @@
                 <div class="search-box mt-md">
                     <input type="text" id="content-search-input" placeholder="Search series or movies..." />
                 </div>
-                <div
-                    id="content-search-results"
-                    class="search-results"
-                    style="max-height: 320px; overflow-y: auto; margin-top: 1rem"
-                ></div>
+                <div id="content-search-results" class="search-results"></div>
                 <div
                     id="content-selected"
                     style="
