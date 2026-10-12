@@ -82,3 +82,65 @@ test('the auto-refresh switch is remembered across reloads', async ({ page }) =>
     await page.reload();
     await expect(sw).toHaveAttribute('aria-checked', 'true');
 });
+
+const listHeights = (page) =>
+    page.evaluate(() =>
+        ['upcoming-list', 'popular-list'].map((id) => document.getElementById(id).getBoundingClientRect().height)
+    );
+
+/** Five rows in each list, like a populated server */
+function fullLists() {
+    const day = (n) => new Date(Date.now() + n * 86400e3).toISOString().slice(0, 10);
+    const upcoming = [1, 2, 30, 40, 50].map((n, i) => ({
+        kind: i % 2 ? 'movie' : 'tv',
+        id: String(n),
+        title: `Title ${n}`,
+        episode: 'S1E2',
+        date: day(n),
+        chats: 1
+    }));
+    const popular = [1, 2, 3, 4, 5].map((n) => ({
+        seriesId: String(n),
+        subCount: n,
+        Series: { tmdb_id: String(n), title: `Series ${n}` }
+    }));
+    return { upcoming, popular };
+}
+
+async function loadedHeights(page) {
+    await expect(page.locator('#upcoming-list .upcoming-row:not(.skeleton-item)')).toHaveCount(5);
+    await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)')).toHaveCount(5);
+    return listHeights(page);
+}
+
+const expectSame = (a, b) => a.forEach((h, i) => expect(Math.abs(h - b[i])).toBeLessThanOrEqual(1));
+
+test('the dashboard cards keep their height when the data replaces the placeholders', async ({ page }) => {
+    let release;
+    const hold = new Promise((r) => (release = r));
+    await mockPanel(page, { ...fullLists(), hold });
+
+    await expect(page.locator('#upcoming-list .skeleton-item')).toHaveCount(5);
+    const placeholders = await listHeights(page);
+    release();
+    expectSame(placeholders, await loadedHeights(page));
+});
+
+test('the dashboard cards have their final height before the scripts run, and with nothing to list', async ({
+    page
+}) => {
+    // The first paint can come before the deferred app module: the lists are still empty then
+    await page.route('**/js/app.js', (r) => r.abort());
+    await mockPanel(page);
+    const beforeScripts = await listHeights(page);
+    page.__errors.length = 0; // the aborted module is reported as a console error
+
+    await page.unroute('**/js/app.js');
+    await mockPanel(page, fullLists());
+    const loaded = await loadedHeights(page);
+    expectSame(beforeScripts, loaded);
+
+    await mockPanel(page, { upcoming: [], popular: [] });
+    await expect(page.locator('#upcoming-list .empty-note')).toBeVisible();
+    expectSame(await listHeights(page), loaded);
+});

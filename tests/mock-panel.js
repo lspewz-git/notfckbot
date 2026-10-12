@@ -150,7 +150,9 @@ function stats(subs) {
  * Routes every request of `page` and opens the panel. Returns the mutable fixture so a test can
  * change what the next poll sees (e.g. `panel.subs.push(...)`).
  *
- * @param {{ health?: object }} [options] `health`: overrides per service, e.g. { kinopoisk: 'error' }
+ * @param {{ health?: object, upcoming?: object[], popular?: object[], hold?: Promise<void> }} [options]
+ *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
+ *   dashboard lists; `hold`: API answers wait for it, so a test can see the loading state
  */
 async function mockPanel(page, options = {}) {
     const panel = {
@@ -202,8 +204,9 @@ async function mockPanel(page, options = {}) {
             panel.pollsUntilDone = 2;
             return { success: true };
         },
-        '/api/stats/popular': () => [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
-        '/api/upcoming': () => [],
+        '/api/stats/popular': () =>
+            options.popular || [{ seriesId: '66732', subCount: 3, Series: series('66732') }],
+        '/api/upcoming': () => options.upcoming || [],
         '/api/cron': cronStatus,
         '/api/logs': () => [{ type: 'log', time: '12:00:00', text: 'Started' }],
         '/api/data/chats': () => CHATS,
@@ -224,6 +227,7 @@ async function mockPanel(page, options = {}) {
         if (url.pathname.startsWith('/api/')) {
             const handler = api[url.pathname];
             if (!handler) return route.fulfill({ status: 404, json: { error: 'Not mocked' } });
+            if (options.hold) await options.hold;
             return route.fulfill({ status: 200, json: handler() });
         }
 

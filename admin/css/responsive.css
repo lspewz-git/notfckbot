@@ -54,73 +54,6 @@
         font-size: 1.75rem;
     }
 
-    /* Statuses on one line, the switch and refresh on the next */
-    .header-tools {
-        gap: var(--space-2) var(--space-4);
-    }
-
-    .header-divider {
-        display: none;
-    }
-
-    .status-badges {
-        flex-basis: 100%;
-    }
-
-    /* Dashboard: the header stacks from the left */
-    .dash-header {
-        align-items: stretch;
-    }
-
-    #dashboard-section .stats-grid {
-        margin-bottom: 0;
-    }
-
-    #dashboard-section .stat-value {
-        font-size: 2rem;
-    }
-
-    .panel {
-        padding: 18px var(--space-4);
-    }
-
-    /* Coming up: date | title and meta | when; the type icon goes, the meta stays on one line */
-    .upcoming-row {
-        grid-template-columns: 52px minmax(0, 1fr) auto;
-        column-gap: var(--space-3);
-    }
-
-    .up-icon {
-        display: none;
-    }
-
-    .up-meta {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    /* Update check: title, then label | value rows, then the button */
-    .update-strip {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 18px var(--space-4);
-    }
-
-    .strip-pairs {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: var(--space-2) var(--space-4);
-    }
-
-    .strip-pairs > div {
-        display: contents;
-    }
-
-    .update-strip .btn-outline {
-        align-self: flex-start;
-    }
-
     .log-filters {
         flex-wrap: wrap;
     }
@@ -143,20 +76,6 @@
     .glass-card {
         padding: var(--space-4);
         margin-bottom: var(--space-4);
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-2);
-        margin-bottom: var(--space-4);
-    }
-
-    .stat-card {
-        padding: var(--space-4);
-    }
-
-    .stat-value {
-        font-size: var(--text-2xl);
     }
 
     .logs-viewer {

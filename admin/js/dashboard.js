@@ -121,6 +121,39 @@ let upcoming = null;
 // As many as Popular now lists, so the two panels side by side match
 const UPCOMING_SHOWN = 5;
 
+// One builder per list for both the real rows and their placeholders, so a placeholder
+// always has the real row's structure (and therefore its height on every screen size)
+const bar = (width, sub = false) =>
+    `<span class="skeleton${sub ? ' skeleton-sub' : ''}" style="width:${width}"></span>`;
+const PLACEHOLDER_WIDTHS = ['62%', '48%', '70%', '55%', '40%'];
+
+/** @param {{ attrs?: string, placeholder?: boolean, date: string, icon?: string, title: string, meta: string, when: string }} r */
+const upcomingRow = (r) => `
+        <div class="upcoming-row${r.placeholder ? ' skeleton-item' : ''}" ${r.placeholder ? 'aria-hidden="true"' : r.attrs}>
+            <div class="up-date">${r.date}</div>
+            <span class="up-icon">${r.icon || ''}</span>
+            <div class="up-body"><div class="up-title">${r.title}</div><div class="up-meta">${r.meta}</div></div>
+            <span class="up-when">${r.when}</span>
+        </div>`;
+
+/** @param {{ attrs?: string, placeholder?: boolean, rank: string, title: string, count: string }} r */
+const popularRow = (r) => `
+        <div class="popular-item${r.placeholder ? ' skeleton-item' : ''}" ${r.placeholder ? 'aria-hidden="true"' : r.attrs}>
+            <span class="pop-rank">${r.rank}</span>
+            <span class="pop-title">${r.title}</span>
+            <span class="pop-count">${r.count}</span>
+        </div>`;
+
+/** Five placeholder rows in each list, so the cards have their final size before the data. */
+export function renderDashboardPlaceholders() {
+    $('upcoming-list').innerHTML = PLACEHOLDER_WIDTHS.map((w) =>
+        upcomingRow({ placeholder: true, date: bar('52px'), title: bar(w), meta: bar('30%', true), when: bar('56px') })
+    ).join('');
+    $('popular-list').innerHTML = PLACEHOLDER_WIDTHS.map((w) =>
+        popularRow({ placeholder: true, rank: '', title: bar(w), count: '' })
+    ).join('');
+}
+
 function renderUpcoming() {
     const container = $('upcoming-list');
     if (!container || !upcoming) return;
@@ -143,16 +176,14 @@ function renderUpcoming() {
             const what = item.kind === 'tv' ? item.episode || 'New episode' : 'Film release';
             const chats = `${item.chats} ${item.chats === 1 ? 'chat' : 'chats'}`;
             const { day, sub } = dateParts(item.date, today);
-            return `
-        <div class="upcoming-row" data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0">
-            <div class="up-date"><span class="up-day">${escapeHtml(day)}</span><span class="up-weekday">${escapeHtml(sub)}</span></div>
-            <span class="up-icon">${KIND_ICON[item.kind] || ''}</span>
-            <div class="up-body">
-                <div class="up-title">${escapeHtml(item.title)}</div>
-                <div class="up-meta">${escapeHtml(`${what} · ${chats}`)}</div>
-            </div>
-            <span class="up-when">${escapeHtml(relativeDay(item.date, today))}</span>
-        </div>`;
+            return upcomingRow({
+                attrs: `data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0"`,
+                date: `<span class="up-day">${escapeHtml(day)}</span><span class="up-weekday">${escapeHtml(sub)}</span>`,
+                icon: KIND_ICON[item.kind],
+                title: escapeHtml(item.title),
+                meta: escapeHtml(`${what} · ${chats}`),
+                when: escapeHtml(relativeDay(item.date, today))
+            });
         })
         .join('');
 }
@@ -177,12 +208,12 @@ export function updatePopular(list) {
     container.innerHTML = list
         .map((item, idx) => {
             const count = Number(item.subCount) || 0;
-            return `
-        <div class="popular-item" data-action="series" data-id="${escapeHtml(item.seriesId)}" role="button" tabindex="0">
-            <span class="pop-rank">${idx + 1}</span>
-            <span class="pop-title">${escapeHtml(item.Series.title)}</span>
-            <span class="pop-count"><b>${count}</b> ${count === 1 ? 'subscriber' : 'subscribers'}</span>
-        </div>`;
+            return popularRow({
+                attrs: `data-action="series" data-id="${escapeHtml(item.seriesId)}" role="button" tabindex="0"`,
+                rank: String(idx + 1),
+                title: escapeHtml(item.Series.title),
+                count: `<b>${count}</b> ${count === 1 ? 'subscriber' : 'subscribers'}`
+            });
         })
         .join('');
 }

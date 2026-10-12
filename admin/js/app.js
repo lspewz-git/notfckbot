@@ -1,7 +1,7 @@
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
 import { $, $field, all, closest, debounce, target } from './dom.js';
-import { runCheckNow } from './dashboard.js';
+import { runCheckNow, renderDashboardPlaceholders } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
 import { filterLogs } from './logs.js';
@@ -181,6 +181,7 @@ function setupControls() {
 
 // --- Boot ---
 function init() {
+    renderDashboardPlaceholders();
     setupControls();
     setupDelegation();
     setupFilters();
