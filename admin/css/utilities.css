@@ -220,9 +220,6 @@ select:focus {
 .mt-lg {
     margin-top: 1.5rem;
 }
-.mt-xl {
-    margin-top: 2rem;
-}
 
 .field-block {
     margin: var(--space-5) 0;

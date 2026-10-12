@@ -212,7 +212,7 @@ app.get('/api/upcoming', async (req, res) => {
         // One line per film, however many chats wait for it
         const byFilm = new Map();
         for (const w of films) {
-            const id = String(w.tmdb_id).startsWith('movie_') ? w.tmdb_id : `movie_${w.tmdb_id}`;
+            const id = w.tmdb_id;
             const entry = byFilm.get(id) || {
                 kind: 'movie',
                 id,
@@ -253,13 +253,12 @@ app.get('/api/movie/:tmdbId', async (req, res) => {
     try {
         const numericId = String(req.params.tmdbId).replace('movie_', '');
         if (!/^\d+$/.test(numericId)) return res.status(400).json({ error: 'Bad film id' });
-        // Older rows may still hold the bare id (see fix-watchlist-ids.js)
-        const ids = [`movie_${numericId}`, numericId];
+        const id = `movie_${numericId}`;
         const [details, waiting, notified] = await Promise.all([
             tmdb.getDetailsCached(numericId, 'movie'),
             // Chats, not rows: a chat can hold the same film twice (old duplicates)
-            Watchlist.count({ where: { tmdb_id: ids, notified: false }, distinct: true, col: 'chatId' }),
-            Watchlist.count({ where: { tmdb_id: ids, notified: true }, distinct: true, col: 'chatId' })
+            Watchlist.count({ where: { tmdb_id: id, notified: false }, distinct: true, col: 'chatId' }),
+            Watchlist.count({ where: { tmdb_id: id, notified: true }, distinct: true, col: 'chatId' })
         ]);
         res.json({ ...details, waiting, notified });
     } catch (err) {
@@ -395,15 +394,6 @@ app.get('/api/health/:name', async (req, res) => {
 app.get('/api/health', async (req, res) => {
     const parts = await Promise.all(Object.keys(HEALTH_CHECKS).map(checkHealth));
     res.json(Object.assign({}, ...parts));
-});
-
-app.get('/api/chats', async (req, res) => {
-    try {
-        const chats = await Chat.findAll({ include: [Series] });
-        res.json(chats);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
 });
 
 // --- Write endpoints (auth required) ---
@@ -657,12 +647,12 @@ app.post('/api/watchlist', async (req, res) => {
         const chat = await Chat.findByPk(chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
-        // Rows are stored as "movie_<id>"; comparing against the bare id never matched,
-        // which is how the same film ended up in one chat's watchlist twice
+        // Rows are stored as "movie_<id>": the request may send either form, so normalise it
+        // before looking for a duplicate
         const numericId = String(tmdbId).replace('movie_', '');
         if (!/^\d+$/.test(numericId)) return res.status(400).json({ error: 'Bad film id' });
         const fullTmdbId = `movie_${numericId}`;
-        const rows = await Watchlist.findAll({ where: { chatId, tmdb_id: [fullTmdbId, numericId] } });
+        const rows = await Watchlist.findAll({ where: { chatId, tmdb_id: fullTmdbId } });
         if (rows.some((r) => !r.notified)) {
             return res.status(409).json({ error: 'Film already in watchlist for this chat' });
         }

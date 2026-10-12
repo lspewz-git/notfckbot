@@ -17,13 +17,6 @@ const NOTIFY_LABELS_SHORT = {
     first_and_full: '1-я серия + весь сезон'
 };
 
-/** Cycle order for toggling notify modes */
-const NOTIFY_CYCLE = {
-    episode: 'season',
-    season: 'first_and_full',
-    first_and_full: 'episode'
-};
-
 /** TMDB series statuses after which no new episodes are expected, with their labels */
 const FINISHED_STATUS_LABELS = {
     Ended: '🏁 Завершён',
@@ -94,7 +87,6 @@ module.exports = {
     UPDATE_INTERVAL_HOURS,
     NOTIFY_LABELS,
     NOTIFY_LABELS_SHORT,
-    NOTIFY_CYCLE,
     FINISHED_STATUS_LABELS,
     isFinishedStatus,
     escapeHtml,

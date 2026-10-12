@@ -18,7 +18,7 @@ function avatarHue(id) {
     return AVATAR_HUES[h % AVATAR_HUES.length];
 }
 
-/** First letter of the name without the @; "#" when it starts with no letter, "?" when unnamed. */
+/** First letter of the name, leading at sign skipped; "#" when it starts with no letter, "?" when unnamed. */
 function avatarInitial(chat) {
     if (!chat.username) return '?';
     const first = Array.from(chat.username.replace(/^@/, ''))[0] || '';

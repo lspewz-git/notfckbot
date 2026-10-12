@@ -1,12 +1,11 @@
-FROM node:18-slim
-
-# Install wait-for-it or simple shell script to wait for DB
-RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
+FROM node:22-slim
 
 WORKDIR /app
 
+# Production dependencies only: the tests, linters and type checker stay out of the image.
+# Waiting for the database is the healthcheck's job in docker-compose.yml.
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev
 
 COPY . .
 

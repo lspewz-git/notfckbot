@@ -308,11 +308,36 @@
                                 </div>
                                 <!-- Five placeholder rows, so the card has its final size before the data -->
                                 <div id="upcoming-list" class="dash-list" aria-busy="true">
-                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:62%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
-                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:48%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
-                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:70%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
-                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:55%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
-                                    <div class="popular-item skeleton-item"><div class="popular-body"><span class="skeleton" style="width:40%"></span><span class="skeleton skeleton-sub" style="width:30%"></span></div></div>
+                                    <div class="popular-item skeleton-item">
+                                        <div class="popular-body">
+                                            <span class="skeleton" style="width: 62%"></span
+                                            ><span class="skeleton skeleton-sub" style="width: 30%"></span>
+                                        </div>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <div class="popular-body">
+                                            <span class="skeleton" style="width: 48%"></span
+                                            ><span class="skeleton skeleton-sub" style="width: 30%"></span>
+                                        </div>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <div class="popular-body">
+                                            <span class="skeleton" style="width: 70%"></span
+                                            ><span class="skeleton skeleton-sub" style="width: 30%"></span>
+                                        </div>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <div class="popular-body">
+                                            <span class="skeleton" style="width: 55%"></span
+                                            ><span class="skeleton skeleton-sub" style="width: 30%"></span>
+                                        </div>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <div class="popular-body">
+                                            <span class="skeleton" style="width: 40%"></span
+                                            ><span class="skeleton skeleton-sub" style="width: 30%"></span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -325,10 +350,22 @@
                                     <span id="cron-state" class="badge muted">…</span>
                                 </div>
                                 <dl id="cron-status" class="status-list">
-                                    <div><dt>Last check</dt><dd id="cron-last">—</dd></div>
-                                    <div><dt>Checked</dt><dd id="cron-checked">—</dd></div>
-                                    <div><dt>Notifications</dt><dd id="cron-sent">—</dd></div>
-                                    <div><dt>Next check</dt><dd id="cron-next">—</dd></div>
+                                    <div>
+                                        <dt>Last check</dt>
+                                        <dd id="cron-last">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Checked</dt>
+                                        <dd id="cron-checked">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Notifications</dt>
+                                        <dd id="cron-sent">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Next check</dt>
+                                        <dd id="cron-next">—</dd>
+                                    </div>
                                 </dl>
                             </div>
 
@@ -341,11 +378,21 @@
                                     </div>
                                 </div>
                                 <div id="popular-list" class="dash-list" aria-busy="true">
-                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:62%"></span></div>
-                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:48%"></span></div>
-                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:70%"></span></div>
-                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:55%"></span></div>
-                                    <div class="popular-item skeleton-item"><span class="skeleton" style="width:40%"></span></div>
+                                    <div class="popular-item skeleton-item">
+                                        <span class="skeleton" style="width: 62%"></span>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <span class="skeleton" style="width: 48%"></span>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <span class="skeleton" style="width: 70%"></span>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <span class="skeleton" style="width: 55%"></span>
+                                    </div>
+                                    <div class="popular-item skeleton-item">
+                                        <span class="skeleton" style="width: 40%"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -418,11 +465,27 @@
                             <!-- Phones: the header row is hidden, so sorting gets its own strip -->
                             <div class="sort-bar" role="group" aria-label="Sort films">
                                 <span class="sort-bar-label">Sort</span>
-                                <button class="btn btn-ghost sort-btn" data-action="sort" data-table="films" data-sort="year">
-                                    Year<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                <button
+                                    class="btn btn-ghost sort-btn"
+                                    data-action="sort"
+                                    data-table="films"
+                                    data-sort="year"
+                                >
+                                    Year<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="m7 15 5 5 5-5" />
+                                        <path d="m7 9 5-5 5 5" />
+                                    </svg>
                                 </button>
-                                <button class="btn btn-ghost sort-btn" data-action="sort" data-table="films" data-sort="release">
-                                    Release<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                <button
+                                    class="btn btn-ghost sort-btn"
+                                    data-action="sort"
+                                    data-table="films"
+                                    data-sort="release"
+                                >
+                                    Release<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="m7 15 5 5 5-5" />
+                                        <path d="m7 9 5-5 5 5" />
+                                    </svg>
                                 </button>
                             </div>
                             <div class="table-wrap">
@@ -432,13 +495,37 @@
                                             <th>User</th>
                                             <th>Film Title</th>
                                             <th aria-sort="none">
-                                                <button class="th-sort sort-btn" data-action="sort" data-table="films" data-sort="year">
-                                                    Year<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                                <button
+                                                    class="th-sort sort-btn"
+                                                    data-action="sort"
+                                                    data-table="films"
+                                                    data-sort="year"
+                                                >
+                                                    Year<svg
+                                                        class="icon sort-icon"
+                                                        viewBox="0 0 24 24"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <path d="m7 15 5 5 5-5" />
+                                                        <path d="m7 9 5-5 5 5" />
+                                                    </svg>
                                                 </button>
                                             </th>
                                             <th aria-sort="none">
-                                                <button class="th-sort sort-btn" data-action="sort" data-table="films" data-sort="release">
-                                                    Release<svg class="icon sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+                                                <button
+                                                    class="th-sort sort-btn"
+                                                    data-action="sort"
+                                                    data-table="films"
+                                                    data-sort="release"
+                                                >
+                                                    Release<svg
+                                                        class="icon sort-icon"
+                                                        viewBox="0 0 24 24"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <path d="m7 15 5 5 5-5" />
+                                                        <path d="m7 9 5-5 5 5" />
+                                                    </svg>
                                                 </button>
                                             </th>
                                             <th>Actions</th>
@@ -459,11 +546,27 @@
                                 </div>
                                 <span class="pager-info" aria-live="polite"></span>
                                 <div class="pager-nav">
-                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="films" data-step="-1" aria-label="Previous page">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                                    <button
+                                        class="btn btn-ghost btn-icon"
+                                        data-action="page"
+                                        data-table="films"
+                                        data-step="-1"
+                                        aria-label="Previous page"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="m15 18-6-6 6-6" />
+                                        </svg>
                                     </button>
-                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="films" data-step="1" aria-label="Next page">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                                    <button
+                                        class="btn btn-ghost btn-icon"
+                                        data-action="page"
+                                        data-table="films"
+                                        data-step="1"
+                                        aria-label="Next page"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="m9 18 6-6-6-6" />
+                                        </svg>
                                     </button>
                                 </div>
                             </div>
@@ -508,7 +611,11 @@
                             <div class="pager" id="subs-pager" hidden>
                                 <div class="pager-size">
                                     <span class="pager-label">Rows per page</span>
-                                    <select class="select-field" data-page-size="subs" aria-label="Subscriptions per page">
+                                    <select
+                                        class="select-field"
+                                        data-page-size="subs"
+                                        aria-label="Subscriptions per page"
+                                    >
                                         <option value="10">10</option>
                                         <option value="25">25</option>
                                         <option value="50">50</option>
@@ -517,11 +624,27 @@
                                 </div>
                                 <span class="pager-info" aria-live="polite"></span>
                                 <div class="pager-nav">
-                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="subs" data-step="-1" aria-label="Previous page">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                                    <button
+                                        class="btn btn-ghost btn-icon"
+                                        data-action="page"
+                                        data-table="subs"
+                                        data-step="-1"
+                                        aria-label="Previous page"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="m15 18-6-6 6-6" />
+                                        </svg>
                                     </button>
-                                    <button class="btn btn-ghost btn-icon" data-action="page" data-table="subs" data-step="1" aria-label="Next page">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                                    <button
+                                        class="btn btn-ghost btn-icon"
+                                        data-action="page"
+                                        data-table="subs"
+                                        data-step="1"
+                                        aria-label="Next page"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="m9 18 6-6-6-6" />
+                                        </svg>
                                     </button>
                                 </div>
                             </div>

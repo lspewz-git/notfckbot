@@ -71,7 +71,7 @@ function localDay(iso) {
 }
 
 function dayLabel(iso, today) {
-    const diff = Math.round((localDay(iso) - today) / DAY);
+    const diff = Math.round((localDay(iso).getTime() - today.getTime()) / DAY);
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Tomorrow';
     // "Thu 15 Oct" for the coming months; "8 Jul 2027" only once the date is far enough

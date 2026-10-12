@@ -26,7 +26,7 @@ foreground text, not a brand colour.
 
 ## Type
 
-- **Geist** for the UI, **Geist Mono** for IDs and logs (`code`, `.mono`). Figures use tabular
+- **Geist** for the UI, **Geist Mono** for IDs and logs (`code`). Figures use tabular
   numbers.
 - The scale is `--text-xs` 12, `--text-sm` 13, `--text-base` 14 (body), `--text-lg` 16,
   `--text-xl` 20 and `--text-2xl` 24 (page titles, bold, -0.02em).

@@ -1,0 +1,7 @@
+# LF everywhere, including Windows checkouts: Prettier, the Docker image and the
+# server all expect it, and CRLF made unchanged files show up as modified
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
