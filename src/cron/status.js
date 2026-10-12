@@ -7,8 +7,8 @@ const { UPDATE_INTERVAL_HOURS } = require('../constants');
 let isRunning = false;
 
 // The last run is kept in a file next to the code (a bind mount in Docker), so a restart or a deploy
-// doesn't blank the dashboard until the next check
-const STATUS_FILE = path.join(__dirname, '..', '..', '.cron-status.json');
+// doesn't blank the dashboard until the next check. CRON_STATUS_FILE moves it (tests/unit use a temp file).
+const STATUS_FILE = process.env.CRON_STATUS_FILE || path.join(__dirname, '..', '..', '.cron-status.json');
 
 function loadLastRun() {
     try {
