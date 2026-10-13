@@ -7,7 +7,8 @@ import { $, setText } from './dom.js';
  * @param {string} message
  * @param {'info' | 'success' | 'warning' | 'error'} [type]
  */
-export function toast(message, type = 'info') {
+/** @param {number} [ms] how long it stays: longer for a message with several parts to read */
+export function toast(message, type = 'info', ms = 3500) {
     const container = $('toast-container');
     if (!container) return;
 
@@ -19,7 +20,7 @@ export function toast(message, type = 'info') {
     setTimeout(() => {
         el.classList.add('toast-out');
         setTimeout(() => el.remove(), 300);
-    }, 3500);
+    }, ms);
 }
 
 // --- Modals ---

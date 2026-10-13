@@ -1,6 +1,8 @@
 // .env wins over the environment docker-compose baked in at container creation: the
 // admin panel edits .env (tokens, proxy), and those edits must survive a restart.
 require('dotenv').config({ override: true });
+// Every axios request's timeout covers the connection to the proxy too (see http-deadline.js)
+require('./http-deadline').installDeadline(require('axios'));
 const { initDb } = require('./db');
 const bot = require('./bot');
 const { setupCron } = require('./cron');

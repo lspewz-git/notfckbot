@@ -81,6 +81,27 @@ export async function openProxyModal() {
     openModal('proxy-modal');
 }
 
+const TARGET_NAMES = { telegram: 'Telegram', tmdb: 'TMDB', internet: 'Internet' };
+
+/**
+ * "Telegram ✓ 180 ms · TMDB ✗ replied 503 · Internet ✓ 95 ms (IP 1.2.3.4)", or the proxy's own
+ * failure when nothing got through. All fine: success; some: a warning; none: an error.
+ * @param {{ direct: boolean, proxyDown: string | null, checks: Record<string, { ok: boolean, ms: number, error?: string, ip?: string }> }} res
+ */
+export function describeTest(res) {
+    const via = res.direct ? 'Direct connection' : 'Proxy';
+    if (res.proxyDown) return { text: `${via} unreachable: ${res.proxyDown}`, type: 'error' };
+    const checks = Object.entries(res.checks);
+    const parts = checks.map(([name, c]) => {
+        const label = TARGET_NAMES[name] || name;
+        if (!c.ok) return `${label} ✗ ${c.error}`;
+        return `${label} ✓ ${c.ms} ms${c.ip ? ` (IP ${c.ip})` : ''}`;
+    });
+    const passed = checks.filter(([, c]) => c.ok).length;
+    const type = passed === checks.length ? 'success' : passed ? 'warning' : 'error';
+    return { text: `${via}: ${parts.join(' · ')}`, type };
+}
+
 /** Both buttons need the same "is the form usable" check first. */
 function urlOrWarn() {
     const scheme = $field('proxy-scheme').value;
@@ -104,10 +125,11 @@ export function setupProxyForm() {
         btn.disabled = true;
         btn.innerText = 'Testing...';
         try {
-            // Reachability failures come back as an { error } body, which api()
-            // turns into a throw — so both paths land in the catch below.
+            // A URL the server refuses comes back as an { error } body, which api() turns into
+            // a throw; otherwise each target has its own result
             const res = await api('/config/test-proxy', { method: 'POST', body: { url } });
-            toast(`${res.direct ? 'Direct connection' : 'Proxy'} reached TMDB in ${res.ms} ms`, 'success');
+            const { text, type } = describeTest(res);
+            toast(text, type, 8000);
         } catch (err) {
             toast(`Failed: ${err.message}`, 'error');
         } finally {

@@ -15,6 +15,28 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 let cachedAgent = null;
 let cachedUrl = null;
 
+const PROXY_PROTOCOLS = ['http:', 'https:', 'socks:', 'socks4:', 'socks5:', 'socks5h:'];
+
+/**
+ * Why a proxy URL can't be used, or null when it can ('' — no proxy — can). Checked before a
+ * value is saved: the agents throw on a URL they can't parse, and with such a value in .env
+ * the bot would fail on every start.
+ */
+function proxyUrlProblem(url) {
+    if (!url) return null;
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return 'Proxy URL is not valid: check the host and the port (1–65535)';
+    }
+    if (!PROXY_PROTOCOLS.includes(parsed.protocol)) {
+        return 'Proxy URL must start with http://, https://, socks4://, socks5:// or socks5h://';
+    }
+    if (!parsed.hostname) return 'Proxy URL has no host';
+    return null;
+}
+
 /** Build an agent for an arbitrary URL. Returns null for an unusable value. */
 const buildProxyAgent = (url) => {
     if (!url) return null;
@@ -37,10 +59,17 @@ const getProxyAgent = () => {
         return null;
     }
 
-    if (url === cachedUrl && cachedAgent) return cachedAgent;
+    if (url === cachedUrl) return cachedAgent;
 
     cachedUrl = url;
-    cachedAgent = buildProxyAgent(url);
+    try {
+        cachedAgent = buildProxyAgent(url);
+    } catch (err) {
+        // A hand-edited .env: better a direct connection (and this line in the log, once per
+        // value) than a bot that fails on start and every request that throws
+        console.error(`[Proxy] TMDB_PROXY_URL can't be used (${err.message}); connecting directly`);
+        cachedAgent = null;
+    }
     return cachedAgent;
 };
 
@@ -103,6 +132,7 @@ function withSavedPassword(newUrl, savedUrl) {
 
 module.exports = {
     getProxyAgent,
+    proxyUrlProblem,
     buildProxyAgent,
     applyProxyToBot,
     redactProxyUrl,

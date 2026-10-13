@@ -236,6 +236,19 @@ async function mockPanel(page, options = {}) {
         '/api/data/films': () => FILMS,
         '/api/data/series': () =>
             SERIES.map((x) => ({ tmdb_id: x.tmdb_id, title: x.title, last_season: 2, last_episode: 5 })),
+        // The proxy dialog: no proxy saved; the test answers options.proxyTest
+        '/api/config': () => ({ tmdbApiKey: 'abcd*****wxyz', tmdbProxyUrl: '', proxyHasPassword: false }),
+        '/api/config/test-proxy': () =>
+            options.proxyTest || {
+                success: true,
+                direct: false,
+                proxyDown: null,
+                checks: {
+                    telegram: { ok: true, ms: 180 },
+                    tmdb: { ok: true, ms: 240 },
+                    internet: { ok: true, ms: 95, ip: '203.0.113.7' }
+                }
+            },
         // Release history: two years, the latest by default
         '/api/history': (req) => {
             const asked = Number(new URL(req.url()).searchParams.get('year'));

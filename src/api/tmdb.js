@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { getProxyAgent } = require('../proxy');
+const { installDeadline } = require('../http-deadline');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 require('dotenv').config();
 
@@ -10,6 +11,8 @@ const apiClient = axios.create({
     timeout: 15000, // Increased timeout for slow proxies
     proxy: false
 });
+// The timeout above counts from the first byte to the proxy, not from when its socket is ready
+installDeadline(apiClient);
 
 apiClient.interceptors.request.use(
     (config) => {
