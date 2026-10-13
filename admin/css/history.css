@@ -50,10 +50,28 @@
     min-width: 0;
 }
 
+/* The title opens the card: underlined like the titles in the Serials and Movies tables. As wide
+   as its text, so the pointer and the hover belong to the title, not to the empty space after it */
 .history-main .link-text {
+    align-self: flex-start;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 4px;
+    /* overflow: hidden (for the ellipsis) clips at the text's box, and the underline sits right
+       at its edge: on a phone's fractional pixels it was cut off on some titles. Room below for
+       it, given back by the margin so the row keeps its height */
+    padding-bottom: 0.25em;
+    margin-bottom: -0.25em;
+}
+
+.history-main .link-text:hover {
+    text-decoration-color: currentColor;
 }
 
 .history-genres {

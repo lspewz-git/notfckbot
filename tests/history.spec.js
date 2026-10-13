@@ -170,3 +170,26 @@ test('a year that fails to load says so and keeps the year on screen; pressing i
     // The browser reports the failed request itself; nothing else may be logged
     page.__errors = page.__errors.filter((e) => !e.includes('500'));
 });
+
+test('a title looks clickable, like in the Serials and Movies tables, and opens from the keyboard', async ({
+    page
+}) => {
+    await mockPanel(page);
+    await openHistory(page);
+    const title = page.locator('#history-series .link-text').first();
+    const style = await title.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { cursor: s.cursor, line: s.textDecorationLine };
+    });
+    expect(style).toEqual({ cursor: 'pointer', line: 'underline' });
+    // Only as wide as the title: the empty space after it is not part of the link
+    const [titleBox, rowBox] = await Promise.all([
+        title.boundingBox(),
+        page.locator('#history-series .history-main').first().boundingBox()
+    ]);
+    expect(titleBox.width).toBeLessThan(rowBox.width / 2);
+
+    await title.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#detail-title')).toHaveText('Stranger Things');
+});
