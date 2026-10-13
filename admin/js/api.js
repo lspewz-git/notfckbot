@@ -15,7 +15,8 @@ export async function api(path, options = {}) {
 
     const res = await fetch(`${API_URL}${path}`, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        // The server answers only requests carrying this (src/admin/panel-only.js)
+        headers: { 'Content-Type': 'application/json', 'X-Requested-By': 'notfckbot-panel' },
         body: body === undefined ? undefined : JSON.stringify(body)
     });
 

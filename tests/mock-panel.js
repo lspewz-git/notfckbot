@@ -372,6 +372,11 @@ async function mockPanel(page, options = {}) {
             const card = cards.map(([re, fn]) => [url.pathname.match(re), fn]).find(([m]) => m);
             const handler = api[url.pathname] || (card && ((req) => card[1](card[0], req)));
             if (!handler) return route.fulfill({ status: 404, json: { error: 'Not mocked' } });
+            // As the server does (src/admin/panel-only.js): a request without the panel's mark
+            // is refused, so a call that forgets it fails here too
+            const marked = route.request().headers()['x-requested-by'] === 'notfckbot-panel';
+            if (!marked && !url.pathname.startsWith('/api/poster/'))
+                return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
             if (options.hold) await options.hold;
             const answer = await handler(route.request());
             // A handler may pick the status: { status, body }

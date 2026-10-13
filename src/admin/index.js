@@ -4,14 +4,15 @@
  * req.app.get('bot').
  */
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 const { startLogCapture } = require('./log-buffer');
+const { panelOnly } = require('./panel-only');
 
 const app = express();
 const PORT = 3000;
 
-app.use(cors());
+// No CORS: the panel is served from here, and no other site may call the API
+app.use('/api', panelOnly);
 app.use(express.json());
 
 // Serve static files from 'admin' directory

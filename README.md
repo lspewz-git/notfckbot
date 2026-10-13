@@ -243,7 +243,7 @@ ADMIN_URL=http://<host>/ npm test
   - `search.js` — поиск, карточка тайтла, подписка на сериал, добавление фильма; как выглядят список и карточка — в `search-views.js`;
   - `subscriptions.js` — «Мои подписки»: обзор, настройки, архив, отписка;
   - `state.js` (состояние диалога), `keyboards.js` (клавиатуры и кнопки ссылок).
-- `src/admin/` — сервер панели: `index.js` (Express, статика, подключение маршрутов), `env.js` (запись в `.env`, маскирование токенов), `log-buffer.js` (логи для панели), `version.js` (выкаченный коммит из `.git`) и `routes/` — по файлу на раздел API: `stats`, `data`, `details`, `logs`, `health`, `services`, `config`, `records`, `actions`.
+- `src/admin/` — сервер панели: `index.js` (Express, статика, подключение маршрутов), `env.js` (запись в `.env`, маскирование токенов), `log-buffer.js` (логи для панели), `version.js` (выкаченный коммит из `.git`), `panel-only.js` (API отвечает только самой панели: другой сайт, открытый в браузере, или ссылка, набранная в адресной строке, получат 403) и `routes/` — по файлу на раздел API: `stats`, `data`, `details`, `logs`, `health`, `services`, `config`, `records`, `actions`, `history`.
 - `src/cron/` — фоновая проверка обновлений: `index.js` (расписание и запуск), `series.js` (новые серии, завершённые сезоны, смена статуса), `films.js` (вышедшие фильмы), `messages.js` (тексты уведомлений), `status.js` (статус проверки для панели).
 - `src/proxy.js` — единая точка сборки прокси-агента для TMDB и Telegram.
 - `src/api/tmdb.js` — клиент TMDB.
