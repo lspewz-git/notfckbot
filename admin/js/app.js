@@ -4,6 +4,7 @@ import { $, $field, all, closest, debounce } from './dom.js';
 import { runCheckNow, renderDashboardPlaceholders, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
+import { fillPagers } from './pager.js';
 import { filterLogs } from './logs.js';
 import { setHistoryYear, setHistoryPage, setupHistory } from './history.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo } from './ui.js';
@@ -204,6 +205,8 @@ function setupControls() {
 
 // --- Boot ---
 function init() {
+    // First: the selects inside are what setupFilters, setupHistory and enhanceSelects work on
+    fillPagers();
     renderDashboardPlaceholders();
     setupControls();
     setupDelegation();

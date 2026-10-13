@@ -420,90 +420,26 @@
                             <div class="glass-card history-group">
                                 <h2 class="history-title">Serials <span id="history-series-count"></span></h2>
                                 <ul id="history-series" class="history-list" aria-busy="true"></ul>
-                                <div class="pager" id="history-series-pager" hidden>
-                                    <div class="pager-size">
-                                        <span class="pager-label">Rows per page</span>
-                                        <select
-                                            class="select-field"
-                                            data-history-size="series"
-                                            aria-label="Serials per page"
-                                        >
-                                            <option value="10">10</option>
-                                            <option value="25">25</option>
-                                            <option value="50">50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                    </div>
-                                    <span class="pager-info" aria-live="polite"></span>
-                                    <div class="pager-nav">
-                                        <button
-                                            class="btn btn-ghost btn-icon"
-                                            data-action="history-page"
-                                            data-list="series"
-                                            data-step="-1"
-                                            aria-label="Previous page"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="m15 18-6-6 6-6" />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            class="btn btn-ghost btn-icon"
-                                            data-action="history-page"
-                                            data-list="series"
-                                            data-step="1"
-                                            aria-label="Next page"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="m9 18 6-6-6-6" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
+                                <!-- Filled by pager.js (fillPagers) -->
+                                <div
+                                    class="pager"
+                                    id="history-series-pager"
+                                    data-pager="history-series"
+                                    data-pager-label="Serials per page"
+                                    hidden
+                                ></div>
                             </div>
                             <div class="glass-card history-group">
                                 <h2 class="history-title">Movies <span id="history-films-count"></span></h2>
                                 <ul id="history-films" class="history-list" aria-busy="true"></ul>
-                                <div class="pager" id="history-films-pager" hidden>
-                                    <div class="pager-size">
-                                        <span class="pager-label">Rows per page</span>
-                                        <select
-                                            class="select-field"
-                                            data-history-size="films"
-                                            aria-label="Movies per page"
-                                        >
-                                            <option value="10">10</option>
-                                            <option value="25">25</option>
-                                            <option value="50">50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                    </div>
-                                    <span class="pager-info" aria-live="polite"></span>
-                                    <div class="pager-nav">
-                                        <button
-                                            class="btn btn-ghost btn-icon"
-                                            data-action="history-page"
-                                            data-list="films"
-                                            data-step="-1"
-                                            aria-label="Previous page"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="m15 18-6-6 6-6" />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            class="btn btn-ghost btn-icon"
-                                            data-action="history-page"
-                                            data-list="films"
-                                            data-step="1"
-                                            aria-label="Next page"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="m9 18 6-6-6-6" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
+                                <!-- Filled by pager.js (fillPagers) -->
+                                <div
+                                    class="pager"
+                                    id="history-films-pager"
+                                    data-pager="history-films"
+                                    data-pager-label="Movies per page"
+                                    hidden
+                                ></div>
                             </div>
                         </div>
                     </section>
@@ -608,42 +544,14 @@
                                     <tbody id="watchlist-body"></tbody>
                                 </table>
                             </div>
-                            <div class="pager" id="films-pager" hidden>
-                                <div class="pager-size">
-                                    <span class="pager-label">Rows per page</span>
-                                    <select class="select-field" data-page-size="films" aria-label="Films per page">
-                                        <option value="10">10</option>
-                                        <option value="25">25</option>
-                                        <option value="50">50</option>
-                                        <option value="100">100</option>
-                                    </select>
-                                </div>
-                                <span class="pager-info" aria-live="polite"></span>
-                                <div class="pager-nav">
-                                    <button
-                                        class="btn btn-ghost btn-icon"
-                                        data-action="page"
-                                        data-table="films"
-                                        data-step="-1"
-                                        aria-label="Previous page"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="m15 18-6-6 6-6" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        class="btn btn-ghost btn-icon"
-                                        data-action="page"
-                                        data-table="films"
-                                        data-step="1"
-                                        aria-label="Next page"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="m9 18 6-6-6-6" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
+                            <!-- Filled by pager.js (fillPagers) -->
+                            <div
+                                class="pager"
+                                id="films-pager"
+                                data-pager="films"
+                                data-pager-label="Films per page"
+                                hidden
+                            ></div>
                         </div>
                     </section>
 
@@ -687,46 +595,14 @@
                                     <tbody id="subs-body"></tbody>
                                 </table>
                             </div>
-                            <div class="pager" id="subs-pager" hidden>
-                                <div class="pager-size">
-                                    <span class="pager-label">Rows per page</span>
-                                    <select
-                                        class="select-field"
-                                        data-page-size="subs"
-                                        aria-label="Subscriptions per page"
-                                    >
-                                        <option value="10">10</option>
-                                        <option value="25">25</option>
-                                        <option value="50">50</option>
-                                        <option value="100">100</option>
-                                    </select>
-                                </div>
-                                <span class="pager-info" aria-live="polite"></span>
-                                <div class="pager-nav">
-                                    <button
-                                        class="btn btn-ghost btn-icon"
-                                        data-action="page"
-                                        data-table="subs"
-                                        data-step="-1"
-                                        aria-label="Previous page"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="m15 18-6-6 6-6" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        class="btn btn-ghost btn-icon"
-                                        data-action="page"
-                                        data-table="subs"
-                                        data-step="1"
-                                        aria-label="Next page"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="m9 18 6-6-6-6" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
+                            <!-- Filled by pager.js (fillPagers) -->
+                            <div
+                                class="pager"
+                                id="subs-pager"
+                                data-pager="subs"
+                                data-pager-label="Subscriptions per page"
+                                hidden
+                            ></div>
                         </div>
                     </section>
                 </div>

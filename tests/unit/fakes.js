@@ -7,7 +7,11 @@
 function fakeBot({ failFor = [] } = {}) {
     const sent = [];
     const send = async (chatId, text, photo) => {
-        if (failFor.includes(chatId)) throw new Error('Forbidden: bot was blocked by the user');
+        if (failFor.includes(chatId)) {
+            // Shaped like Telegraf's TelegramError
+            const description = 'Forbidden: bot was blocked by the user';
+            throw Object.assign(new Error(description), { description, response: { error_code: 403, description } });
+        }
         sent.push({ chatId, text, photo });
     };
     return {

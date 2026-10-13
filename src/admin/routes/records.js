@@ -1,6 +1,7 @@
 /** One record at a time: subscriptions, films, and a chat's block or direct message. */
 const { Chat, Series, Subscription, Watchlist } = require('../../db');
 const tmdb = require('../../api/tmdb');
+const { deliver } = require('../../delivery');
 
 const router = require('express').Router();
 
@@ -170,9 +171,8 @@ router.post('/api/chat/:chatId/message', async (req, res) => {
 
     const bot = req.app.get('bot');
     try {
-        await bot.telegram.sendMessage(chatId, `✉️ <b>Сообщение от администратора:</b>\n\n${message}`, {
-            parse_mode: 'HTML'
-        });
+        const result = await deliver(bot, chatId, `✉️ <b>Сообщение от администратора:</b>\n\n${message}`);
+        if (result.status !== 'sent') throw new Error(result.error);
         console.log(`[Admin] Direct message sent to ${chatId}`);
         res.json({ success: true });
     } catch (err) {

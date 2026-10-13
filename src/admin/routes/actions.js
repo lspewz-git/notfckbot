@@ -5,6 +5,7 @@ const { buildTestMessage, TEST_MODES, EPISODE_MODES, STATUS_MODES } = require('.
 const { formatWatchLinks } = require('../../constants');
 const { findKinopoiskIdQuick } = require('../../api/kinopoisk');
 const tmdb = require('../../api/tmdb');
+const { deliver } = require('../../delivery');
 
 const router = require('express').Router();
 
@@ -32,12 +33,9 @@ router.post('/api/broadcast', async (req, res) => {
         let failCount = 0;
 
         for (const chat of chats) {
-            try {
-                await bot.telegram.sendMessage(chat.id, `📣 <b>ОБЪЯВЛЕНИЕ:</b>\n\n${message}`, { parse_mode: 'HTML' });
-                successCount++;
-            } catch (e) {
-                failCount++;
-            }
+            const result = await deliver(bot, chat.id, `📣 <b>ОБЪЯВЛЕНИЕ:</b>\n\n${message}`);
+            if (result.status === 'sent') successCount++;
+            else failCount++;
             // FIX: Rate limit — Telegram allows ~30 messages/sec; 50ms keeps us safe
             await new Promise((r) => setTimeout(r, 50));
         }
@@ -153,16 +151,8 @@ router.post('/api/test-notification', async (req, res) => {
                 ? await filmTest(filmId)
                 : await seriesTest(seriesId, mode, { season, episode, episodeName });
 
-        if (posterUrl) {
-            try {
-                await bot.telegram.sendPhoto(chatId, posterUrl, { caption: msg, parse_mode: 'HTML' });
-            } catch (photoErr) {
-                console.error(`[Admin] sendPhoto failed (${photoErr.message}), falling back to sendMessage`);
-                await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
-            }
-        } else {
-            await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
-        }
+        const result = await deliver(bot, chatId, msg, { photo: posterUrl });
+        if (result.status !== 'sent') throw new Error(result.error);
 
         console.log(`[Admin] Test notification sent to chat ${chatId} for "${title}" (mode: ${mode})`);
         res.json({ success: true, message: 'Test notification sent successfully', title, chatId, mode });

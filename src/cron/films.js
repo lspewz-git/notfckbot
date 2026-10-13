@@ -5,6 +5,7 @@ const { findKinopoiskId } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
 const { buildFilmMessage } = require('./messages');
 const { tally } = require('./status');
+const { notify } = require('./outbox');
 
 /** Out once TMDB says Released, or once its release date has passed. */
 const isMovieReleased = (data, now = new Date()) => {
@@ -68,27 +69,10 @@ const checkWatchlistReleases = async (bot) => {
             const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
 
             for (const entry of filmEntries) {
-                try {
-                    const msg = buildFilmMessage({ entry, data, links, now });
-
-                    if (entry.poster_url) {
-                        await bot.telegram.sendPhoto(entry.Chat.id, entry.poster_url, {
-                            caption: msg,
-                            parse_mode: 'HTML'
-                        });
-                    } else {
-                        await bot.telegram.sendMessage(entry.Chat.id, msg, {
-                            parse_mode: 'HTML',
-                            disable_web_page_preview: false
-                        });
-                    }
-                    tally('sent');
-                } catch (err) {
-                    tally('failed');
-                    console.error(`[Cron] Failed to notify watchlist chat ${entry.Chat.id}:`, err.message);
-                }
-
-                // Mark as notified so we don't send again
+                const msg = buildFilmMessage({ entry, data, links, now });
+                // A message that doesn't go out is queued by notify(), so the film counts as
+                // announced either way
+                await notify(bot, entry.Chat.id, msg, { photo: entry.poster_url, about: entry.title });
                 await entry.update({ notified: true });
             }
         } catch (err) {

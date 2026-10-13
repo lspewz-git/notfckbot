@@ -241,15 +241,16 @@ ADMIN_URL=http://<host>/ npm test
   - `history.js` — 🗓 Вышло по годам;
   - `commands.js` — команды и кнопки нижнего меню;
   - `search.js` — поиск, карточка тайтла, подписка на сериал, добавление фильма; как выглядят список и карточка — в `search-views.js`;
-  - `subscriptions.js` — «Мои подписки»: обзор, настройки, архив, отписка;
+  - `subscriptions.js` — «Мои подписки»: обзор, настройки, архив, отписка (экраны — в `subscriptions-views.js`);
   - `state.js` (состояние диалога), `keyboards.js` (клавиатуры и кнопки ссылок).
 - `src/admin/` — сервер панели: `index.js` (Express, статика, подключение маршрутов), `env.js` (запись в `.env`, маскирование токенов), `log-buffer.js` (логи для панели), `version.js` (выкаченный коммит из `.git`), `panel-only.js` (API отвечает только самой панели: другой сайт, открытый в браузере, или ссылка, набранная в адресной строке, получат 403) и `routes/` — по файлу на раздел API: `stats`, `data`, `details`, `logs`, `health`, `services`, `config`, `records`, `actions`, `history`.
-- `src/cron/` — фоновая проверка обновлений: `index.js` (расписание и запуск), `series.js` (новые серии, завершённые сезоны, смена статуса), `films.js` (вышедшие фильмы), `messages.js` (тексты уведомлений), `status.js` (статус проверки для панели).
+- `src/cron/` — фоновая проверка обновлений: `index.js` (расписание и запуск), `series.js` (новые серии, завершённые сезоны, смена статуса), `films.js` (вышедшие фильмы), `messages.js` (тексты уведомлений), `outbox.js` (отправка уведомлений и очередь неотправленного), `status.js` (статус проверки для панели).
+- `src/delivery.js` — отправка одного сообщения в чат: с постером (без него, если Telegram не принял картинку), с повтором при сбое сети и паузой, которую просит Telegram при частых отправках. Что не ушло за три попытки, проверка обновлений кладёт в очередь (`PendingMessages`) и досылает первым делом на следующей проверке — до суток попыток. Заблокировавшим бота чатам не повторяет.
 - `src/proxy.js` — единая точка сборки прокси-агента для TMDB и Telegram.
 - `src/api/tmdb.js` — клиент TMDB.
 - `src/api/kinopoisk.js` — поиск ID Кинопоиска (Wikidata, kinopoiskapiunofficial.tech, с кешем) и статус API.
 - `src/constants.js` — общие подписи, статусы завершённых сериалов, форматирование дат и ссылки на просмотр.
-- `src/models/` — модели БД: `Chat`, `Series`, `Subscription`, `Watchlist`.
+- `src/models/` — модели БД: `Chat`, `Series`, `Subscription`, `Watchlist`, `PendingMessage`.
 - `src/db.js`, `src/database.js` — Sequelize и подключение к MariaDB.
 
 **Фронтенд панели** (`admin/`)
@@ -257,7 +258,7 @@ ADMIN_URL=http://<host>/ npm test
 - `index.html` — разметка; обработчики навешиваются делегированием, инлайновых `onclick` нет.
 - `js/` — 22 ES-модуля с однонаправленными зависимостями:
   `dom` · `api` · `store` · `render` · `format` → `ui` · `select` · `table-defs` → `pager` · `table-sort` → `tables` · `dashboard` · `logs` · `history` → `data` → `chats` · `records` · `maintenance` · `proxy` · `services` · `test-notify` → `app`.
-  Таблицы: `table-defs` (колонки, вкладки, вид строки), `pager` (страницы), `table-sort` (сортировка), `tables` (вкладки, фильтр, отрисовка).
+  Таблицы: `table-defs` (колонки, вкладки, вид строки), `pager` (страницы и разметка всех блоков страниц — `fillPagers`), `table-sort` (сортировка), `tables` (вкладки, фильтр, отрисовка).
 - `css/` — 12 файлов, подключаются в порядке каскада: `base` (токены дизайна), `layout`, `cards`, `logs`, `history`, `tables`, `buttons`, `forms`, `overlays`, `utilities`, `responsive`, `dashboard` (дашборд целиком, включая телефон; последним, чтобы перекрывать общие стили).
 - `DESIGN.md` — дизайн-система: палитра, типографика, отступы, компоненты.
 - `jsconfig.json` — настройки проверки типов.

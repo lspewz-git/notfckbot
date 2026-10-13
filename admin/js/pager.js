@@ -1,9 +1,9 @@
 /** Pages for the long tables: the page size (remembered per table), the current page, the pager. */
 
-import { $ } from './dom.js';
+import { $, escapeHtml } from './dom.js';
 import { TABLES } from './table-defs.js';
 
-const PAGE_SIZES = [10, 25, 50, 100];
+export const PAGE_SIZES = [10, 25, 50, 100];
 const PAGE_SIZE_KEY = 'admin.pageSize.';
 
 function storedPageSize(type) {
@@ -13,6 +13,45 @@ function storedPageSize(type) {
     } catch {
         return PAGE_SIZES[0];
     }
+}
+
+const ARROWS = [
+    [-1, 'Previous page', 'm15 18-6-6 6-6'],
+    [1, 'Next page', 'm9 18 6-6-6-6']
+];
+
+/**
+ * Every pager's markup, from one template: the size select, "11–20 of 34", the arrows. The
+ * container names what it pages: data-pager="films" (a table) or "history-series" (a History
+ * list), and data-pager-label the select for screen readers. Runs before anything reads the
+ * selects (setupFilters, setupHistory, enhanceSelects).
+ */
+export function fillPagers() {
+    document.querySelectorAll('.pager[data-pager]').forEach((el) => {
+        const { pager = '', pagerLabel = '' } = /** @type {HTMLElement} */ (el).dataset;
+        const history = pager.startsWith('history-');
+        const name = escapeHtml(history ? pager.slice('history-'.length) : pager);
+        const sizeAttr = history ? 'data-history-size' : 'data-page-size';
+        const target = history
+            ? `data-action="history-page" data-list="${name}"`
+            : `data-action="page" data-table="${name}"`;
+        el.innerHTML = `
+            <div class="pager-size">
+                <span class="pager-label">Rows per page</span>
+                <select class="select-field" ${sizeAttr}="${name}" aria-label="${escapeHtml(pagerLabel)}">
+                    ${PAGE_SIZES.map((n) => `<option value="${n}">${n}</option>`).join('')}
+                </select>
+            </div>
+            <span class="pager-info" aria-live="polite"></span>
+            <div class="pager-nav">
+                ${ARROWS.map(
+                    ([step, label, path]) => `
+                    <button class="btn btn-ghost btn-icon" ${target} data-step="${step}" aria-label="${label}">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>
+                    </button>`
+                ).join('')}
+            </div>`;
+    });
 }
 
 // Per paged table: { page (1-based), size }

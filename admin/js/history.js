@@ -4,6 +4,7 @@ import { $, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { isUnchanged } from './render.js';
 import { toast } from './ui.js';
+import { PAGE_SIZES } from './pager.js';
 
 // The year on screen; null until the first answer, which picks the latest year with releases
 let selectedYear = null;
@@ -25,7 +26,6 @@ const FILLER_ROW = `
     </li>`;
 
 // --- Pages: the same choices as the tables; a list of up to the smallest size has no pager ---
-const PAGE_SIZES = [10, 25, 50, 100];
 const PAGE_SIZE_KEY = 'admin.pageSize.history-';
 
 function storedPageSize(kind) {

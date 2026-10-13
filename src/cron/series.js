@@ -4,6 +4,7 @@ const { ensureKinopoiskId } = require('../api/kinopoisk');
 const { isFinishedStatus, formatWatchLinks } = require('../constants');
 const { buildSeriesMessages, buildStatusMessage } = require('./messages');
 const { tally } = require('./status');
+const { notify } = require('./outbox');
 const { ensureReleaseSeasons } = require('./release-seasons');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
@@ -17,13 +18,7 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
 
     console.log(`[Cron] Status of "${item.title}": ${oldStatus} -> ${newStatus}, notifying subscribers`);
     for (const chat of item.Chats || []) {
-        try {
-            await bot.telegram.sendMessage(chat.id, msg, { parse_mode: 'HTML' });
-            tally('sent');
-        } catch (err) {
-            tally('failed');
-            console.error(`[Cron] Failed to send status update to chat ${chat.id}:`, err.message);
-        }
+        await notify(bot, chat.id, msg, { about: `${item.title}: ${newStatus}` });
     }
 };
 
@@ -41,11 +36,6 @@ const isSeasonComplete = (data, season, episode) => {
     const moreInSeason = Boolean(next) && next.season_number === season;
     return total > 0 && episode >= total && !moreInSeason;
 };
-
-const sendToChat = (bot, item, chatId, msg) =>
-    item.poster_url
-        ? bot.telegram.sendPhoto(chatId, item.poster_url, { caption: msg, parse_mode: 'HTML' })
-        : bot.telegram.sendMessage(chatId, msg, { parse_mode: 'HTML' });
 
 const notifyNewEpisodes = async (bot, item, data) => {
     const lastE = data.last_episode_to_air;
@@ -90,27 +80,21 @@ const notifyNewEpisodes = async (bot, item, data) => {
         links
     });
 
+    // A message that doesn't go out is queued by notify(), so the episode is recorded as
+    // announced either way
     for (const chat of item.Chats || []) {
-        try {
-            const mode = chat.Subscription.notify_type;
-            let msg = null;
-            if (mode === 'episode') {
-                if (hasNewContent) msg = messages.episode;
-            } else if (mode === 'season') {
-                if (announceComplete) msg = messages.complete;
-            } else if (mode === 'first_and_full') {
-                // A one-episode season is both premiere and finale: one message is enough
-                if (hasNewContent && currentEpisode === 1) msg = messages.premiere;
-                else if (announceComplete) msg = messages.complete;
-            }
-            if (msg) {
-                await sendToChat(bot, item, chat.id, msg);
-                tally('sent');
-            }
-        } catch (err) {
-            tally('failed');
-            console.error(`[Cron] Failed to notify chat ${chat.id}:`, err.message);
+        const mode = chat.Subscription.notify_type;
+        let msg = null;
+        if (mode === 'episode') {
+            if (hasNewContent) msg = messages.episode;
+        } else if (mode === 'season') {
+            if (announceComplete) msg = messages.complete;
+        } else if (mode === 'first_and_full') {
+            // A one-episode season is both premiere and finale: one message is enough
+            if (hasNewContent && currentEpisode === 1) msg = messages.premiere;
+            else if (announceComplete) msg = messages.complete;
         }
+        if (msg) await notify(bot, chat.id, msg, { photo: item.poster_url, about: item.title });
     }
 
     await item.update({

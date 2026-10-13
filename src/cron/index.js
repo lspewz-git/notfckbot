@@ -10,6 +10,7 @@ const { beginRun, endRun, getCronStatus, nextRunAt } = require('./status');
 const { checkSeriesUpdates, notifyNewEpisodes, notifyStatusChange, isSeasonComplete } = require('./series');
 const { checkWatchlistReleases, isMovieReleased } = require('./films');
 const { buildSeriesMessages, buildFilmMessage } = require('./messages');
+const { flushPending } = require('./outbox');
 
 const checkUpdates = async (bot) => {
     if (!beginRun()) {
@@ -20,6 +21,8 @@ const checkUpdates = async (bot) => {
     let fatal = null;
 
     try {
+        // What the previous checks couldn't send goes first, so news arrives in order
+        await flushPending(bot).catch((err) => console.error('[Cron] Queued messages failed:', err.message));
         // Load all series WITH their subscribers in one single query
         const allSeries = await Series.findAll({ include: [{ model: Chat }] });
         await checkSeriesUpdates(bot, allSeries);

@@ -1,23 +1,23 @@
 {
-    "compilerOptions": {
-        "target": "ES2022",
-        "lib": ["ES2022", "DOM", "DOM.Iterable"],
-        "module": "ESNext",
-        "moduleResolution": "Bundler",
-        "allowJs": true,
-        "checkJs": true,
-        "noEmit": true,
-        "skipLibCheck": true,
-        // Browser code: keep @types/node (pulled in by dependencies) out of the program
-        "types": [],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    // Browser code: keep @types/node (pulled in by dependencies) out of the program
+    "types": [],
 
-        "noUnusedLocals": true,
-        "noImplicitReturns": true,
-        "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
 
-        "strict": false,
-        "strictNullChecks": false
-    },
-    "include": ["js/**/*.js"],
-    "exclude": ["../node_modules"]
+    "strict": false,
+    "strictNullChecks": false
+  },
+  "include": ["js/**/*.js"],
+  "exclude": ["../node_modules"]
 }

@@ -3,6 +3,7 @@ const Chat = require('./models/Chat');
 const Series = require('./models/Series');
 const Subscription = require('./models/Subscription');
 const Watchlist = require('./models/Watchlist');
+const PendingMessage = require('./models/PendingMessage');
 
 const initDb = async () => {
     try {
@@ -18,4 +19,4 @@ const initDb = async () => {
     }
 };
 
-module.exports = { initDb, Chat, Series, Subscription, Watchlist };
+module.exports = { initDb, Chat, Series, Subscription, Watchlist, PendingMessage };
