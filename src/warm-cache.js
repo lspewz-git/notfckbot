@@ -9,6 +9,7 @@
  */
 const { Series, Watchlist } = require('./db');
 const { getDetailsCached } = require('./api/tmdb');
+const { findKinopoiskId } = require('./api/kinopoisk');
 
 /** Every title the panel can show a card for: the tracked series and the films on any list. */
 async function trackedTitles() {
@@ -27,7 +28,10 @@ async function warmDetailsCache() {
         const [mediaType, numericId] = String(tmdbId).split('_');
         if (!numericId) continue;
         try {
-            await getDetailsCached(numericId, mediaType);
+            const details = await getDetailsCached(numericId, mediaType);
+            // Films keep no Kinopoisk ID in the database (series do): find it now, so the
+            // History page links straight to their pages from the first view
+            if (mediaType === 'movie') await findKinopoiskId(tmdbId, details.imdb_id);
         } catch {
             // Already logged by tmdb.js; that card will just ask TMDB when opened
             failed += 1;

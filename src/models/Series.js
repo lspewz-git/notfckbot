@@ -63,6 +63,13 @@ const Series = sequelize.define('Series', {
     next_episode_number: {
         type: DataTypes.INTEGER,
         allowNull: true
+    },
+    // The years in which an episode aired, with their seasons, as "2024:2;2025:2,3", for the
+    // release history. Null until every season has been looked at once
+    // (src/cron/release-seasons.js); "" when none aired yet.
+    release_seasons: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 });
 

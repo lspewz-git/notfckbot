@@ -1,0 +1,110 @@
+/* History: what came out each year, serials and movies in two lists */
+
+#history-years {
+    margin-bottom: var(--space-3);
+}
+
+/* Serials and movies side by side, each a card of its own; the taller one sets the row */
+.history-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    align-items: start;
+}
+
+.history-grid .glass-card {
+    margin-bottom: 0;
+}
+
+.history-title {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-base);
+    font-weight: 600;
+}
+
+.history-title span {
+    margin-left: var(--space-1);
+    color: var(--text-dim);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+.history-list {
+    list-style: none;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 3.25rem;
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border-row);
+}
+
+.history-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.history-main .link-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-genres {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+/* The card's Kinopoisk button, a size smaller to sit in a row */
+.history-item .kp-link {
+    flex: 0 0 auto;
+    min-height: 32px;
+    margin-bottom: 0;
+    padding: 0 10px 0 8px;
+    font-size: var(--text-xs);
+}
+
+.history-item .kp-logo {
+    width: 16px;
+    height: 16px;
+}
+
+/* Tops up a list's last page to a full page's height */
+.history-filler {
+    visibility: hidden;
+}
+
+/* Loading: rows of the same height as the data, so nothing jumps */
+.history-skeleton {
+    display: flex;
+    align-items: center;
+    min-height: 3.25rem;
+    border-top: 1px solid var(--border-row);
+}
+
+.history-empty {
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--border-row);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+/* Too narrow for two lists side by side: one card above the other */
+@media (max-width: 1024px) {
+    .history-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    /* Only the logo on a phone: the name gets the width */
+    .history-item .kp-link span {
+        display: none;
+    }
+}

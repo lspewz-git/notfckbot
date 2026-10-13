@@ -111,6 +111,7 @@ const buildOverview = ({ active, archived }) => {
     const rows = [];
     if (active.length > 0) rows.push([Markup.button.callback('⚙️ Настроить подписки', 'subs_p_0')]);
     if (archived.length > 0) rows.push([Markup.button.callback(`🗄 Завершённые (${archived.length})`, 'subs_a_0')]);
+    rows.push([Markup.button.callback('🗓 Вышло по годам', 'hist_0')]);
     return { text: lines.join('\n'), keyboard: Markup.inlineKeyboard(rows) };
 };
 

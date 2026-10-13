@@ -26,6 +26,7 @@ app.use(require('./routes/actions'));
 app.use(require('./routes/records'));
 app.use(require('./routes/config'));
 app.use(require('./routes/services'));
+app.use(require('./routes/history'));
 
 function startAdminServer(bot) {
     // FIX: Log capture is started here, not at module load time (avoids global side effect)

@@ -21,6 +21,7 @@ require('./commands').register(bot);
 require('./settings').register(bot);
 require('./search').register(bot);
 require('./subscriptions').register(bot);
+require('./history').register(bot);
 
 // Without this, Telegraf rethrows a handler's error and its polling loop stops for good: one
 // failed edit or a button answered too late, and the bot would stop answering everyone until
@@ -39,6 +40,7 @@ bot.telegram
         { command: 'search', description: 'Найти фильм или сериал' },
         { command: 'subs', description: 'Мои подписки и список ожидания' },
         { command: 'help', description: 'Как пользоваться ботом' },
+        { command: 'history', description: 'Что выходило по годам' },
         { command: 'settings', description: 'Настройки чата' },
         { command: 'cancel', description: 'Отменить текущее действие' },
         { command: 'menu_on', description: 'Включить нижнее меню' },

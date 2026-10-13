@@ -127,6 +127,15 @@
     background: var(--scrollbar-thumb-hover) padding-box;
 }
 
+/* The shared icon sprite (index.html): takes no room, yet isn't display:none, which would stop
+   the masks and gradients inside it from drawing where the icons are used */
+.icon-sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 /* Keep room for the scrollbar from the start: otherwise it appears once the
    data makes the page taller, and everything shifts sideways by its width */
 html {

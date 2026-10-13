@@ -5,6 +5,7 @@ import { toast } from './ui.js';
 import { renderTable, renderSkeleton, renderTableMessage } from './tables.js';
 import { updateStats, updateHealth, updatePopular, updateUpcoming, updateCron, updateVersion } from './dashboard.js';
 import { setLogs, renderLogs } from './logs.js';
+import { loadHistory } from './history.js';
 
 // Which /api/data/:type each section needs, if any
 const SECTION_TABLES = {
@@ -43,6 +44,7 @@ export async function fetchData() {
         jobs.push(api('/cron').then(updateCron));
         jobs.push(api('/version').then(updateVersion));
     }
+    if (currentSection === 'history') jobs.push(loadHistory());
     if (currentSection === 'logs') {
         jobs.push(
             api('/logs').then((logs) => {

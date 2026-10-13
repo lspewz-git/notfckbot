@@ -6,6 +6,7 @@ const bot = require('./bot');
 const { setupCron } = require('./cron');
 const { startAdminServer } = require('./admin');
 const { warmDetailsCache } = require('./warm-cache');
+const { backfillReleaseSeasons } = require('./cron/release-seasons');
 
 async function start() {
     try {
@@ -29,7 +30,11 @@ async function start() {
         startAdminServer(bot);
 
         // In the background: the panel's cards are quick from the first one after a restart
-        warmDetailsCache().catch((err) => console.error('[Cache] Warm-up failed:', err.message));
+        // Then the release history's years for series that have none yet (once per series)
+        warmDetailsCache()
+            .catch((err) => console.error('[Cache] Warm-up failed:', err.message))
+            .then(backfillReleaseSeasons)
+            .catch((err) => console.error('[History] Backfill failed:', err.message));
 
         console.log('Launching Telegram bot...');
         bot.launch({ dropPendingUpdates: true })

@@ -51,8 +51,8 @@ async function fromKinopoiskApi(imdbId) {
     return toId(res.data?.items?.[0]?.kinopoiskId);
 }
 
-// Answers already known, so repeated taps on "Случайный фильм" don't repeat the
-// lookup (and don't spend API quota). Misses expire, as both sources catch up.
+// Answers already known, so a search list, a card and the history page asking about one title
+// don't repeat the lookup (and don't spend API quota). Misses expire, as both sources catch up.
 const cache = new Map();
 const CACHE_MAX = 1000;
 const MISS_TTL_MS = 6 * 60 * 60 * 1000;
@@ -103,6 +103,18 @@ async function lookupKinopoiskId(tmdbId, imdbId) {
 function remember(tmdbId, id, failed = false) {
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
     cache.set(tmdbId, { id, at: Date.now(), failed });
+}
+
+/**
+ * The ID if a lookup already found it, without asking anyone; otherwise null, and a lookup is
+ * started in the background so the next call has it. For lists of many titles at once.
+ */
+function knownKinopoiskId(tmdbId, imdbId = null) {
+    const hit = cache.get(tmdbId);
+    if (hit && hit.id) return hit.id;
+    // Answers from memory while a miss or a failure is recent, asks again once it has expired
+    lookupKinopoiskId(tmdbId, imdbId).catch(() => {});
+    return null;
 }
 
 /** @returns {Promise<number | null>} null when the title is unknown or a source was unreachable */
@@ -167,6 +179,7 @@ async function getKinopoiskStatus() {
 module.exports = {
     findKinopoiskId,
     findKinopoiskIdQuick,
+    knownKinopoiskId,
     ensureKinopoiskId,
     checkKinopoiskKey,
     getKinopoiskStatus

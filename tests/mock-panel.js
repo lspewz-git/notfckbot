@@ -164,6 +164,7 @@ function stats(subs) {
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
  *   `addError`: adding a film fails with this message (409);
+ *   `history(year)`: the /api/history answer for the year asked (0 when none);
  *   `hold`: API answers wait for it, so a test can see the loading state
  */
 async function mockPanel(page, options = {}) {
@@ -235,6 +236,42 @@ async function mockPanel(page, options = {}) {
         '/api/data/films': () => FILMS,
         '/api/data/series': () =>
             SERIES.map((x) => ({ tmdb_id: x.tmdb_id, title: x.title, last_season: 2, last_episode: 5 })),
+        // Release history: two years, the latest by default
+        '/api/history': (req) => {
+            const asked = Number(new URL(req.url()).searchParams.get('year'));
+            if (options.history) return options.history(asked);
+            const year = [2026, 2025].includes(asked) ? asked : 2026;
+            const kp = (id) => `https://www.kinopoisk.ru/series/${id}/`;
+            return year === 2026
+                ? {
+                      years: [2026, 2025],
+                      year,
+                      series: [
+                          {
+                              tmdbId: 'tv_66732',
+                              title: 'Stranger Things',
+                              seasons: [4, 5],
+                              genres: ['drama', 'mystery'],
+                              kinopoiskUrl: kp(915196)
+                          },
+                          { tmdbId: 'tv_95396', title: 'Severance', seasons: [2], genres: [], kinopoiskUrl: kp(1) }
+                      ],
+                      films: [
+                          {
+                              tmdbId: 'movie_1',
+                              title: 'Dune: Part Three',
+                              genres: ['sci-fi'],
+                              kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=Dune'
+                          }
+                      ]
+                  }
+                : {
+                      years: [2026, 2025],
+                      year,
+                      series: [{ tmdbId: 'tv_1399', title: 'Game of Thrones', genres: ['drama'], kinopoiskUrl: kp(2) }],
+                      films: []
+                  };
+        },
         // Test notifications: what the dialog sent last
         '/api/test-notification': (req) => {
             panel.lastTest = req.postDataJSON();
@@ -269,7 +306,9 @@ async function mockPanel(page, options = {}) {
     const cards = [
         [
             /^\/api\/series\/(.+)$/,
-            ([, id]) => {
+            ([, raw]) => {
+                // Real ids carry "tv_"; the fixtures here don't
+                const id = raw.replace('tv_', '');
                 const subs = panel.subs.filter((s) => s.seriesId === id);
                 return {
                     name: series(id).title,

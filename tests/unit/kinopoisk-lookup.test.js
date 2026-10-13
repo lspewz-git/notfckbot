@@ -23,7 +23,7 @@ mock.method(axios, 'get', async (url) => {
     throw Object.assign(new Error('Request failed with status code 401'), { response: { status: 401 } });
 });
 
-const { findKinopoiskId } = require('../../src/api/kinopoisk');
+const { findKinopoiskId, knownKinopoiskId } = require('../../src/api/kinopoisk');
 
 beforeEach(() => {
     requests = [];
@@ -47,4 +47,25 @@ test('a found ID is kept: no second request', async () => {
     assert.equal(await findKinopoiskId('movie_1003', 'tt3'), 435);
     assert.equal(await findKinopoiskId('movie_1003', 'tt3'), 435);
     assert.deepEqual(requests, ['wikidata']);
+});
+
+test('the history asks again once a miss has expired, instead of keeping the search link for good', async () => {
+    const realNow = Date.now;
+    try {
+        assert.equal(knownKinopoiskId('movie_3003'), null);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.deepEqual(requests, ['wikidata'], 'looked up in the background');
+        assert.equal(knownKinopoiskId('movie_3003'), null);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.deepEqual(requests, ['wikidata'], 'a fresh miss is not asked again');
+
+        // Seven hours on, Wikidata has learned the film
+        wikidataKnows = 4004;
+        Date.now = () => realNow() + 7 * 60 * 60 * 1000;
+        assert.equal(knownKinopoiskId('movie_3003'), null);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(knownKinopoiskId('movie_3003'), 4004);
+    } finally {
+        Date.now = realNow;
+    }
 });

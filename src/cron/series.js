@@ -4,6 +4,7 @@ const { ensureKinopoiskId } = require('../api/kinopoisk');
 const { isFinishedStatus, formatWatchLinks } = require('../constants');
 const { buildSeriesMessages, buildStatusMessage } = require('./messages');
 const { tally } = require('./status');
+const { ensureReleaseSeasons } = require('./release-seasons');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
 // Returning <-> In Production changes are not interesting to users and stay silent.
@@ -141,6 +142,12 @@ const checkSeriesUpdates = async (bot, allSeries) => {
 
             // Cached on the row after the first hit, so this is a lookup only for new titles
             await ensureKinopoiskId(item, data.imdb_id);
+            // For the release history; never holds up the notifications. A new series' first
+            // pass asks TMDB for every season (dozens for a long show), so it runs on its own
+            const seasonsDone = ensureReleaseSeasons(item, data).catch((err) =>
+                console.error(`[History] Release seasons for ${item.tmdb_id} failed:`, err.message)
+            );
+            if (item.release_seasons !== null && item.release_seasons !== undefined) await seasonsDone;
 
             try {
                 await notifyNewEpisodes(bot, item, data);
