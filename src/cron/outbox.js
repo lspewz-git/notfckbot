@@ -5,9 +5,10 @@
 const { PendingMessage } = require('../db');
 const { deliver } = require('../delivery');
 const { tally } = require('./status');
+const { UPDATE_INTERVAL_HOURS } = require('../constants');
 
-// A day of checks (every 3 hours), or two days on the calendar: past that the news is stale
-const MAX_ATTEMPTS = 8;
+// A day of checks, however often they run, or two days on the calendar: past that the news is stale
+const MAX_ATTEMPTS = Math.ceil(24 / UPDATE_INTERVAL_HOURS);
 const MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 
 // Set once a send fails for want of Telegram or the network (not a chat's own problem, which

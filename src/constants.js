@@ -83,11 +83,31 @@ const formatWatchLinks = (opts) => {
     return [watch.join('\n'), info.join('\n')].filter(Boolean).join('\n\n');
 };
 
-// How often the cron checks TMDB for new episodes and releases
-const UPDATE_INTERVAL_HOURS = 3;
+// How often the update check asks TMDB for new episodes and releases: UPDATE_INTERVAL_HOURS in
+// .env, 3 by default. Only a divisor of 24: the schedule ("0 */N * * *") starts again at
+// midnight, so with 5 the checks would run at 0, 5, 10, 15, 20 and then 0 again, 4 hours later.
+const DEFAULT_INTERVAL_HOURS = 3;
+const INTERVAL_CHOICES = [1, 2, 3, 4, 6, 8, 12, 24];
+
+/** The interval from a .env value; an unusable one is reported and the default used. */
+function parseIntervalHours(value) {
+    if (value === undefined || String(value).trim() === '') return DEFAULT_INTERVAL_HOURS;
+    const hours = Number(value);
+    if (INTERVAL_CHOICES.includes(hours)) return hours;
+    console.error(
+        `[Cron] UPDATE_INTERVAL_HOURS=${value} is not one of ${INTERVAL_CHOICES.join(', ')}; ` +
+            `checking every ${DEFAULT_INTERVAL_HOURS} hours`
+    );
+    return DEFAULT_INTERVAL_HOURS;
+}
+
+// Read once, at start: src/index.js loads .env before anything requires this file
+const UPDATE_INTERVAL_HOURS = parseIntervalHours(process.env.UPDATE_INTERVAL_HOURS);
 
 module.exports = {
     UPDATE_INTERVAL_HOURS,
+    parseIntervalHours,
+    INTERVAL_CHOICES,
     NOTIFY_LABELS,
     NOTIFY_LABELS_SHORT,
     FINISHED_STATUS_LABELS,

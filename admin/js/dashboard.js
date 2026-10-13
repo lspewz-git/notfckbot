@@ -319,7 +319,8 @@ function renderCron() {
         'cron-next',
         until > 0 ? `In ${duration(until)}, at ${clock(cron.nextRunAt)}` : `Due now, every ${cron.intervalHours} h`
     );
-    setText('series-interval', `Checked every ${cron.intervalHours} hours`);
+    const hours = cron.intervalHours;
+    setText('series-interval', hours === 1 ? 'Checked every hour' : `Checked every ${hours} hours`);
     renderRunButton();
 }
 

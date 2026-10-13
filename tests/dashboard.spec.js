@@ -242,3 +242,11 @@ test('a refresh pressed while one is running joins it instead of sending everyth
     await expect(btn).not.toHaveClass(/spinning/, { timeout: 5000 });
     expect(statsRequests).toBe(1);
 });
+
+test('the series card says how often the check runs, from the server', async ({ page }) => {
+    await mockPanel(page, { intervalHours: 6 });
+    await expect(page.locator('#series-interval')).toHaveText('Checked every 6 hours');
+    await mockPanel(page, { intervalHours: 1 });
+    await page.reload();
+    await expect(page.locator('#series-interval')).toHaveText('Checked every hour');
+});

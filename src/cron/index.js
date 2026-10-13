@@ -38,7 +38,7 @@ const checkUpdates = async (bot) => {
 
 const setupCron = (bot) => {
     cron.schedule(`0 */${UPDATE_INTERVAL_HOURS} * * *`, () => checkUpdates(bot));
-    console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS} hours.`);
+    console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS === 1 ? 'hour' : `${UPDATE_INTERVAL_HOURS} hours`}.`);
 };
 
 module.exports = {

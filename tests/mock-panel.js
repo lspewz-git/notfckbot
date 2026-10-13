@@ -178,7 +178,7 @@ async function mockPanel(page, options = {}) {
             running: false,
             lastRun: null,
             nextRunAt: new Date(Date.now() + 3600e3).toISOString(),
-            intervalHours: 3
+            intervalHours: options.intervalHours || 3
         },
         pollsUntilDone: 0
     };
