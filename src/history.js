@@ -1,13 +1,15 @@
 /**
  * The release history: for a year, the tracked series that had an episode out and the films that
  * came out, each with its genres and Kinopoisk link. For the whole database (the admin panel) or
- * for one chat's subscriptions and watchlist (the bot).
+ * for one chat's subscriptions and watchlist (the bot). For the bot also the year ahead: what
+ * TMDB already lists for it.
  */
 const { Series, Subscription, Watchlist } = require('./db');
 const { getDetailsCached } = require('./api/tmdb');
 const { knownKinopoiskId } = require('./api/kinopoisk');
 const { getWatchLinks } = require('./constants');
 const { parseSeasons, airedYear } = require('./cron/release-seasons');
+const { periodItems } = require('./calendar');
 
 // Enough to tell a drama from a cartoon; TMDB lists the main genre first
 const GENRES_SHOWN = 2;
@@ -21,21 +23,28 @@ const byTitle = (a, b) => a.title.localeCompare(b.title, 'ru');
 // list comes without genres rather than after TMDB's 15-second timeout
 const GENRES_WAIT_MS = 3000;
 
-/** Genres in Russian, from the (usually cached) TMDB details; none if TMDB doesn't answer. */
-async function genresOf(numericId, type) {
+/** The promise, or a rejection once TMDB has kept us waiting GENRES_WAIT_MS. */
+async function soon(promise) {
     let timer;
     try {
-        const details = await Promise.race([
-            getDetailsCached(numericId, type),
+        return await Promise.race([
+            promise,
             new Promise((_, reject) => {
                 timer = setTimeout(() => reject(new Error('TMDB is slow')), GENRES_WAIT_MS);
             })
         ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/** Genres in Russian, from the (usually cached) TMDB details; none if TMDB doesn't answer. */
+async function genresOf(numericId, type) {
+    try {
+        const details = await soon(getDetailsCached(numericId, type));
         return (details.genres || []).slice(0, GENRES_SHOWN).map((g) => g.name.toLowerCase());
     } catch {
         return [];
-    } finally {
-        clearTimeout(timer);
     }
 }
 
@@ -98,4 +107,58 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
     return { years, year: shown, series: seriesOut.sort(byTitle), films: filmsOut.sort(byTitle) };
 }
 
-module.exports = { releaseHistory };
+/**
+ * What is still to come in a year for one chat (from `from`, by default the year's start): the
+ * series with episodes or a season announced in it (with those seasons) and the films whose
+ * digital premiere falls in it. Episode dates from TMDB's season lists (src/calendar.js); a season
+ * TMDB dates but has no episodes for yet counts by its date.
+ * @param {{ chatId: number | string, year: number, from?: string }} options from: "YYYY-MM-DD"
+ * @returns {Promise<{ series: object[], films: object[], failed: number }>} failed: series TMDB
+ *   didn't answer for
+ */
+async function upcomingHistory({ chatId, year, from = `${year}-01-01` }) {
+    const to = `${year}-12-31`;
+    const inYear = (date) => Boolean(date) && String(date).slice(0, 10) >= from && String(date).slice(0, 10) <= to;
+    const [{ items, failed }, subs] = await Promise.all([
+        periodItems(chatId, from, to),
+        Subscription.findAll({ where: { chatId }, include: [{ model: Series }] })
+    ]);
+
+    const seasons = new Map();
+    const addSeason = (tmdbId, season) => {
+        if (!seasons.has(tmdbId)) seasons.set(tmdbId, new Set());
+        if (season) seasons.get(tmdbId).add(season);
+    };
+    for (const item of items) if (item.kind === 'tv') addSeason(item.tmdbId, item.season);
+    const seriesRows = subs.map((s) => s.Series).filter(Boolean);
+    await Promise.all(
+        seriesRows.map(async (s) => {
+            if (inYear(s.next_episode_date)) addSeason(s.tmdb_id, s.next_episode_season);
+            const details = await soon(getDetailsCached(s.tmdb_id.replace('tv_', ''), 'tv')).catch(() => null);
+            for (const season of (details && details.seasons) || []) {
+                if (season.season_number > 0 && inYear(season.air_date)) addSeason(s.tmdb_id, season.season_number);
+            }
+        })
+    );
+
+    const films = new Map();
+    for (const item of items) if (item.kind === 'movie') films.set(item.tmdbId, item);
+    const [seriesOut, filmsOut] = await Promise.all([
+        Promise.all(
+            seriesRows
+                .filter((s, i, all) => seasons.has(s.tmdb_id) && all.findIndex((o) => o.tmdb_id === s.tmdb_id) === i)
+                .map((s) =>
+                    entry({
+                        tmdbId: s.tmdb_id,
+                        title: s.title,
+                        kinopoiskId: s.kinopoisk_id,
+                        seasons: [...seasons.get(s.tmdb_id)].sort((a, b) => a - b)
+                    })
+                )
+        ),
+        Promise.all([...films.values()].map((f) => entry({ tmdbId: f.tmdbId, title: f.title })))
+    ]);
+    return { series: seriesOut.sort(byTitle), films: filmsOut.sort(byTitle), failed };
+}
+
+module.exports = { releaseHistory, upcomingHistory };

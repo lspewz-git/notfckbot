@@ -29,11 +29,7 @@ describe('the overview', () => {
         assert.ok(view.text.indexOf('<b>Сериалы</b>') < view.text.indexOf('<b>Фильмы в ожидании</b>'));
         assert.match(view.text, /• Пацаны — 🔔 Каждая серия/);
         assert.match(view.text, /• Дюна \(2026\) — 📅/);
-        assert.deepEqual(buttons(view), [
-            ['⚙️ Настроить подписки'],
-            ['🗄 Завершённые (1)'],
-            ['📅 Неделя и месяц', '🗓 Вышло по годам']
-        ]);
+        assert.deepEqual(buttons(view), [['⚙️ Настроить подписки'], ['🗄 Завершённые (1)'], ['📅 Календарь']]);
     });
 
     test('a long list is cut at 40 lines, pointing to the settings', () => {

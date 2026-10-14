@@ -145,7 +145,7 @@ function seasonsToAsk(series, details, from, to) {
         .slice(0, SEASONS_PER_SERIES);
 }
 
-/** One series' episodes in the period: [{ date, title, season, episode, note }]. */
+/** One series' episodes in the period: [{ date, tmdbId, title, season, episode, note }]. */
 async function seriesEpisodes(series, from, to) {
     const numericId = String(series.tmdb_id).replace('tv_', '');
     const details = await getDetailsCached(numericId, 'tv').catch(() => null);
@@ -165,6 +165,7 @@ async function seriesEpisodes(series, from, to) {
             items.push({
                 date: ep.air_date,
                 kind: 'tv',
+                tmdbId: series.tmdb_id,
                 title: series.title,
                 season,
                 episode: ep.episode_number,
@@ -198,7 +199,7 @@ async function periodItems(chatId, from, to) {
         const date = f.premiere_digital && String(f.premiere_digital).slice(0, 10);
         if (!date || date < from || date > to || seenFilms.has(f.tmdb_id)) continue;
         seenFilms.add(f.tmdb_id);
-        items.push({ date, kind: 'movie', title: f.title });
+        items.push({ date, kind: 'movie', tmdbId: f.tmdb_id, title: f.title });
     }
     items.sort(
         (a, b) =>

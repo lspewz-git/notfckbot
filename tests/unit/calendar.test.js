@@ -168,42 +168,58 @@ describe('the buttons', () => {
     const texts = (p, opts) =>
         calendarKeyboard(p, opts).reply_markup.inline_keyboard.map((r) => r.map((b) => `${b.text}|${b.callback_data}`));
 
-    test('week: back, current, ahead; week ticked; the way back to the subscriptions', () => {
+    test('week: only the previous and the next; the tabs; the way back to the subscriptions', () => {
         assert.deepEqual(texts({ kind: 'w', offset: 0, from: '2026-10-12' }), [
-            ['◀️ Прошлая|cal_w_-1', 'Текущая|cal_w_0', 'Следующая ▶️|cal_w_1'],
-            ['✅ Неделя|cal_w_0', 'Месяц|cal_m_0'],
+            ['◀️ Прошлая|cal_w_-1', 'Следующая ▶️|cal_w_1'],
+            ['✅ Неделя|cal_w_0', 'Месяц|cal_m_0', 'Год|hist_0'],
             ['⬅️ К подпискам|subs_o']
         ]);
     });
 
-    test('month: the neighbouring months by name; a digest has no way back to a menu', () => {
-        const rows = texts({ kind: 'm', offset: 2, from: '2026-12-01' }, { digest: true });
-        assert.deepEqual(rows[0], ['◀️ Ноябрь|cal_m_1', 'Текущий|cal_m_0', 'Январь ▶️|cal_m_3']);
+    test('from a neighbouring week or month only the way back to the current one', () => {
+        assert.deepEqual(texts({ kind: 'w', offset: 1, from: '2026-10-19' })[0], ['◀️ Текущая|cal_w_0']);
+        assert.deepEqual(texts({ kind: 'w', offset: -1, from: '2026-10-05' })[0], ['Текущая ▶️|cal_w_0']);
+        assert.deepEqual(texts({ kind: 'm', offset: -1, from: '2026-09-01' })[0], ['Октябрь ▶️|cal_m_0']);
+    });
+
+    test('month: the neighbouring months by name, month ticked; no way back when asked', () => {
+        const rows = texts({ kind: 'm', offset: 0, from: '2026-12-01' }, { back: false });
+        assert.deepEqual(rows[0], ['◀️ Ноябрь|cal_m_-1', 'Январь ▶️|cal_m_1']);
+        assert.deepEqual(rows[1], ['Неделя|cal_w_0', '✅ Месяц|cal_m_0', 'Год|hist_0']);
         assert.equal(rows.length, 2);
     });
 
-    test('no arrow past two years', () => {
-        const rows = texts({ kind: 'm', offset: 24, from: '2028-10-01' });
-        assert.equal(rows[0].length, 2);
+    test('a digest: the way back in a private chat and where anyone may press; not where only the owner may', async () => {
+        const back = async (fields) =>
+            (await calendarView(chat(fields), 'w', 0, { digest: true, now: NOW })).keyboard.reply_markup.inline_keyboard
+                .flat()
+                .some((b) => b.callback_data === 'subs_o');
+        assert.equal(await back({ id: 10 }), true);
+        assert.equal(await back({ id: -100, buttons_mode: 'all' }), true);
+        assert.equal(await back({ id: -100, buttons_mode: 'owner' }), false);
     });
 
-    test('a made-up offset beyond the limit changes nothing', async () => {
+    test("a button further out than the limit (an old message's) opens the current period", async () => {
         let handler;
         register({ command() {}, action: (trigger, fn) => (handler = fn) });
         const ctx = {
-            match: ['cal_m_99', 'm', '99'],
+            match: ['cal_m_2', 'm', '2'],
             state: { chatData: chat() },
+            callbackQuery: { message: { reply_markup: { inline_keyboard: [[{ callback_data: 'subs_o' }]] } } },
             answered: 0,
-            edited: 0,
+            edited: [],
             answerCbQuery() {
                 this.answered += 1;
             },
-            editMessageText() {
-                this.edited += 1;
+            async editMessageText(text) {
+                this.edited.push(text);
             }
         };
         await handler(ctx);
-        assert.deepEqual([ctx.answered, ctx.edited], [1, 0]);
+        const current = calendar.period('m', 0, 'Europe/Moscow');
+        const title = `${calendar.MONTHS_TITLE[Number(current.from.slice(5, 7)) - 1]} ${current.from.slice(0, 4)}`;
+        assert.equal(ctx.answered, 1);
+        assert.match(ctx.edited[0], new RegExp(`^📅 <b>${title}</b>`));
     });
 });
 

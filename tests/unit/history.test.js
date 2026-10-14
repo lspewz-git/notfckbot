@@ -32,16 +32,29 @@ mock.method(tmdb, 'getSeasonDetails', async (id, season) => {
 const GENRES = { 'tv:1': ['Драма', 'Криминал', 'Боевик'], 'tv:2': ['Комедия'], 'movie:7': ['Фантастика'] };
 // Set by a test: TMDB takes the request and never answers
 let tmdbStuck = false;
+// The year ahead (the calendar's episode lists): season 5 of 1 dated with no episodes yet,
+// season 3 of 6 with its episodes listed
+const UPCOMING_SEASONS = {
+    1: [{ season_number: 5, air_date: '2027-06-01', episode_count: 0 }],
+    6: [{ season_number: 3, air_date: '2027-03-01', episode_count: 2 }]
+};
+const EPISODE_LISTS = { '6:3': ['2027-03-01', '2027-03-08'] };
+mock.method(tmdb, 'getSeasonDetailsCached', async (id, season) => ({
+    episodes: (EPISODE_LISTS[`${id}:${season}`] || []).map((air_date, i) => ({ episode_number: i + 1, air_date }))
+}));
 mock.method(tmdb, 'getDetailsCached', async (id, type) => {
     if (tmdbStuck) await new Promise(() => {});
-    return { genres: (GENRES[`${type}:${id}`] || []).map((name) => ({ name })) };
+    const seasons = (type === 'tv' && UPCOMING_SEASONS[id]) || [];
+    return { genres: (GENRES[`${type}:${id}`] || []).map((name) => ({ name })), seasons };
 });
 // Kinopoisk: only film 7's ID is known
 mock.method(kinopoisk, 'knownKinopoiskId', (tmdbId) => (tmdbId === 'movie_7' ? 777 : null));
 
 const { ensureReleaseSeasons } = require('../../src/cron/release-seasons');
 const { releaseHistory } = require('../../src/history');
-const { historyView } = require('../../src/bot/history');
+const { historyView, yearView, register } = require('../../src/bot/history');
+const { todayIn } = require('../../src/calendar');
+const { upcomingHistory } = require('../../src/history');
 
 const now = new Date('2026-10-12T12:00:00Z');
 const seriesRow = (fields) => ({
@@ -227,9 +240,9 @@ describe('the bot message', () => {
     });
     const buttons = (view) => view.keyboard.reply_markup.inline_keyboard.map((row) => row.map((b) => b.text));
 
-    test('serials, then films; each title a link; a button per year, oldest first', () => {
+    test('serials, then films; each title a link; last year, this year, the next; the tabs', () => {
         const view = historyView({
-            years: [2026, 2025, 2024],
+            thisYear: 2026,
             year: 2025,
             series: [item('Пацаны', ['драма'], [4, 5]), item('Аббатство', [], [2])],
             films: [item('Дюна', [])]
@@ -242,24 +255,188 @@ describe('the bot message', () => {
         );
         assert.match(view.text, />Аббатство<\/a> · сезон 2\n/);
         assert.match(view.text, />Дюна<\/a>\n/);
-        assert.deepEqual(buttons(view), [['2024', '2025 ✓', '2026'], ['⬅️ К подпискам']]);
+        assert.deepEqual(buttons(view), [
+            ['2025 ✓', '2026', '2027'],
+            ['Неделя', 'Месяц', '✅ Год'],
+            ['⬅️ К подпискам']
+        ]);
     });
 
     test("a list that would pass Telegram's 4096 characters is cut, saying how many are left", () => {
         const many = Array.from({ length: 200 }, (_, i) => item(`Сериал номер ${i}`, ['драма', 'криминал']));
-        const view = historyView({ years: [2026], year: 2026, series: many, films: [] });
+        const view = historyView({ thisYear: 2026, year: 2026, series: many, films: [] });
         assert.ok(view.text.length < 4096, String(view.text.length));
         assert.match(view.text, /…и ещё \d+ — полный список в панели/);
     });
 
-    test('nothing out yet: says so, with the way back', () => {
-        const view = historyView({ years: [], year: null, series: [], films: [] });
-        assert.match(view.text, /пока ничего не выходило/);
-        assert.deepEqual(buttons(view), [['⬅️ К подпискам']]);
+    test('nothing that year: says so, in the tense of the year; no way back when asked', () => {
+        const empty = (year, options) => historyView({ thisYear: 2026, year, series: [], films: [] }, options);
+        assert.match(empty(2025).text, /В 2025 у подписок ничего не выходило\./);
+        assert.match(empty(2026).text, /В 2026 у подписок пока ничего не выходило\./);
+        assert.match(empty(2027).text, /^🗓 <b>Выйдет в 2027<\/b>\n\nНа 2027 у подписок пока ничего не объявлено\./);
+        assert.deepEqual(buttons(empty(2026, { back: false })), [
+            ['2025', '2026 ✓', '2027'],
+            ['Неделя', 'Месяц', '✅ Год']
+        ]);
+    });
+
+    test('this year: what is still to come, after what came out, marked serial or film', () => {
+        const view = historyView({
+            thisYear: 2026,
+            year: 2026,
+            series: [item('Пацаны', ['драма'], [5])],
+            films: [],
+            later: { series: [item('Темная материя', [], [2])], films: [item('Шрэк 5', [])] }
+        });
+        assert.match(view.text, /📺 <b>Сериалы<\/b>\n<a [^>]+>Пацаны<\/a>/);
+        assert.match(
+            view.text,
+            /⏳ <b>Ещё выйдет в 2026<\/b>\n📺 <a [^>]+>Темная материя<\/a> · сезон 2\n🎬 <a [^>]+>Шрэк 5<\/a>\n/
+        );
+        // Nothing out yet, something to come: both said
+        const early = historyView({
+            thisYear: 2026,
+            year: 2026,
+            series: [],
+            films: [],
+            later: { series: [], films: [item('Шрэк 5', [])] }
+        });
+        assert.match(early.text, /пока ничего не выходило\.\n\n⏳ <b>Ещё выйдет в 2026<\/b>/);
+    });
+
+    test('a long year: what is still to come keeps its room, what came out is cut', () => {
+        const many = Array.from({ length: 200 }, (_, i) => item(`Сериал номер ${i}`, ['драма', 'криминал']));
+        const coming = Array.from({ length: 5 }, (_, i) => item(`Скоро ${i}`));
+        const view = historyView({
+            thisYear: 2026,
+            year: 2026,
+            series: many,
+            films: [],
+            later: { series: coming, films: [] }
+        });
+        assert.ok(view.text.length < 4096, String(view.text.length));
+        assert.equal((view.text.match(/>Скоро \d<\/a>/g) || []).length, 5);
+        // What came out: serials before films, as before; no heading left without lines
+        const films = historyView({ thisYear: 2026, year: 2026, series: many, films: [item('Дюна', [])] });
+        assert.doesNotMatch(films.text, /Фильмы/);
+        assert.match(films.text, />Сериал номер 0<\/a>/);
+        assert.match(view.text, /…и ещё \d+ — полный список в панели/);
+        // Next year's list is not in the panel: no pointing there
+        const ahead = historyView({ thisYear: 2026, year: 2027, series: many, films: [] });
+        assert.match(ahead.text, /…и ещё \d+\.<\/i>/);
     });
 
     test('titles are escaped', () => {
-        const view = historyView({ years: [2026], year: 2026, series: [item('A <b> & C')], films: [] });
+        const view = historyView({ thisYear: 2026, year: 2026, series: [item('A <b> & C')], films: [] });
         assert.match(view.text, />A &lt;b&gt; &amp; C<\/a>/);
+    });
+});
+
+describe('the year view', () => {
+    const SERIES = [
+        // Episodes out this year, season 5 announced for next year with no episodes listed yet
+        { tmdb_id: 'tv_1', title: 'Пацаны', kinopoisk_id: 435, release_seasons: '2026:4', last_season: 4 },
+        // Nothing this year; the next episode is dated next year
+        {
+            tmdb_id: 'tv_2',
+            title: 'Аббатство',
+            kinopoisk_id: null,
+            release_seasons: '2023:1',
+            next_episode_date: '2027-02-01',
+            next_episode_season: 2
+        },
+        // Episodes of season 3 listed for next year
+        { tmdb_id: 'tv_6', title: 'Дом', kinopoisk_id: null, release_seasons: '2024:2', last_season: 3 }
+    ];
+    const FILMS = [
+        { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01' },
+        { tmdb_id: 'movie_8', title: 'Будущее', premiere_digital: '2027-05-01' }
+    ];
+    beforeEach(() => {
+        mock.method(Subscription, 'findAll', async () => SERIES.map((s) => ({ Series: s })));
+        mock.method(Watchlist, 'findAll', async () => FILMS);
+    });
+
+    test('next year: episodes listed, a season dated, a next episode; films by their premiere', async () => {
+        const h = await upcomingHistory({ chatId: 1, year: 2027 });
+        assert.deepEqual(
+            h.series.map((s) => `${s.title} ${s.seasons.join(',')}`),
+            ['Аббатство 2', 'Дом 3', 'Пацаны 5']
+        );
+        assert.deepEqual(
+            h.films.map((f) => f.title),
+            ['Будущее']
+        );
+    });
+
+    test('the three years around the chat\'s own; anything else is this year; next year says "Выйдет"', async () => {
+        const chat = { id: 1, timezone: 'Europe/Moscow' };
+        const title = async (year) => (await yearView(chat, year, { now })).text.split('\n')[0];
+        assert.equal(await title(null), '🗓 <b>Вышло в 2026</b>');
+        assert.equal(await title(2024), '🗓 <b>Вышло в 2026</b>');
+        assert.equal(await title(2027), '🗓 <b>Выйдет в 2027</b>');
+        // Nothing out in 2025 among these: empty, not another year instead
+        assert.match((await yearView(chat, 2025, { now })).text, /В 2025 у подписок ничего не выходило/);
+    });
+
+    test('from a digest in a group where only the owner presses: no way back', async () => {
+        const view = await yearView({ id: -5, buttons_mode: 'owner' }, 2026, { digest: true, now });
+        assert.ok(!view.keyboard.reply_markup.inline_keyboard.flat().some((b) => b.callback_data === 'subs_o'));
+    });
+
+    test('this year: out so far from the history, the rest of the year from today on', async () => {
+        const chat = { id: 1, timezone: 'Europe/Moscow' };
+        // 14 October 2026: season 3 of Дом starts in March 2027, Будущее comes out in 2027
+        const view = await yearView(chat, 2026, { now: new Date('2026-10-14T09:00:00Z') });
+        assert.match(view.text, /^🗓 <b>Вышло в 2026<\/b>/);
+        assert.match(view.text, />Пацаны<\/a> · сезон 4/);
+        assert.doesNotMatch(view.text, /Ещё выйдет/, 'nothing left this year among these');
+        EPISODE_LISTS['6:3'] = ['2026-12-01', '2027-03-08'];
+        try {
+            const later = await yearView(chat, 2026, { now: new Date('2026-10-14T09:00:00Z') });
+            assert.match(later.text, /⏳ <b>Ещё выйдет в 2026<\/b>\n📺 <a [^>]+>Дом<\/a> · сезон 3/);
+        } finally {
+            EPISODE_LISTS['6:3'] = ['2027-03-01', '2027-03-08'];
+        }
+    });
+
+    test('this year: a film out today is out, not also to come; a TMDB failure is said of what is to come', async () => {
+        const chat = { id: 1, timezone: 'Europe/Moscow' };
+        const today = new Date('2027-05-01T09:00:00Z'); // Будущее comes out today
+        const view = await yearView(chat, 2027, { now: today });
+        assert.match(view.text, /🎬 <b>Фильмы<\/b>\n<a [^>]+>Будущее<\/a>/);
+        assert.doesNotMatch(view.text, /🎬 <a [^>]+>Будущее/);
+        const failed = historyView({ thisYear: 2026, year: 2026, series: [], films: [], later: null, failed: 2 });
+        assert.match(failed.text, /TMDB не ответил по 2 сериалам — в «Ещё выйдет» их нет/);
+    });
+
+    test('a year button: answered at once; a digest stays without the way back; an unknown year is this one', async () => {
+        let handler;
+        register({ command() {}, action: (trigger, fn) => (handler = fn) });
+        const thisYear = Number(todayIn('Europe/Moscow').slice(0, 4));
+        const press = async (data, chat, keyboard) => {
+            const calls = [];
+            const ctx = {
+                match: [data, data.slice(5)],
+                state: { chatData: chat },
+                callbackQuery: { message: { reply_markup: { inline_keyboard: keyboard } } },
+                answerCbQuery: async () => calls.push('answered'),
+                editMessageText: async (text, extra) => calls.push({ text, extra })
+            };
+            await handler(ctx);
+            return calls;
+        };
+        const backIn = (extra) => extra.reply_markup.inline_keyboard.flat().some((b) => b.callback_data === 'subs_o');
+
+        const digest = await press(`hist_${thisYear + 1}`, { id: -5, buttons_mode: 'owner' }, [
+            [{ callback_data: 'cal_w_1' }]
+        ]);
+        assert.equal(digest[0], 'answered');
+        assert.match(digest[1].text, new RegExp(`^🗓 <b>Выйдет в ${thisYear + 1}</b>`));
+        assert.equal(backIn(digest[1].extra), false);
+
+        const menu = await press('hist_1999', { id: 7 }, [[{ callback_data: 'subs_o' }]]);
+        assert.match(menu[1].text, new RegExp(`^🗓 <b>Вышло в ${thisYear}</b>`));
+        assert.equal(backIn(menu[1].extra), true);
     });
 });
