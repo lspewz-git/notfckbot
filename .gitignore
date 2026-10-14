@@ -16,3 +16,5 @@ playwright-report/
 
 # Claude Code: local working rules (server address, deploy steps)
 CLAUDE.md
+.env.bak
+.env.tmp

@@ -4,6 +4,7 @@ const { buildProxyAgent } = require('../../proxy');
 const { checkKinopoiskKey } = require('../../api/kinopoisk');
 const { updateEnvFile, maskToken } = require('../env');
 const { invalidateHealth } = require('./health');
+const { restartBlock, restartSoon } = require('../restart');
 
 const router = require('express').Router();
 
@@ -139,10 +140,18 @@ router.post('/api/services/:name', async (req, res) => {
     invalidateHealth();
     console.log(`[Admin] ${service.env} updated (${maskToken(token)}).`);
 
-    res.json({ success: true, masked: maskToken(token), restarting: Boolean(service.restartOnChange) });
-
-    // docker-compose's restart policy brings the process straight back with the new .env
-    if (service.restartOnChange) setTimeout(() => process.exit(0), 800);
+    // docker-compose's restart policy brings the process straight back with the new .env; not
+    // around an update check, though: then the token waits for a restart from Settings
+    const restarting = Boolean(service.restartOnChange) && !restartBlock();
+    res.json({
+        success: true,
+        masked: maskToken(token),
+        restarting,
+        restartPending: Boolean(service.restartOnChange) && !restarting
+    });
+    if (restarting) restartSoon(`new ${service.env}`);
 });
 
 module.exports = router;
+module.exports.SERVICES = SERVICES;
+module.exports.describeError = describeError;

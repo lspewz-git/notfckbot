@@ -21,6 +21,14 @@ export async function api(path, options = {}) {
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    if (!res.ok || data.error) {
+        // The body goes along: some answers say more than the message (Settings: which field)
+        const err = /** @type {Error & { status?: number, data?: any }} */ (
+            new Error(data.error || `HTTP ${res.status}`)
+        );
+        err.status = res.status;
+        err.data = data;
+        throw err;
+    }
     return data;
 }

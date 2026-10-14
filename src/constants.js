@@ -89,11 +89,15 @@ const formatWatchLinks = (opts) => {
 const DEFAULT_INTERVAL_HOURS = 3;
 const INTERVAL_CHOICES = [1, 2, 3, 4, 6, 8, 12, 24];
 
-/** The interval from a .env value; an unusable one is reported and the default used. */
-function parseIntervalHours(value) {
+/**
+ * The interval from a .env value; an unusable one is reported (unless `quiet`: the panel reads it
+ * on every refresh) and the default used.
+ */
+function parseIntervalHours(value, { quiet = false } = {}) {
     if (value === undefined || String(value).trim() === '') return DEFAULT_INTERVAL_HOURS;
     const hours = Number(value);
     if (INTERVAL_CHOICES.includes(hours)) return hours;
+    if (quiet) return DEFAULT_INTERVAL_HOURS;
     console.error(
         `[Cron] UPDATE_INTERVAL_HOURS=${value} is not one of ${INTERVAL_CHOICES.join(', ')}; ` +
             `checking every ${DEFAULT_INTERVAL_HOURS} hours`

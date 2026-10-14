@@ -7,7 +7,8 @@ import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.
 import { fillPagers } from './pager.js';
 import { filterLogs } from './logs.js';
 import { setHistoryYear, setHistoryPage, setupHistory } from './history.js';
-import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo } from './ui.js';
+import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
+import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
@@ -27,7 +28,24 @@ const REFRESH_SECONDS = 10;
 
 // --- Navigation ---
 
+let activeSection = 'dashboard';
+
 function switchSection(id) {
+    // Leaving Settings with changes not saved: ask, rather than lose them silently
+    if (activeSection === 'settings' && id !== 'settings' && hasUnsavedSettings()) {
+        showConfirm({
+            title: 'Leave without saving?',
+            text: 'The changes in Settings will be lost.',
+            confirmLabel: 'Discard changes',
+            cancelLabel: 'Stay',
+            onConfirm: () => {
+                discardSettings();
+                switchSection(id);
+            }
+        });
+        return;
+    }
+    activeSection = id;
     setSection(id);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
     // Sidebar items and tab-bar items; "More" counts as active for the sections it holds
@@ -112,6 +130,7 @@ const CLICK_ACTIONS = {
     'add-content': (el) => openAddContentFor(el.dataset.kind === 'tv' ? 'tv' : 'movie'),
     'history-year': (el) => setHistoryYear(Number(el.dataset.year)),
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step)),
+    ...settingsActions,
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
     service: (el) =>
@@ -213,6 +232,7 @@ function init() {
     setupFilters();
     // Before enhanceSelects(), like setupFilters: the styled dropdowns start on the remembered size
     setupHistory();
+    setupSettings();
     setupProxyForm();
     enhanceSelects();
     updateAutoRefreshSwitch();

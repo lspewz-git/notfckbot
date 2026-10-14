@@ -172,6 +172,15 @@ export async function saveServiceToken() {
             closeModal('service-modal');
             return;
         }
+        if (res.restartPending) {
+            toast(
+                'Token saved. An update check is about to run: restart the bot in Settings afterwards.',
+                'warning',
+                8000
+            );
+            closeModal('service-modal');
+            return;
+        }
         toast('Token saved', 'success');
         const link = /** @type {HTMLAnchorElement} */ ($('service-status-link'));
         await openServiceModal(current, {

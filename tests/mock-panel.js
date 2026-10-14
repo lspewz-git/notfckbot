@@ -180,7 +180,20 @@ async function mockPanel(page, options = {}) {
             nextRunAt: new Date(Date.now() + 3600e3).toISOString(),
             intervalHours: options.intervalHours || 3
         },
-        pollsUntilDone: 0
+        pollsUntilDone: 0,
+        settings: {
+            tokens: {
+                telegram: { configured: true, masked: '8123*****xYz4' },
+                tmdb: { configured: true, masked: 'eyJh*****Q9wE' },
+                kinopoisk: { configured: false, masked: '' }
+            },
+            proxy: { url: '', hasPassword: false },
+            interval: { hours: 3, active: 3, choices: [1, 2, 3, 4, 6, 8, 12, 24] },
+            database: { host: 'db', name: 'series_bot', user: 'bot_user' },
+            restart: { pending: [], blocked: null },
+            startedAt: new Date(Date.now() - 3600e3).toISOString(),
+            ...options.settings
+        }
     };
 
     function cronStatus() {
@@ -238,6 +251,39 @@ async function mockPanel(page, options = {}) {
             SERIES.map((x) => ({ tmdb_id: x.tmdb_id, title: x.title, last_season: 2, last_episode: 5 })),
         // The proxy dialog: no proxy saved; the test answers options.proxyTest
         '/api/config': () => ({ tmdbApiKey: 'abcd*****wxyz', tmdbProxyUrl: '', proxyHasPassword: false }),
+        // Settings: GET answers panel.settings; POST records the body and answers options.settingsSave
+        // (a { status, body } for an error) or the settings with the body applied
+        '/api/settings': (req) => {
+            if (req.method() === 'GET') return panel.settings;
+            const body = req.postDataJSON();
+            panel.lastSettingsSave = body;
+            if (options.settingsSave) return options.settingsSave(body);
+            const saved = [];
+            if (body.intervalHours !== undefined) {
+                panel.settings.interval.hours = body.intervalHours;
+                panel.settings.restart.pending = ['interval'];
+                saved.push('UPDATE_INTERVAL_HOURS');
+            }
+            if (body.proxyUrl !== undefined) {
+                panel.settings.proxy.url = body.proxyUrl.replace(/:[^:@/]*@/, '@');
+                saved.push('TMDB_PROXY_URL');
+            }
+            for (const name of Object.keys(body.tokens || {})) {
+                panel.settings.tokens[name] = { configured: true, masked: 'new0*****cafe' };
+                saved.push(name);
+            }
+            return { saved, settings: panel.settings };
+        },
+        '/api/restart': () => {
+            panel.restarted = true;
+            if (panel.settings.restart.blocked) {
+                return {
+                    status: 409,
+                    body: { error: 'An update check is due', blocked: panel.settings.restart.blocked }
+                };
+            }
+            return { restarting: true };
+        },
         '/api/config/test-proxy': () =>
             options.proxyTest || {
                 success: true,

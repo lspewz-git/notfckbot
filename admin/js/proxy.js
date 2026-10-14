@@ -10,22 +10,18 @@ import { api } from './api.js';
 import { mutate } from './data.js';
 import { toast, openModal, closeModal } from './ui.js';
 import { setSelectValue } from './select.js';
+import { composeProxyUrl, parseProxyUrl, describeTest } from './proxy-url.js';
 
 const FIELDS = ['proxy-host', 'proxy-port', 'proxy-user', 'proxy-pass'];
 
 function urlFromForm() {
-    const scheme = $field('proxy-scheme').value;
-    if (!scheme) return '';
-
-    const host = $field('proxy-host').value.trim();
-    const port = $field('proxy-port').value.trim();
-    if (!host || !port) return '';
-
-    const user = $field('proxy-user').value.trim();
-    const pass = $field('proxy-pass').value;
-    const auth = user ? `${encodeURIComponent(user)}${pass ? ':' + encodeURIComponent(pass) : ''}@` : '';
-
-    return `${scheme}://${auth}${host}:${port}`;
+    return composeProxyUrl({
+        scheme: $field('proxy-scheme').value,
+        host: $field('proxy-host').value,
+        port: $field('proxy-port').value,
+        user: $field('proxy-user').value,
+        pass: $field('proxy-pass').value
+    });
 }
 
 function syncForm() {
@@ -49,15 +45,15 @@ function fillForm(url) {
         return syncForm();
     }
 
-    try {
-        const parsed = new URL(url);
-        setSelectValue('proxy-scheme', parsed.protocol.replace(':', ''));
-        $field('proxy-host').value = parsed.hostname;
-        $field('proxy-port').value = parsed.port;
-        $field('proxy-user').value = decodeURIComponent(parsed.username || '');
+    const parts = parseProxyUrl(url);
+    if (parts) {
+        setSelectValue('proxy-scheme', parts.scheme);
+        $field('proxy-host').value = parts.host;
+        $field('proxy-port').value = parts.port;
+        $field('proxy-user').value = parts.user;
         // The server never sends the password; an empty field keeps the saved one
         $field('proxy-pass').value = '';
-    } catch (e) {
+    } else {
         // Hand-edited .env value we can't parse — start from a clean form
         toast('Stored proxy URL could not be parsed', 'warning');
         setSelectValue('proxy-scheme', '');
@@ -79,27 +75,6 @@ export async function openProxyModal() {
         syncForm();
     }
     openModal('proxy-modal');
-}
-
-const TARGET_NAMES = { telegram: 'Telegram', tmdb: 'TMDB', internet: 'Internet' };
-
-/**
- * "Telegram ✓ 180 ms · TMDB ✗ replied 503 · Internet ✓ 95 ms (IP 1.2.3.4)", or the proxy's own
- * failure when nothing got through. All fine: success; some: a warning; none: an error.
- * @param {{ direct: boolean, proxyDown: string | null, checks: Record<string, { ok: boolean, ms: number, error?: string, ip?: string }> }} res
- */
-export function describeTest(res) {
-    const via = res.direct ? 'Direct connection' : 'Proxy';
-    if (res.proxyDown) return { text: `${via} unreachable: ${res.proxyDown}`, type: 'error' };
-    const checks = Object.entries(res.checks);
-    const parts = checks.map(([name, c]) => {
-        const label = TARGET_NAMES[name] || name;
-        if (!c.ok) return `${label} ✗ ${c.error}`;
-        return `${label} ✓ ${c.ms} ms${c.ip ? ` (IP ${c.ip})` : ''}`;
-    });
-    const passed = checks.filter(([, c]) => c.ok).length;
-    const type = passed === checks.length ? 'success' : passed ? 'warning' : 'error';
-    return { text: `${via}: ${parts.join(' · ')}`, type };
 }
 
 /** Both buttons need the same "is the form usable" check first. */

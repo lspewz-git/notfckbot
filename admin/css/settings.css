@@ -1,0 +1,205 @@
+/* Settings: the server's .env as fields, a bar for unsaved changes, restart */
+
+/* Two columns of cards on a wide screen, one on a narrow one */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+/* Cards side by side are as tall as each other */
+.settings-grid .glass-card {
+    margin-bottom: 0;
+}
+
+.settings-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+    font-size: var(--text-base);
+    font-weight: 600;
+}
+
+.settings-desc {
+    margin-bottom: var(--space-3);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.settings-optional {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    font-weight: 400;
+}
+
+/* Label on the left, the field on the right; stacked on a phone */
+.settings-row {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    padding: var(--space-2) 0;
+}
+
+.settings-label {
+    padding-top: calc((var(--control-h) - 1.25rem) / 2);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
+.settings-field {
+    min-width: 0;
+}
+
+.settings-pair {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.settings-pair .input-field,
+.settings-pair .custom-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-pair .settings-port {
+    flex: 0 0 6.5rem;
+}
+
+.settings-interval {
+    max-width: 12rem;
+}
+
+.mono {
+    font-family: var(--font-mono);
+}
+
+/* A field changed since the last save */
+.settings-card [data-dirty='true'],
+.settings-card .custom-select:has([data-dirty='true']) .custom-select-trigger {
+    border-color: var(--warning);
+}
+
+.field-error {
+    margin-top: var(--space-2);
+    color: var(--danger);
+    font-size: var(--text-xs);
+}
+
+.field-error[hidden],
+#settings-proxy-fields[hidden] {
+    display: none;
+}
+
+/* Unsaved changes: stays in view while the page scrolls */
+.settings-bar {
+    position: sticky;
+    top: var(--space-3);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+}
+
+.settings-bar-text {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.settings-bar[data-dirty='true'] {
+    border-color: var(--warning);
+}
+
+.settings-bar[data-dirty='true'] .settings-bar-text {
+    color: var(--text);
+}
+
+/* What the bot runs with now: a line of its own above the button */
+.settings-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+}
+
+/* Something saved that only a restart applies */
+.settings-status[data-pending='true'] {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+@media (max-width: 1024px) {
+    .settings-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    .settings-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-1);
+    }
+
+    .settings-label {
+        padding-top: 0;
+    }
+
+    /* Above the bottom tab bar */
+    .settings-bar {
+        top: var(--space-2);
+    }
+}
+
+/* The proxy's connection check: one line per target, under the fields */
+.settings-checks {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+}
+
+.settings-checks-head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.settings-checks dl {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    row-gap: var(--space-1);
+}
+
+.settings-checks dt {
+    color: var(--text-secondary);
+}
+
+.settings-checks dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+.settings-checks dd[data-state='ok'] {
+    color: var(--success);
+}
+
+.settings-checks dd[data-state='error'] {
+    color: var(--danger);
+}

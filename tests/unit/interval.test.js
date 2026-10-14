@@ -36,3 +36,9 @@ test('the next check follows the interval', () => {
     assert.equal(nextRunAt(at(19, 20), 1).getHours(), 20);
     assert.equal(nextRunAt(at(19, 20), 24).getDate(), 14, 'once a day: tomorrow at midnight');
 });
+
+test('quiet: the panel reading it on every refresh logs nothing', () => {
+    errors.mock.resetCalls();
+    assert.equal(parseIntervalHours('5', { quiet: true }), 3);
+    assert.equal(errors.mock.callCount(), 0);
+});
