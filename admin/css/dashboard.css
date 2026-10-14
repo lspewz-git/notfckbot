@@ -353,10 +353,52 @@
 }
 
 /* --- Charts --- */
-.charts-row {
+/* The charts and the lists below them share the cards' columns and split the same way, so the
+   edge between two blocks runs down in one line: six columns wide (3 + 3), three when narrower
+   (2 + 1), one on a tablet or a phone */
+.charts-row,
+.dash-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-3);
+}
+
+.charts-row > *,
+.dash-row > * {
+    grid-column: span 3;
+}
+
+@media (max-width: 1380px) {
+    .charts-row,
+    .dash-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .charts-row > :first-child,
+    .dash-row > .panel-wide {
+        grid-column: span 2;
+    }
+
+    .charts-row > :last-child,
+    .dash-row > :not(.panel-wide) {
+        grid-column: span 1;
+    }
+}
+
+/* A tablet: a third of the width is too narrow for a chart of 30 days or the popular titles */
+@media (max-width: 960px) {
+    .charts-row,
+    .dash-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* As specific as the spans above: a span of 2 in one column adds an empty one beside it */
+    .charts-row > :first-child,
+    .charts-row > :last-child,
+    .dash-row > .panel-wide,
+    .dash-row > :not(.panel-wide) {
+        grid-column: auto;
+    }
 }
 
 .chart-card {
@@ -398,27 +440,10 @@
     height: 180px;
 }
 
-@media (max-width: 1024px) {
-    .charts-row {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-/* --- Coming up + Popular now --- */
-.dash-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-}
-
+/* --- Coming up + Popular now (their columns: with the charts, above) --- */
 .panel {
-    flex: 2 1 380px;
     min-width: 0;
     padding: 22px var(--space-6);
-}
-
-.panel-wide {
-    flex: 3 1 560px;
 }
 
 .panel .card-head {

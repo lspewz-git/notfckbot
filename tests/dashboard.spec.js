@@ -311,3 +311,49 @@ test('the charts draw, and the subscriptions one switches between weeks and mont
     await expect(page.locator('[data-action="chart-subs"][data-by="months"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#chart-subs')).toHaveAttribute('aria-label', 'New subscriptions per month');
 });
+
+test('the charts and the lists line up with the cards: every edge between blocks is one between cards', async ({
+    page
+}) => {
+    await mockPanel(page);
+    await expect(page.locator('#sent-count')).toHaveText('38');
+    const edges = await page.evaluate(() => {
+        const sides = (sel) =>
+            [...document.querySelectorAll(sel)].flatMap((el) => {
+                const r = el.getBoundingClientRect();
+                return [Math.round(r.left), Math.round(r.right)];
+            });
+        return { cards: sides('.stats-grid .stat-card'), others: sides('.charts-row > *, .dash-row > *') };
+    });
+    for (const x of edges.others) {
+        expect(
+            edges.cards.some((c) => Math.abs(c - x) <= 1),
+            `edge at ${x}`
+        ).toBe(true);
+    }
+});
+
+test('the charts and the lists below split at the same line', async ({ page }) => {
+    test.skip((page.viewportSize() || { width: 1280 }).width < 768, 'one column on a phone');
+    // Wide enough for six cards in a row, where the two rows used to split apart
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await mockPanel(page);
+    await expect(page.locator('#sent-count')).toHaveText('38');
+    const [charts, lists] = await page.evaluate(() =>
+        ['.charts-row > :first-child', '.dash-row > :first-child'].map((s) =>
+            Math.round(document.querySelector(s).getBoundingClientRect().right)
+        )
+    );
+    expect(charts).toBe(lists);
+});
+
+test('on a tablet the charts and the lists stand one under another, full width', async ({ page }) => {
+    test.skip((page.viewportSize() || { width: 1280 }).width < 768, 'phone: covered by the layout tests');
+    await page.setViewportSize({ width: 820, height: 1100 });
+    await mockPanel(page);
+    await expect(page.locator('#sent-count')).toHaveText('38');
+    const widths = await page
+        .locator('.charts-row > *, .dash-row > *')
+        .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().width)));
+    expect(new Set(widths).size, String(widths)).toBe(1);
+});
