@@ -217,7 +217,7 @@ test('the bot card says since when the bot runs, not a vague "running"', async (
     await mockPanel(page);
     await openSettings(page);
     await expect(page.locator('#settings-restart-text')).toContainText(/^Running since today, \d{1,2}:\d{2}/);
-    await expect(page.locator('#settings-restart-text')).toContainText('Nothing waits for a restart.');
+    await expect(page.locator('#settings-restart-text')).toHaveText(/^Running since today, \d{1,2}:\d{2}( [AP]M)?\.$/);
 });
 
 test('Test shows each target in the card; changing the proxy clears the old result', async ({ page }) => {
@@ -257,4 +257,27 @@ test('a refresh keeps the connection check; Discard of a proxy change clears it'
     await expect(page.locator('#settings-checks-when')).toContainText('Through the proxy');
     await page.locator('[data-action="settings-discard"]').click();
     await expect(page.locator('#settings-checks-when')).toHaveText('Press Test to check');
+});
+
+test('while the settings load, nothing shows that would then jump away', async ({ page }) => {
+    let release;
+    const hold = new Promise((resolve) => {
+        release = resolve;
+    });
+    await mockPanel(page, { hold });
+    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
+    if (narrow) {
+        await page.locator('.tab-item[data-open="more-modal"]').click();
+        await page.locator('#more-modal [data-section="settings"]').click();
+    } else {
+        await page.locator('.nav-item[data-section="settings"]').click();
+    }
+    await expect(page.locator('#settings-section')).toHaveClass(/active/);
+    // The answer is held: the proxy fields stay hidden, as they will be with no proxy saved
+    await expect(page.locator('#settings-proxy-fields')).toBeHidden();
+    const before = await page.locator('#settings-restart-text').boundingBox();
+    release();
+    await expect(page.locator('#settings-masked-telegram')).toHaveText('8123*****xYz4');
+    await expect(page.locator('#settings-proxy-fields')).toBeHidden();
+    expect((await page.locator('#settings-restart-text').boundingBox()).height).toBe(before.height);
 });

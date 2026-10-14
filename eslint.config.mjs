@@ -83,7 +83,8 @@ const RULES = {
 };
 
 export default [
-    { ignores: ['node_modules/**'] },
+    // admin/vendor: third-party builds (Chart.js), as published
+    { ignores: ['node_modules/**', 'admin/vendor/**'] },
 
     {
         // Bot, API, cron, one-off maintenance scripts

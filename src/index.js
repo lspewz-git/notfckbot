@@ -43,9 +43,22 @@ async function start() {
             .then(() => console.log('Bot is running! 🚀'))
             .catch((err) => console.error('Bot launch failed:', err));
 
-        // Enable graceful stop
-        process.once('SIGINT', () => bot.stop('SIGINT'));
-        process.once('SIGTERM', () => bot.stop('SIGTERM'));
+        // Graceful stop (docker compose restart/stop): the day counts kept in memory are written
+        // first, then the process ends without waiting for Docker to kill it
+        for (const signal of ['SIGINT', 'SIGTERM']) {
+            process.once(signal, async () => {
+                // Throws when polling never started (a stop during startup)
+                try {
+                    bot.stop(signal);
+                } catch {
+                    // nothing to stop
+                }
+                await require('./stats-log')
+                    .flushStats()
+                    .catch(() => {});
+                process.exit(0);
+            });
+        }
     } catch (err) {
         console.error('Fatal error during startup:', err);
         process.exit(1);

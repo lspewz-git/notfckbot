@@ -74,7 +74,40 @@ function buildTestMessage(mode, { title, season, episode, episodeName, links, fi
     return TEST_PREFIX + real;
 }
 
+/**
+ * A held notification's line in the list that comes after quiet hours, and its button.
+ * @param {{ kind: 'episode' | 'premiere' | 'complete' | 'status' | 'film', title: string,
+ *   season?: number, episode?: number, episodeName?: string, status?: string }} what
+ * @returns {{ line: string, label: string }}
+ */
+function heldLine({ kind, title, season, episode, episodeName, status }) {
+    const t = escapeHtml(title);
+    const code = `S${season}E${episode}`;
+    switch (kind) {
+        case 'episode':
+            return {
+                line: `📺 <b>${t}</b> — серия ${code}${episodeName ? ` «${escapeHtml(episodeName)}»` : ''}`,
+                label: `${title} ${code}`
+            };
+        case 'premiere':
+            return { line: `📺 <b>${t}</b> — премьера ${season} сезона`, label: `${title} ${code}` };
+        case 'complete':
+            return { line: `📺 <b>${t}</b> — вышел весь ${season} сезон`, label: `${title}: ${season} сезон` };
+        case 'status': {
+            const what = !isFinishedStatus(status)
+                ? 'сериал продлили'
+                : status === 'Canceled'
+                  ? 'сериал отменён'
+                  : 'сериал завершён';
+            return { line: `📺 <b>${t}</b> — ${what}`, label: title };
+        }
+        default:
+            return { line: `🎬 <b>${t}</b> — фильм вышел`, label: title };
+    }
+}
+
 module.exports = {
+    heldLine,
     buildSeriesMessages,
     buildStatusMessage,
     buildFilmMessage,

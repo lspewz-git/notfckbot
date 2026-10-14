@@ -258,14 +258,13 @@
                             <button id="service-alert-action" class="alert-action">Details</button>
                         </div>
 
+                        <!-- Six cards: as one row when wide, three or two per row when not (dashboard.css).
+                             The changes beside the numbers are filled by dashboard.js (updateStats) -->
                         <div class="stats-grid">
                             <div class="stat-card" data-section="chats" role="button" tabindex="0">
-                                <span class="stat-label">Total chats</span>
-                                <div class="stat-figure"><span id="chats-count" class="stat-value">-</span></div>
-                                <div class="stat-text">
-                                    <span class="stat-title">Users and groups</span>
-                                    <span class="stat-desc">Everyone who has started the bot</span>
-                                </div>
+                                <span class="stat-label">Chats</span>
+                                <span id="chats-count" class="stat-value">-</span>
+                                <span id="chats-delta" class="stat-delta">&nbsp;</span>
                             </div>
                             <div
                                 class="stat-card"
@@ -275,14 +274,17 @@
                                 tabindex="0"
                             >
                                 <span class="stat-label">Active subscriptions</span>
-                                <div class="stat-figure">
-                                    <span id="subs-count" class="stat-value">-</span>
-                                    <span id="subs-archived-count" class="stat-secondary" hidden></span>
-                                </div>
-                                <div class="stat-text">
-                                    <span class="stat-title">Series still on air</span>
-                                    <span class="stat-desc">New episodes are announced</span>
-                                </div>
+                                <span id="subs-count" class="stat-value">-</span>
+                                <span class="stat-delta"
+                                    ><span id="subs-delta">&nbsp;</span
+                                    ><span id="subs-archived-count" class="stat-aside" hidden></span
+                                ></span>
+                            </div>
+                            <div class="stat-card" data-static>
+                                <span class="stat-label">Series tracked</span>
+                                <span id="series-count" class="stat-value">-</span>
+                                <!-- The interval comes from /api/cron (UPDATE_INTERVAL_HOURS in .env) -->
+                                <span id="series-interval" class="stat-delta">Checked regularly</span>
                             </div>
                             <div
                                 class="stat-card"
@@ -291,25 +293,62 @@
                                 role="button"
                                 tabindex="0"
                             >
-                                <span class="stat-label">Movies</span>
-                                <div class="stat-figure">
-                                    <span id="films-count" class="stat-value">-</span>
-                                    <span id="films-released-count" class="stat-secondary" hidden></span>
-                                </div>
-                                <div class="stat-text">
-                                    <span class="stat-title">Films awaiting release</span>
-                                    <span class="stat-desc">Notified on release</span>
-                                </div>
+                                <span class="stat-label">Movies awaiting</span>
+                                <span id="films-count" class="stat-value">-</span>
+                                <span class="stat-delta"
+                                    ><span id="films-delta">&nbsp;</span
+                                    ><span id="films-released-count" class="stat-aside" hidden></span
+                                ></span>
                             </div>
                             <div class="stat-card" data-static>
-                                <span class="stat-label">Series tracked</span>
-                                <div class="stat-figure"><span id="series-count" class="stat-value">-</span></div>
-                                <div class="stat-text">
-                                    <!-- The interval comes from /api/cron (UPDATE_INTERVAL_HOURS in .env) -->
-                                    <span id="series-interval" class="stat-title">Checked regularly</span>
-                                    <span class="stat-desc">Episodes and status from TMDB</span>
-                                </div>
+                                <span class="stat-label">Sent, last 7 days</span>
+                                <span id="sent-count" class="stat-value">-</span>
+                                <span id="sent-delta" class="stat-delta">&nbsp;</span>
                             </div>
+                            <div class="stat-card" data-static>
+                                <span class="stat-label">Not delivered, 7 days</span>
+                                <span id="failed-count" class="stat-value">-</span>
+                                <span id="failed-delta" class="stat-delta">&nbsp;</span>
+                            </div>
+                        </div>
+
+                        <!-- Charts.js draws these (dashboard-charts.js) -->
+                        <div class="charts-row">
+                            <section class="glass-card chart-card" aria-labelledby="chart-subs-title">
+                                <div class="chart-head">
+                                    <h3 id="chart-subs-title">New subscriptions</h3>
+                                    <div class="chart-toggle" role="group" aria-label="Group by">
+                                        <button
+                                            class="btn btn-ghost active"
+                                            data-action="chart-subs"
+                                            data-by="weeks"
+                                            aria-pressed="true"
+                                        >
+                                            Weeks
+                                        </button>
+                                        <button
+                                            class="btn btn-ghost"
+                                            data-action="chart-subs"
+                                            data-by="months"
+                                            aria-pressed="false"
+                                        >
+                                            Months
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="chart-box">
+                                    <canvas id="chart-subs" role="img" aria-label="New subscriptions per week"></canvas>
+                                </div>
+                            </section>
+                            <section class="glass-card chart-card" aria-labelledby="chart-sent-title">
+                                <div class="chart-head">
+                                    <h3 id="chart-sent-title">Notifications per day</h3>
+                                    <span id="chart-sent-note" class="chart-note">Last 30 days</span>
+                                </div>
+                                <div class="chart-box">
+                                    <canvas id="chart-sent" role="img" aria-label="Notifications sent per day"></canvas>
+                                </div>
+                            </section>
                         </div>
 
                         <div class="dash-row">
@@ -534,7 +573,8 @@
                                         <button class="btn btn-ghost" data-action="settings-proxy-test">Test</button>
                                     </div>
                                 </div>
-                                <div id="settings-proxy-fields">
+                                <!-- Hidden until the saved settings say a proxy is on: shown first, they jumped away on load -->
+                                <div id="settings-proxy-fields" hidden>
                                     <div class="settings-row">
                                         <label class="settings-label" for="settings-proxy-host">Host and port</label>
                                         <div class="settings-field settings-pair">
@@ -624,9 +664,7 @@
                                     lost. Not in the 5 minutes before an update check, nor in the first 6 after it
                                     starts.
                                 </p>
-                                <div class="settings-status" id="settings-restart-text">
-                                    Running with the saved settings.
-                                </div>
+                                <div class="settings-status" id="settings-restart-text">&nbsp;</div>
                                 <button class="btn btn-ghost" id="settings-restart" data-action="settings-restart">
                                     Restart bot
                                 </button>
@@ -1272,6 +1310,48 @@
                     </select>
                     <p class="field-hint">Shows up in the chat with the bot's next reply there.</p>
                 </div>
+                <!-- Hours filled by chats.js; the zones are src/quiet.js ZONES (a unit test keeps them equal) -->
+                <div class="field-block">
+                    <span class="field-label" id="chat-settings-quiet-label">Quiet hours</span>
+                    <div class="settings-pair" role="group" aria-labelledby="chat-settings-quiet-label">
+                        <select
+                            id="chat-settings-quiet-start"
+                            class="select-field"
+                            aria-label="Quiet hours from"
+                        ></select>
+                        <select id="chat-settings-quiet-end" class="select-field" aria-label="Quiet hours to"></select>
+                    </div>
+                    <div class="mt-sm">
+                        <select id="chat-settings-timezone" class="select-field" aria-label="Time zone">
+                            <option value="Europe/Kaliningrad">Kaliningrad (UTC+2)</option>
+                            <option value="Europe/Moscow">Moscow (UTC+3)</option>
+                            <option value="Europe/Samara">Samara (UTC+4)</option>
+                            <option value="Asia/Yekaterinburg">Yekaterinburg (UTC+5)</option>
+                            <option value="Asia/Omsk">Omsk (UTC+6)</option>
+                            <option value="Asia/Novosibirsk">Novosibirsk (UTC+7)</option>
+                            <option value="Asia/Irkutsk">Irkutsk (UTC+8)</option>
+                            <option value="Asia/Yakutsk">Yakutsk (UTC+9)</option>
+                            <option value="Asia/Vladivostok">Vladivostok (UTC+10)</option>
+                            <option value="Asia/Magadan">Magadan (UTC+11)</option>
+                            <option value="Asia/Kamchatka">Kamchatka (UTC+12)</option>
+                        </select>
+                    </div>
+                    <p class="field-hint">Notifications in these hours come in one message when they end.</p>
+                </div>
+                <div class="field-block">
+                    <span class="field-label" id="chat-settings-digests-label">Digests</span>
+                    <div class="settings-pair" role="group" aria-labelledby="chat-settings-digests-label">
+                        <select id="chat-settings-digest-week" class="select-field" aria-label="Weekly digest">
+                            <option value="off">No weekly digest</option>
+                            <option value="on">Weekly: Mondays, 10:00</option>
+                        </select>
+                        <select id="chat-settings-digest-month" class="select-field" aria-label="Monthly digest">
+                            <option value="off">No monthly digest</option>
+                            <option value="on">Monthly: the 1st, 10:00</option>
+                        </select>
+                    </div>
+                    <p class="field-hint">What comes out in the week or month ahead, in the chat's time zone.</p>
+                </div>
                 <button id="chat-settings-save" class="btn btn-primary btn-block">Save</button>
                 <button data-close-return="chat-settings-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1690,6 +1770,8 @@
         <!-- Toasts (replace window.alert) -->
         <div id="toast-container" class="toast-container"></div>
 
+        <!-- Chart.js 4.4.7 (MIT), the dashboard's charts: a copy, so they work without the internet -->
+        <script src="vendor/chart.umd.js" defer></script>
         <script type="module" src="js/app.js"></script>
     </body>
 </html>

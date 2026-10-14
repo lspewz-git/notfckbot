@@ -5,23 +5,77 @@ import { api } from './api.js';
 import { toast } from './ui.js';
 import { isUnchanged } from './render.js';
 
+const ARROW_UP = 'M3 17l6-6 4 4 8-8M15 7h6v6';
+const ARROW_DOWN = 'M3 7l6 6 4-4 8 8M15 17h6v-6';
+
+/**
+ * A card's change: an arrow and the number, then what it compares with. Green when the change
+ * is good news, amber (the logo's colour) when it isn't, grey when nothing changed.
+ * @param {string} id
+ * @param {number} change
+ * @param {string} text "new in 30 days", "from the week before"
+ * @param {string} flat what to say when nothing changed
+ * @param {'up' | 'down'} goodWhen which way is good news
+ */
+function setDelta(id, change, text, flat, goodWhen = 'up') {
+    const el = $(id);
+    if (!el) return;
+    const n = Number(change) || 0;
+    // Only these classes: the element may carry its own (the card's line style)
+    const state = !n ? 'delta-flat' : n > 0 === (goodWhen === 'up') ? 'delta-good' : 'delta-bad';
+    el.classList.add('delta');
+    el.classList.remove('delta-flat', 'delta-good', 'delta-bad');
+    el.classList.add(state);
+    if (!n) {
+        el.textContent = flat;
+        return;
+    }
+    el.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${n > 0 ? ARROW_UP : ARROW_DOWN}" /></svg>`;
+    const strong = document.createElement('b');
+    strong.textContent = `${n > 0 ? '+' : '−'}${Math.abs(n)}`;
+    el.append(strong, ` ${text}`);
+}
+
+/** "· 8 archived": an aside after the change, hidden when there is none. */
+function setAside(id, n, text) {
+    const el = $(id);
+    if (!el) return;
+    el.hidden = !n;
+    el.textContent = `${n ?? 0} ${text}`;
+}
+
 export function updateStats(stats) {
     setText('chats-count', stats.chatsCount);
+    setDelta('chats-delta', stats.chatsNew30, 'new in 30 days', 'None new in 30 days');
     // activeSubsCount is newer than the panel's first backend — fall back to the total
     setText('subs-count', stats.activeSubsCount ?? stats.subsCount);
-
-    const archived = $('subs-archived-count');
-    if (archived) {
-        archived.hidden = !stats.archivedSubsCount;
-        archived.innerText = `+${stats.archivedSubsCount ?? 0} archived`;
-    }
+    setDelta('subs-delta', stats.subsNew30, 'new in 30 days', 'None new in 30 days');
+    setAside('subs-archived-count', stats.archivedSubsCount, 'archived');
     setText('films-count', stats.activeFilmsCount ?? stats.filmsCount);
-    const released = $('films-released-count');
-    if (released) {
-        released.hidden = !stats.releasedFilmsCount;
-        released.innerText = `+${stats.releasedFilmsCount ?? 0} released`;
-    }
+    // Added minus released: how the waiting list changed
+    setDelta(
+        'films-delta',
+        (stats.filmsAdded30 || 0) - (stats.filmsReleased30 || 0),
+        'in 30 days',
+        'No change in 30 days'
+    );
+    setAside('films-released-count', stats.releasedFilmsCount, 'released');
     setText('series-count', stats.seriesCount);
+    setText('sent-count', stats.sent7 ?? 0);
+    setDelta(
+        'sent-delta',
+        (stats.sent7 || 0) - (stats.sentPrev7 || 0),
+        'from the week before',
+        'Same as the week before'
+    );
+    setText('failed-count', stats.failed7 ?? 0);
+    setDelta(
+        'failed-delta',
+        (stats.failed7 || 0) - (stats.failedPrev7 || 0),
+        'from the week before',
+        'Same as the week before',
+        'down'
+    );
 }
 
 // --- Service statuses ---

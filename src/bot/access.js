@@ -26,7 +26,7 @@ function ownerOf(chatId, messageId) {
 const isGroup = (chat) => Boolean(chat) && chat.type !== 'private';
 
 // Buttons that check their own rights, or do nothing: open to everyone in every mode
-const OPEN_BUTTONS = /^(settings_|noop$|subs_noop$)/;
+const OPEN_BUTTONS = /^(settings_|held_|cal_|noop$|subs_noop$)/;
 
 const REPLY_METHODS = ['reply', 'replyWithHTML', 'replyWithPhoto', 'replyWithMarkdown', 'replyWithMarkdownV2'];
 

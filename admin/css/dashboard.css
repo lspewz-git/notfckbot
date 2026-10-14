@@ -256,18 +256,25 @@
     background: rgba(255, 107, 94, 0.1);
 }
 
-/* --- Stat cards --- */
+/* --- Stat cards: a label, the number, and how it changed --- */
+/* Six in a row when there is room; three or two per row otherwise, never a gap at the end */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-3);
+}
+
+@media (max-width: 1380px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
 
 .stat-card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: var(--space-5) 22px;
+    gap: 2px;
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--surface-1);
@@ -290,49 +297,111 @@
 }
 
 .stat-label {
-    color: var(--text-dim);
-    font-size: var(--text-base);
-}
-
-.stat-figure {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
 }
 
 .stat-value {
-    font-size: 2.75rem;
+    font-size: 1.75rem;
     font-weight: 600;
-    line-height: 1;
-    letter-spacing: -0.035em;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
-/* "+6 archived": keeps its place while hidden, so the figure doesn't shift when it appears */
-.stat-secondary {
+.stat-delta {
     color: var(--text-dim);
-    font-size: var(--text-sm);
-    white-space: nowrap;
+    font-size: var(--text-xs);
+    line-height: 1.4;
 }
 
-.stat-secondary[hidden] {
+.delta {
     display: inline;
-    visibility: hidden;
 }
 
-.stat-text {
+.delta .icon {
+    width: 13px;
+    height: 13px;
+    margin-right: 2px;
+    vertical-align: -2px;
+}
+
+.delta b {
+    font-weight: 600;
+}
+
+/* Good news green; the rest in the logo's amber; nothing changed in grey */
+.delta-good {
+    color: var(--success);
+}
+
+.delta-bad {
+    color: var(--accent);
+}
+
+.delta-flat {
+    color: var(--text-dim);
+}
+
+/* "· 8 archived" after the change */
+.stat-aside::before {
+    content: ' · ';
+}
+
+.stat-aside[hidden] {
+    display: none;
+}
+
+/* --- Charts --- */
+.charts-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.chart-card {
+    margin-bottom: 0;
+}
+
+.chart-head {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.chart-head h3 {
+    font-size: var(--text-base);
+    font-weight: 600;
+}
+
+.chart-note {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.chart-toggle {
+    display: flex;
     gap: 2px;
 }
 
-.stat-title {
-    font-size: var(--text-base);
-    font-weight: 500;
+.chart-toggle .btn {
+    min-height: 28px;
+    padding: 0 var(--space-2);
+    font-size: var(--text-xs);
 }
 
-.stat-desc {
-    color: var(--text-dim);
-    font-size: var(--text-sm);
+/* Chart.js sizes the canvas to this box */
+.chart-box {
+    position: relative;
+    height: 180px;
+}
+
+@media (max-width: 1024px) {
+    .charts-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 /* --- Coming up + Popular now --- */
@@ -655,11 +724,11 @@
     }
 
     .stat-card {
-        padding: var(--space-4);
+        padding: var(--space-3);
     }
 
     .stat-value {
-        font-size: 2rem;
+        font-size: 1.5rem;
     }
 
     .panel {

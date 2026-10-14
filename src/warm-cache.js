@@ -8,7 +8,7 @@
  * moment is no problem: concurrent requests for a title share one fetch (see tmdb.js).
  */
 const { Series, Watchlist } = require('./db');
-const { getDetailsCached } = require('./api/tmdb');
+const { getDetailsCached, getSeasonDetailsCached } = require('./api/tmdb');
 const { findKinopoiskId } = require('./api/kinopoisk');
 
 /** Every title the panel can show a card for: the tracked series and the films on any list. */
@@ -32,6 +32,15 @@ async function warmDetailsCache() {
             // Films keep no Kinopoisk ID in the database (series do): find it now, so the
             // History page links straight to their pages from the first view
             if (mediaType === 'movie') await findKinopoiskId(tmdbId, details.imdb_id);
+            // The bot's 📅 week and month read episode dates from the current season (and the
+            // next, once announced): the first view after a start shouldn't wait for TMDB
+            if (mediaType === 'tv') {
+                const last = details.last_episode_to_air && details.last_episode_to_air.season_number;
+                const next = details.next_episode_to_air && details.next_episode_to_air.season_number;
+                for (const season of new Set([last, next].filter(Boolean))) {
+                    await getSeasonDetailsCached(numericId, season).catch(() => {});
+                }
+            }
         } catch {
             // Already logged by tmdb.js; that card will just ask TMDB when opened
             failed += 1;

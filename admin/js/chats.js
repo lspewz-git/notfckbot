@@ -115,18 +115,54 @@ const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POS
 
 // --- Settings ---
 /** The chat's bot settings: who presses its buttons (groups only) and the bottom menu. */
+const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
+
+/** The quiet hours selects' options: "Off" and the 24 hours to start, the 24 hours to end. */
+export function setupChatSettingsForm() {
+    const hours = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${hourLabel(h)}</option>`).join('');
+    $('chat-settings-quiet-start').innerHTML = `<option value="">Off</option>${hours}`;
+    $('chat-settings-quiet-end').innerHTML = hours;
+    // With quiet hours off, there is no end to pick
+    $field('chat-settings-quiet-start').addEventListener('change', syncQuietEnd);
+}
+
+function syncQuietEnd() {
+    const off = $field('chat-settings-quiet-start').value === '';
+    const end = $field('chat-settings-quiet-end');
+    const shown = /** @type {HTMLElement} */ (end.closest('.custom-select') || end);
+    shown.style.visibility = off ? 'hidden' : '';
+}
+
 function openChatSettings(chat, label) {
     const group = chat.type !== 'private';
     setText('chat-settings-sub', label);
     $('chat-settings-buttons-field').hidden = !group;
     setSelectValue('chat-settings-buttons', chat.buttons_mode === 'all' ? 'all' : 'owner');
     setSelectValue('chat-settings-menu', chat.menu_enabled === false ? 'off' : 'on');
+    const quietOn = Number.isInteger(chat.quiet_start) && Number.isInteger(chat.quiet_end);
+    setSelectValue('chat-settings-quiet-start', quietOn ? String(chat.quiet_start) : '');
+    setSelectValue('chat-settings-quiet-end', String(quietOn ? chat.quiet_end : 8));
+    setSelectValue('chat-settings-timezone', chat.timezone || 'Europe/Moscow');
+    setSelectValue('chat-settings-digest-week', chat.digest_week ? 'on' : 'off');
+    setSelectValue('chat-settings-digest-month', chat.digest_month ? 'on' : 'off');
+    syncQuietEnd();
 
     const save = /** @type {HTMLButtonElement} */ ($('chat-settings-save'));
     save.onclick = async () => {
         if (save.disabled) return;
         const body = { menu_enabled: $field('chat-settings-menu').value === 'on' };
         if (group) body.buttons_mode = $field('chat-settings-buttons').value;
+        const start = $field('chat-settings-quiet-start').value;
+        const end = $field('chat-settings-quiet-end').value;
+        if (start !== '' && start === end) {
+            toast('Quiet hours need different start and end hours', 'warning');
+            return;
+        }
+        body.quiet_start = start === '' ? null : Number(start);
+        body.quiet_end = start === '' ? null : Number(end);
+        body.timezone = $field('chat-settings-timezone').value;
+        body.digest_week = $field('chat-settings-digest-week').value === 'on';
+        body.digest_month = $field('chat-settings-digest-month').value === 'on';
         save.disabled = true;
         save.setAttribute('aria-busy', 'true');
         try {

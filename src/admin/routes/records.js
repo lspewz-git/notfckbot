@@ -2,6 +2,8 @@
 const { Chat, Series, Subscription, Watchlist } = require('../../db');
 const tmdb = require('../../api/tmdb');
 const { deliver } = require('../../delivery');
+const { ZONES, isHour } = require('../../quiet');
+const { sentMarkOnEnable } = require('../../cron/digests');
 
 const router = require('express').Router();
 
@@ -74,8 +76,29 @@ router.post('/api/chat/:chatId/block', async (req, res) => {
 // The chat's bot settings, the same ones its ⚙️ Settings screen in Telegram changes
 const BUTTONS_MODES = ['owner', 'all'];
 router.patch('/api/chat/:chatId/settings', async (req, res) => {
-    const { buttons_mode: buttonsMode, menu_enabled: menuEnabled } = req.body || {};
+    const body = req.body || {};
+    const { buttons_mode: buttonsMode, menu_enabled: menuEnabled } = body;
     const changes = {};
+    // Quiet hours: both hours (0–23, not the same) or both null for off
+    if (body.quiet_start !== undefined || body.quiet_end !== undefined) {
+        const { quiet_start: start, quiet_end: end } = body;
+        const off = start === null && end === null;
+        if (!off && !(isHour(start) && isHour(end) && start !== end)) {
+            return res.status(400).json({ error: 'Quiet hours: two different hours from 0 to 23, or both off' });
+        }
+        changes.quiet_start = off ? null : start;
+        changes.quiet_end = off ? null : end;
+    }
+    if (body.timezone !== undefined) {
+        if (!ZONES.some((z) => z.id === body.timezone)) return res.status(400).json({ error: 'Unknown time zone' });
+        changes.timezone = body.timezone;
+    }
+    for (const which of ['week', 'month']) {
+        const value = body[`digest_${which}`];
+        if (value === undefined) continue;
+        if (typeof value !== 'boolean') return res.status(400).json({ error: `Bad digest_${which}` });
+        changes[`digest_${which}`] = value;
+    }
     if (buttonsMode !== undefined) {
         if (!BUTTONS_MODES.includes(buttonsMode)) return res.status(400).json({ error: 'Bad buttons_mode' });
         changes.buttons_mode = buttonsMode;
@@ -88,8 +111,26 @@ router.patch('/api/chat/:chatId/settings', async (req, res) => {
     try {
         const chat = await Chat.findByPk(req.params.chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
+        // A digest turned on starts with the next one due, as in the bot (src/cron/digests.js)
+        for (const which of ['week', 'month']) {
+            if (changes[`digest_${which}`] && !chat[`digest_${which}`]) {
+                changes[`digest_${which}_sent`] = sentMarkOnEnable(which === 'week' ? 'w' : 'm', {
+                    ...chat.get(),
+                    ...changes
+                });
+            }
+        }
         await chat.update(changes);
-        res.json({ success: true, buttons_mode: chat.buttons_mode, menu_enabled: chat.menu_enabled });
+        res.json({
+            success: true,
+            buttons_mode: chat.buttons_mode,
+            menu_enabled: chat.menu_enabled,
+            quiet_start: chat.quiet_start,
+            quiet_end: chat.quiet_end,
+            timezone: chat.timezone,
+            digest_week: chat.digest_week,
+            digest_month: chat.digest_month
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

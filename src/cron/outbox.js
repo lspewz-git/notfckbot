@@ -2,8 +2,10 @@
  * The update check's sending: each notification through deliver() (retries included), and what
  * still didn't go out kept in PendingMessage for the next check, which sends it first.
  */
-const { PendingMessage } = require('../db');
+const { PendingMessage, HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
+const { isQuietNow } = require('../quiet');
+const stats = require('../stats-log');
 const { tally } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 
@@ -16,22 +18,47 @@ const MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 // to the queue: no waiting through three tries per message for a Telegram that isn't there, and
 // no newer message slipping out ahead of an older queued one. Each check starts afresh.
 let unreachable = false;
+// Each chat's settings, read once per check: a chat with ten new episodes is one query
+let chats = new Map();
+
+async function chatSettings(chatId) {
+    if (!chats.has(String(chatId)))
+        chats.set(
+            String(chatId),
+            Chat.findByPk(chatId).catch(() => null)
+        );
+    return chats.get(String(chatId));
+}
 const QUEUED = { status: 'failed', error: 'Telegram was unreachable earlier in this check' };
 
 /**
- * Sends one notification; a temporary failure is queued for the next check.
- * @param {{ photo?: string | null, about?: string }} [options] about: for the log
+ * Sends one notification; a temporary failure is queued for the next check. In the chat's quiet
+ * hours it is held instead, for the list that goes out when they end (src/cron/held.js).
+ * @param {{ photo?: string | null, about?: string, line?: string, label?: string }} [options]
+ *   about: the title, for the log; line and label: its line and button in that list
  */
-async function notify(bot, chatId, text, { photo = null, about = '' } = {}) {
+async function notify(bot, chatId, text, { photo = null, about = '', line = '', label = '' } = {}) {
+    if (line && isQuietNow(await chatSettings(chatId))) {
+        try {
+            await HeldNotification.create({ chatId, line, label: label || about || 'Уведомление', text, photo });
+            return { status: 'held' };
+        } catch (err) {
+            // Better at night than never
+            console.error(`[Cron] Couldn't hold a notification for chat ${chatId}, sending it now:`, err.message);
+        }
+    }
     const result = unreachable ? QUEUED : await deliver(bot, chatId, text, { photo });
     if (result.status === 'failed') unreachable = true;
     if (result.status === 'sent') {
         tally('sent');
+        stats.count('sent');
         return result;
     }
     tally('failed');
     const what = about ? ` about "${about}"` : '';
+    // The day counts take a failure once it is final: a queued message may still go out
     if (result.status !== 'failed') {
+        stats.count('failed');
         console.error(`[Cron] Chat ${chatId} not notified${what} (${result.status}): ${result.error}`);
         return result;
     }
@@ -39,6 +66,7 @@ async function notify(bot, chatId, text, { photo = null, about = '' } = {}) {
         await PendingMessage.create({ chatId, text, photo });
         console.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}. Will retry on the next check`);
     } catch (err) {
+        stats.count('failed');
         console.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}; queueing failed:`, err.message);
     }
     return result;
@@ -47,6 +75,7 @@ async function notify(bot, chatId, text, { photo = null, about = '' } = {}) {
 /** Starts a check: sends what earlier checks couldn't, oldest first, before the check's own news. */
 async function flushPending(bot, now = new Date()) {
     unreachable = false;
+    chats = new Map();
     const pending = await PendingMessage.findAll({ order: [['id', 'ASC']] });
     if (!pending.length) return;
     let sent = 0;
@@ -54,11 +83,14 @@ async function flushPending(bot, now = new Date()) {
         const age = now.getTime() - new Date(message.createdAt).getTime();
         if (message.attempts >= MAX_ATTEMPTS || age > MAX_AGE_MS) {
             console.error(`[Cron] Gave up on a message to chat ${message.chatId} after ${message.attempts} retries`);
+            stats.count('failed');
             await message.destroy();
             continue;
         }
         // Telegram down: the rest wait for the next check, untried (their age still runs out)
         if (unreachable) break;
+        // A retry is still a notification: not in the chat's quiet hours; a later check sends it
+        if (isQuietNow(await chatSettings(message.chatId), now)) continue;
         const result = await deliver(bot, message.chatId, message.text, { photo: message.photo });
         if (result.status === 'failed') {
             unreachable = true;
@@ -67,8 +99,10 @@ async function flushPending(bot, now = new Date()) {
         }
         if (result.status === 'sent') {
             tally('sent');
+            stats.count('sent');
             sent += 1;
         } else {
+            stats.count('failed');
             console.error(
                 `[Cron] Queued message to chat ${message.chatId} dropped (${result.status}): ${result.error}`
             );

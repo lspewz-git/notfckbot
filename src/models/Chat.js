@@ -27,6 +27,43 @@ const Chat = sequelize.define('Chat', {
         allowNull: false,
         defaultValue: 'owner'
     },
+    // Quiet hours: whole hours in the chat's time zone (src/quiet.js); both null when off.
+    // Notifications in them are held and come as one message when they end.
+    quiet_start: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    quiet_end: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    // An IANA zone of Russia's (src/quiet.js ZONES): for quiet hours and the digests' send time
+    timezone: {
+        type: DataTypes.STRING(40),
+        allowNull: false,
+        defaultValue: 'Europe/Moscow'
+    },
+    // The digests: the week ahead on Mondays, the month on the 1st, at 10:00 in the chat's zone
+    // (src/cron/digests.js). Off until the chat turns them on
+    digest_week: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
+    digest_month: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
+    // The period last sent (the week's Monday, "2026-10-12"; the month, "2026-10"), so each goes once
+    digest_week_sent: {
+        type: DataTypes.STRING(10),
+        allowNull: true
+    },
+    digest_month_sent: {
+        type: DataTypes.STRING(7),
+        allowNull: true
+    },
     blockedUntil: {
         type: DataTypes.DATE,
         allowNull: true

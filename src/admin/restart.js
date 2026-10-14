@@ -4,6 +4,7 @@
  * a restart then would skip it, and the subscribers would hear about new episodes hours late.
  */
 const { getCronStatus } = require('../cron/status');
+const { flushStats } = require('../stats-log');
 
 // No restart this close before a scheduled check, or this soon after one started
 const BEFORE_MS = 5 * 60 * 1000;
@@ -30,7 +31,11 @@ function restartBlock(now = new Date(), status = getCronStatus()) {
 /** Exits shortly, so the answer to the request that asked for it gets out first. */
 function restartSoon(why) {
     console.log(`[Admin] Restarting the bot: ${why}`);
-    setTimeout(() => process.exit(0), 800);
+    // The day counts kept in memory go to the database first
+    setTimeout(async () => {
+        await flushStats().catch(() => {});
+        process.exit(0);
+    }, 800);
 }
 
 module.exports = { restartBlock, restartSoon };

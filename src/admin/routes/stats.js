@@ -1,6 +1,9 @@
 /** Dashboard figures: counters, most popular series, the update check, upcoming releases. */
 const { Op } = require('sequelize');
-const { Chat, Series, Subscription, Watchlist } = require('../../db');
+const { Chat, Series, Subscription, Watchlist, DailyStat } = require('../../db');
+const { todayIn, addDays, weekStart, addMonths } = require('../../calendar');
+const { DEFAULT_ZONE } = require('../../quiet');
+const { unwritten } = require('../../stats-log');
 const { getCronStatus } = require('../../cron');
 const { getVersion } = require('../version');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('../../constants');
@@ -10,6 +13,110 @@ const router = require('express').Router();
 // TMDB statuses after which a show gets no new episodes. Subscriptions to such
 // shows are "archived" — derived from Series.status alone, nothing is stored.
 const FINISHED_SERIES_STATUSES = Object.keys(FINISHED_STATUS_LABELS);
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The day counts from `from` to `to` (inclusive, "YYYY-MM-DD"), the table's plus those not yet written. */
+async function dayCounts(from, to) {
+    const rows = await DailyStat.findAll({ where: { day: { [Op.between]: [from, to] } } });
+    const byDay = new Map(
+        rows.map((r) => [r.day, { sent: r.sent, failed: r.failed, checks: r.checks, check_errors: r.check_errors }])
+    );
+    for (const [day, counts] of unwritten()) {
+        if (day < from || day > to) continue;
+        const known = byDay.get(day) || { sent: 0, failed: 0, checks: 0, check_errors: 0 };
+        for (const [field, n] of Object.entries(counts)) known[field] += n;
+        byDay.set(day, known);
+    }
+    return byDay;
+}
+
+const sum = (byDay, from, to, field) =>
+    [...byDay].filter(([day]) => day >= from && day <= to).reduce((n, [, c]) => n + c[field], 0);
+
+/** The changes the stat cards show next to their numbers: the last 30 days, the last 7 against the 7 before. */
+async function recentChanges(now = new Date()) {
+    const since30 = new Date(now.getTime() - 30 * DAY_MS);
+    const today = todayIn(DEFAULT_ZONE, now);
+    const days = await dayCounts(addDays(today, -13), today);
+    const [chatsNew, subsNew, filmsAddedRows, filmsReleased] = await Promise.all([
+        Chat.count({ where: { createdAt: { [Op.gte]: since30 } } }),
+        // New ones among the active: the card counts subscriptions to series still on air
+        Subscription.count({
+            include: [{ model: Series, attributes: [], required: false }],
+            where: {
+                createdAt: { [Op.gte]: since30 },
+                [Op.or]: [{ '$Series.status$': null }, { '$Series.status$': { [Op.notIn]: FINISHED_SERIES_STATUSES } }]
+            }
+        }),
+        Watchlist.findAll({
+            attributes: ['notified', 'premiere_digital', 'createdAt'],
+            where: { createdAt: { [Op.gte]: since30 } }
+        }),
+        // Released: by the release date, not the row's, which the update check touches
+        Watchlist.findAll({
+            attributes: ['premiere_digital', 'createdAt'],
+            where: { notified: true, premiere_digital: { [Op.between]: [addDays(today, -29), today] } }
+        })
+    ]);
+    // Both sides only for films that waited: one added already out was never awaiting
+    const waited = (f) => (f.premiere_digital || '') >= todayIn(DEFAULT_ZONE, new Date(f.createdAt));
+    return {
+        chatsNew30: chatsNew,
+        subsNew30: subsNew,
+        // Added while still awaiting: a film added already out goes straight to Released and never
+        // waited (its release date is before the day it was added)
+        filmsAdded30: filmsAddedRows.filter((f) => !f.notified || waited(f)).length,
+        filmsReleased30: filmsReleased.filter(waited).length,
+        sent7: sum(days, addDays(today, -6), today, 'sent'),
+        sentPrev7: sum(days, addDays(today, -13), addDays(today, -7), 'sent'),
+        failed7: sum(days, addDays(today, -6), today, 'failed'),
+        failedPrev7: sum(days, addDays(today, -13), addDays(today, -7), 'failed')
+    };
+}
+
+/**
+ * The dashboard's charts: new subscriptions by week (12) and by month (12), notifications by day (30).
+ * Weeks run Monday to Sunday, days by Moscow time, as the bot counts them.
+ */
+router.get('/api/stats/charts', async (req, res) => {
+    try {
+        const today = todayIn(DEFAULT_ZONE);
+        const firstWeek = addDays(weekStart(today), -11 * 7);
+        const firstMonth = addMonths(today, -11);
+        const since = firstMonth < firstWeek ? firstMonth : firstWeek;
+        const subs = await Subscription.findAll({
+            attributes: ['createdAt'],
+            where: { createdAt: { [Op.gte]: new Date(`${since}T00:00:00Z`) } }
+        });
+        const subDays = subs.map((s) => todayIn(DEFAULT_ZONE, new Date(s.createdAt)));
+
+        const weeks = Array.from({ length: 12 }, (_, i) => ({ start: addDays(firstWeek, i * 7), count: 0 }));
+        const months = Array.from({ length: 12 }, (_, i) => ({
+            month: addMonths(today, i - 11).slice(0, 7),
+            count: 0
+        }));
+        for (const day of subDays) {
+            const week = weeks.find((w) => w.start === weekStart(day));
+            if (week) week.count += 1;
+            const month = months.find((m) => m.month === day.slice(0, 7));
+            if (month) month.count += 1;
+        }
+
+        const firstDay = addDays(today, -29);
+        const counts = await dayCounts(firstDay, today);
+        const days = Array.from({ length: 30 }, (_, i) => {
+            const day = addDays(firstDay, i);
+            const c = counts.get(day) || { sent: 0, failed: 0 };
+            return { day, sent: c.sent, failed: c.failed };
+        });
+        // Since when there are day counts at all: the chart says so instead of showing zeros as fact
+        const first = await DailyStat.min('day');
+        res.json({ weeks, months, days, countingSince: first || today });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 router.get('/api/stats', async (req, res) => {
     try {
@@ -30,6 +137,7 @@ router.get('/api/stats', async (req, res) => {
         const activeSubsCount = subsCount - archivedSubsCount;
         const activeFilmsCount = filmsCount - releasedFilmsCount;
         res.json({
+            ...(await recentChanges()),
             chatsCount,
             seriesCount,
             subsCount,

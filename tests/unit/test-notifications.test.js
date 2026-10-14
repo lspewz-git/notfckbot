@@ -9,6 +9,8 @@ const { buildTestMessage, TEST_MODES } = require('../../src/cron/messages');
 const { fakeBot, fakeSeries } = require('./fakes');
 
 mock.method(console, 'log', () => {});
+// A chat's settings (quiet hours) come from the database: none here, so none set
+mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
 
 const MARK = '🧪 <b>[Тестовое уведомление]</b>\n\n';
 const parts = { title: 'Test Show', season: 2, episode: 8, episodeName: 'Finale', links: '<links>' };

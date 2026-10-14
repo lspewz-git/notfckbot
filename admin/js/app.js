@@ -3,6 +3,7 @@
 import { $, $field, all, closest, debounce } from './dom.js';
 import { runCheckNow, renderDashboardPlaceholders, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
+import { setSubsChart } from './dashboard-charts.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
 import { fillPagers } from './pager.js';
 import { filterLogs } from './logs.js';
@@ -12,7 +13,14 @@ import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, 
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
-import { openChatActions, openAddContentFor, searchContent, selectContent, submitAddContent } from './chats.js';
+import {
+    openChatActions,
+    openAddContentFor,
+    searchContent,
+    selectContent,
+    submitAddContent,
+    setupChatSettingsForm
+} from './chats.js';
 import {
     openSeriesDetails,
     openFilmDetails,
@@ -131,6 +139,7 @@ const CLICK_ACTIONS = {
     'history-year': (el) => setHistoryYear(Number(el.dataset.year)),
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step)),
     ...settingsActions,
+    'chart-subs': (el) => setSubsChart(el.dataset.by),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
     service: (el) =>
@@ -233,6 +242,7 @@ function init() {
     // Before enhanceSelects(), like setupFilters: the styled dropdowns start on the remembered size
     setupHistory();
     setupSettings();
+    setupChatSettingsForm();
     setupProxyForm();
     enhanceSelects();
     updateAutoRefreshSwitch();

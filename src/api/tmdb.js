@@ -206,7 +206,31 @@ const getSeasonDetails = async (tv_id, season_number) => {
     }
 };
 
+// Seasons for the bot's week and month views: the same lifetime as the details. Not refreshed
+// by the update check, which reads only the details
+const seasonCache = new Map(); // "1399:2" -> { data, at }
+const seasonInFlight = new Map();
+
+/** A season's episodes, from memory when fresh enough; concurrent calls share one request. */
+const getSeasonDetailsCached = (tvId, seasonNumber) => {
+    const key = `${tvId}:${seasonNumber}`;
+    const hit = seasonCache.get(key);
+    if (hit && Date.now() - hit.at < DETAILS_TTL_MS) return Promise.resolve(hit.data);
+    if (seasonInFlight.has(key)) return seasonInFlight.get(key);
+    const request = getSeasonDetails(tvId, seasonNumber)
+        .then((data) => {
+            seasonCache.delete(key);
+            seasonCache.set(key, { data, at: Date.now() });
+            if (seasonCache.size > DETAILS_CACHE_MAX) seasonCache.delete(seasonCache.keys().next().value);
+            return data;
+        })
+        .finally(() => seasonInFlight.delete(key));
+    seasonInFlight.set(key, request);
+    return request;
+};
+
 module.exports = {
+    getSeasonDetailsCached,
     searchMulti,
     digitalReleaseDate,
     getDetails,

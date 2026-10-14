@@ -149,7 +149,27 @@ function stats(subs) {
         subsCount: subs.length,
         activeSubsCount: subs.length - archived,
         archivedSubsCount: archived,
-        filmsCount: 1
+        filmsCount: 1,
+        // The changes on the cards: options.stats overrides any
+        chatsNew30: 2,
+        subsNew30: 5,
+        filmsAdded30: 1,
+        filmsReleased30: 4,
+        sent7: 38,
+        sentPrev7: 50,
+        failed7: 0,
+        failedPrev7: 2
+    };
+}
+
+/** /api/stats/charts: twelve weeks and months of new subscriptions, thirty days of notifications. */
+function charts() {
+    const day = (i) => new Date(Date.UTC(2026, 8, 15 + i)).toISOString().slice(0, 10);
+    return {
+        weeks: Array.from({ length: 12 }, (_, i) => ({ start: day(i * 7 - 77 + 28), count: (i * 7) % 5 })),
+        months: Array.from({ length: 12 }, (_, i) => ({ month: `2026-${String(i + 1).padStart(2, '0')}`, count: i % 4 })),
+        days: Array.from({ length: 30 }, (_, i) => ({ day: day(i), sent: (i * 3) % 7, failed: i === 9 ? 1 : 0 })),
+        countingSince: day(20)
     };
 }
 
@@ -219,7 +239,8 @@ async function mockPanel(page, options = {}) {
     }
 
     const api = {
-        '/api/stats': () => stats(panel.subs),
+        '/api/stats': () => ({ ...stats(panel.subs), ...options.stats }),
+        '/api/stats/charts': () => charts(),
         '/api/health': () => ({ ...panel.health, kinopoiskQuota: { used: 3, limit: 500 } }),
         '/api/health/telegram': () => ({ telegram: panel.health.telegram }),
         '/api/health/tmdb': () => ({ tmdb: panel.health.tmdb }),

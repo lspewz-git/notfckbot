@@ -7,7 +7,7 @@
 const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { PendingMessage } = require('../../src/db');
+const { PendingMessage, Chat } = require('../../src/db');
 const { deliver } = require('../../src/delivery');
 const { notify, flushPending, MAX_ATTEMPTS } = require('../../src/cron/outbox');
 const { notifyNewEpisodes } = require('../../src/cron');
@@ -15,6 +15,8 @@ const { fakeSeries, ep, tmdbSeries } = require('./fakes');
 
 mock.method(console, 'log', () => {});
 mock.method(console, 'error', () => {});
+// A chat's settings (quiet hours) come from the database: none here, so none set
+mock.method(Chat, 'findByPk', async () => null);
 
 /** A Telegram error as Telegraf throws it. */
 const telegramError = (code, description, parameters) =>

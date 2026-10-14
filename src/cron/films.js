@@ -3,7 +3,7 @@ const { Chat, Watchlist } = require('../db');
 const { getDetails } = require('../api/tmdb');
 const { findKinopoiskId } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
-const { buildFilmMessage } = require('./messages');
+const { buildFilmMessage, heldLine } = require('./messages');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
 
@@ -72,7 +72,11 @@ const checkWatchlistReleases = async (bot) => {
                 const msg = buildFilmMessage({ entry, data, links, now });
                 // A message that doesn't go out is queued by notify(), so the film counts as
                 // announced either way
-                await notify(bot, entry.Chat.id, msg, { photo: entry.poster_url, about: entry.title });
+                await notify(bot, entry.Chat.id, msg, {
+                    photo: entry.poster_url,
+                    about: entry.title,
+                    ...heldLine({ kind: 'film', title: entry.title })
+                });
                 await entry.update({ notified: true });
             }
         } catch (err) {

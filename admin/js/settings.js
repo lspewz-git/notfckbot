@@ -119,7 +119,8 @@ function renderRestart(settings) {
             : since.toLocaleDateString([], { day: 'numeric', month: 'short' });
     text.textContent = pending.length
         ? `Waiting for a restart: ${pending.join(' and ')}.`
-        : `Running since ${day}, ${clock(settings.startedAt)}. Nothing waits for a restart.`;
+        : // Short enough for one line on a phone, as tall as the placeholder before it
+          `Running since ${day}, ${clock(settings.startedAt)}.`;
 }
 
 /** The connection check's lines: blank (not checked, or the proxy changed since), or the result. */

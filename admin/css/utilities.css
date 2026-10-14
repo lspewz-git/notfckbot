@@ -214,6 +214,10 @@ select:focus {
     width: 100%;
 }
 
+.mt-sm {
+    margin-top: var(--space-2);
+}
+
 .mt-md {
     margin-top: 1rem;
 }

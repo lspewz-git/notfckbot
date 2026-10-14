@@ -47,7 +47,7 @@ test.afterEach(async ({ page }) => {
 test('the dashboard counts only active subscriptions and notes the archived ones', async ({ page }) => {
     await expect(page.locator('#subs-count')).toHaveText(String(ACTIVE));
     await expect(page.locator('#subs-archived-count')).toBeVisible();
-    await expect(page.locator('#subs-archived-count')).toHaveText(`+${ARCHIVED} archived`);
+    await expect(page.locator('#subs-archived-count')).toHaveText(`${ARCHIVED} archived`);
 });
 
 test('the tabs show counts and split the rows', async ({ page }) => {

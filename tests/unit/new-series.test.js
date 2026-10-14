@@ -10,6 +10,8 @@ const { newSeriesFields } = require('../../src/api/tmdb');
 const { fakeBot, ep, tmdbSeries, kindOf } = require('./fakes');
 
 mock.method(console, 'log', () => {});
+// A chat's settings (quiet hours) come from the database: none here, so none set
+mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
 
 /** A Series row made from `fields`, with subscribers in every mode, as the update check sees it. */
 function trackedRow(fields) {

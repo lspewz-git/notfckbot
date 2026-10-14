@@ -250,3 +250,64 @@ test('the series card says how often the check runs, from the server', async ({ 
     await page.reload();
     await expect(page.locator('#series-interval')).toHaveText('Checked every hour');
 });
+
+test('the cards: each number with its change, green for good news, amber for the rest', async ({ page }) => {
+    await mockPanel(page);
+    await expect(page.locator('#chats-delta')).toHaveText('+2 new in 30 days');
+    await expect(page.locator('#chats-delta')).toHaveClass(/delta-good/);
+    await expect(page.locator('#films-delta')).toHaveText('−3 in 30 days');
+    await expect(page.locator('#films-delta')).toHaveClass(/delta-bad/);
+    await expect(page.locator('#sent-count')).toHaveText('38');
+    await expect(page.locator('#sent-delta')).toHaveText('−12 from the week before');
+    await expect(page.locator('#sent-delta')).toHaveClass(/delta-bad/);
+    // Fewer undelivered is the good direction
+    await expect(page.locator('#failed-delta')).toHaveText('−2 from the week before');
+    await expect(page.locator('#failed-delta')).toHaveClass(/delta-good/);
+    // The amber is the logo's
+    const [amber, accent] = await page.evaluate(() => [
+        getComputedStyle(document.querySelector('#films-delta')).color,
+        getComputedStyle(document.querySelector('.rail-logo')).backgroundColor
+    ]);
+    expect(amber).toBe(accent);
+});
+
+test('nothing changed: said in words, in grey', async ({ page }) => {
+    await mockPanel(page, { stats: { chatsNew30: 0, sent7: 10, sentPrev7: 10 } });
+    await expect(page.locator('#chats-delta')).toHaveText('None new in 30 days');
+    await expect(page.locator('#sent-delta')).toHaveText('Same as the week before');
+    await expect(page.locator('#sent-delta')).toHaveClass(/delta-flat/);
+    // The same small type as a change with an arrow
+    const sizes = await page.evaluate(() =>
+        ['#chats-delta', '#films-delta'].map((s) => getComputedStyle(document.querySelector(s)).fontSize)
+    );
+    expect(sizes[0]).toBe(sizes[1]);
+});
+
+test('six cards fill their rows with no gap: one row wide, three per row narrower, two on a phone', async ({
+    page
+}) => {
+    await mockPanel(page);
+    await expect(page.locator('#sent-count')).toHaveText('38');
+    const rows = await page.locator('.stats-grid .stat-card').evaluateAll((cards) => {
+        const tops = cards.map((c) => Math.round(c.getBoundingClientRect().top));
+        return [...new Set(tops)].map((t) => tops.filter((x) => x === t).length);
+    });
+    const width = (page.viewportSize() || { width: 1280 }).width;
+    expect(rows).toEqual(width < 768 ? [2, 2, 2] : width <= 1380 ? [3, 3] : [6]);
+});
+
+test('the charts draw, and the subscriptions one switches between weeks and months', async ({ page }) => {
+    await mockPanel(page);
+    const chart = (id) =>
+        page.evaluate((cid) => {
+            const c = window.Chart && window.Chart.getChart(document.getElementById(cid));
+            return c ? { labels: c.data.labels.length, sets: c.data.datasets.map((d) => d.label) } : null;
+        }, id);
+    await expect.poll(() => chart('chart-subs')).toEqual({ labels: 12, sets: ['New subscriptions'] });
+    expect(await chart('chart-sent')).toEqual({ labels: 30, sets: ['Sent', 'Not delivered'] });
+    await expect(page.locator('#chart-sent-note')).toHaveText(/^Counting since/);
+
+    await page.locator('[data-action="chart-subs"][data-by="months"]').click();
+    await expect(page.locator('[data-action="chart-subs"][data-by="months"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#chart-subs')).toHaveAttribute('aria-label', 'New subscriptions per month');
+});

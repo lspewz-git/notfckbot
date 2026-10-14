@@ -11,6 +11,9 @@ const { checkSeriesUpdates, notifyNewEpisodes, notifyStatusChange, isSeasonCompl
 const { checkWatchlistReleases, isMovieReleased } = require('./films');
 const { buildSeriesMessages, buildFilmMessage } = require('./messages');
 const { flushPending } = require('./outbox');
+const { releaseHeld } = require('./held');
+const { sendDigests } = require('./digests');
+const stats = require('../stats-log');
 
 const checkUpdates = async (bot) => {
     if (!beginRun()) {
@@ -32,12 +35,23 @@ const checkUpdates = async (bot) => {
         console.error('[Cron] Fatal error during update check:', error);
     } finally {
         endRun(fatal);
+        const { lastRun } = getCronStatus();
+        stats.count('checks');
+        if (fatal || (lastRun && lastRun.errors)) stats.count('check_errors');
+        await stats.flushStats();
         console.log('[Cron] Update check complete.');
     }
 };
 
 const setupCron = (bot) => {
     cron.schedule(`0 */${UPDATE_INTERVAL_HOURS} * * *`, () => checkUpdates(bot));
+    // What quiet hours held goes out soon after they end, whatever hour that is; then the
+    // weekly and monthly digests that are due
+    cron.schedule('*/10 * * * *', async () => {
+        await releaseHeld(bot);
+        await sendDigests(bot);
+        await stats.flushStats();
+    });
     console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS === 1 ? 'hour' : `${UPDATE_INTERVAL_HOURS} hours`}.`);
 };
 

@@ -6,6 +6,7 @@ import { renderTable, renderSkeleton, renderTableMessage } from './tables.js';
 import { updateStats, updateHealth, updatePopular, updateUpcoming, updateCron, updateVersion } from './dashboard.js';
 import { setLogs, renderLogs } from './logs.js';
 import { loadHistory } from './history.js';
+import { updateCharts } from './dashboard-charts.js';
 import { loadSettings } from './settings.js';
 
 // Which /api/data/:type each section needs, if any
@@ -36,6 +37,7 @@ export async function fetchData() {
     const jobs = [];
     if (currentSection === 'dashboard') {
         jobs.push(api('/stats').then(updateStats));
+        jobs.push(api('/stats/charts').then(updateCharts));
         // One request per service: each badge updates as soon as its own service answers
         for (const service of ['telegram', 'tmdb', 'kinopoisk', 'proxy']) {
             jobs.push(api(`/health/${service}`).then(updateHealth));

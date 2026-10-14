@@ -36,17 +36,17 @@ function classify(err) {
     return { kind: 'temporary' };
 }
 
-async function sendOnce(bot, chatId, text, photo) {
+async function sendOnce(bot, chatId, text, photo, extra) {
     if (photo) {
         try {
-            return await bot.telegram.sendPhoto(chatId, photo, { caption: text, parse_mode: 'HTML' });
+            return await bot.telegram.sendPhoto(chatId, photo, { caption: text, parse_mode: 'HTML', ...extra });
         } catch (err) {
             // Only a poster problem falls back to text; a blocked chat or a timeout stays an error
             if (classify(err).kind !== 'rejected') throw err;
             console.error(`[Delivery] Poster refused for chat ${chatId} (${err.message}); sending text`);
         }
     }
-    return bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
+    return bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML', ...extra });
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,15 +64,16 @@ function withTimeout(promise, ms) {
  * @param {object} bot Telegraf instance
  * @param {number | string} chatId
  * @param {string} text HTML
- * @param {{ photo?: string | null, wait?: (ms: number) => Promise<void> }} [options]
+ * @param {{ photo?: string | null, extra?: object, wait?: (ms: number) => Promise<void> }} [options]
+ *   extra: more of Telegram's send options, e.g. a keyboard (Markup.inlineKeyboard(…))
  * @returns {Promise<{ status: 'sent' | 'gone' | 'rejected' | 'failed', error?: string }>}
  *   gone: the chat is unreachable; rejected: Telegram refused the message; failed: Telegram or
  *   the network didn't answer after a few tries, so a later attempt may still work
  */
-async function deliver(bot, chatId, text, { photo = null, wait = sleep } = {}) {
+async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sleep } = {}) {
     for (let attempt = 1; ; attempt += 1) {
         try {
-            await withTimeout(sendOnce(bot, chatId, text, photo), TRY_TIMEOUT_MS);
+            await withTimeout(sendOnce(bot, chatId, text, photo, extra), TRY_TIMEOUT_MS);
             return { status: 'sent' };
         } catch (err) {
             const { kind, retryAfter } = classify(err);

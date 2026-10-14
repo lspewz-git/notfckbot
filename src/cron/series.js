@@ -2,7 +2,7 @@
 const { getDetails, nextEpisodeFields } = require('../api/tmdb');
 const { ensureKinopoiskId } = require('../api/kinopoisk');
 const { isFinishedStatus, formatWatchLinks } = require('../constants');
-const { buildSeriesMessages, buildStatusMessage } = require('./messages');
+const { buildSeriesMessages, buildStatusMessage, heldLine } = require('./messages');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
 const { ensureReleaseSeasons } = require('./release-seasons');
@@ -18,7 +18,10 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
 
     console.log(`[Cron] Status of "${item.title}": ${oldStatus} -> ${newStatus}, notifying subscribers`);
     for (const chat of item.Chats || []) {
-        await notify(bot, chat.id, msg, { about: `${item.title}: ${newStatus}` });
+        await notify(bot, chat.id, msg, {
+            about: `${item.title}: ${newStatus}`,
+            ...heldLine({ kind: 'status', title: item.title, status: newStatus })
+        });
     }
 };
 
@@ -84,17 +87,28 @@ const notifyNewEpisodes = async (bot, item, data) => {
     // announced either way
     for (const chat of item.Chats || []) {
         const mode = chat.Subscription.notify_type;
-        let msg = null;
+        let kind = null;
         if (mode === 'episode') {
-            if (hasNewContent) msg = messages.episode;
+            if (hasNewContent) kind = 'episode';
         } else if (mode === 'season') {
-            if (announceComplete) msg = messages.complete;
+            if (announceComplete) kind = 'complete';
         } else if (mode === 'first_and_full') {
             // A one-episode season is both premiere and finale: one message is enough
-            if (hasNewContent && currentEpisode === 1) msg = messages.premiere;
-            else if (announceComplete) msg = messages.complete;
+            if (hasNewContent && currentEpisode === 1) kind = 'premiere';
+            else if (announceComplete) kind = 'complete';
         }
-        if (msg) await notify(bot, chat.id, msg, { photo: item.poster_url, about: item.title });
+        if (!kind) continue;
+        await notify(bot, chat.id, messages[kind], {
+            photo: item.poster_url,
+            about: item.title,
+            ...heldLine({
+                kind,
+                title: item.title,
+                season: currentSeason,
+                episode: currentEpisode,
+                episodeName: lastE.name
+            })
+        });
     }
 
     await item.update({
