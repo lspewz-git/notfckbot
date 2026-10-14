@@ -7,9 +7,19 @@
     gap: var(--space-3);
 }
 
-/* Cards side by side are as tall as each other */
+/* Each column stacks its cards; the last one stretches, so both columns end on one line */
+.settings-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
 .settings-grid .glass-card {
     margin-bottom: 0;
+}
+
+.settings-col > .glass-card:last-child {
+    flex: 1;
 }
 
 .settings-title {

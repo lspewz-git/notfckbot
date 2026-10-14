@@ -192,19 +192,32 @@ test('a refresh does not close a token field opened for pasting', async ({ page 
     await expect(page.locator('#settings-token-tmdb')).toBeVisible();
 });
 
-test('cards side by side are as tall as each other; Restart sits under its description', async ({ page }) => {
+test('Services and Proxy on the left, the rest on the right; both columns end on one line', async ({ page }) => {
     test.skip((page.viewportSize() || { width: 1280 }).width < 1024, 'one column on a phone');
     await mockPanel(page);
     await openSettings(page);
-    const boxes = await page.locator('.settings-card').evaluateAll((cards) =>
-        cards.map((c) => {
-            const r = c.getBoundingClientRect();
-            return { top: Math.round(r.top), height: Math.round(r.height) };
-        })
-    );
-    for (let i = 0; i + 1 < boxes.length; i += 2) {
-        if (boxes[i].top === boxes[i + 1].top) expect(boxes[i].height).toBe(boxes[i + 1].height);
-    }
+    const columns = async () =>
+        page.locator('.settings-col').evaluateAll((cols) =>
+            cols.map((col) => ({
+                titles: [...col.querySelectorAll('.settings-title')].map((t) => t.firstChild.textContent.trim()),
+                bottom: Math.round(col.lastElementChild.getBoundingClientRect().bottom)
+            }))
+        );
+    const [left, right] = await columns();
+    expect(left.titles).toEqual(['Services', 'Proxy']);
+    expect(right.titles).toEqual(['Update check', 'Database', 'Bot']);
+    expect(left.bottom).toBe(right.bottom);
+    // A proxy turned on makes the left column taller: the right one follows
+    await pick(page, 'settings-proxy-scheme', 'SOCKS5h');
+    await expect(page.locator('#settings-proxy-fields')).toBeVisible();
+    const [left2, right2] = await columns();
+    expect(left2.bottom).toBe(right2.bottom);
+});
+
+test('Restart sits under its description', async ({ page }) => {
+    test.skip((page.viewportSize() || { width: 1280 }).width < 1024, 'one column on a phone');
+    await mockPanel(page);
+    await openSettings(page);
     const [card, button] = await Promise.all([
         page.locator('.settings-card:has(#settings-restart)').boundingBox(),
         page.locator('#settings-restart').boundingBox()

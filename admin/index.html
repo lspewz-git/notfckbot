@@ -467,227 +467,242 @@
                             <button class="btn btn-primary" id="settings-save" data-action="settings-save">Save</button>
                         </div>
                         <div class="settings-grid">
-                            <div class="glass-card settings-card">
-                                <h2 class="settings-title">Services</h2>
-                                <p class="settings-desc">A new token is checked with its service before it's saved.</p>
-                                <div class="settings-row">
-                                    <label class="settings-label" for="settings-token-telegram"
-                                        >Telegram bot token</label
-                                    >
-                                    <div class="settings-field">
-                                        <div class="token-row">
-                                            <code class="token-masked" id="settings-masked-telegram">—</code>
-                                            <input
-                                                type="text"
-                                                id="settings-token-telegram"
-                                                class="input-field mono"
-                                                data-setting="token"
-                                                data-service="telegram"
-                                                autocomplete="off"
-                                                spellcheck="false"
-                                                placeholder="Paste the new value"
-                                                hidden
-                                            />
-                                            <button
-                                                class="btn btn-ghost"
-                                                data-action="settings-replace"
-                                                data-service="telegram"
-                                            >
-                                                Replace
-                                            </button>
+                            <div class="settings-col">
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">Services</h2>
+                                    <p class="settings-desc">
+                                        A new token is checked with its service before it's saved.
+                                    </p>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-token-telegram"
+                                            >Telegram bot token</label
+                                        >
+                                        <div class="settings-field">
+                                            <div class="token-row">
+                                                <code class="token-masked" id="settings-masked-telegram">—</code>
+                                                <input
+                                                    type="text"
+                                                    id="settings-token-telegram"
+                                                    class="input-field mono"
+                                                    data-setting="token"
+                                                    data-service="telegram"
+                                                    autocomplete="off"
+                                                    spellcheck="false"
+                                                    placeholder="Paste the new value"
+                                                    hidden
+                                                />
+                                                <button
+                                                    class="btn btn-ghost"
+                                                    data-action="settings-replace"
+                                                    data-service="telegram"
+                                                >
+                                                    Replace
+                                                </button>
+                                            </div>
+                                            <p class="field-error" id="settings-error-telegram" hidden></p>
                                         </div>
-                                        <p class="field-error" id="settings-error-telegram" hidden></p>
+                                    </div>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-token-tmdb">TMDB key</label>
+                                        <div class="settings-field">
+                                            <div class="token-row">
+                                                <code class="token-masked" id="settings-masked-tmdb">—</code>
+                                                <input
+                                                    type="text"
+                                                    id="settings-token-tmdb"
+                                                    class="input-field mono"
+                                                    data-setting="token"
+                                                    data-service="tmdb"
+                                                    autocomplete="off"
+                                                    spellcheck="false"
+                                                    placeholder="Paste the new value"
+                                                    hidden
+                                                />
+                                                <button
+                                                    class="btn btn-ghost"
+                                                    data-action="settings-replace"
+                                                    data-service="tmdb"
+                                                >
+                                                    Replace
+                                                </button>
+                                            </div>
+                                            <p class="field-error" id="settings-error-tmdb" hidden></p>
+                                        </div>
+                                    </div>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-token-kinopoisk"
+                                            >Kinopoisk key <span class="settings-optional">optional</span></label
+                                        >
+                                        <div class="settings-field">
+                                            <div class="token-row">
+                                                <code class="token-masked" id="settings-masked-kinopoisk">—</code>
+                                                <input
+                                                    type="text"
+                                                    id="settings-token-kinopoisk"
+                                                    class="input-field mono"
+                                                    data-setting="token"
+                                                    data-service="kinopoisk"
+                                                    autocomplete="off"
+                                                    spellcheck="false"
+                                                    placeholder="Paste the new value"
+                                                    hidden
+                                                />
+                                                <button
+                                                    class="btn btn-ghost"
+                                                    data-action="settings-replace"
+                                                    data-service="kinopoisk"
+                                                >
+                                                    Replace
+                                                </button>
+                                            </div>
+                                            <p class="field-error" id="settings-error-kinopoisk" hidden></p>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="settings-row">
-                                    <label class="settings-label" for="settings-token-tmdb">TMDB key</label>
-                                    <div class="settings-field">
-                                        <div class="token-row">
-                                            <code class="token-masked" id="settings-masked-tmdb">—</code>
-                                            <input
-                                                type="text"
-                                                id="settings-token-tmdb"
-                                                class="input-field mono"
-                                                data-setting="token"
-                                                data-service="tmdb"
-                                                autocomplete="off"
-                                                spellcheck="false"
-                                                placeholder="Paste the new value"
-                                                hidden
-                                            />
-                                            <button
-                                                class="btn btn-ghost"
-                                                data-action="settings-replace"
-                                                data-service="tmdb"
+
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">Proxy</h2>
+                                    <p class="settings-desc">For TMDB and Telegram. Applies at once, no restart.</p>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-proxy-scheme">Mode</label>
+                                        <div class="settings-field settings-pair">
+                                            <select
+                                                id="settings-proxy-scheme"
+                                                class="select-field"
+                                                data-setting="proxy"
                                             >
-                                                Replace
+                                                <option value="">Off — connect directly</option>
+                                                <option value="http">HTTP</option>
+                                                <option value="https">HTTPS</option>
+                                                <option value="socks5">SOCKS5</option>
+                                                <option value="socks5h">SOCKS5h — resolve DNS on the proxy</option>
+                                            </select>
+                                            <button class="btn btn-ghost" data-action="settings-proxy-test">
+                                                Test
                                             </button>
                                         </div>
-                                        <p class="field-error" id="settings-error-tmdb" hidden></p>
                                     </div>
-                                </div>
-                                <div class="settings-row">
-                                    <label class="settings-label" for="settings-token-kinopoisk"
-                                        >Kinopoisk key <span class="settings-optional">optional</span></label
-                                    >
-                                    <div class="settings-field">
-                                        <div class="token-row">
-                                            <code class="token-masked" id="settings-masked-kinopoisk">—</code>
-                                            <input
-                                                type="text"
-                                                id="settings-token-kinopoisk"
-                                                class="input-field mono"
-                                                data-setting="token"
-                                                data-service="kinopoisk"
-                                                autocomplete="off"
-                                                spellcheck="false"
-                                                placeholder="Paste the new value"
-                                                hidden
-                                            />
-                                            <button
-                                                class="btn btn-ghost"
-                                                data-action="settings-replace"
-                                                data-service="kinopoisk"
+                                    <!-- Hidden until the saved settings say a proxy is on: shown first, they jumped away on load -->
+                                    <div id="settings-proxy-fields" hidden>
+                                        <div class="settings-row">
+                                            <label class="settings-label" for="settings-proxy-host"
+                                                >Host and port</label
                                             >
-                                                Replace
-                                            </button>
+                                            <div class="settings-field settings-pair">
+                                                <input
+                                                    type="text"
+                                                    id="settings-proxy-host"
+                                                    class="input-field"
+                                                    data-setting="proxy"
+                                                    placeholder="10.0.0.5"
+                                                    autocomplete="off"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    id="settings-proxy-port"
+                                                    class="input-field settings-port"
+                                                    data-setting="proxy"
+                                                    placeholder="1080"
+                                                    min="1"
+                                                    max="65535"
+                                                    aria-label="Port"
+                                                />
+                                            </div>
                                         </div>
-                                        <p class="field-error" id="settings-error-kinopoisk" hidden></p>
+                                        <div class="settings-row">
+                                            <label class="settings-label" for="settings-proxy-user">Login</label>
+                                            <div class="settings-field settings-pair">
+                                                <input
+                                                    type="text"
+                                                    id="settings-proxy-user"
+                                                    class="input-field"
+                                                    data-setting="proxy"
+                                                    placeholder="Username (optional)"
+                                                    autocomplete="off"
+                                                />
+                                                <input
+                                                    type="password"
+                                                    id="settings-proxy-pass"
+                                                    class="input-field"
+                                                    data-setting="proxy"
+                                                    placeholder="Password"
+                                                    autocomplete="new-password"
+                                                    aria-label="Password"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="field-error" id="settings-error-proxy" hidden></p>
+                                    <!-- Filled by Test (settings.js): what the bot reaches with these settings -->
+                                    <div class="settings-checks" id="settings-proxy-checks" aria-live="polite">
+                                        <div class="settings-checks-head">
+                                            <span>Connection check</span>
+                                            <span id="settings-checks-when">Press Test to check</span>
+                                        </div>
+                                        <dl>
+                                            <dt>Telegram</dt>
+                                            <dd data-check="telegram">—</dd>
+                                            <dt>TMDB</dt>
+                                            <dd data-check="tmdb">—</dd>
+                                            <dt>Internet</dt>
+                                            <dd data-check="internet">—</dd>
+                                        </dl>
                                     </div>
                                 </div>
                             </div>
+                            <div class="settings-col">
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">Update check</h2>
+                                    <p class="settings-desc">
+                                        How often the bot asks TMDB for new episodes and releases.
+                                    </p>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-interval">Every</label>
+                                        <div class="settings-field">
+                                            <select
+                                                id="settings-interval"
+                                                class="select-field settings-interval"
+                                                data-setting="interval"
+                                            ></select>
+                                            <p class="field-hint">Applies after a restart</p>
+                                            <p class="field-error" id="settings-error-interval" hidden></p>
+                                        </div>
+                                    </div>
+                                </div>
 
-                            <div class="glass-card settings-card">
-                                <h2 class="settings-title">Proxy</h2>
-                                <p class="settings-desc">For TMDB and Telegram. Applies at once, no restart.</p>
-                                <div class="settings-row">
-                                    <label class="settings-label" for="settings-proxy-scheme">Mode</label>
-                                    <div class="settings-field settings-pair">
-                                        <select id="settings-proxy-scheme" class="select-field" data-setting="proxy">
-                                            <option value="">Off — connect directly</option>
-                                            <option value="http">HTTP</option>
-                                            <option value="https">HTTPS</option>
-                                            <option value="socks5">SOCKS5</option>
-                                            <option value="socks5h">SOCKS5h — resolve DNS on the proxy</option>
-                                        </select>
-                                        <button class="btn btn-ghost" data-action="settings-proxy-test">Test</button>
-                                    </div>
-                                </div>
-                                <!-- Hidden until the saved settings say a proxy is on: shown first, they jumped away on load -->
-                                <div id="settings-proxy-fields" hidden>
-                                    <div class="settings-row">
-                                        <label class="settings-label" for="settings-proxy-host">Host and port</label>
-                                        <div class="settings-field settings-pair">
-                                            <input
-                                                type="text"
-                                                id="settings-proxy-host"
-                                                class="input-field"
-                                                data-setting="proxy"
-                                                placeholder="10.0.0.5"
-                                                autocomplete="off"
-                                            />
-                                            <input
-                                                type="number"
-                                                id="settings-proxy-port"
-                                                class="input-field settings-port"
-                                                data-setting="proxy"
-                                                placeholder="1080"
-                                                min="1"
-                                                max="65535"
-                                                aria-label="Port"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div class="settings-row">
-                                        <label class="settings-label" for="settings-proxy-user">Login</label>
-                                        <div class="settings-field settings-pair">
-                                            <input
-                                                type="text"
-                                                id="settings-proxy-user"
-                                                class="input-field"
-                                                data-setting="proxy"
-                                                placeholder="Username (optional)"
-                                                autocomplete="off"
-                                            />
-                                            <input
-                                                type="password"
-                                                id="settings-proxy-pass"
-                                                class="input-field"
-                                                data-setting="proxy"
-                                                placeholder="Password"
-                                                autocomplete="new-password"
-                                                aria-label="Password"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <p class="field-error" id="settings-error-proxy" hidden></p>
-                                <!-- Filled by Test (settings.js): what the bot reaches with these settings -->
-                                <div class="settings-checks" id="settings-proxy-checks" aria-live="polite">
-                                    <div class="settings-checks-head">
-                                        <span>Connection check</span>
-                                        <span id="settings-checks-when">Press Test to check</span>
-                                    </div>
-                                    <dl>
-                                        <dt>Telegram</dt>
-                                        <dd data-check="telegram">—</dd>
-                                        <dt>TMDB</dt>
-                                        <dd data-check="tmdb">—</dd>
-                                        <dt>Internet</dt>
-                                        <dd data-check="internet">—</dd>
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">
+                                        Database <span class="settings-optional">read only</span>
+                                    </h2>
+                                    <p class="settings-desc">
+                                        Changing these here wouldn't change the database itself: the bot would lose its
+                                        connection.
+                                    </p>
+                                    <dl class="kv-list">
+                                        <dt>Host</dt>
+                                        <dd id="settings-db-host" class="mono">—</dd>
+                                        <dt>Database</dt>
+                                        <dd id="settings-db-name" class="mono">—</dd>
+                                        <dt>User</dt>
+                                        <dd id="settings-db-user" class="mono">—</dd>
+                                        <dt>Password</dt>
+                                        <dd class="mono">••••••</dd>
                                     </dl>
                                 </div>
-                            </div>
 
-                            <div class="glass-card settings-card">
-                                <h2 class="settings-title">Update check</h2>
-                                <p class="settings-desc">How often the bot asks TMDB for new episodes and releases.</p>
-                                <div class="settings-row">
-                                    <label class="settings-label" for="settings-interval">Every</label>
-                                    <div class="settings-field">
-                                        <select
-                                            id="settings-interval"
-                                            class="select-field settings-interval"
-                                            data-setting="interval"
-                                        ></select>
-                                        <p class="field-hint">Applies after a restart</p>
-                                        <p class="field-error" id="settings-error-interval" hidden></p>
-                                    </div>
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">Bot</h2>
+                                    <p class="settings-desc">
+                                        Restart stops the bot and starts it again with the saved .env: that is what
+                                        applies a new update interval or Telegram token. It's back in about 5 seconds;
+                                        nothing is lost. Not in the 5 minutes before an update check, nor in the first 6
+                                        after it starts.
+                                    </p>
+                                    <div class="settings-status" id="settings-restart-text">&nbsp;</div>
+                                    <button class="btn btn-ghost" id="settings-restart" data-action="settings-restart">
+                                        Restart bot
+                                    </button>
                                 </div>
-                            </div>
-
-                            <div class="glass-card settings-card">
-                                <h2 class="settings-title">Bot</h2>
-                                <p class="settings-desc">
-                                    Restart stops the bot and starts it again with the saved .env: that is what applies
-                                    a new update interval or Telegram token. It's back in about 5 seconds; nothing is
-                                    lost. Not in the 5 minutes before an update check, nor in the first 6 after it
-                                    starts.
-                                </p>
-                                <div class="settings-status" id="settings-restart-text">&nbsp;</div>
-                                <button class="btn btn-ghost" id="settings-restart" data-action="settings-restart">
-                                    Restart bot
-                                </button>
-                            </div>
-
-                            <div class="glass-card settings-card">
-                                <h2 class="settings-title">
-                                    Database <span class="settings-optional">read only</span>
-                                </h2>
-                                <p class="settings-desc">
-                                    Changing these here wouldn't change the database itself: the bot would lose its
-                                    connection.
-                                </p>
-                                <dl class="kv-list">
-                                    <dt>Host</dt>
-                                    <dd id="settings-db-host" class="mono">—</dd>
-                                    <dt>Database</dt>
-                                    <dd id="settings-db-name" class="mono">—</dd>
-                                    <dt>User</dt>
-                                    <dd id="settings-db-user" class="mono">—</dd>
-                                    <dt>Password</dt>
-                                    <dd class="mono">••••••</dd>
-                                </dl>
                             </div>
                         </div>
                     </section>
