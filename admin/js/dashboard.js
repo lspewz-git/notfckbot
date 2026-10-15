@@ -1,6 +1,6 @@
 /** The dashboard: counters, service statuses and the error banner, upcoming releases, popularity, the update check. */
 
-import { $, setText, updateBadge, escapeHtml } from './dom.js';
+import { $, all, setText, updateBadge, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { toast } from './ui.js';
 import { isUnchanged } from './render.js';
@@ -188,37 +188,40 @@ let upcoming = null;
 // As many as Popular now lists, so the two panels side by side match
 const UPCOMING_SHOWN = 5;
 
-// One builder per list for both the real rows and their placeholders, so a placeholder
-// always has the real row's structure (and therefore its height on every screen size)
-const bar = (width, sub = false) =>
-    `<span class="skeleton${sub ? ' skeleton-sub' : ''}" style="width:${width}"></span>`;
-const PLACEHOLDER_WIDTHS = ['62%', '48%', '70%', '55%', '40%'];
-
-/** @param {{ attrs?: string, placeholder?: boolean, date: string, icon?: string, title: string, meta: string, when: string }} r */
+// The placeholder rows are in index.html (they show with the first paint): a row here keeps their
+// structure, and tests/dashboard.spec.js checks the two match in shape and height
+/** @param {{ attrs: string, date: string, icon?: string, title: string, meta: string, when: string }} r */
 const upcomingRow = (r) => `
-        <div class="upcoming-row${r.placeholder ? ' skeleton-item' : ''}" ${r.placeholder ? 'aria-hidden="true"' : r.attrs}>
+        <div class="upcoming-row" ${r.attrs}>
             <div class="up-date">${r.date}</div>
             <span class="up-icon">${r.icon || ''}</span>
             <div class="up-body"><div class="up-title">${r.title}</div><div class="up-meta">${r.meta}</div></div>
             <span class="up-when">${r.when}</span>
         </div>`;
 
-/** @param {{ attrs?: string, placeholder?: boolean, rank: string, title: string, count: string }} r */
+/** @param {{ attrs: string, rank: string, title: string, count: string }} r */
 const popularRow = (r) => `
-        <div class="popular-item${r.placeholder ? ' skeleton-item' : ''}" ${r.placeholder ? 'aria-hidden="true"' : r.attrs}>
+        <div class="popular-item" ${r.attrs}>
             <span class="pop-rank">${r.rank}</span>
             <span class="pop-title">${r.title}</span>
             <span class="pop-count">${r.count}</span>
         </div>`;
 
-/** Five placeholder rows in each list, so the cards have their final size before the data. */
-export function renderDashboardPlaceholders() {
-    $('upcoming-list').innerHTML = PLACEHOLDER_WIDTHS.map((w) =>
-        upcomingRow({ placeholder: true, date: bar('52px'), title: bar(w), meta: bar('30%', true), when: bar('56px') })
-    ).join('');
-    $('popular-list').innerHTML = PLACEHOLDER_WIDTHS.map((w) =>
-        popularRow({ placeholder: true, rank: '', title: bar(w), count: '' })
-    ).join('');
+// A request that fails before its first answer: the page's placeholders give way to a dead end
+// rather than shimmering on for ever (as the tables do); the next refresh fills them in
+const FAILED_NOTE = '<p class="empty-note">Failed to load. Retrying on the next refresh.</p>';
+
+/** /api/stats failed: a dash where a number has never come. */
+export function statsFailed() {
+    all('.stat-value .skeleton').forEach((el) => el.replaceWith('-'));
+}
+
+/** /api/upcoming or /api/stats/popular failed: a note where the list has never come. */
+export function listFailed(id) {
+    const container = $(id);
+    if (!container || !container.querySelector('.skeleton-item')) return;
+    container.innerHTML = FAILED_NOTE;
+    container.removeAttribute('aria-busy');
 }
 
 function renderUpcoming() {

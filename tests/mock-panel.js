@@ -167,7 +167,10 @@ function charts() {
     const day = (i) => new Date(Date.UTC(2026, 8, 15 + i)).toISOString().slice(0, 10);
     return {
         weeks: Array.from({ length: 12 }, (_, i) => ({ start: day(i * 7 - 77 + 28), count: (i * 7) % 5 })),
-        months: Array.from({ length: 12 }, (_, i) => ({ month: `2026-${String(i + 1).padStart(2, '0')}`, count: i % 4 })),
+        months: Array.from({ length: 12 }, (_, i) => ({
+            month: `2026-${String(i + 1).padStart(2, '0')}`,
+            count: i % 4
+        })),
         days: Array.from({ length: 30 }, (_, i) => ({ day: day(i), sent: (i * 3) % 7, failed: i === 9 ? 1 : 0 })),
         countingSince: day(20)
     };
@@ -179,13 +182,17 @@ function charts() {
  *
  * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
- *   addHold?: Promise<void>, addError?: string }} [options]
+ *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
+ *   failing?: string[] }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
  *   `addError`: adding a film fails with this message (409);
  *   `history(year)`: the /api/history answer for the year asked (0 when none);
- *   `hold`: API answers wait for it, so a test can see the loading state
+ *   `hold`: API answers wait for it, so a test can see the loading state;
+ *   `failing`: API paths ('/api/stats') that answer 500;
+ *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
+ *   served once it resolves (a page.route() of the test's would lose to this one's catch-all)
  */
 async function mockPanel(page, options = {}) {
     const panel = {
@@ -458,6 +465,8 @@ async function mockPanel(page, options = {}) {
             if (!marked && !url.pathname.startsWith('/api/poster/'))
                 return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
             if (options.hold) await options.hold;
+            if (options.failing && options.failing.includes(url.pathname))
+                return route.fulfill({ status: 500, json: { error: 'Test failure' } });
             const answer = await handler(route.request());
             // A handler may pick the status: { status, body }
             if (answer && answer.status && answer.body)
@@ -466,6 +475,9 @@ async function mockPanel(page, options = {}) {
         }
 
         const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1));
+        const asked = options.files && options.files[rel];
+        if (asked === 'missing') return route.abort();
+        if (asked) await asked;
         const file = path.join(ADMIN_DIR, rel);
         if (!file.startsWith(ADMIN_DIR) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: '' });
 

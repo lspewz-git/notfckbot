@@ -162,20 +162,113 @@ test('the dashboard cards keep their height when the data replaces the placehold
 test('the dashboard cards have their final height before the scripts run, and with nothing to list', async ({
     page
 }) => {
-    // The first paint can come before the deferred app module: the lists are still empty then
-    await page.route('**/js/app.js', (r) => r.abort());
-    await mockPanel(page);
+    // The first paint can come before the app module: only the page's own placeholders then.
+    // Not awaited: the page's load waits for the held module
+    let release;
+    const scripts = new Promise((r) => (release = r));
+    const opened = mockPanel(page, { ...fullLists(), files: { 'js/app.js': scripts } });
+    await expect(page.locator('#upcoming-list .skeleton-item')).toHaveCount(5);
     const beforeScripts = await listHeights(page);
-    page.__errors.length = 0; // the aborted module is reported as a console error
 
-    await page.unroute('**/js/app.js');
-    await mockPanel(page, fullLists());
+    release();
+    await opened;
     const loaded = await loadedHeights(page);
     expectSame(beforeScripts, loaded);
 
     await mockPanel(page, { upcoming: [], popular: [] });
     await expect(page.locator('#upcoming-list .empty-note')).toBeVisible();
     expectSame(await listHeights(page), loaded);
+});
+
+test('the placeholders are in the page itself: they show before any script has run', async ({ page }) => {
+    // The panel's script and Chart.js held back: what the first paint shows. Not awaited: the
+    // page's load waits for them
+    let release;
+    const scripts = new Promise((r) => (release = r));
+    const opened = mockPanel(page, { files: { 'js/app.js': scripts, 'vendor/chart.umd.js': scripts } });
+    await expect(page.locator('.stat-value .skeleton')).toHaveCount(6);
+    await expect(page.locator('#upcoming-list .skeleton-item')).toHaveCount(5);
+    await expect(page.locator('#popular-list .skeleton-item')).toHaveCount(5);
+    await expect(page.locator('.chart-box .chart-skeleton')).toHaveCount(2);
+    for (const el of await page.locator('.stat-value .skeleton, .chart-skeleton').all()) await expect(el).toBeVisible();
+    const cards = await page.locator('.stat-card').evaluateAll((els) => els.map((e) => e.offsetHeight));
+
+    release();
+    await opened;
+    await expect(page.locator('.stat-value .skeleton')).toHaveCount(0);
+    // A number in place of its bar: the cards keep their height
+    expect(await page.locator('.stat-card').evaluateAll((els) => els.map((e) => e.offsetHeight))).toEqual(cards);
+    await expect(page.locator('.chart-skeleton')).toHaveCount(0);
+});
+
+test("the page's placeholder rows have the shape of the rows that replace them", async ({ page }) => {
+    // The row's parts and the body's lines (what sets the height), not the text that fills them
+    const shape = (selector) =>
+        page
+            .locator(selector)
+            .first()
+            .evaluate((row) => {
+                const walk = (el) =>
+                    [...el.children]
+                        .filter((c) => !c.classList.contains('skeleton') && c.tagName !== 'svg')
+                        .map(
+                            (c) => `${c.tagName}.${[...c.classList].join('.')}(${c.matches('.up-body') ? walk(c) : ''})`
+                        )
+                        .join(',');
+                return `${row.tagName}.${[...row.classList].filter((c) => c !== 'skeleton-item').join('.')}(${walk(row)})`;
+            });
+    let release;
+    const hold = new Promise((r) => (release = r));
+    await mockPanel(page, { ...fullLists(), hold });
+    const placeholders = [await shape('#upcoming-list .skeleton-item'), await shape('#popular-list .skeleton-item')];
+    release();
+    await loadedHeights(page);
+    expect([await shape('#upcoming-list .upcoming-row'), await shape('#popular-list .popular-item')]).toEqual(
+        placeholders
+    );
+});
+
+test('Chart.js coming after the data: the charts draw when it does; not coming at all: no bars left', async ({
+    page
+}) => {
+    let release;
+    const late = new Promise((r) => (release = r));
+    // Not awaited: the page's load event waits for Chart.js too
+    const opened = mockPanel(page, { files: { 'vendor/chart.umd.js': late } });
+    await expect(page.locator('#sent-count')).toHaveText(/\d/);
+    await expect(page.locator('.chart-skeleton')).toHaveCount(2);
+    release();
+    await opened;
+    await expect
+        .poll(() =>
+            page.evaluate(() => Boolean(window.Chart && window.Chart.getChart(document.getElementById('chart-sent'))))
+        )
+        .toBe(true);
+    await expect(page.locator('.chart-skeleton')).toHaveCount(0);
+
+    await mockPanel(page, { files: { 'vendor/chart.umd.js': 'missing' } });
+    await expect(page.locator('.chart-skeleton')).toHaveCount(0);
+    page.__errors.length = 0;
+});
+
+test('a dashboard request failing on the first load: a dash, no chart bars, a note; no shimmer left', async ({
+    page
+}) => {
+    const failing = ['/api/stats', '/api/stats/charts', '/api/upcoming', '/api/stats/popular'];
+    const options = { failing };
+    await mockPanel(page, options);
+    await expect(page.locator('#sent-count')).toHaveText('-');
+    await expect(page.locator('.chart-skeleton')).toHaveCount(0);
+    await expect(page.locator('#upcoming-list .empty-note')).toHaveText(/Failed to load/);
+    await expect(page.locator('#popular-list .empty-note')).toHaveText(/Failed to load/);
+    await expect(page.locator('.skeleton')).toHaveCount(0);
+    page.__errors.length = 0; // the failed requests are logged
+
+    // The next refresh fills them in
+    failing.length = 0;
+    await page.locator('#refresh-btn').click();
+    await expect(page.locator('#sent-count')).toHaveText(/\d/);
+    await expect(page.locator('#popular-list .popular-item')).not.toHaveCount(0);
 });
 
 test('the deployed commit is shown in the footer, linked to GitHub', async ({ page }) => {

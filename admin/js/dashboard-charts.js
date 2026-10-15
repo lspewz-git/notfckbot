@@ -1,7 +1,9 @@
 /**
- * The dashboard's two charts, drawn by Chart.js (admin/vendor/chart.umd.js, loaded before the
- * modules as the global `Chart`): new subscriptions by week or month, and notifications by day.
- * Colours come from the design tokens, so the charts follow the panel's theme.
+ * The dashboard's two charts, drawn by Chart.js (admin/vendor/chart.umd.js, the global `Chart`,
+ * loaded `async` so the panel's own scripts don't wait for it): new subscriptions by week or
+ * month, and notifications by day. Until a chart is drawn, the page's own placeholder bars
+ * (.chart-skeleton in index.html) stand in its place. Colours come from the design tokens, so the
+ * charts follow the panel's theme.
  */
 
 import { $, all } from './dom.js';
@@ -56,6 +58,7 @@ function draw(id, chartData, stacked) {
         return;
     }
     charts[id] = new (ChartJs())($(id), { type: 'bar', data: chartData, options: options(stacked) });
+    $(id).parentElement.querySelector('.chart-skeleton')?.remove();
 }
 
 function renderSubs() {
@@ -108,13 +111,29 @@ function renderSent() {
     $('chart-sent-note').textContent = since > data.days[0].day ? `Counting since ${dayLabel(since)}` : 'Last 30 days';
 }
 
-/** New data from /api/stats/charts; nothing to do without Chart.js (its file didn't load). */
-export function updateCharts(next) {
-    if (!ChartJs() || isUnchanged('charts', next)) return;
-    data = next;
+function renderAll() {
     renderSubs();
     renderSent();
 }
+
+/** New data from /api/stats/charts; drawn once Chart.js is there (it may come after the data). */
+export function updateCharts(next) {
+    if (isUnchanged('charts', next)) return;
+    data = next;
+    if (ChartJs()) renderAll();
+}
+
+/** /api/stats/charts failed: no placeholder bars for a chart that has never come. */
+export function chartsFailed() {
+    if (!data) all('.chart-skeleton').forEach((el) => el.remove());
+}
+
+// Chart.js arriving after the data: draw then. Its file not loading at all: no placeholders left
+// standing for charts that will never come (the page's load waits for every script, failed or not)
+document.getElementById('chartjs')?.addEventListener('load', () => data && renderAll());
+window.addEventListener('load', () => {
+    if (!ChartJs()) all('.chart-skeleton').forEach((el) => el.remove());
+});
 
 /** The Weeks / Months buttons. */
 export function setSubsChart(by) {

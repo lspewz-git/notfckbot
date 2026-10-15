@@ -3,10 +3,19 @@
 import { api } from './api.js';
 import { toast } from './ui.js';
 import { renderTable, renderSkeleton, renderTableMessage } from './tables.js';
-import { updateStats, updateHealth, updatePopular, updateUpcoming, updateCron, updateVersion } from './dashboard.js';
+import {
+    updateStats,
+    updateHealth,
+    updatePopular,
+    updateUpcoming,
+    updateCron,
+    updateVersion,
+    statsFailed,
+    listFailed
+} from './dashboard.js';
 import { setLogs, renderLogs } from './logs.js';
 import { loadHistory } from './history.js';
-import { updateCharts } from './dashboard-charts.js';
+import { updateCharts, chartsFailed } from './dashboard-charts.js';
 import { loadSettings } from './settings.js';
 
 // Which /api/data/:type each section needs, if any
@@ -19,6 +28,12 @@ const SECTION_TABLES = {
 let currentSection = 'dashboard';
 export const setSection = (id) => {
     currentSection = id;
+};
+
+/** A failed request's fallback, then the error on as before (logged below). */
+const orElse = (fallback) => (err) => {
+    fallback();
+    throw err;
 };
 
 // Tables that have received a response at least once
@@ -36,14 +51,24 @@ export async function fetchData() {
 
     const jobs = [];
     if (currentSection === 'dashboard') {
-        jobs.push(api('/stats').then(updateStats));
-        jobs.push(api('/stats/charts').then(updateCharts));
+        jobs.push(api('/stats').then(updateStats, orElse(statsFailed)));
+        jobs.push(api('/stats/charts').then(updateCharts, orElse(chartsFailed)));
         // One request per service: each badge updates as soon as its own service answers
         for (const service of ['telegram', 'tmdb', 'kinopoisk', 'proxy']) {
             jobs.push(api(`/health/${service}`).then(updateHealth));
         }
-        jobs.push(api('/stats/popular').then(updatePopular));
-        jobs.push(api('/upcoming').then(updateUpcoming));
+        jobs.push(
+            api('/stats/popular').then(
+                updatePopular,
+                orElse(() => listFailed('popular-list'))
+            )
+        );
+        jobs.push(
+            api('/upcoming').then(
+                updateUpcoming,
+                orElse(() => listFailed('upcoming-list'))
+            )
+        );
         jobs.push(api('/cron').then(updateCron));
         jobs.push(api('/version').then(updateVersion));
     }

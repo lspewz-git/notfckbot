@@ -607,6 +607,32 @@
     padding-block: calc((1lh - 0.7rem) / 2);
 }
 
+/* A card's number still loading: a bar in the number's own line box, as in the rows above */
+.stat-value .skeleton {
+    width: 3.5rem;
+    height: 1lh;
+    padding-block: calc((1lh - 1.1rem) / 2);
+    background-clip: content-box;
+}
+
+/* A chart still loading: bars where the drawn chart puts its own (past the y labels, above the
+   x labels); dashboard-charts.js removes them when Chart.js draws */
+.chart-skeleton {
+    position: absolute;
+    inset: var(--space-2) 0 1.75rem 2rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: clamp(2px, 1%, 10px);
+    pointer-events: none;
+}
+
+.chart-skeleton .skeleton {
+    flex: 1;
+    max-width: 28px;
+    border-radius: 3px 3px 0 0;
+}
+
 /* --- Update check strip --- */
 .update-strip {
     display: flex;
@@ -741,6 +767,12 @@
 
     .dash-header h1 {
         font-size: 1.75rem;
+    }
+
+    /* Two cards a row: a card's change line ("+3 from the week before") takes two lines here,
+       so the room is there before the data too and the cards don't grow when it comes */
+    .stat-delta {
+        min-height: 2lh;
     }
 
     .stats-grid {

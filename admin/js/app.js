@@ -1,7 +1,7 @@
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
 import { $, $field, all, closest, debounce } from './dom.js';
-import { runCheckNow, renderDashboardPlaceholders, openFailingService } from './dashboard.js';
+import { runCheckNow, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setSubsChart } from './dashboard-charts.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
@@ -235,7 +235,6 @@ function setupControls() {
 function init() {
     // First: the selects inside are what setupFilters, setupHistory and enhanceSelects work on
     fillPagers();
-    renderDashboardPlaceholders();
     setupControls();
     setupDelegation();
     setupFilters();
