@@ -6,9 +6,12 @@
 const { getCronStatus } = require('../cron/status');
 const { flushStats } = require('../stats-log');
 
-// No restart this close before a scheduled check, or this soon after one started
+// No restart this close before a scheduled check. After it: not until that check has finished
+// (and a moment more), or, if it never ran (node-cron late, or skipped), until AFTER_MS past
+// its time. The check takes seconds, so the bot can usually restart a minute after hh:00.
 const BEFORE_MS = 5 * 60 * 1000;
 const AFTER_MS = 6 * 60 * 1000;
+const SETTLE_MS = 30 * 1000;
 
 /**
  * @returns {{ reason: 'running' | 'due' | 'started', checkAt: string, until: string } | null}
@@ -24,7 +27,16 @@ function restartBlock(now = new Date(), status = getCronStatus()) {
         return { reason: 'running', checkAt: iso(started), until: iso(t + 60 * 1000) };
     }
     if (next - t < BEFORE_MS) return { reason: 'due', checkAt: iso(next), until: iso(next + AFTER_MS) };
-    if (t - previous < AFTER_MS) return { reason: 'started', checkAt: iso(previous), until: iso(previous + AFTER_MS) };
+    if (t - previous < AFTER_MS) {
+        const run = status.lastRun;
+        // The run that finished is this check's, not an earlier one (a manual run just before)
+        const done =
+            run && run.finishedAt && new Date(run.startedAt).getTime() >= previous - 1000
+                ? new Date(run.finishedAt).getTime()
+                : null;
+        if (done === null) return { reason: 'started', checkAt: iso(previous), until: iso(previous + AFTER_MS) };
+        if (t < done + SETTLE_MS) return { reason: 'started', checkAt: iso(previous), until: iso(done + SETTLE_MS) };
+    }
     return null;
 }
 

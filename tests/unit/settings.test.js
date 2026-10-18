@@ -71,11 +71,33 @@ describe('restartBlock', () => {
         assert.equal(blocked.until, '2026-10-14T21:06:00.000Z');
     });
 
-    test('just after a check started (the schedule already points at the next one): refused', () => {
+    test('the check due at 18:00 never ran (node-cron late or skipped): refused until 18:06', () => {
         const blocked = restartBlock(at('2026-10-14T18:03:00Z'), status('2026-10-14T21:00:00Z'));
         assert.equal(blocked.reason, 'started');
         assert.equal(blocked.checkAt, '2026-10-14T18:00:00.000Z');
+        assert.equal(blocked.until, '2026-10-14T18:06:00.000Z');
         assert.equal(restartBlock(at('2026-10-14T18:07:00Z'), status('2026-10-14T21:00:00Z')), null);
+    });
+
+    // The 18:00 check, finished in 16 s
+    const ran = { lastRun: { startedAt: '2026-10-14T18:00:00.032Z', finishedAt: '2026-10-14T18:00:16.019Z' } };
+
+    test('the check has finished: refused only for 30 s more, then fine long before 18:06', () => {
+        const settling = restartBlock(at('2026-10-14T18:00:30Z'), status('2026-10-14T21:00:00Z', ran));
+        assert.equal(settling.reason, 'started');
+        assert.equal(settling.until, '2026-10-14T18:00:46.019Z');
+        assert.equal(restartBlock(at('2026-10-14T18:00:47Z'), status('2026-10-14T21:00:00Z', ran)), null);
+    });
+
+    test("an earlier run (a manual one at 17:58) doesn't count as the 18:00 check", () => {
+        const manual = { lastRun: { startedAt: '2026-10-14T17:58:00Z', finishedAt: '2026-10-14T17:58:15Z' } };
+        const blocked = restartBlock(at('2026-10-14T18:02:00Z'), status('2026-10-14T21:00:00Z', manual));
+        assert.equal(blocked.until, '2026-10-14T18:06:00.000Z');
+    });
+
+    test('before the check nothing changes: refused, whatever the last run was', () => {
+        const blocked = restartBlock(at('2026-10-14T20:57:00Z'), status('2026-10-14T21:00:00Z', ran));
+        assert.equal(blocked.reason, 'due');
     });
 
     test('a check still running: refused whatever the clock says', () => {

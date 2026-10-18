@@ -1,10 +1,9 @@
 /** Series and film cards, their posters, and TMDB search. */
-const axios = require('axios');
 const { Chat, Series, Subscription, Watchlist } = require('../../db');
-const { getProxyAgent } = require('../../proxy');
 const tmdb = require('../../api/tmdb');
 const { findKinopoiskIdQuick } = require('../../api/kinopoisk');
 const { getWatchLinks } = require('../../constants');
+const { servePoster } = require('../posters');
 
 // What the card shows of a chat: enough for its name and avatar
 const CHAT_FIELDS = ['id', 'username', 'type'];
@@ -104,30 +103,8 @@ router.get('/api/kinopoisk/:type/:id', async (req, res) => {
 });
 
 // TMDB posters through this server: image.tmdb.org is blocked on some networks the
-// panel is opened from, while the server can reach it. Fixed host, strict path.
-const POSTER_SIZES = new Set(['w92', 'w185', 'w342', 'w500']);
-router.get('/api/poster/:size/:file', async (req, res) => {
-    const { size, file } = req.params;
-    if (!POSTER_SIZES.has(size) || !/^[A-Za-z0-9]+\.(jpg|png)$/.test(file)) return res.status(400).end();
-    try {
-        const upstream = await axios.get(`https://image.tmdb.org/t/p/${size}/${file}`, {
-            responseType: 'stream',
-            timeout: 10000,
-            httpsAgent: getProxyAgent(),
-            proxy: false
-        });
-        res.set('Content-Type', upstream.headers['content-type'] || 'image/jpeg');
-        // Poster files never change under the same name
-        res.set('Cache-Control', 'public, max-age=604800, immutable');
-        // Without a listener, a connection dropped mid-download is an unhandled
-        // 'error' event, and that takes the whole process down
-        upstream.data.on('error', () => res.destroy());
-        res.on('close', () => upstream.data.destroy());
-        upstream.data.pipe(res);
-    } catch (err) {
-        res.status(err.response ? err.response.status : 502).end();
-    }
-});
+// panel is opened from, while the server can reach it. Kept on disk after the first fetch.
+router.get('/api/poster/:size/:file', (req, res) => servePoster(req.params.size, req.params.file, res));
 
 router.get('/api/tmdb/search', async (req, res) => {
     try {

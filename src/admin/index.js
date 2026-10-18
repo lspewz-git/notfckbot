@@ -7,6 +7,7 @@ const express = require('express');
 const path = require('path');
 const { startLogCapture } = require('./log-buffer');
 const { panelOnly } = require('./panel-only');
+const { sweepPosters } = require('./posters');
 
 const app = express();
 const PORT = 3000;
@@ -37,6 +38,13 @@ function startAdminServer(bot) {
     app.listen(PORT, () => {
         console.log(`🚀 Admin Panel running on http://localhost:${PORT}`);
     });
+    // Posters on disk (./posters.js): what nobody opened for months goes, once a day
+    const sweep = () =>
+        sweepPosters()
+            .then((n) => n && console.log(`[Posters] Removed ${n} unused from the disk cache`))
+            .catch((err) => console.error('[Posters] Sweep failed:', err.message));
+    sweep();
+    setInterval(sweep, 24 * 60 * 60 * 1000).unref();
 }
 
 module.exports = { startAdminServer };

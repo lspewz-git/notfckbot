@@ -156,6 +156,15 @@ test('restart: refused around an update check, with the time to come back', asyn
     expect(panel.restarted).toBeUndefined();
 });
 
+test('restart: the check just finished, seconds to wait: said in seconds, not as a past minute', async ({ page }) => {
+    const checkAt = new Date(Date.now() - 40 * 1000).toISOString();
+    const until = new Date(Date.now() + 20 * 1000).toISOString();
+    await mockPanel(page, { settings: { restart: { pending: [], blocked: { reason: 'started', checkAt, until } } } });
+    await openSettings(page);
+    await page.locator('[data-action="settings-restart"]').click();
+    await expect(page.locator('.toast-warning')).toContainText(/Restart in d+ s./);
+});
+
 test('restart: asks, then waits for the bot to answer again', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSettings(page);

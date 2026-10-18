@@ -105,6 +105,12 @@ function blockText(blocked) {
     if (blocked.reason === 'running') return 'An update check is running. Restart once it finishes.';
     const when =
         blocked.reason === 'due' ? `runs at ${clock(blocked.checkAt)}` : `started at ${clock(blocked.checkAt)}`;
+    // Before a check its length is unknown: the latest it can be is all we can say
+    if (blocked.reason === 'due')
+        return `An update check ${when}. Restart once it finishes, by ${clock(blocked.until)} at the latest.`;
+    // Seconds left: a clock without seconds would read as "now"
+    const left = Math.ceil((new Date(blocked.until).getTime() - Date.now()) / 1000);
+    if (left > 0 && left < 60) return `An update check ${when}. Restart in ${left} s.`;
     return `An update check ${when}. Restart after ${clock(blocked.until)}.`;
 }
 
