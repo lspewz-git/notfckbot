@@ -4,6 +4,7 @@ const { installDeadline } = require('../http-deadline');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { lruCache, fetchFresh } = require('../lru');
 require('dotenv').config();
+const { log } = require('../log');
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -35,15 +36,15 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
     (response) => {
         if (response.config.method === 'get') {
-            console.log(`[TMDB] ✅ Successful GET: ${response.config.url}`);
+            log.info(`[TMDB] ✅ Successful GET: ${response.config.url}`);
         }
         return response;
     },
     (error) => {
         if (error.code === 'ECONNRESET') {
-            console.error('[TMDB] ❌ Connection Reset. Check your Proxy or Network.');
+            log.error('[TMDB] ❌ Connection Reset. Check your Proxy or Network.');
         } else if (error.code === 'ETIMEDOUT') {
-            console.error('[TMDB] ❌ Timeout. Proxy is too slow.');
+            log.error('[TMDB] ❌ Timeout. Proxy is too slow.');
         }
         return Promise.reject(error);
     }
@@ -61,7 +62,7 @@ const searchMulti = async (query) => {
         // Return only movies and tv shows
         return (response.data.results || []).filter((item) => item.media_type === 'movie' || item.media_type === 'tv');
     } catch (error) {
-        console.error('TMDB API Error (searchMulti):', error.message);
+        log.error(`TMDB API Error (searchMulti): ${error.message}`);
         throw error;
     }
 };
@@ -157,7 +158,7 @@ const fetchDetails = async (id, media_type) => {
 
         return data;
     } catch (error) {
-        console.error(`TMDB API Error (getDetails ${media_type}/${id}):`, error.message);
+        log.error(`TMDB API Error (getDetails ${media_type}/${id}): ${error.message}`);
         throw error;
     }
 };
@@ -198,7 +199,7 @@ const getSeasonDetails = async (tv_id, season_number) => {
         });
         return response.data;
     } catch (error) {
-        console.error(`TMDB API Error (getSeasonDetails ${tv_id} s${season_number}):`, error.message);
+        log.error(`TMDB API Error (getSeasonDetails ${tv_id} s${season_number}): ${error.message}`);
         throw error;
     }
 };

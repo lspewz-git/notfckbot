@@ -6,6 +6,7 @@ const { formatWatchLinks } = require('../constants');
 const { buildFilmMessage, heldLine } = require('./messages');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
+const { log } = require('../log');
 
 /** Out once TMDB says Released, or once its release date has passed. */
 const isMovieReleased = (data, now = new Date()) => {
@@ -44,7 +45,7 @@ const checkWatchlistReleases = async (bot) => {
     });
 
     if (entries.length === 0) return;
-    console.log(`[Cron] Checking ${entries.length} watchlist movie(s)...`);
+    log.info(`[Cron] Checking ${entries.length} watchlist movie(s)...`);
 
     const now = new Date();
 
@@ -85,12 +86,12 @@ const checkWatchlistReleases = async (bot) => {
             await keepRussianDates(filmEntries, `movie_${filmId}`, data.imdb_id, now);
 
             if (!isMovieReleased(data, now)) {
-                console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
+                log.info(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
                 continue;
             }
 
             // 🎉 Film is released! Notify all users waiting for it
-            console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
+            log.info(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
             // A release happens once per film, so the ID is looked up here rather than ahead of time
             const kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
             const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
@@ -114,7 +115,7 @@ const checkWatchlistReleases = async (bot) => {
             }
         } catch (err) {
             tally('errors');
-            console.error(`[Cron] Error checking watchlist movie ${tmdb_id}:`, err.message);
+            log.error(`[Cron] Error checking watchlist movie ${tmdb_id}: ${err.message}`);
         }
     }
 };

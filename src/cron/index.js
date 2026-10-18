@@ -14,32 +14,33 @@ const { flushPending } = require('./outbox');
 const { releaseHeld } = require('./held');
 const { sendDigests } = require('./digests');
 const stats = require('../stats-log');
+const { log } = require('../log');
 
 const checkUpdates = async (bot) => {
     if (!beginRun()) {
-        console.log('[Cron] Update check already in progress. Skipping.');
+        log.info('[Cron] Update check already in progress. Skipping.');
         return;
     }
-    console.log('[Cron] Running update check...');
+    log.info('[Cron] Running update check...');
     let fatal = null;
 
     try {
         // What the previous checks couldn't send goes first, so news arrives in order
-        await flushPending(bot).catch((err) => console.error('[Cron] Queued messages failed:', err.message));
+        await flushPending(bot).catch((err) => log.error(`[Cron] Queued messages failed: ${err.message}`));
         // Load all series WITH their subscribers in one single query
         const allSeries = await Series.findAll({ include: [{ model: Chat }] });
         await checkSeriesUpdates(bot, allSeries);
         await checkWatchlistReleases(bot);
     } catch (error) {
         fatal = error.message;
-        console.error('[Cron] Fatal error during update check:', error);
+        log.error({ err: error }, '[Cron] Fatal error during update check');
     } finally {
         endRun(fatal);
         const { lastRun } = getCronStatus();
         stats.count('checks');
         if (fatal || (lastRun && lastRun.errors)) stats.count('check_errors');
         await stats.flushStats();
-        console.log('[Cron] Update check complete.');
+        log.info('[Cron] Update check complete.');
     }
 };
 
@@ -52,7 +53,7 @@ const setupCron = (bot) => {
         await sendDigests(bot);
         await stats.flushStats();
     });
-    console.log(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS === 1 ? 'hour' : `${UPDATE_INTERVAL_HOURS} hours`}.`);
+    log.info(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS === 1 ? 'hour' : `${UPDATE_INTERVAL_HOURS} hours`}.`);
 };
 
 module.exports = {

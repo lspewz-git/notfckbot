@@ -18,7 +18,9 @@ function loadStatus(file) {
     return require(STATUS_PATH);
 }
 
-const errors = mock.method(console, 'error', () => {});
+const { log } = require('../../src/log');
+
+const errors = mock.method(log, 'error', () => {});
 
 after(() => {
     delete process.env.CRON_STATUS_FILE;

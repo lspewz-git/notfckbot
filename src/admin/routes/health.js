@@ -5,6 +5,7 @@ const { getKinopoiskStatus } = require('../../api/kinopoisk');
 const { lruCache } = require('../../lru');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 // The dashboard polls every 10 s. Each service is checked on its own, with its own
 // cache, so a slow or dead one (a timeout takes seconds) holds up only its own badge.
@@ -82,9 +83,9 @@ function logChange(name, value) {
     lastFailed.set(name, failed);
     // The first check after a start only speaks up if something is wrong
     if (before === failed || (before === undefined && !failed)) return;
-    if (failed) console.error(`[Health] ${LOG_NAMES[name]}: error (${value.reason || 'no details'})`);
+    if (failed) log.error(`[Health] ${LOG_NAMES[name]}: error (${value.reason || 'no details'})`);
     // A failing proxy or key that was then removed is "off", not "ok"
-    else console.log(`[Health] ${LOG_NAMES[name]}: ${value[name] === 'off' ? 'off' : 'ok again'}`);
+    else log.info(`[Health] ${LOG_NAMES[name]}: ${value[name] === 'off' ? 'off' : 'ok again'}`);
 }
 
 // name -> the check's answer; concurrent requests share one check

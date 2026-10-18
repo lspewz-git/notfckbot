@@ -4,6 +4,7 @@
  */
 const { Chat } = require('../db');
 const { clearState } = require('./state');
+const { log } = require('../log');
 
 // Anti-Spam: throttle to 1 request/second per user
 // And track identical rapid commands for auto-blocking
@@ -36,7 +37,7 @@ function register(bot) {
         const now = Date.now();
         const minGap = ctx.callbackQuery ? 400 : 1000;
         if (now - (lastMessageTimes[userId] || 0) < minGap) {
-            console.log(`[Anti-Spam] Global Throttle: Ignoring rapid event from User ${userId}`);
+            log.info(`[Anti-Spam] Global Throttle: Ignoring rapid event from User ${userId}`);
             if (ctx.callbackQuery) {
                 try {
                     await ctx.answerCbQuery('⏳ Секунду…');
@@ -135,7 +136,7 @@ function register(bot) {
                     // Auto-block for 5 minutes
                     const blockUntil = new Date(now + 5 * 60 * 1000);
                     await userData.update({ blockedUntil: blockUntil });
-                    console.log(`[Anti-Spam] Auto-blocked user ${userId} for spamming: "${spamText}"`);
+                    log.info(`[Anti-Spam] Auto-blocked user ${userId} for spamming: "${spamText}"`);
 
                     // 🧹 Clean up the spammed messages from the chat
                     const chatToClean = ctx.chat ? ctx.chat.id : null;
@@ -159,7 +160,7 @@ function register(bot) {
                     try {
                         await ctx.reply(notice);
                     } catch (e) {
-                        console.error('[Anti-Spam] Failed to send block notice:', e.message);
+                        log.error(`[Anti-Spam] Failed to send block notice: ${e.message}`);
                     }
 
                     return; // Stop execution

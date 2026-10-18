@@ -8,9 +8,6 @@ const assert = require('node:assert/strict');
 const tmdb = require('../../src/api/tmdb');
 const { Subscription, Watchlist, Chat } = require('../../src/db');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
-
 // --- TMDB: one series, seasons 1 and 2; season 2 airs weekly across October 2026 ---
 const SEASONS = {
     '1:1': [

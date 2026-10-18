@@ -7,6 +7,7 @@
  */
 const { Series } = require('../db');
 const { getDetailsCached, getSeasonDetails } = require('../api/tmdb');
+const { log } = require('../log');
 
 /** "2024:2;2025:2,3" → Map { 2024 → [2], 2025 → [2, 3] } */
 function parseSeasons(value) {
@@ -85,11 +86,11 @@ async function backfillReleaseSeasons() {
             await ensureReleaseSeasons(series, details);
         } catch (err) {
             failed += 1;
-            console.error(`[History] Release seasons for ${series.tmdb_id} failed:`, err.message);
+            log.error(`[History] Release seasons for ${series.tmdb_id} failed: ${err.message}`);
         }
     }
     if (pending.length) {
-        console.log(`[History] Release seasons filled for ${pending.length - failed} of ${pending.length} series`);
+        log.info(`[History] Release seasons filled for ${pending.length - failed} of ${pending.length} series`);
     }
 }
 

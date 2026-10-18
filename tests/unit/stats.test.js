@@ -10,9 +10,6 @@ const express = require('express');
 const { DailyStat, Subscription, Chat, Series, Watchlist } = require('../../src/db');
 const stats = require('../../src/stats-log');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
-
 describe('counting by day', () => {
     beforeEach(async () => {
         // Whatever an earlier test left counted

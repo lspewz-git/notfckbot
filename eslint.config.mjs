@@ -98,6 +98,12 @@ export default [
     },
 
     {
+        // The bot and the API log through src/log.js: console output misses the panel's Logs page
+        files: ['src/**/*.js'],
+        rules: { 'no-console': 'error' }
+    },
+
+    {
         // Playwright specs. They run on Node, but page.evaluate() callbacks
         // are executed in the browser, so both sets of globals are legitimate.
         files: ['tests/**/*.js'],

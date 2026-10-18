@@ -13,8 +13,6 @@ const { notify, flushPending, MAX_ATTEMPTS } = require('../../src/cron/outbox');
 const { notifyNewEpisodes } = require('../../src/cron');
 const { fakeSeries, ep, tmdbSeries } = require('./fakes');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
 // A chat's settings (quiet hours) come from the database: none here, so none set
 mock.method(Chat, 'findByPk', async () => null);
 

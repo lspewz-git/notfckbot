@@ -7,6 +7,7 @@ const { Chat, Series, Subscription, Watchlist } = require('../db');
 const { NOTIFY_LABELS, isFinishedStatus } = require('../constants');
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
+const { log } = require('../log');
 const {
     EMPTY_SUBS_TEXT,
     isArchiveLoc,
@@ -90,7 +91,7 @@ const sendSubscriptionList = async (ctx) => {
         const { text, keyboard } = buildOverview(items);
         await ctx.reply(text, { parse_mode: 'HTML', ...keyboard });
     } catch (error) {
-        console.error('[Bot] List subscriptions error:', error);
+        log.error({ err: error }, '[Bot] List subscriptions error');
         await ctx.reply('Ошибка получения списка подписок.');
     }
 };
@@ -106,7 +107,7 @@ function register(bot) {
             await showOverview(ctx);
             await ctx.answerCbQuery();
         } catch (error) {
-            console.error('[Bot] Subs overview error:', error);
+            log.error({ err: error }, '[Bot] Subs overview error');
             await ctx.answerCbQuery('Ошибка загрузки списка.');
         }
     });
@@ -117,7 +118,7 @@ function register(bot) {
             await showSubsList(ctx, list === 'a' ? `a${page}` : page);
             await ctx.answerCbQuery();
         } catch (error) {
-            console.error('[Bot] Subs page error:', error);
+            log.error({ err: error }, '[Bot] Subs page error');
             await ctx.answerCbQuery('Ошибка загрузки списка.');
         }
     });
@@ -133,7 +134,7 @@ function register(bot) {
             await editView(ctx, buildSeriesCard(series, sub.notify_type, loc));
             await ctx.answerCbQuery();
         } catch (error) {
-            console.error('[Bot] Subs series card error:', error);
+            log.error({ err: error }, '[Bot] Subs series card error');
             await ctx.answerCbQuery('Ошибка.');
         }
     };
@@ -150,7 +151,7 @@ function register(bot) {
             await editView(ctx, buildMovieCard(item, loc));
             await ctx.answerCbQuery();
         } catch (error) {
-            console.error('[Bot] Subs movie card error:', error);
+            log.error({ err: error }, '[Bot] Subs movie card error');
             await ctx.answerCbQuery('Ошибка.');
         }
     });
@@ -168,7 +169,7 @@ function register(bot) {
             await editView(ctx, buildSeriesCard(series, newType, loc));
             await ctx.answerCbQuery(`Режим: ${NOTIFY_LABELS[newType]}`);
         } catch (error) {
-            console.error('[Bot] Subs mode error:', error);
+            log.error({ err: error }, '[Bot] Subs mode error');
             await ctx.answerCbQuery('Ошибка при смене режима.');
         }
     });
@@ -180,7 +181,7 @@ function register(bot) {
             await editView(ctx, buildUnsubscribeConfirm(series, tmdbId, loc));
             await ctx.answerCbQuery();
         } catch (error) {
-            console.error('[Bot] Subs unsubscribe confirm error:', error);
+            log.error({ err: error }, '[Bot] Subs unsubscribe confirm error');
             await ctx.answerCbQuery('Ошибка.');
         }
     };
@@ -192,7 +193,7 @@ function register(bot) {
             await editView(ctx, buildWatchlistRemoveConfirm(item, watchlistId, loc));
             await ctx.answerCbQuery();
         } catch (error) {
-            console.error('[Bot] Subs watchlist remove confirm error:', error);
+            log.error({ err: error }, '[Bot] Subs watchlist remove confirm error');
             await ctx.answerCbQuery('Ошибка.');
         }
     };
@@ -211,7 +212,7 @@ function register(bot) {
             await showSubsList(ctx, loc);
             await ctx.answerCbQuery('Вы отписались ❌');
         } catch (error) {
-            console.error('[Bot] Subs unsubscribe error:', error);
+            log.error({ err: error }, '[Bot] Subs unsubscribe error');
             await ctx.answerCbQuery('Ошибка при отписке.');
         }
     });
@@ -223,7 +224,7 @@ function register(bot) {
             await showSubsList(ctx, loc);
             await ctx.answerCbQuery('Удалено из списка ожидания ❌');
         } catch (error) {
-            console.error('[Bot] Subs watchlist remove error:', error);
+            log.error({ err: error }, '[Bot] Subs watchlist remove error');
             await ctx.answerCbQuery('Ошибка при удалении.');
         }
     });

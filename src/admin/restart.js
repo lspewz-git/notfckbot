@@ -5,6 +5,7 @@
  */
 const { getCronStatus } = require('../cron/status');
 const { flushStats } = require('../stats-log');
+const { log } = require('../log');
 
 // No restart this close before a scheduled check. After it: not until that check has finished
 // (and a moment more), or, if it never ran (node-cron late, or skipped), until AFTER_MS past
@@ -42,7 +43,7 @@ function restartBlock(now = new Date(), status = getCronStatus()) {
 
 /** Exits shortly, so the answer to the request that asked for it gets out first. */
 function restartSoon(why) {
-    console.log(`[Admin] Restarting the bot: ${why}`);
+    log.info(`[Admin] Restarting the bot: ${why}`);
     // The day counts kept in memory go to the database first
     setTimeout(async () => {
         await flushStats().catch(() => {});

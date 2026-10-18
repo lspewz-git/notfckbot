@@ -10,6 +10,7 @@
 const { Series, Watchlist } = require('./db');
 const { getDetailsCached, getSeasonDetailsCached } = require('./api/tmdb');
 const { findKinopoiskId } = require('./api/kinopoisk');
+const { log } = require('./log');
 
 /** Every title the panel can show a card for: the tracked series and the films on any list. */
 async function trackedTitles() {
@@ -47,7 +48,7 @@ async function warmDetailsCache() {
         }
     }
     const seconds = Math.round((Date.now() - started) / 1000);
-    console.log(
+    log.info(
         `[Cache] Warmed TMDB details for ${ids.length - failed} of ${ids.length} titles in ${seconds} s` +
             (failed ? ` (${failed} failed)` : '')
     );

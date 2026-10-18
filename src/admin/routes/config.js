@@ -12,6 +12,7 @@ const { isSafeEnvValue, updateEnvFile, maskToken } = require('../env');
 const { invalidateHealth } = require('./health');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 router.get('/api/config', (req, res) => {
     // The panel has no login, so secrets only ever leave the server masked
@@ -42,7 +43,7 @@ router.post('/api/config', (req, res) => {
         invalidateHealth();
     }
 
-    console.log('[Admin] Configuration updated successfully.');
+    log.info('[Admin] Configuration updated successfully.');
     res.json({
         success: true,
         tmdbApiKey: maskToken(process.env.TMDB_API_KEY),

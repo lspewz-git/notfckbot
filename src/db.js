@@ -6,17 +6,18 @@ const Watchlist = require('./models/Watchlist');
 const PendingMessage = require('./models/PendingMessage');
 const HeldNotification = require('./models/HeldNotification');
 const DailyStat = require('./models/DailyStat');
+const { log } = require('./log');
 
 const initDb = async () => {
     try {
         await sequelize.authenticate();
-        console.log('Connection to MariaDB has been established successfully.');
+        log.info('Connection to MariaDB has been established successfully.');
 
         // Sync models
         await sequelize.sync({ alter: true });
-        console.log('Database models synchronized.');
+        log.info('Database models synchronized.');
     } catch (error) {
-        console.error('Unable to connect to the database:', error);
+        log.error({ err: error }, 'Unable to connect to the database');
         process.exit(1);
     }
 };

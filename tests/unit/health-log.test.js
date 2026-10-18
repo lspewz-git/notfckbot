@@ -6,10 +6,11 @@ const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { TelegramError } = require('telegraf');
 const { reasonOf, logChange } = require('../../src/admin/routes/health');
+const { log } = require('../../src/log');
 
 const logs = [];
-mock.method(console, 'log', (line) => logs.push(line));
-mock.method(console, 'error', (line) => logs.push(line));
+mock.method(log, 'info', (line) => logs.push(line));
+mock.method(log, 'error', (line) => logs.push(line));
 beforeEach(() => (logs.length = 0));
 
 describe('reasonOf', () => {

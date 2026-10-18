@@ -23,6 +23,7 @@
     "lru-cache": "^11.5.3",
     "mariadb": "2.5.6",
     "node-cron": "^4.2.1",
+    "pino": "^10.4.0",
     "sequelize": "^6.37.7",
     "socks-proxy-agent": "^8.0.5",
     "telegraf": "^4.16.3"

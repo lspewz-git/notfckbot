@@ -6,6 +6,7 @@ const { buildSeriesMessages, buildStatusMessage, heldLine } = require('./message
 const { tally } = require('./status');
 const { notify } = require('./outbox');
 const { ensureReleaseSeasons } = require('./release-seasons');
+const { log } = require('../log');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
 // Returning <-> In Production changes are not interesting to users and stay silent.
@@ -16,7 +17,7 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
 
     const msg = buildStatusMessage(item.title, newStatus);
 
-    console.log(`[Cron] Status of "${item.title}": ${oldStatus} -> ${newStatus}, notifying subscribers`);
+    log.info(`[Cron] Status of "${item.title}": ${oldStatus} -> ${newStatus}, notifying subscribers`);
     for (const chat of item.Chats || []) {
         await notify(bot, chat.id, msg, {
             about: `${item.title}: ${newStatus}`,
@@ -68,7 +69,7 @@ const notifyNewEpisodes = async (bot, item, data) => {
     const announceComplete = complete && completedSeason < currentSeason;
     if (!hasNewContent && !announceComplete) return;
 
-    console.log(
+    log.info(
         `[Cron] "${item.title}": S${currentSeason}E${currentEpisode}` +
             (hasNewContent ? ' new' : '') +
             (announceComplete ? ', season complete' : '')
@@ -143,7 +144,7 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             // For the release history; never holds up the notifications. A new series' first
             // pass asks TMDB for every season (dozens for a long show), so it runs on its own
             const seasonsDone = ensureReleaseSeasons(item, data).catch((err) =>
-                console.error(`[History] Release seasons for ${item.tmdb_id} failed:`, err.message)
+                log.error(`[History] Release seasons for ${item.tmdb_id} failed: ${err.message}`)
             );
             if (item.release_seasons !== null && item.release_seasons !== undefined) await seasonsDone;
 
@@ -151,13 +152,13 @@ const checkSeriesUpdates = async (bot, allSeries) => {
                 await notifyNewEpisodes(bot, item, data);
             } catch (err) {
                 tally('errors');
-                console.error(`[Cron] Episode check failed for ${item.tmdb_id} ("${item.title}"):`, err.message);
+                log.error(`[Cron] Episode check failed for ${item.tmdb_id} ("${item.title}"): ${err.message}`);
             }
 
             if (statusChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
         } catch (err) {
             tally('errors');
-            console.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"):`, err.message);
+            log.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"): ${err.message}`);
         }
     }
 };

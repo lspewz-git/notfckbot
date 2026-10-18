@@ -11,9 +11,6 @@ const tmdb = require('../../src/api/tmdb');
 const kinopoisk = require('../../src/api/kinopoisk');
 const { Series, Subscription, Watchlist } = require('../../src/db');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
-
 // --- TMDB: seasons with episode air dates, and genres ---
 const SEASONS = {
     // Season 1 in 2023; season 2 runs from December 2024 into January 2025

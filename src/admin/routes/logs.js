@@ -1,5 +1,5 @@
-/** The Logs page. */
-const { logBuffer } = require('../log-buffer');
+/** The Logs page: the logger's last entries (src/log.js). */
+const { logBuffer } = require('../../log');
 
 const router = require('express').Router();
 

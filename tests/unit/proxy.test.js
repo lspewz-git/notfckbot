@@ -2,11 +2,10 @@
  * The proxy setting (src/proxy.js): which URLs can be saved, the password kept out of sight, and
  * a broken value in .env not taking the bot down. Run: npm run test:unit
  */
-const { test, mock, afterEach } = require('node:test');
+const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { proxyUrlProblem, getProxyAgent, redactProxyUrl, withSavedPassword } = require('../../src/proxy');
 
-mock.method(console, 'error', () => {});
 const saved = process.env.TMDB_PROXY_URL;
 afterEach(() => {
     process.env.TMDB_PROXY_URL = saved || '';

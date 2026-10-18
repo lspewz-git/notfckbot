@@ -7,7 +7,9 @@ const assert = require('node:assert/strict');
 const { parseIntervalHours, INTERVAL_CHOICES } = require('../../src/constants');
 const { nextRunAt } = require('../../src/cron/status');
 
-const errors = mock.method(console, 'error', () => {});
+const { log } = require('../../src/log');
+
+const errors = mock.method(log, 'error', () => {});
 
 test('not set: every 3 hours', () => {
     assert.equal(parseIntervalHours(undefined), 3);

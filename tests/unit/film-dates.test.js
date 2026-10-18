@@ -8,7 +8,6 @@ const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const axios = require('axios');
 
-mock.method(console, 'error', () => {});
 process.env.KINOPOISK_API_KEY = 'test-key';
 
 const kinopoisk = require('../../src/api/kinopoisk');

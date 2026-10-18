@@ -1,5 +1,6 @@
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const { log } = require('./log');
 
 /**
  * Single source of truth for the outbound proxy.
@@ -67,7 +68,7 @@ const getProxyAgent = () => {
     } catch (err) {
         // A hand-edited .env: better a direct connection (and this line in the log, once per
         // value) than a bot that fails on start and every request that throws
-        console.error(`[Proxy] TMDB_PROXY_URL can't be used (${err.message}); connecting directly`);
+        log.error(`[Proxy] TMDB_PROXY_URL can't be used (${err.message}); connecting directly`);
         cachedAgent = null;
     }
     return cachedAgent;
@@ -79,15 +80,13 @@ const getProxyAgent = () => {
  */
 const applyProxyToBot = (bot) => {
     if (!bot || !bot.telegram || !bot.telegram.options) {
-        console.error('[Proxy] Could not reach the Telegram client options — restart to apply.');
+        log.error('[Proxy] Could not reach the Telegram client options — restart to apply.');
         return false;
     }
 
     bot.telegram.options.agent = getProxyAgent();
     // Logs are readable in the admin panel, so never print the password
-    console.log(
-        `[Proxy] Telegram client now using: ${redactProxyUrl(process.env.TMDB_PROXY_URL) || 'direct connection'}`
-    );
+    log.info(`[Proxy] Telegram client now using: ${redactProxyUrl(process.env.TMDB_PROXY_URL) || 'direct connection'}`);
     return true;
 };
 

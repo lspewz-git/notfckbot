@@ -9,7 +9,6 @@ const { notifyNewEpisodes } = require('../../src/cron');
 const { newSeriesFields } = require('../../src/api/tmdb');
 const { fakeBot, ep, tmdbSeries, kindOf } = require('./fakes');
 
-mock.method(console, 'log', () => {});
 // A chat's settings (quiet hours) come from the database: none here, so none set
 mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
 

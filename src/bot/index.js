@@ -24,12 +24,13 @@ require('./subscriptions').register(bot);
 require('./history').register(bot);
 require('./calendar').register(bot);
 require('./held').register(bot);
+const { log } = require('../log');
 
 // Without this, Telegraf rethrows a handler's error and its polling loop stops for good: one
 // failed edit or a button answered too late, and the bot would stop answering everyone until
 // restarted. Log it, tell the user if they pressed a button, and go on with the next update.
 bot.catch((err, ctx) => {
-    console.error(`[Bot] Error in update ${ctx.update && ctx.update.update_id}:`, err.message);
+    log.error(`[Bot] Error in update ${ctx.update && ctx.update.update_id}: ${err.message}`);
     if (ctx.callbackQuery) ctx.answerCbQuery('Что-то пошло не так. Попробуйте ещё раз.').catch(() => {});
 });
 
@@ -49,6 +50,6 @@ bot.telegram
         { command: 'menu_on', description: 'Включить нижнее меню' },
         { command: 'menu_off', description: 'ОТКЛЮЧИТЬ нижнее меню' }
     ])
-    .catch((err) => console.error('[Bot] Failed to set commands:', err));
+    .catch((err) => log.error({ err }, '[Bot] Failed to set commands'));
 
 module.exports = bot;

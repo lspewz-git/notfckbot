@@ -8,6 +8,7 @@ const tmdb = require('../../api/tmdb');
 const { deliver } = require('../../delivery');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 const BROADCAST_TARGETS = {
     all: {},
@@ -39,7 +40,7 @@ router.post('/api/broadcast', async (req, res) => {
             // FIX: Rate limit — Telegram allows ~30 messages/sec; 50ms keeps us safe
             await new Promise((r) => setTimeout(r, 50));
         }
-        console.log(`[Admin] Broadcast to "${target}": ${successCount} delivered, ${failCount} failed.`);
+        log.info(`[Admin] Broadcast to "${target}": ${successCount} delivered, ${failCount} failed.`);
         res.json({ success: true, successCount, failCount });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -118,7 +119,7 @@ async function seriesTest(seriesId, mode, { season, episode, episodeName }) {
             }
         }
     } catch (tmdbErr) {
-        console.log(`[Admin] TMDB fetch note for ${numericId}: ${tmdbErr.message}`);
+        log.info(`[Admin] TMDB fetch note for ${numericId}: ${tmdbErr.message}`);
     }
 
     if (!title) throw Object.assign(new Error('Series details could not be found'), { status: 404 });
@@ -154,10 +155,10 @@ router.post('/api/test-notification', async (req, res) => {
         const result = await deliver(bot, chatId, msg, { photo: posterUrl });
         if (result.status !== 'sent') throw new Error(result.error);
 
-        console.log(`[Admin] Test notification sent to chat ${chatId} for "${title}" (mode: ${mode})`);
+        log.info(`[Admin] Test notification sent to chat ${chatId} for "${title}" (mode: ${mode})`);
         res.json({ success: true, message: 'Test notification sent successfully', title, chatId, mode });
     } catch (err) {
-        console.error('[Admin] Test notification error:', err.message);
+        log.error(`[Admin] Test notification error: ${err.message}`);
         res.status(err.status || 500).json({ error: `Не удалось отправить уведомление: ${err.message}` });
     }
 });

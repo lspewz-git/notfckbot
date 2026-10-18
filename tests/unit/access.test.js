@@ -17,8 +17,6 @@ mock.method(Telegram.prototype, 'callApi', async (method, payload) => {
     if (method === 'getChatMember') return { status: memberStatus[payload.user_id] || 'member' };
     return true;
 });
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
 
 // --- The database, stubbed: one group and its members ---
 const GROUP = -1001;

@@ -9,6 +9,7 @@ const { HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
 const stats = require('../stats-log');
+const { log } = require('../log');
 
 // Telegram's limit is 4096 characters; the lines carry HTML, so stop well before it
 const MAX_TEXT = 3500;
@@ -66,16 +67,16 @@ async function releaseHeld(bot, now = new Date()) {
             if (result.status === 'failed') continue;
             if (result.status !== 'sent') {
                 stats.count('failed', items.length);
-                console.error(`[Quiet] List for chat ${chatId} dropped (${result.status}): ${result.error}`);
+                log.error(`[Quiet] List for chat ${chatId} dropped (${result.status}): ${result.error}`);
             } else {
-                console.log(`[Quiet] Sent chat ${chatId} the ${items.length} notification(s) held overnight`);
+                log.info(`[Quiet] Sent chat ${chatId} the ${items.length} notification(s) held overnight`);
                 stats.count('sent', items.length);
             }
             await HeldNotification.update({ sentAt: now }, { where: { id: items.map((i) => i.id) } });
         }
         await HeldNotification.destroy({ where: { sentAt: { [Op.lt]: new Date(now.getTime() - KEEP_MS) } } });
     } catch (err) {
-        console.error('[Quiet] Releasing held notifications failed:', err.message);
+        log.error(`[Quiet] Releasing held notifications failed: ${err.message}`);
     } finally {
         running = false;
     }

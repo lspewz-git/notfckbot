@@ -7,10 +7,8 @@ const assert = require('node:assert/strict');
 const { notifyNewEpisodes, notifyStatusChange, isSeasonComplete, buildSeriesMessages } = require('../../src/cron');
 const { fakeBot, fakeSeries, ep, tmdbSeries, kindOf } = require('./fakes');
 
-mock.method(console, 'log', () => {});
 // A chat's settings (quiet hours) come from the database: none here, so none set
 mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
-mock.method(console, 'error', () => {});
 
 const kinds = (bot) => bot.sent.map((m) => `${m.chatId}:${kindOf(m.text)}`);
 

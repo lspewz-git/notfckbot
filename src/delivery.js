@@ -4,6 +4,7 @@
  * Telegram or the network fails for a moment. Used by the update check, the panel's test alerts,
  * broadcasts and messages.
  */
+const { log } = require('./log');
 
 // Telegram's flood limit asks to wait this many seconds at most; more would hold up the check
 const MAX_FLOOD_WAIT_S = 60;
@@ -43,7 +44,7 @@ async function sendOnce(bot, chatId, text, photo, extra) {
         } catch (err) {
             // Only a poster problem falls back to text; a blocked chat or a timeout stays an error
             if (classify(err).kind !== 'rejected') throw err;
-            console.error(`[Delivery] Poster refused for chat ${chatId} (${err.message}); sending text`);
+            log.error(`[Delivery] Poster refused for chat ${chatId} (${err.message}); sending text`);
         }
     }
     return bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML', ...extra });

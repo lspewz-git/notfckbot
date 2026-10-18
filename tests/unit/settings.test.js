@@ -18,9 +18,6 @@ const { writeEnv } = require('../../src/admin/env');
 const { restartBlock } = require('../../src/admin/restart');
 const services = require('../../src/admin/routes/services');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
-
 const ORIGINAL = '# Tokens\nBOT_TOKEN=123:old\nTMDB_PROXY_URL=\n\nDB_PASSWORD=secret\n';
 
 after(() => fs.rmSync(dir, { recursive: true, force: true }));

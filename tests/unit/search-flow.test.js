@@ -10,8 +10,6 @@ const tmdb = require('../../src/api/tmdb');
 const kinopoisk = require('../../src/api/kinopoisk');
 const { Series, Subscription, Watchlist } = require('../../src/db');
 
-mock.method(console, 'log', () => {});
-
 // --- TMDB and the database, stubbed ---
 const film = (id, title, date) => ({ media_type: 'movie', id, title, release_date: date });
 const RESULTS = [

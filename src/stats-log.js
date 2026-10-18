@@ -6,6 +6,7 @@
 const { DailyStat } = require('./db');
 const { todayIn } = require('./calendar');
 const { DEFAULT_ZONE } = require('./quiet');
+const { log } = require('./log');
 
 const FIELDS = ['sent', 'failed', 'checks', 'check_errors'];
 // "2026-10-14" -> { sent: 3, failed: 0, ... }, not yet written
@@ -33,7 +34,7 @@ async function flushStats() {
             const by = Object.fromEntries(Object.entries(counts).filter(([, n]) => n));
             if (Object.keys(by).length) await DailyStat.increment(by, { where: { day } });
         } catch (err) {
-            console.error('[Stats] Writing the day counts failed:', err.message);
+            log.error(`[Stats] Writing the day counts failed: ${err.message}`);
             for (const [field, n] of Object.entries(counts)) count(field, n, new Date(`${day}T12:00:00Z`));
         }
     }

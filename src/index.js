@@ -9,10 +9,11 @@ const { setupCron } = require('./cron');
 const { startAdminServer } = require('./admin');
 const { warmDetailsCache } = require('./warm-cache');
 const { backfillReleaseSeasons } = require('./cron/release-seasons');
+const { log } = require('./log');
 
 async function start() {
     try {
-        console.log('Starting NotFckBot...');
+        log.info('Starting NotFckBot...');
 
         // Initialize Database
         await initDb();
@@ -21,11 +22,11 @@ async function start() {
         setupCron(bot);
 
         // Launch Bot with explicit configuration
-        console.log('Verifying bot token...');
+        log.info('Verifying bot token...');
         const botInfo = await bot.telegram.getMe();
-        console.log(`Bot verified: @${botInfo.username}`);
+        log.info(`Bot verified: @${botInfo.username}`);
 
-        console.log('Cleaning up old webhooks...');
+        log.info('Cleaning up old webhooks...');
         await bot.telegram.deleteWebhook();
 
         // Start Admin Dashboard
@@ -34,14 +35,14 @@ async function start() {
         // In the background: the panel's cards are quick from the first one after a restart
         // Then the release history's years for series that have none yet (once per series)
         warmDetailsCache()
-            .catch((err) => console.error('[Cache] Warm-up failed:', err.message))
+            .catch((err) => log.error(`[Cache] Warm-up failed: ${err.message}`))
             .then(backfillReleaseSeasons)
-            .catch((err) => console.error('[History] Backfill failed:', err.message));
+            .catch((err) => log.error(`[History] Backfill failed: ${err.message}`));
 
-        console.log('Launching Telegram bot...');
+        log.info('Launching Telegram bot...');
         bot.launch({ dropPendingUpdates: true })
-            .then(() => console.log('Bot is running! 🚀'))
-            .catch((err) => console.error('Bot launch failed:', err));
+            .then(() => log.info('Bot is running! 🚀'))
+            .catch((err) => log.error({ err }, 'Bot launch failed'));
 
         // Graceful stop (docker compose restart/stop): the day counts kept in memory are written
         // first, then the process ends without waiting for Docker to kill it
@@ -60,7 +61,7 @@ async function start() {
             });
         }
     } catch (err) {
-        console.error('Fatal error during startup:', err);
+        log.error({ err }, 'Fatal error during startup');
         process.exit(1);
     }
 }

@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { lruCache } = require('../lru');
 require('dotenv').config();
+const { log } = require('../log');
 
 /**
  * Finding a title's Kinopoisk ID, which the watch links need
@@ -72,7 +73,7 @@ const cache = lruCache({
                 if (id) return { id, failed: false };
             } catch (err) {
                 failed = true;
-                console.error(`[Kinopoisk] Lookup failed for ${tmdbId}:`, err.message);
+                log.error(`[Kinopoisk] Lookup failed for ${tmdbId}: ${err.message}`);
             }
         }
         // A failure is remembered too, briefly: otherwise every page of search results would
@@ -127,9 +128,9 @@ async function ensureKinopoiskId(row, imdbId) {
     try {
         await row.update({ kinopoisk_id: id, kinopoisk_checked_at: new Date() });
     } catch (err) {
-        console.error(`[Kinopoisk] Could not save ID for ${row.tmdb_id}:`, err.message);
+        log.error(`[Kinopoisk] Could not save ID for ${row.tmdb_id}: ${err.message}`);
     }
-    if (id) console.log(`[Kinopoisk] ${row.tmdb_id} -> ${id}`);
+    if (id) log.info(`[Kinopoisk] ${row.tmdb_id} -> ${id}`);
     return id;
 }
 
@@ -209,7 +210,7 @@ async function fetchRussianDates(id, _stale, { options }) {
             options.ttl = FAIL_TTL_MS;
             dates = { ...NO_DATES, failed: true };
         }
-        console.error(`[Kinopoisk] Release dates of ${id} failed: ${err.message}`);
+        log.error(`[Kinopoisk] Release dates of ${id} failed: ${err.message}`);
     }
     return dates;
 }

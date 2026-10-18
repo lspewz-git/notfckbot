@@ -5,9 +5,9 @@
  */
 const express = require('express');
 const path = require('path');
-const { startLogCapture } = require('./log-buffer');
 const { panelOnly } = require('./panel-only');
 const { sweepPosters } = require('./posters');
+const { log } = require('../log');
 
 const app = express();
 const PORT = 3000;
@@ -32,17 +32,15 @@ app.use(require('./routes/history'));
 app.use(require('./routes/settings'));
 
 function startAdminServer(bot) {
-    // FIX: Log capture is started here, not at module load time (avoids global side effect)
-    startLogCapture();
     app.set('bot', bot);
     app.listen(PORT, () => {
-        console.log(`🚀 Admin Panel running on http://localhost:${PORT}`);
+        log.info(`🚀 Admin Panel running on http://localhost:${PORT}`);
     });
     // Posters on disk (./posters.js): what nobody opened for months goes, once a day
     const sweep = () =>
         sweepPosters()
-            .then((n) => n && console.log(`[Posters] Removed ${n} unused from the disk cache`))
-            .catch((err) => console.error('[Posters] Sweep failed:', err.message));
+            .then((n) => n && log.info(`[Posters] Removed ${n} unused from the disk cache`))
+            .catch((err) => log.error(`[Posters] Sweep failed: ${err.message}`));
     sweep();
     setInterval(sweep, 24 * 60 * 60 * 1000).unref();
 }

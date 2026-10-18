@@ -3,12 +3,13 @@ const { setState, clearState } = require('./state');
 const { mainMenu, getCancelMenu } = require('./keyboards');
 const { clearLastMessages } = require('./search');
 const { sendSubscriptionList } = require('./subscriptions');
+const { log } = require('../log');
 
 function register(bot) {
     bot.command('start', async (ctx) => {
         clearState(ctx);
         setState(ctx, { state: 'idle', results: [], currentPage: 0, lastMessageIds: [] });
-        console.log(`[Bot] /start from ${ctx.from.id} (${ctx.from.username || 'N/A'})`);
+        log.info(`[Bot] /start from ${ctx.from.id} (${ctx.from.username || 'N/A'})`);
         await ctx.reply(
             '👋 <b>Привет!</b>\n\nЯ помогу тебе не пропустить выход новых серий твоих любимых сериалов и цифровой релиз фильмов.\n\nИспользуй меню ниже, чтобы начать работу.',
             { parse_mode: 'HTML', ...mainMenu(ctx) }

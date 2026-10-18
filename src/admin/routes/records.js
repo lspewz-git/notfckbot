@@ -6,6 +6,7 @@ const { ZONES, isHour } = require('../../quiet');
 const { sentMarkOnEnable } = require('../../cron/digests');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 router.delete('/api/subscription/:chatId/:seriesId', async (req, res) => {
     const { chatId, seriesId } = req.params;
@@ -214,7 +215,7 @@ router.post('/api/chat/:chatId/message', async (req, res) => {
     try {
         const result = await deliver(bot, chatId, `✉️ <b>Сообщение от администратора:</b>\n\n${message}`);
         if (result.status !== 'sent') throw new Error(result.error);
-        console.log(`[Admin] Direct message sent to ${chatId}`);
+        log.info(`[Admin] Direct message sent to ${chatId}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

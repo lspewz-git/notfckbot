@@ -8,8 +8,6 @@ const assert = require('node:assert/strict');
 const axios = require('axios');
 
 process.env.KINOPOISK_API_KEY = 'test-key';
-mock.method(console, 'error', () => {});
-mock.method(console, 'log', () => {});
 
 // What each source does, set per test: Wikidata knows nothing, the API rejects the key
 let requests;

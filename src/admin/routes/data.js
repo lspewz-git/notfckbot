@@ -3,6 +3,7 @@ const { Chat, Series, Subscription, Watchlist } = require('../../db');
 const { isFinishedStatus } = require('../../constants');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 // Chats whose name Telegram refused to give us (bot kicked, chat deleted...).
 // Remembered so the polling admin panel doesn't retry them on every refresh.
@@ -28,7 +29,7 @@ async function backfillChatNames(chats, bot) {
                 }
             } catch (err) {
                 unresolvableChatNames.add(String(chat.id));
-                console.error(`[Admin] Could not resolve name for chat ${chat.id}: ${err.message}`);
+                log.error(`[Admin] Could not resolve name for chat ${chat.id}: ${err.message}`);
             }
         })
     );

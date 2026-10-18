@@ -8,6 +8,7 @@ const { isQuietNow } = require('../quiet');
 const stats = require('../stats-log');
 const { tally } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
+const { log } = require('../log');
 
 // A day of checks, however often they run, or two days on the calendar: past that the news is stale
 const MAX_ATTEMPTS = Math.ceil(24 / UPDATE_INTERVAL_HOURS);
@@ -44,7 +45,7 @@ async function notify(bot, chatId, text, { photo = null, about = '', line = '', 
             return { status: 'held' };
         } catch (err) {
             // Better at night than never
-            console.error(`[Cron] Couldn't hold a notification for chat ${chatId}, sending it now:`, err.message);
+            log.error(`[Cron] Couldn't hold a notification for chat ${chatId}, sending it now: ${err.message}`);
         }
     }
     const result = unreachable ? QUEUED : await deliver(bot, chatId, text, { photo });
@@ -59,15 +60,15 @@ async function notify(bot, chatId, text, { photo = null, about = '', line = '', 
     // The day counts take a failure once it is final: a queued message may still go out
     if (result.status !== 'failed') {
         stats.count('failed');
-        console.error(`[Cron] Chat ${chatId} not notified${what} (${result.status}): ${result.error}`);
+        log.error(`[Cron] Chat ${chatId} not notified${what} (${result.status}): ${result.error}`);
         return result;
     }
     try {
         await PendingMessage.create({ chatId, text, photo });
-        console.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}. Will retry on the next check`);
+        log.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}. Will retry on the next check`);
     } catch (err) {
         stats.count('failed');
-        console.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}; queueing failed:`, err.message);
+        log.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}; queueing failed: ${err.message}`);
     }
     return result;
 }
@@ -82,7 +83,7 @@ async function flushPending(bot, now = new Date()) {
     for (const message of pending) {
         const age = now.getTime() - new Date(message.createdAt).getTime();
         if (message.attempts >= MAX_ATTEMPTS || age > MAX_AGE_MS) {
-            console.error(`[Cron] Gave up on a message to chat ${message.chatId} after ${message.attempts} retries`);
+            log.error(`[Cron] Gave up on a message to chat ${message.chatId} after ${message.attempts} retries`);
             stats.count('failed');
             await message.destroy();
             continue;
@@ -103,13 +104,11 @@ async function flushPending(bot, now = new Date()) {
             sent += 1;
         } else {
             stats.count('failed');
-            console.error(
-                `[Cron] Queued message to chat ${message.chatId} dropped (${result.status}): ${result.error}`
-            );
+            log.error(`[Cron] Queued message to chat ${message.chatId} dropped (${result.status}): ${result.error}`);
         }
         await message.destroy();
     }
-    console.log(`[Cron] Queued messages: ${sent} of ${pending.length} sent`);
+    log.info(`[Cron] Queued messages: ${sent} of ${pending.length} sent`);
 }
 
 module.exports = { notify, flushPending, MAX_ATTEMPTS };

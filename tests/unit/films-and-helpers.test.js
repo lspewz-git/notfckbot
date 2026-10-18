@@ -5,7 +5,7 @@
 // Dates are formatted the way the server does it, in UTC, whatever machine runs the tests
 process.env.TZ = 'UTC';
 
-const { test, describe, mock } = require('node:test');
+const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { isMovieReleased, buildFilmMessage, nextRunAt } = require('../../src/cron');
 const { digitalReleaseDate, nextEpisodeFields } = require('../../src/api/tmdb');
@@ -16,8 +16,6 @@ const {
     isFinishedStatus,
     UPDATE_INTERVAL_HOURS
 } = require('../../src/constants');
-
-mock.method(console, 'log', () => {});
 
 const NOW = new Date('2026-10-12T12:00:00Z');
 

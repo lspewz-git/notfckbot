@@ -12,6 +12,7 @@ const { mainMenu } = require('./keyboards');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
 const { recordOwner } = require('./access');
 const { lruCache } = require('../lru');
+const { log } = require('../log');
 
 const mainMenuButton = Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]]);
 
@@ -204,7 +205,7 @@ function register(bot) {
         if (state.state !== 'waiting_for_search') return;
 
         try {
-            console.log(`[Bot] Search query: "${text}" from ${ctx.from.id}`);
+            log.info(`[Bot] Search query: "${text}" from ${ctx.from.id}`);
             // "typing…" in the chat header while TMDB searches (up to a second)
             ctx.sendChatAction('typing').catch(() => {});
             const results = await searchMulti(text);
@@ -228,7 +229,7 @@ function register(bot) {
             };
             await showList(ctx, session, 0);
         } catch (error) {
-            console.error('[Bot] Search error:', error);
+            log.error({ err: error }, '[Bot] Search error');
             await ctx.reply('Ошибка при поиске. Попробуйте позже.', mainMenu(ctx));
             setState(ctx, { state: 'idle' });
         }
@@ -269,7 +270,7 @@ function register(bot) {
             const sub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
             return showCard(ctx, ctx.state.search, seriesCard(data, { subscribedMode: sub ? sub.notify_type : null }));
         } catch (error) {
-            console.error('[Bot] Card error:', error);
+            log.error({ err: error }, '[Bot] Card error');
             await ctx.answerCbQuery('Не удалось открыть карточку.').catch(() => {});
         }
     });
@@ -292,7 +293,7 @@ function register(bot) {
             });
             if (!created) await subscription.update({ notify_type: notifyType });
 
-            console.log(
+            log.info(
                 `[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`
             );
 
@@ -318,7 +319,7 @@ function register(bot) {
             await showText(ctx, `${heading}\n\n${details}`, mainMenuButton);
             endSearch(ctx);
         } catch (error) {
-            console.error('[Bot] Finalize subscription error:', error);
+            log.error({ err: error }, '[Bot] Finalize subscription error');
             await ctx.answerCbQuery('Ошибка сохранения подписки.').catch(() => {});
         }
     });
@@ -365,7 +366,7 @@ function register(bot) {
             );
             endSearch(ctx);
         } catch (error) {
-            console.error('[Bot] Watchlist add error:', error);
+            log.error({ err: error }, '[Bot] Watchlist add error');
             await ctx.answerCbQuery('Ошибка при добавлении.').catch(() => {});
         }
     });

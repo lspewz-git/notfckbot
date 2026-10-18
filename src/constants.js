@@ -2,6 +2,7 @@
  * Shared constants for notification types, labels, and other enums.
  * Centralizes magic strings to avoid duplication across files.
  */
+const { log } = require('./log');
 
 /** Human-readable labels for subscription notification types */
 const NOTIFY_LABELS = {
@@ -153,7 +154,7 @@ function parseIntervalHours(value, { quiet = false } = {}) {
     const hours = Number(value);
     if (INTERVAL_CHOICES.includes(hours)) return hours;
     if (quiet) return DEFAULT_INTERVAL_HOURS;
-    console.error(
+    log.error(
         `[Cron] UPDATE_INTERVAL_HOURS=${value} is not one of ${INTERVAL_CHOICES.join(', ')}; ` +
             `checking every ${DEFAULT_INTERVAL_HOURS} hours`
     );

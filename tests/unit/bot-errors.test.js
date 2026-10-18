@@ -12,7 +12,6 @@ mock.method(Telegram.prototype, 'callApi', async (method, payload) => {
     calls.push({ method, payload });
     return true;
 });
-mock.method(console, 'error', () => {});
 
 // No database: the middleware records every chat it sees; here it finds a plain, unblocked one
 const { Chat } = require('../../src/db');

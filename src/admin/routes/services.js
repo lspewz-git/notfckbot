@@ -7,6 +7,7 @@ const { invalidateHealth } = require('./health');
 const { restartBlock, restartSoon } = require('../restart');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 const outbound = () => ({ httpsAgent: buildProxyAgent(process.env.TMDB_PROXY_URL), proxy: false, timeout: 8000 });
 
@@ -138,7 +139,7 @@ router.post('/api/services/:name', async (req, res) => {
     process.env[service.env] = token;
     updateEnvFile(service.env, token);
     invalidateHealth();
-    console.log(`[Admin] ${service.env} updated (${maskToken(token)}).`);
+    log.info(`[Admin] ${service.env} updated (${maskToken(token)}).`);
 
     // docker-compose's restart policy brings the process straight back with the new .env; not
     // around an update check, though: then the token waits for a restart from Settings

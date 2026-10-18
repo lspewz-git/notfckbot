@@ -11,6 +11,7 @@ const { isQuietNow, hourIn } = require('../quiet');
 const { todayIn, weekStart } = require('../calendar');
 const { calendarView } = require('../bot/calendar');
 const stats = require('../stats-log');
+const { log } = require('../log');
 
 const DIGEST_HOUR = 10;
 const NO_PREVIEW = { link_preview_options: { is_disabled: true } };
@@ -58,7 +59,7 @@ async function sendDigests(bot, now = new Date()) {
                 try {
                     view = await calendarView(chat, kind, 0, { digest: true, now });
                 } catch (err) {
-                    console.error(`[Digest] Couldn't put together the ${kind} digest for ${chat.id}:`, err.message);
+                    log.error(`[Digest] Couldn't put together the ${kind} digest for ${chat.id}: ${err.message}`);
                     continue;
                 }
                 if (!view.empty) {
@@ -69,16 +70,14 @@ async function sendDigests(bot, now = new Date()) {
                     if (result.status === 'failed') continue;
                     stats.count(result.status === 'sent' ? 'sent' : 'failed');
                     if (result.status !== 'sent') {
-                        console.error(
-                            `[Digest] ${kind} digest for ${chat.id} dropped (${result.status}): ${result.error}`
-                        );
+                        log.error(`[Digest] ${kind} digest for ${chat.id} dropped (${result.status}): ${result.error}`);
                     }
                 }
                 await chat.update({ [field]: key });
             }
         }
     } catch (err) {
-        console.error('[Digest] Sending digests failed:', err.message);
+        log.error(`[Digest] Sending digests failed: ${err.message}`);
     } finally {
         running = false;
     }

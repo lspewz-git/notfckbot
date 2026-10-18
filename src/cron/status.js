@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
+const { log } = require('../log');
 
 // Guard to prevent parallel cron runs (avoids duplicate notifications)
 let isRunning = false;
@@ -71,7 +72,7 @@ function endRun(fatal) {
     try {
         fs.writeFileSync(STATUS_FILE, JSON.stringify(lastRun));
     } catch (err) {
-        console.error('[Cron] Could not save run status:', err.message);
+        log.error(`[Cron] Could not save run status: ${err.message}`);
     }
 }
 

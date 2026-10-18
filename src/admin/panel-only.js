@@ -12,6 +12,7 @@
  *
  * Posters are left open: <img> can't send headers, and they are TMDB's public images.
  */
+const { log } = require('../log');
 const PANEL_HEADER = 'x-requested-by';
 const PANEL_VALUE = 'notfckbot-panel';
 const OPEN_PATHS = /^\/api\/poster\//;
@@ -55,7 +56,7 @@ function refusal(req) {
 function panelOnly(req, res, next) {
     const reason = refusal(req);
     if (!reason) return next();
-    console.warn(`[Admin] Refused ${req.method} ${req.originalUrl}: ${reason} (origin ${req.headers.origin || '-'})`);
+    log.warn(`[Admin] Refused ${req.method} ${req.originalUrl}: ${reason} (origin ${req.headers.origin || '-'})`);
     res.status(403).json({ error: reason });
 }
 

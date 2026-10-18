@@ -7,8 +7,6 @@ const { test, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const axios = require('axios');
 
-mock.method(console, 'error', () => {});
-
 // Every request to the stub TMDB: answered by `answer`, released when `gate` resolves
 let requests;
 let answer;

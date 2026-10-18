@@ -17,6 +17,7 @@ const { invalidateHealth } = require('./health');
 const { restartBlock, restartSoon } = require('../restart');
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 /** What waits for a restart: saved, but the running process still uses the old value. */
 function pendingRestart(bot) {
@@ -127,7 +128,7 @@ router.post('/api/settings', async (req, res) => {
     if ('TMDB_PROXY_URL' in changes) applyProxyToBot(req.app.get('bot'));
     invalidateHealth();
     const saved = Object.keys(changes);
-    console.log(`[Admin] Settings saved: ${saved.join(', ')}`);
+    log.info(`[Admin] Settings saved: ${saved.join(', ')}`);
     res.json({ saved, settings: currentSettings(req.app.get('bot')) });
 });
 

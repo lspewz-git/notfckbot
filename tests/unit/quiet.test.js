@@ -15,9 +15,6 @@ const { releaseHeld, heldView } = require('../../src/cron/held');
 const { heldLine } = require('../../src/cron/messages');
 const { quietView, zoneView, settingsView } = require('../../src/bot/settings');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
-
 // 14 October 2026, in UTC: 20:30 is 23:30 in Moscow and 06:30 the next day in Vladivostok
 const at = (utc) => new Date(`2026-10-14T${utc}:00Z`);
 const chat = (fields) => ({ id: 10, quiet_start: 23, quiet_end: 8, timezone: 'Europe/Moscow', ...fields });

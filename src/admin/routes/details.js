@@ -9,6 +9,7 @@ const { servePoster } = require('../posters');
 const CHAT_FIELDS = ['id', 'username', 'type'];
 
 const router = require('express').Router();
+const { log } = require('../../log');
 
 router.get('/api/series/:tmdbId', async (req, res) => {
     try {
@@ -111,7 +112,7 @@ router.get('/api/tmdb/search', async (req, res) => {
         const { q } = req.query;
         if (!q) return res.status(400).json({ error: 'Query is required' });
         const results = await tmdb.searchMulti(q);
-        console.log(`[Admin] Search results for "${q}": ${results.length} items found.`);
+        log.info(`[Admin] Search results for "${q}": ${results.length} items found.`);
         res.json(results);
     } catch (err) {
         res.status(500).json({ error: err.message });

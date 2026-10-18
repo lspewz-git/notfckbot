@@ -1,6 +1,7 @@
 /** The .env file: the panel writes tokens and the proxy there, and shows secrets only masked. */
 const fs = require('fs');
 const path = require('path');
+const { log } = require('../log');
 
 const ENV_PATH = process.env.ENV_FILE || path.join(__dirname, '../../.env');
 
@@ -59,7 +60,7 @@ const updateEnvFile = (key, value) => {
     try {
         writeEnv({ [key]: value });
     } catch (err) {
-        console.error('[Admin] Failed to write .env:', err.message);
+        log.error(`[Admin] Failed to write .env: ${err.message}`);
     }
 };
 

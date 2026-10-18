@@ -11,9 +11,6 @@ const tmdb = require('../../src/api/tmdb');
 const kinopoisk = require('../../src/api/kinopoisk');
 const { Watchlist } = require('../../src/db');
 
-mock.method(console, 'log', () => {});
-mock.method(console, 'error', () => {});
-
 // Not out yet: the check only keeps its dates, it sends nothing (a test may swap it for one out)
 const NOT_OUT = {
     title: 'Пчеловод 2',
