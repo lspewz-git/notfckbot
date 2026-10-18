@@ -14,7 +14,7 @@ const mainMenu = (ctx) => {
 
 const cancelMenu = Markup.keyboard([['❌ Отмена']]).resize();
 
-/** One URL button per watch/info link: HDRezka, SSPoisk (when the Kinopoisk ID is known), Kinopoisk. */
+/** One URL button per watch/info link: SSPoisk (when the Kinopoisk ID is known), Kinopoisk. */
 const watchButtonRows = (opts) =>
     getWatchLinks(opts).map((l) => [Markup.button.url(`${l.kind === 'watch' ? '▶️' : '🎬'} ${l.label}`, l.url)]);
 

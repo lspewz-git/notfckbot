@@ -102,11 +102,6 @@ function extraFilmDates(data, ru = {}, { markExpected } = {}) {
 /** A release date for the bot's messages, or a note that there isn't one yet. */
 const formatDigitalDate = (date) => formatRuDate(date) || 'дата не объявлена';
 
-const getWatchLink = (title) => {
-    // HDRezka search URL:
-    return `https://rezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`;
-};
-
 /**
  * Where to watch or read about a title. With a Kinopoisk ID the Kinopoisk and
  * SSPoisk links point straight at the title (SSPoisk mirrors Kinopoisk's URLs);
@@ -117,7 +112,7 @@ const getWatchLink = (title) => {
  * @returns {{ label: string, url: string, kind: 'watch' | 'info' }[]}
  */
 const getWatchLinks = ({ title, kinopoiskId, mediaType }) => {
-    const links = [{ label: 'Смотреть на HDRezka', url: getWatchLink(title), kind: 'watch' }];
+    const links = [];
     if (kinopoiskId) {
         const path = `${mediaType === 'tv' ? 'series' : 'film'}/${kinopoiskId}/`;
         links.push({ label: 'Смотреть на SSPoisk', url: `https://www.sspoisk.ru/${path}`, kind: 'watch' });
@@ -181,7 +176,6 @@ module.exports = {
     extraFilmDates,
     premiereMonthOnly,
     formatDigitalDate,
-    getWatchLink,
     getWatchLinks,
     formatWatchLinks
 };

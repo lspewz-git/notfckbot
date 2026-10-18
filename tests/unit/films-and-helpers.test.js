@@ -140,33 +140,29 @@ describe('nextEpisodeFields', () => {
 });
 
 describe('watch links', () => {
-    test('with a Kinopoisk ID: HDRezka, SSPoisk and Kinopoisk, straight to the title', () => {
+    test('with a Kinopoisk ID: SSPoisk and Kinopoisk, straight to the title; no HDRezka', () => {
         const links = getWatchLinks({ title: 'Dune', kinopoiskId: 123, mediaType: 'movie' });
         assert.deepEqual(
             links.map((l) => l.url),
-            [
-                'https://rezka.ag/search/?do=search&subaction=search&q=Dune',
-                'https://www.sspoisk.ru/film/123/',
-                'https://www.kinopoisk.ru/film/123/'
-            ]
+            ['https://www.sspoisk.ru/film/123/', 'https://www.kinopoisk.ru/film/123/']
         );
     });
 
     test('a series links to /series/ on Kinopoisk and SSPoisk', () => {
         const links = getWatchLinks({ title: 'X', kinopoiskId: 7, mediaType: 'tv' });
-        assert.equal(links[1].url, 'https://www.sspoisk.ru/series/7/');
+        assert.equal(links[0].url, 'https://www.sspoisk.ru/series/7/');
     });
 
     test('without an ID: no SSPoisk, Kinopoisk falls back to a search', () => {
         const links = getWatchLinks({ title: 'Тёмная материя', kinopoiskId: null, mediaType: 'tv' });
-        assert.equal(links.length, 2);
-        assert.ok(links[1].url.startsWith('https://www.kinopoisk.ru/index.php?kp_query=%D0'));
+        assert.equal(links.length, 1);
+        assert.ok(links[0].url.startsWith('https://www.kinopoisk.ru/index.php?kp_query=%D0'));
     });
 
     test('the HTML block escapes & in hrefs for Telegram', () => {
         const html = formatWatchLinks({ title: 'A&B', kinopoiskId: null, mediaType: 'movie' });
-        assert.match(html, /href="https:\/\/rezka\.ag\/search\/\?do=search&amp;subaction=search&amp;q=A%26B"/);
-        assert.doesNotMatch(html, /&subaction/);
+        assert.match(html, /href="https:\/\/www\.kinopoisk\.ru\/index\.php\?kp_query=A%26B"/);
+        assert.doesNotMatch(html, /rezka/);
     });
 });
 
