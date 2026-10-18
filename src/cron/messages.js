@@ -1,5 +1,5 @@
 /** The notification texts the update check sends. Pure: no Telegram, database or network. */
-const { isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
+const { isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates } = require('../constants');
 
 /**
  * The three series notifications, as sent to subscribers. Exported so the admin
@@ -29,15 +29,14 @@ function buildStatusMessage(title, newStatus) {
 
 /**
  * The "film is out" message for one watchlist entry. The notification goes out on the
- * main release; the digital date is added for information, since that's when it can
- * usually be streamed.
+ * main release; the premiere in Russia and the digital releases are added for information,
+ * since a digital release is when it can usually be streamed.
+ * @param {{ entry: object, data: object, links: string, now?: Date, ru?: object }} parts
+ *   ru: Kinopoisk's Russian dates (russianDates)
  */
-function buildFilmMessage({ entry, data, links, now = new Date() }) {
+function buildFilmMessage({ entry, data, links, now = new Date(), ru = {} }) {
     const formattedDate = formatRuDate(data.release_date || null);
-    const digital = data.digital_release_date;
-    const digitalLine = digital
-        ? `💻 Цифровой релиз: <b>${formatRuDate(digital)}</b>${new Date(digital) > now ? ' (ожидается)' : ''}\n`
-        : '';
+    const digitalLine = extraFilmDates(data, ru, { markExpected: now }).join('');
     const directorInfo = data.director_name ? `🎬 Режиссер: <b>${escapeHtml(data.director_name)}</b>\n` : '';
     return (
         `🎬 <b>Фильм доступен!</b>\n\n` +

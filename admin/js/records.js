@@ -5,7 +5,7 @@ import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
-import { chatLabel, chatDisplayName, formatReleaseDate, MODE_LABELS } from './format.js';
+import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
 
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
@@ -76,6 +76,9 @@ async function openDetails(load) {
         setText('detail-meta', card.meta);
         setText('detail-desc', card.desc || 'No description available.');
         $('detail-people').innerHTML = card.people;
+        const dates = $('detail-dates');
+        dates.innerHTML = card.dates || '';
+        dates.hidden = !card.dates;
 
         const img = $img('detail-poster');
         img.hidden = !card.poster;
@@ -111,7 +114,16 @@ export const openFilmDetails = (tmdbId) =>
     openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
         const rating = data.vote_average ? `TMDB ⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated on TMDB yet';
-        const release = data.release_date ? formatReleaseDate(data.release_date) : 'Release date TBA';
+        const d = data.dates || {};
+        const row = (label, iso, note, format = formatReleaseDate) =>
+            iso ? `<dt>${label}</dt><dd>${escapeHtml(format(iso))}${note ? ` · ${escapeHtml(note)}` : ''}</dd>` : '';
+        const dates =
+            row('Release', d.release || data.release_date) +
+            row('Premiere in Russia', d.ruPremiere, null, formatPremiereRu) +
+            (d.digital && !(d.digitalCountry === 'RU' && d.digital === d.ruDigital)
+                ? row('Digital', d.digital, d.digitalCountry)
+                : '') +
+            row('Digital in Russia', d.ruDigital, d.ruServices);
         const chats = data.chats || [];
         const waiting = chats.filter((c) => !c.notified);
         const notified = chats.filter((c) => c.notified);
@@ -120,7 +132,8 @@ export const openFilmDetails = (tmdbId) =>
             (notified.length ? peopleGroup('Already notified', notified) : '');
         return {
             title: data.title || data.original_title,
-            meta: `${rating} • ${release} • ${data.status || 'Unknown status'}`,
+            meta: `${rating} • ${data.status || 'Unknown status'}`,
+            dates: dates || '<dt>Release</dt><dd>TBA</dd>',
             desc: data.overview,
             people: people || '<p class="people-none">No chat has this film on its list.</p>',
             poster: posterUrl(data.poster_path),

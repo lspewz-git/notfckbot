@@ -42,7 +42,7 @@ router.get('/api/movie/:tmdbId', async (req, res) => {
             tmdb.getDetailsCached(numericId, 'movie'),
             Watchlist.findAll({
                 where: { tmdb_id: id },
-                attributes: ['notified'],
+                attributes: ['notified', 'ru_premiere', 'ru_digital', 'ru_services', 'ru_checked_at'],
                 include: [{ model: Chat, attributes: CHAT_FIELDS }]
             })
         ]);
@@ -54,9 +54,22 @@ router.get('/api/movie/:tmdbId', async (req, res) => {
             // Told once is told: a duplicate row still waiting doesn't undo it
             chats.set(e.Chat.id, { chat: e.Chat, notified: Boolean(e.notified) || Boolean(known && known.notified) });
         }
+        // The Russian dates the update check keeps, from the row it asked Kinopoisk for last
+        const ruRow = entries
+            .filter((e) => e.ru_checked_at)
+            .sort((a, b) => new Date(b.ru_checked_at) - new Date(a.ru_checked_at))[0];
+        const dates = {
+            release: details.release_date || null,
+            digital: details.digital_release_date || null,
+            digitalCountry: details.digital_release_country || null,
+            ruPremiere: (ruRow && ruRow.ru_premiere) || null,
+            ruDigital: (ruRow && ruRow.ru_digital) || null,
+            ruServices: (ruRow && ruRow.ru_services) || null
+        };
         const list = [...chats.values()];
         res.json({
             ...details,
+            dates,
             waiting: list.filter((c) => !c.notified).length,
             notified: list.filter((c) => c.notified).length,
             chats: list

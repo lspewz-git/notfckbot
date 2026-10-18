@@ -6,6 +6,7 @@ import {
     chatLabel,
     seriesStatusBadge,
     formatReleaseDate,
+    releaseExtras,
     formatNextEpisode,
     MODE_LABELS
 } from './format.js';
@@ -25,11 +26,11 @@ const ICON = {
 };
 
 /**
- * The phone card: the title (with a badge) on one line, the rest as one muted line.
- * Desktop hides this cell; phones hide every other cell except Actions.
- * @param {{ title: string, action?: string, id?: string, badge?: string, meta: string[] }} card
+ * The phone card: the title (with a badge) on one line, the rest as one muted line, and any
+ * `more` lines under it. Desktop hides this cell; phones hide every other cell except Actions.
+ * @param {{ title: string, action?: string, id?: string, badge?: string, meta: string[], more?: string[] }} card
  */
-function compactCell({ title, action, id, badge = '', meta }) {
+function compactCell({ title, action, id, badge = '', meta, more = [] }) {
     const titleHtml = action
         ? `<span class="compact-title link-text" data-action="${action}" data-id="${escapeHtml(id)}" role="button" tabindex="0">${title}</span>`
         : `<span class="compact-title">${title}</span>`;
@@ -37,6 +38,7 @@ function compactCell({ title, action, id, badge = '', meta }) {
         <td class="cell-compact">
             <div class="compact-head">${titleHtml}${badge}</div>
             <div class="compact-meta">${meta.filter(Boolean).map(escapeHtml).join(' · ')}</div>
+            ${more.map((line) => `<div class="compact-meta">${escapeHtml(line)}</div>`).join('')}
         </td>`;
 }
 
@@ -175,18 +177,22 @@ export const TABLES = {
         },
         row: (item) => {
             const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
+            const extras = releaseExtras(item);
             return `
             <tr class="row-compact">
                 <td data-label="User">${escapeHtml(user)}</td>
                 <td data-label="Film Title" class="link-cell" data-action="film" data-id="${escapeHtml(item.tmdb_id)}"><span class="link-text">${escapeHtml(item.title)}</span></td>
                 <td data-label="Year">${item.year || '—'}</td>
-                <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}</td>
+                <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}${extras
+                    .map((line) => `<span class="release-sub">${escapeHtml(line)}</span>`)
+                    .join('')}</td>
                 ${compactCell({
                     title: escapeHtml(item.title),
                     action: 'film',
                     id: item.tmdb_id,
                     badge: item.year ? `<span class="compact-year">${item.year}</span>` : '',
-                    meta: [user, `Release ${formatReleaseDate(item.premiere_digital)}`]
+                    meta: [user, `Release ${formatReleaseDate(item.premiere_digital)}`],
+                    more: extras
                 })}
                 <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="${item.id}" aria-label="Delete ${escapeHtml(item.title)} for ${escapeHtml(user)}">${ICON.trash}${btnLabel('Delete')}</button></td>
             </tr>

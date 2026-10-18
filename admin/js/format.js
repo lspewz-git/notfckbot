@@ -76,6 +76,66 @@ export function formatReleaseDate(iso) {
 }
 
 /**
+ * Whether a Russian cinema premiere from Kinopoisk is only a month: Kinopoisk puts a month it
+ * knows no day of on the 1st, and films open in Russian cinemas on Thursdays, so a 1st that isn't
+ * a Thursday is "some time that month". 1 January stays a day: New Year premieres are real.
+ * Same rule as premiereMonthOnly() in src/constants.js (the bot's).
+ */
+function premiereMonthOnly(iso) {
+    const d = new Date(`${String(iso).slice(0, 10)}T00:00:00Z`);
+    return !isNaN(d.getTime()) && d.getUTCDate() === 1 && d.getUTCMonth() !== 0 && d.getUTCDay() !== 4;
+}
+
+/** "16 Jan 2027", or "Feb 2027" for a premiere known only to the month. */
+export function formatPremiereRu(iso) {
+    return premiereMonthOnly(iso)
+        ? new Date(`${String(iso).slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+              month: 'short',
+              year: 'numeric',
+              timeZone: 'UTC'
+          })
+        : formatReleaseDate(iso);
+}
+
+/** "16 Jan", with the year when it isn't `sameYearAs`'s ("16 Jan 2028"). */
+function shortDate(iso, sameYearAs) {
+    const full = formatReleaseDate(iso);
+    return sameYearAs && String(iso).slice(0, 4) === String(sameYearAs).slice(0, 4)
+        ? full.replace(/ \d{4}$/, '')
+        : full;
+}
+
+/**
+ * A film's dates besides its main release, for the Movies table: "Russia: cinema 16 Jan · digital
+ * 27 Feb, Okko" (from Kinopoisk) and "Digital 6 Feb (US)" (TMDB's, unless it is that same
+ * Russian date). Plain text; empty when nothing is known.
+ * @param {{ premiere_digital?: string | null, digital_date?: string | null, digital_country?: string | null,
+ *   ru_premiere?: string | null, ru_digital?: string | null, ru_services?: string | null }} film
+ * @returns {string[]}
+ */
+export function releaseExtras(film) {
+    const main = film.premiere_digital;
+    const lines = [];
+    const russia = [];
+    if (film.ru_premiere) {
+        // A month alone keeps its year: "cinema Feb 2027"
+        russia.push(
+            `cinema ${premiereMonthOnly(film.ru_premiere) ? formatPremiereRu(film.ru_premiere) : shortDate(film.ru_premiere, main)}`
+        );
+    }
+    if (film.ru_digital)
+        russia.push(`digital ${shortDate(film.ru_digital, main)}${film.ru_services ? `, ${film.ru_services}` : ''}`);
+    if (russia.length) lines.push(`Russia: ${russia.join(' · ')}`);
+    const sameAsRussia = film.digital_country === 'RU' && film.digital_date === film.ru_digital;
+    if (film.digital_date && !sameAsRussia) {
+        lines.push(
+            `Digital ${shortDate(film.digital_date, main)}${film.digital_country ? ` (${film.digital_country})` : ''}`
+        );
+    }
+    return lines;
+}
+
+/**
  * "S2E5 · 15 Oct 2026" for the next announced episode, "S2E5 · TBA" when it has
  * no date yet, plain "TBA" when TMDB announces nothing. Plain text.
  */

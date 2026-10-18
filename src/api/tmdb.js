@@ -69,10 +69,10 @@ const searchMulti = async (query) => {
 const DIGITAL = 4;
 
 /**
- * The digital release date ("2026-03-04"), or null when TMDB has none. Russia's
- * date is preferred, then the US, then the earliest anywhere.
+ * The digital release: its date ("2026-03-04") and country ("US"), or nulls when TMDB has none.
+ * Russia's date is preferred, then the US, then the earliest anywhere.
  */
-function digitalReleaseDate(releaseDates) {
+function digitalRelease(releaseDates) {
     const byCountry = (releaseDates && releaseDates.results) || [];
     const digitalIn = (country) =>
         (country.release_dates || [])
@@ -83,10 +83,17 @@ function digitalReleaseDate(releaseDates) {
     for (const code of ['RU', 'US']) {
         const country = byCountry.find((c) => c.iso_3166_1 === code);
         const date = country && digitalIn(country);
-        if (date) return date;
+        if (date) return { date, country: code };
     }
-    return byCountry.map(digitalIn).filter(Boolean).sort()[0] || null;
+    const first = byCountry
+        .map((c) => ({ date: digitalIn(c), country: c.iso_3166_1 }))
+        .filter((r) => r.date)
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return first || { date: null, country: null };
 }
+
+/** The digital release date alone. */
+const digitalReleaseDate = (releaseDates) => digitalRelease(releaseDates).date;
 
 /**
  * The columns of a newly tracked series. It starts at the latest episode already aired, so the
@@ -141,7 +148,11 @@ const fetchDetails = async (id, media_type) => {
         }
 
         data.imdb_id = data.imdb_id || (data.external_ids && data.external_ids.imdb_id) || null;
-        if (media_type === 'movie') data.digital_release_date = digitalReleaseDate(data.release_dates);
+        if (media_type === 'movie') {
+            const digital = digitalRelease(data.release_dates);
+            data.digital_release_date = digital.date;
+            data.digital_release_country = digital.country;
+        }
 
         return data;
     } catch (error) {
@@ -233,6 +244,7 @@ module.exports = {
     getSeasonDetailsCached,
     searchMulti,
     digitalReleaseDate,
+    digitalRelease,
     getDetails,
     getDetailsCached,
     nextEpisodeFields,

@@ -37,6 +37,8 @@ test("a series card lists who is subscribed, with each chat's mode", async ({ pa
     await expect(rows.filter({ hasText: 'bob' })).toContainText('Whole season');
     await expect(rows.filter({ hasText: 'Movie Club' })).toContainText('Every episode');
     await expect(card(page).locator('#detail-meta')).toContainText('TMDB ⭐️ 8.4');
+    // Release dates are a film's: no block for a series
+    await expect(card(page).locator('#detail-dates')).toBeHidden();
 });
 
 test("the Kinopoisk button opens the title's page in a new tab", async ({ page }) => {
@@ -97,4 +99,30 @@ test("the Kinopoisk button keeps its size when the title's page replaces the sea
     const after = await button.boundingBox();
     expect(after).toEqual(before);
     await expect(button).toHaveText('Open on Kinopoisk');
+});
+
+test("a film card lists the film's dates, TBA when none is known", async ({ page }) => {
+    const day = new Date(Date.now() + 5 * 86400e3).toISOString().slice(0, 10);
+    const upcoming = [
+        { kind: 'movie', id: 'movie_5', title: 'Hunger Games', date: day, chats: 1 },
+        { kind: 'movie', id: 'movie_3', title: 'No Date Yet', date: day, chats: 1 },
+        { kind: 'movie', id: 'movie_4', title: 'Spider-Man 4', date: day, chats: 1 }
+    ];
+    await mockPanel(page, { upcoming });
+
+    await page.locator('#upcoming-list [data-id="movie_5"]').click();
+    const dates = card(page).locator('#detail-dates');
+    await expect(dates.locator('dt')).toHaveText(['Release', 'Premiere in Russia', 'Digital in Russia']);
+    await expect(dates).toContainText('15 Jan 2027 · Okko');
+    // The release date moved from the line under the title to the list
+    await expect(card(page).locator('#detail-meta')).not.toContainText('Nov');
+
+    await page.keyboard.press('Escape');
+    await page.locator('#upcoming-list [data-id="movie_4"]').click();
+    await expect(dates.locator('dd').nth(1)).toHaveText('Feb 2027');
+
+    await page.keyboard.press('Escape');
+    await page.locator('#upcoming-list [data-id="movie_3"]').click();
+    await expect(card(page).locator('#detail-title')).toHaveText('No Date Yet');
+    await expect(dates.locator('dd')).toHaveText(['TBA']);
 });

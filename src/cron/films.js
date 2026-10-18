@@ -1,7 +1,7 @@
 /** The watchlist half of the update check: tell each chat when its film is out. */
 const { Chat, Watchlist } = require('../db');
 const { getDetails } = require('../api/tmdb');
-const { findKinopoiskId } = require('../api/kinopoisk');
+const { findKinopoiskId, russianDates } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
 const { buildFilmMessage, heldLine } = require('./messages');
 const { tally } = require('./status');
@@ -14,6 +14,27 @@ const isMovieReleased = (data, now = new Date()) => {
     const releaseDate = new Date(data.release_date);
     return !isNaN(releaseDate) && releaseDate <= now;
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Kinopoisk's Russian dates onto the film's rows, at most once a day (the quota). A failed
+ * lookup leaves what is stored and is tried on the next check.
+ */
+async function keepRussianDates(entries, tmdbId, imdbId, now) {
+    const due = entries.some((e) => !e.ru_checked_at || now - new Date(e.ru_checked_at) >= DAY_MS);
+    if (!due) return;
+    const kinopoiskId = await findKinopoiskId(tmdbId, imdbId).catch(() => null);
+    const ru = await russianDates(kinopoiskId);
+    if (ru.failed) return;
+    const fields = {
+        ru_premiere: ru.premiere,
+        ru_digital: ru.digital,
+        ru_services: ru.services.length ? ru.services.join(', ') : null,
+        ru_checked_at: now
+    };
+    for (const entry of entries) await entry.update(fields);
+}
 
 const checkWatchlistReleases = async (bot) => {
     // Load all unnotified watchlist entries with their chat
@@ -54,8 +75,14 @@ const checkWatchlistReleases = async (bot) => {
                 if (entry.premiere_digital !== freshDate) changes.premiere_digital = freshDate;
                 if (freshYear && entry.year !== freshYear) changes.year = freshYear;
                 if (freshTitle && entry.title !== freshTitle) changes.title = freshTitle;
+                if ((entry.digital_date || null) !== (data.digital_release_date || null))
+                    changes.digital_date = data.digital_release_date || null;
+                if ((entry.digital_country || null) !== (data.digital_release_country || null))
+                    changes.digital_country = data.digital_release_country || null;
                 if (Object.keys(changes).length) await entry.update(changes);
             }
+
+            await keepRussianDates(filmEntries, `movie_${filmId}`, data.imdb_id, now);
 
             if (!isMovieReleased(data, now)) {
                 console.log(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
@@ -67,9 +94,15 @@ const checkWatchlistReleases = async (bot) => {
             // A release happens once per film, so the ID is looked up here rather than ahead of time
             const kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
             const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
+            // The Russian dates as kept just above: a Kinopoisk failing now doesn't drop them
+            const ru = {
+                premiere: firstEntry.ru_premiere || null,
+                digital: firstEntry.ru_digital || null,
+                services: firstEntry.ru_services ? firstEntry.ru_services.split(', ') : []
+            };
 
             for (const entry of filmEntries) {
-                const msg = buildFilmMessage({ entry, data, links, now });
+                const msg = buildFilmMessage({ entry, data, links, now, ru });
                 // A message that doesn't go out is queued by notify(), so the film counts as
                 // announced either way
                 await notify(bot, entry.Chat.id, msg, {

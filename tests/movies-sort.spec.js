@@ -97,3 +97,19 @@ test('the header cell reports the order to assistive tech', async ({ page }) => 
     await expect(page.locator('thead th[aria-sort="ascending"]')).toHaveCount(1);
     await expect(page.locator('thead th[aria-sort="none"]')).toHaveCount(1);
 });
+
+test('the Release column: the other dates under the main one, only where known', async ({ page }) => {
+    await goToMovies(page);
+    const release = (title) =>
+        page
+            .locator('#watchlist-body tr', { hasText: title })
+            .locator(page.viewportSize().width <= 760 ? '.cell-compact' : '[data-label="Release"]');
+    await expect(release('Hunger Games')).toContainText('Russia: cinema 20 Nov · digital 15 Jan 2027, Okko');
+    await expect(release('Dune: Part Three')).toContainText('Digital 2 Feb 2027 (US)');
+    // Only the month known: the month, not a made-up 1st
+    await expect(release('Spider-Man 4')).toContainText('Russia: cinema Feb 2027');
+    // Nothing else known: the one date, as before
+    await expect(release('Avengers: Doomsday').locator('.release-sub, .compact-meta')).toHaveCount(
+        page.viewportSize().width <= 760 ? 1 : 0
+    );
+});

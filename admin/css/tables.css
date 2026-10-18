@@ -171,3 +171,10 @@ table[data-tab='archive'] .col-next {
     display: flex;
     gap: var(--space-2);
 }
+
+/* A film's other dates under its release (Movies): quieter and smaller, one per line */
+.release-sub {
+    display: block;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}

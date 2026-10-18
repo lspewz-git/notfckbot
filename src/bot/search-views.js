@@ -3,7 +3,7 @@
  * calls — so search.js decides how to put them on screen and tests can check them directly.
  */
 const { Markup } = require('telegraf');
-const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
+const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates } = require('../constants');
 const { watchButtonRows } = require('./keyboards');
 // The release check's own rule, so the card never says "out" before the notification does
 const { isMovieReleased } = require('../cron/films');
@@ -125,10 +125,12 @@ function seriesCard(data, { subscribedMode = null } = {}) {
 /**
  * A film's card. Out already: the release date and where to watch. Not yet: the release date
  * and "add to the watchlist" (or a note that it's there).
+ * Both with the premiere in Russia and the digital releases when known (extraFilmDates).
  * @param {object} data TMDB film details
- * @param {{ kinopoiskId?: number | null, onWatchlist?: boolean, now?: Date }} [opts]
+ * @param {{ kinopoiskId?: number | null, onWatchlist?: boolean, now?: Date, ru?: object }} [opts]
+ *   ru: Kinopoisk's Russian dates (russianDates)
  */
-function filmCard(data, { kinopoiskId = null, onWatchlist = false, now = new Date() } = {}) {
+function filmCard(data, { kinopoiskId = null, onWatchlist = false, now = new Date(), ru = {} } = {}) {
     const name = data.title || data.original_title || 'Без названия';
     const kindLine = data.director_name ? `Фильм · режиссёр ${data.director_name}` : 'Фильм';
     const released = isMovieReleased(data, now);
@@ -136,14 +138,12 @@ function filmCard(data, { kinopoiskId = null, onWatchlist = false, now = new Dat
 
     let dates;
     let rows;
+    const more = extraFilmDates(data, ru).join('');
     if (released) {
-        dates = `✅ Уже вышел${date ? ` — <b>${date}</b>` : ''}\n`;
+        dates = `✅ Уже вышел${date ? ` — <b>${date}</b>` : ''}\n` + more;
         rows = watchButtonRows({ title: name, kinopoiskId, mediaType: 'movie' });
     } else {
-        const digital = formatRuDate(data.digital_release_date);
-        dates =
-            `📅 Релиз: <b>${date || 'дата не объявлена'}</b>\n` +
-            (digital ? `💻 Цифровой релиз: <b>${digital}</b>\n` : '');
+        dates = `📅 Релиз: <b>${date || 'дата не объявлена'}</b>\n` + more;
         rows = onWatchlist ? [] : [[Markup.button.callback('📌 В список ожидания', `watchlist_add_movie_${data.id}`)]];
     }
     rows.push(backRow);

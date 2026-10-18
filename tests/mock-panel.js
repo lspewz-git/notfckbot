@@ -90,13 +90,27 @@ const film = (id, title, year, premiere_digital, notified = false) => ({
     notified
 });
 
-/** Waiting films in no particular order, one without a date; plus one released. */
+/**
+ * Waiting films in no particular order, one without a date; plus one released. Dune: Part
+ * Three has a US digital release only; Hunger Games also has Russian dates from Kinopoisk.
+ */
 const FILMS = [
-    film(1, 'Dune: Part Three', 2026, '2026-12-18'),
+    { ...film(1, 'Dune: Part Three', 2026, '2026-12-18'), digital_date: '2027-02-02', digital_country: 'US' },
     film(2, 'Avengers: Doomsday', 2026, '2026-12-16'),
     film(3, 'No Date Yet', null, null),
-    film(4, 'Spider-Man 4', 2027, '2027-06-16'),
-    film(5, 'Hunger Games', 2026, '2026-11-18'),
+    // Kinopoisk knows only the month of its Russian premiere (the 1st, not a Thursday)
+    {
+        ...film(4, 'Spider-Man 4', 2027, '2027-06-16'),
+        ru_premiere: '2027-02-01',
+        ru_checked_at: '2026-10-18T09:00:00Z'
+    },
+    {
+        ...film(5, 'Hunger Games', 2026, '2026-11-18'),
+        ru_premiere: '2026-11-20',
+        ru_digital: '2027-01-15',
+        ru_services: 'Okko',
+        ru_checked_at: '2026-10-18T09:00:00Z'
+    },
     film(6, 'Dune', 2024, '2024-04-16', true)
 ];
 
@@ -416,6 +430,14 @@ async function mockPanel(page, options = {}) {
                     title: rows[0].title,
                     vote_average: 7.1,
                     release_date: rows[0].premiere_digital,
+                    dates: {
+                        release: rows[0].premiere_digital,
+                        digital: rows[0].digital_date || null,
+                        digitalCountry: rows[0].digital_country || null,
+                        ruPremiere: rows[0].ru_premiere || null,
+                        ruDigital: rows[0].ru_digital || null,
+                        ruServices: rows[0].ru_services || null
+                    },
                     status: rows[0].notified ? 'Released' : 'Post Production',
                     overview: 'A test film.',
                     poster_path: null,

@@ -35,6 +35,16 @@ const Watchlist = sequelize.define('Watchlist', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    // The film's other dates, kept by the update check for the panel (shown, not acted on):
+    // TMDB's digital release and its country ("US"), every check; from Kinopoisk once a day,
+    // the premiere in Russia, the online release there and its cinemas ("Okko, START")
+    digital_date: { type: DataTypes.STRING(10), allowNull: true },
+    digital_country: { type: DataTypes.STRING(2), allowNull: true },
+    ru_premiere: { type: DataTypes.STRING(10), allowNull: true },
+    ru_digital: { type: DataTypes.STRING(10), allowNull: true },
+    ru_services: { type: DataTypes.STRING, allowNull: true },
+    // When Kinopoisk was last asked; null = never
+    ru_checked_at: { type: DataTypes.DATE, allowNull: true },
     // Whether we have already sent the release notification
     notified: {
         type: DataTypes.BOOLEAN,

@@ -168,6 +168,88 @@ async function checkKinopoiskKey(key) {
     return { used: daily.used, limit: daily.value, accountType: res.data?.accountType };
 }
 
+// --- A film's Russian dates: the cinema premiere and the digital release ---
+
+const NO_DATES = Object.freeze({ premiere: null, digital: null, services: [] });
+const DATES_TTL_MS = 24 * 60 * 60 * 1000;
+const datesCache = new Map(); // kinopoiskId -> { dates, at, ttl }
+
+const earliest = (items) =>
+    items
+        .map((i) => i.date)
+        .filter(Boolean)
+        .sort()[0] || null;
+
+/**
+ * The Russian premiere and digital release from Kinopoisk's distributions, or nulls (no key, not
+ * known, or the API failing; then also `failed`, so stored dates aren't wiped). Never throws.
+ * Kept a day: the dates change rarely, the quota is 500 requests a day.
+ * @returns {Promise<{ premiere: string | null, digital: string | null, services: string[], failed?: true }>}
+ *   "YYYY-MM-DD" dates; services: the online cinemas of the digital release ("START")
+ */
+async function russianDates(kinopoiskId) {
+    const id = toId(kinopoiskId);
+    if (!id || !process.env.KINOPOISK_API_KEY) return NO_DATES;
+    const hit = datesCache.get(id);
+    if (hit && Date.now() - hit.at < hit.ttl) return hit.dates;
+    let dates = NO_DATES;
+    let ttl = DATES_TTL_MS;
+    try {
+        const res = await axios.get(`${KP_API}/api/v2.2/films/${id}/distributions`, {
+            headers: kpHeaders(),
+            timeout: 8000
+        });
+        const items = (res.data && res.data.items) || [];
+        const inRussia = (i) => Boolean(i.country) && i.country.country === 'Россия';
+        // Kinopoisk lists Russia's online releases, with or without the country filled in
+        const online = items.filter((i) => i.type === 'DIGITAL' && i.date && (!i.country || inRussia(i)));
+        const digital = earliest(online);
+        dates = {
+            premiere: earliest(
+                items.filter((i) => (i.type === 'PREMIERE' || i.type === 'COUNTRY_SPECIFIC') && inRussia(i))
+            ),
+            digital,
+            services: [
+                ...new Set(
+                    online
+                        .filter((i) => i.date === digital)
+                        .flatMap((i) => (i.companies || []).map((c) => c.name))
+                        .filter(Boolean)
+                )
+            ]
+        };
+    } catch (err) {
+        // 404 is "no such film": as good as no dates. Anything else is tried again soon
+        if (!(err.response && err.response.status === 404)) {
+            ttl = FAIL_TTL_MS;
+            dates = { ...NO_DATES, failed: true };
+        }
+        console.error(`[Kinopoisk] Release dates of ${id} failed: ${err.message}`);
+    }
+    if (datesCache.size >= CACHE_MAX) datesCache.delete(datesCache.keys().next().value);
+    datesCache.set(id, { dates, at: Date.now(), ttl });
+    return dates;
+}
+
+/**
+ * For the bot's card: the Kinopoisk ID and then the dates, given up on after `ms` in all, so a
+ * slow Kinopoisk never holds the card back (it then shows TMDB's dates only).
+ * @returns {Promise<{ kinopoiskId: number | null, ru: typeof NO_DATES }>}
+ */
+async function kinopoiskQuick(tmdbId, imdbId, ms = 3000) {
+    let settled = { kinopoiskId: null, ru: NO_DATES };
+    const lookup = (async () => {
+        const kinopoiskId = await findKinopoiskId(tmdbId, imdbId);
+        settled = { kinopoiskId, ru: NO_DATES };
+        const ru = kinopoiskId ? await russianDates(kinopoiskId) : NO_DATES;
+        settled = { kinopoiskId, ru };
+    })().catch(() => {});
+    let timer;
+    await Promise.race([lookup, new Promise((resolve) => (timer = setTimeout(resolve, ms)))]);
+    clearTimeout(timer);
+    return settled;
+}
+
 /** For the admin health badge. */
 async function getKinopoiskStatus() {
     const key = process.env.KINOPOISK_API_KEY;
@@ -177,6 +259,9 @@ async function getKinopoiskStatus() {
 }
 
 module.exports = {
+    russianDates,
+    kinopoiskQuick,
+    NO_DATES,
     findKinopoiskId,
     findKinopoiskIdQuick,
     knownKinopoiskId,

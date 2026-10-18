@@ -37,8 +37,13 @@ const DETAILS = {
 mock.method(tmdb, 'searchMulti', async () => RESULTS);
 mock.method(tmdb, 'getDetails', async (id, type) => DETAILS[`${type}:${id}`]);
 mock.method(tmdb, 'getDetailsCached', async (id, type) => DETAILS[`${type}:${id}`]);
-mock.method(kinopoisk, 'findKinopoiskIdQuick', async () => null);
-mock.method(kinopoisk, 'findKinopoiskId', async () => null);
+mock.method(kinopoisk, 'kinopoiskQuick', async () => ({ kinopoiskId: null, ru: kinopoisk.NO_DATES }));
+// Recorded: the list prefetches each film's Kinopoisk ID for its card
+const kinopoiskAsked = [];
+mock.method(kinopoisk, 'findKinopoiskId', async (tmdbId) => {
+    kinopoiskAsked.push(tmdbId);
+    return null;
+});
 
 let db;
 beforeEach(() => {
@@ -304,4 +309,17 @@ test('a double tap on "subscribe" subscribes once', async () => {
     await Promise.all([press(bot, chat, card, 'sub_set_tv_3_episode'), press(bot, chat, card, 'sub_set_tv_3_episode')]);
     assert.equal(db.subs.length, 1);
     assert.match(only(chat).text, /Вы успешно подписались/);
+});
+
+test("the list prefetches every film's Kinopoisk ID, out or not: its card needs it for the Russian dates", async () => {
+    const bot = fakeBot();
+    const chat = fakeChat();
+    const { setState } = require('../../src/bot/state');
+    const userCtx = chat.ctxFor(null, { message: { text: 'курьер' } });
+    setState(userCtx, { state: 'waiting_for_search' });
+    kinopoiskAsked.length = 0;
+    await bot.onText()(userCtx, async () => {});
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    assert.ok(kinopoiskAsked.includes('movie_1'), 'the film not out yet too');
+    assert.ok(!kinopoiskAsked.includes('tv_3'), 'not for a series');
 });

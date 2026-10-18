@@ -4,8 +4,7 @@
  */
 const { Markup } = require('telegraf');
 const { searchMulti, getDetails, getDetailsCached, newSeriesFields } = require('../api/tmdb');
-const { findKinopoiskId, findKinopoiskIdQuick } = require('../api/kinopoisk');
-const { isMovieReleased } = require('../cron/films');
+const { findKinopoiskId, kinopoiskQuick } = require('../api/kinopoisk');
 const { Series, Subscription, Watchlist } = require('../db');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
@@ -110,16 +109,16 @@ async function showList(ctx, session, page) {
 
 /**
  * While the list is being read, fetches what the page's cards will need, so a tap opens one at
- * once: TMDB details (into its cache) and, for a film that is out, the Kinopoisk ID (into the
- * lookup's cache). Fire and forget; a failure only means that card asks again when opened.
+ * once: TMDB details (into its cache) and, for a film, the Kinopoisk ID (into the lookup's cache:
+ * the watch links and the Russian dates need it; usually Wikidata, no quota). The dates themselves
+ * wait for the tap: they cost a Kinopoisk request. Fire and forget; a failure only means that
+ * card asks again when opened.
  */
 function prefetch(items) {
     for (const item of items) {
         getDetailsCached(item.id, item.media_type)
             .then((data) => {
-                if (item.media_type === 'movie' && isMovieReleased(data)) {
-                    return findKinopoiskId(`movie_${item.id}`, data.imdb_id);
-                }
+                if (item.media_type === 'movie') return findKinopoiskId(`movie_${item.id}`, data.imdb_id);
                 return null;
             })
             .catch(() => {});
@@ -258,14 +257,14 @@ function register(bot) {
             await ctx.answerCbQuery();
 
             if (mediaType === 'movie') {
-                const [onWatchlist, kinopoiskId] = await Promise.all([
+                const [onWatchlist, { kinopoiskId, ru }] = await Promise.all([
                     Watchlist.findOne({ where: { chatId: ctx.chat.id, tmdb_id: tmdbId, notified: false } }).then(
                         Boolean
                     ),
-                    // Only a film that is out shows watch links, the only thing that needs the ID
-                    isMovieReleased(data) ? findKinopoiskIdQuick(tmdbId, data.imdb_id) : null
+                    // The ID for the watch links (a film that is out) and the Russian dates (any film)
+                    kinopoiskQuick(tmdbId, data.imdb_id)
                 ]);
-                return showCard(ctx, ctx.state.search, filmCard(data, { kinopoiskId, onWatchlist }));
+                return showCard(ctx, ctx.state.search, filmCard(data, { kinopoiskId, onWatchlist, ru }));
             }
 
             const sub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });

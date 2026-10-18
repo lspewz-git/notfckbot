@@ -276,6 +276,16 @@
     font-size: var(--text-sm);
 }
 
+/* A film's dates in its dialog: the list without the room a service dialog keeps for its rows */
+.detail-dates {
+    min-height: 0;
+    margin-bottom: var(--space-3);
+}
+
+.detail-dates[hidden] {
+    display: none;
+}
+
 /* Kinopoisk: a quiet button with the brand mark, between the description and the chats */
 .kp-link {
     display: inline-flex;
