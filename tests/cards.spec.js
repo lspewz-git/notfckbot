@@ -126,3 +126,26 @@ test("a film card lists the film's dates, TBA when none is known", async ({ page
     await expect(card(page).locator('#detail-title')).toHaveText('No Date Yet');
     await expect(dates.locator('dd')).toHaveText(['TBA']);
 });
+
+test('on a phone a small poster sits beside the title, the description under both at full width', async ({ page }) => {
+    test.skip(page.viewportSize().width > 560, 'the phone layout');
+    await mockPanel(page, { poster: true });
+    await openSeriesCard(page);
+    const poster = card(page).locator('#detail-poster');
+    await expect(poster).toBeVisible();
+    const settled = () => page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+    await settled();
+    const [p, title, meta, desc] = await Promise.all(
+        [
+            poster,
+            card(page).locator('#detail-title'),
+            card(page).locator('#detail-meta'),
+            card(page).locator('#detail-desc')
+        ].map((l) => l.boundingBox())
+    );
+    expect(p.width).toBeLessThanOrEqual(60);
+    expect(title.x).toBeGreaterThan(p.x + p.width);
+    expect(meta.x).toBe(title.x);
+    expect(desc.y).toBeGreaterThanOrEqual(p.y + p.height - 1);
+    expect(Math.abs(desc.x - p.x)).toBeLessThan(1);
+});

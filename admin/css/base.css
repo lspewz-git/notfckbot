@@ -51,6 +51,26 @@
     --warning: #f5b14c;
     --warning-soft: rgba(245, 177, 76, 0.12);
     --muted-soft: rgba(255, 255, 255, 0.06);
+    --on-danger: #ffffff; /* text on --danger-fill */
+    --danger-tint: rgba(255, 107, 94, 0.07); /* the alert banner */
+    --danger-tint-hover: rgba(255, 107, 94, 0.1);
+
+    /* Neutral fills: white over the dark surfaces, by strength */
+    --fill-faint: rgba(255, 255, 255, 0.03); /* notes and previews inside a card */
+    --fill-hover: rgba(255, 255, 255, 0.04); /* hovered rail item, skeleton base */
+    --fill-subtle: rgba(255, 255, 255, 0.05); /* poster stub */
+    --fill-active: rgba(255, 255, 255, 0.08); /* selected rail item */
+    --fill-shine: rgba(255, 255, 255, 0.09); /* the skeleton's moving highlight */
+    --fill-strong: rgba(255, 255, 255, 0.14); /* a switch that is off */
+    --divider: rgba(255, 255, 255, 0.08); /* short rules in the rail and the header */
+
+    /* Overlays: what sits above the page */
+    --scrim: rgba(0, 0, 0, 0.6); /* behind a dialog */
+    --well: rgba(0, 0, 0, 0.4); /* sunken area: the log viewer */
+    --bar-glass: rgba(14, 13, 12, 0.86); /* the phone tab bar, over blur */
+    --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55); /* dropdowns */
+    --shadow-toast: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.5);
 
     /* Type */
     --font-sans: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;

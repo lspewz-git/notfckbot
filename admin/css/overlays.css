@@ -21,7 +21,7 @@
     color: var(--text);
     font-size: 0.85rem;
     line-height: 1.45;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-toast);
     animation: toast-in 0.25s ease-out;
 }
 
@@ -146,7 +146,7 @@
     width: 40px;
     height: 60px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--fill-subtle);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -170,7 +170,7 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--scrim);
     backdrop-filter: blur(2px);
     z-index: 1000;
     align-items: center;
@@ -183,7 +183,7 @@
     background: var(--surface-overlay);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-modal);
     width: 100%;
     max-width: 600px;
     max-height: 90vh;
@@ -372,9 +372,53 @@
     text-align: center;
 }
 
+/* A phone: a small poster beside the title and its meta line, and everything else under them at
+   the full width, so the description isn't squeezed into a column a few words wide. The body's
+   children join the card's grid for that (display: contents) */
 @media (max-width: 560px) {
     .detail {
-        grid-template-columns: 6rem minmax(0, 1fr);
-        gap: var(--space-4);
+        grid-template-columns: 3.5rem minmax(0, 1fr);
+        gap: 0 var(--space-3);
+        align-items: center;
+    }
+
+    .detail-body {
+        display: contents;
+    }
+
+    .detail-poster {
+        grid-row: 1 / span 2;
+    }
+
+    .detail-body > * {
+        grid-column: 1 / -1;
+    }
+
+    .detail-body > #detail-title,
+    .detail-body > .detail-meta {
+        grid-column: 2;
+    }
+
+    /* The two lines together, centred on the poster */
+    .detail-body > #detail-title {
+        align-self: end;
+    }
+
+    .detail-body > .detail-meta {
+        align-self: start;
+    }
+
+    /* No poster: the body as it is, one column */
+    .detail:has(.detail-poster[hidden]) .detail-body {
+        display: block;
+    }
+}
+
+/* The close button is 32px; a finger gets 44 */
+@media (pointer: coarse) {
+    .modal-x::after {
+        content: '';
+        position: absolute;
+        inset: -6px;
     }
 }

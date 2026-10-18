@@ -126,3 +126,25 @@
         display: none;
     }
 }
+
+/* A finger needs 44px: the title's box grows into the row's padding (given back by the margin, so
+   the row keeps its height) and sits above the genres line under it; the Kinopoisk button gets an
+   invisible layer, so the row and its loading placeholder stay the same height */
+@media (pointer: coarse) {
+    .history-main .link-text {
+        position: relative;
+        padding-block: 12px;
+        margin-block: -12px;
+    }
+
+    .history-item .kp-link {
+        position: relative;
+        z-index: 1;
+    }
+
+    .history-item .kp-link::after {
+        content: '';
+        position: absolute;
+        inset: -6px 0;
+    }
+}

@@ -1,7 +1,7 @@
 /* Logs */
 .logs-viewer {
     height: 400px;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--well);
     border-radius: var(--radius);
     padding: 1rem;
     font-family: var(--font-mono);
@@ -31,7 +31,7 @@
 .log-entry .type-tag {
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
-    font-size: 0.65rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     margin-right: 0.5rem;
 }

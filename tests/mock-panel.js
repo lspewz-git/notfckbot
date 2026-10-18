@@ -190,6 +190,12 @@ function charts() {
     };
 }
 
+/** A 1x1 grey PNG: a poster for the cards, sized by CSS like a real one */
+const PIXEL = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+    'base64'
+);
+
 /**
  * Routes every request of `page` and opens the panel. Returns the mutable fixture so a test can
  * change what the next poll sees (e.g. `panel.subs.push(...)`).
@@ -197,7 +203,7 @@ function charts() {
  * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
- *   failing?: string[] }} [options]
+ *   failing?: string[], poster?: boolean }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
@@ -205,6 +211,7 @@ function charts() {
  *   `history(year)`: the /api/history answer for the year asked (0 when none);
  *   `hold`: API answers wait for it, so a test can see the loading state;
  *   `failing`: API paths ('/api/stats') that answer 500;
+ *   `poster`: a series card gets a poster (a 1x1 image);
  *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
  *   served once it resolves (a page.route() of the test's would lose to this one's catch-all)
  */
@@ -416,7 +423,8 @@ async function mockPanel(page, options = {}) {
                     vote_average: 8.4,
                     number_of_seasons: 4,
                     overview: 'A test series.',
-                    poster_path: null,
+                    // options.poster: the card gets a poster (a 1x1 image, see /api/poster/ below)
+                    poster_path: options.poster ? '/poster.png' : null,
                     subCount: subs.length,
                     subscribers: subs.map((s) => ({ chat: s.Chat, mode: s.notify_type }))
                 };
@@ -477,6 +485,8 @@ async function mockPanel(page, options = {}) {
             return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
         }
 
+        if (url.pathname.startsWith('/api/poster/') && options.poster)
+            return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
         if (url.pathname.startsWith('/api/')) {
             const card = cards.map(([re, fn]) => [url.pathname.match(re), fn]).find(([m]) => m);
             const handler = api[url.pathname] || (card && ((req) => card[1](card[0], req)));

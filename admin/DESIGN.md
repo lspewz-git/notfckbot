@@ -1,8 +1,9 @@
 # Admin panel design system
 
-Dark, warm and calm: a near-black page, cards one step lighter, hairline borders, no shadows.
+Dark, warm and calm: a near-black page, cards one step lighter, hairline borders, no shadows
+on the page itself (only what floats above it: dropdowns, toasts, dialogs).
 The tokens live in `css/base.css`; every other stylesheet uses them, so a raw colour, size or
-radius anywhere else is a bug.
+radius anywhere else is a bug (`tests/unit/css-tokens.test.js` fails on a raw colour).
 
 The dashboard's rules, its phone layout included, live together in `css/dashboard.css`, loaded
 last so they win over the shared styles without long selectors.
@@ -17,10 +18,12 @@ last so they win over the shared styles without long selectors.
 | `--surface-3`                                   | `#26241f`                         | Selected items, tooltips, secondary buttons          |
 | `--border` / `--border-row` / `--border-strong` | white at 6% / 5% / 10%            | Card edges / lines between list rows / control edges |
 | `--text` / `--text-secondary`                   | `#f3f1ec` / `#c9c5bd`             | Body / quieter labels (statuses, switch)             |
-| `--text-dim` / `--text-faint`                   | `#a29e96` / `#75716a`             | Descriptions, meta / ranks, icons, "off" states      |
+| `--text-dim` / `--text-faint`                   | `#a29e96` / `#75716a`             | Descriptions, meta, ranks, "off" / icons, decoration |
 | `--accent` / `--on-accent`                      | `#f5b14c` / `#1a1206`             | The logo and a switch that is on. Nothing else       |
 | `--primary` / `--on-primary`                    | `#f3f1ec` / `#161513`             | Primary button: inverted, light with dark text       |
 | `--success` / `--danger` / `--danger-dot`       | `#6fd394` / `#ff8a7f` / `#ff6b5e` | Status text and dots; `*-soft` fills where needed    |
+| `--fill-*` / `--divider`                        | white at 3–14% / 8%               | Hover, selected and skeleton fills / short rules     |
+| `--scrim` / `--well` / `--shadow-*`             | black at 60% / 40%                | Behind a dialog / the log viewer / floating layers   |
 
 Colour means status. The accent is used sparingly; links and the active nav item use plain
 foreground.
@@ -44,6 +47,9 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
   20 cards (`--radius-lg`), 999 switches.
 - **Control height:** `--control-h` sets the height of buttons, inputs and rows. It is 36px with a
   mouse and 44px on touch screens (`pointer: coarse`).
+- **Touch targets:** 44px on touch screens. A control drawn smaller (a chart toggle, "View all",
+  a title link) keeps its look and gets an invisible layer around it (`::after` with a negative
+  `inset`), so the cards and their loading placeholders keep their height.
 
 ## Components
 
@@ -57,6 +63,9 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
 - **Lists on cards:** rows split by `--border-row`, no fills; the title underlines on hover.
 - **Tabs:** a `--surface-3` track. The selected trigger is raised to the panel colour.
 - **Buttons:** primary is inverted, outline for secondary actions on cards, destructive is red.
+- **Title card (series / film):** the poster on the left, the text beside it. On a phone a small
+  poster sits beside the title and its meta line, and the description, dates and chats run
+  under both at the full width.
 
 ## Interaction
 

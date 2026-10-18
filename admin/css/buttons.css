@@ -53,7 +53,7 @@
 
 .btn-danger:hover {
     background: var(--danger-fill);
-    color: #fff;
+    color: var(--on-danger);
 }
 
 /* Quiet destructive action — deliberately less prominent than the safe choice */
