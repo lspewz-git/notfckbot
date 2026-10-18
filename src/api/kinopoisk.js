@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { lruCache } = require('../lru');
 require('dotenv').config();
 
 /**
@@ -52,40 +53,23 @@ async function fromKinopoiskApi(imdbId) {
 }
 
 // Answers already known, so a search list, a card and the history page asking about one title
-// don't repeat the lookup (and don't spend API quota). Misses expire, as both sources catch up.
-const cache = new Map();
+// don't repeat the lookup (and don't spend API quota); a card opened while the search list is
+// still prefetching the same title shares its lookup. A found ID is kept; misses expire, as both
+// sources catch up.
 const CACHE_MAX = 1000;
 const MISS_TTL_MS = 6 * 60 * 60 * 1000;
 // A source that couldn't be asked (down, rejected the key): short, so it is tried again soon
 const FAIL_TTL_MS = 10 * 60 * 1000;
-const inFlight = new Map(); // tmdbId -> pending lookup
-
-/**
- * @param {string} tmdbId e.g. "tv_1399" or "movie_603"
- * @param {string | null} imdbId e.g. "tt0944947", if known
- * @returns {Promise<{ id: number | null, failed: boolean }>} `failed` means a source
- *   could not be asked (network, quota) — as opposed to it not knowing the title
- */
-async function lookupKinopoiskId(tmdbId, imdbId) {
-    const hit = cache.get(tmdbId);
-    if (hit) {
-        // A found ID is kept; a miss and a failure are retried after a while
-        const ttl = hit.id ? Infinity : hit.failed ? FAIL_TTL_MS : MISS_TTL_MS;
-        if (Date.now() - hit.at < ttl) return { id: hit.id, failed: Boolean(hit.failed) };
-    }
-    // A card opened while the search list was still prefetching the same title: one lookup
-    if (inFlight.has(tmdbId)) return inFlight.get(tmdbId);
-
-    const run = (async () => {
+const cache = lruCache({
+    max: CACHE_MAX,
+    /** @returns {Promise<{ id: number | null, failed: boolean }>} */
+    fetchMethod: async (tmdbId, _stale, { options, context: imdbId }) => {
         const [mediaType, numericId] = String(tmdbId).split('_');
         let failed = false;
         for (const lookup of [() => fromWikidata(numericId, mediaType), () => fromKinopoiskApi(imdbId)]) {
             try {
                 const id = await lookup();
-                if (id) {
-                    remember(tmdbId, id);
-                    return { id, failed: false };
-                }
+                if (id) return { id, failed: false };
             } catch (err) {
                 failed = true;
                 console.error(`[Kinopoisk] Lookup failed for ${tmdbId}:`, err.message);
@@ -93,17 +77,18 @@ async function lookupKinopoiskId(tmdbId, imdbId) {
         }
         // A failure is remembered too, briefly: otherwise every page of search results would
         // ask a dead API again (and log it again) for each film Wikidata doesn't know
-        remember(tmdbId, null, failed);
+        options.ttl = failed ? FAIL_TTL_MS : MISS_TTL_MS;
         return { id: null, failed };
-    })().finally(() => inFlight.delete(tmdbId));
-    inFlight.set(tmdbId, run);
-    return run;
-}
+    }
+});
 
-function remember(tmdbId, id, failed = false) {
-    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
-    cache.set(tmdbId, { id, at: Date.now(), failed });
-}
+/**
+ * @param {string} tmdbId e.g. "tv_1399" or "movie_603"
+ * @param {string | null} imdbId e.g. "tt0944947", if known
+ * @returns {Promise<{ id: number | null, failed: boolean }>} `failed` means a source
+ *   could not be asked (network, quota) — as opposed to it not knowing the title
+ */
+const lookupKinopoiskId = (tmdbId, imdbId) => cache.fetch(tmdbId, { context: imdbId || null });
 
 /**
  * The ID if a lookup already found it, without asking anyone; otherwise null, and a lookup is
@@ -172,7 +157,6 @@ async function checkKinopoiskKey(key) {
 
 const NO_DATES = Object.freeze({ premiere: null, digital: null, services: [] });
 const DATES_TTL_MS = 24 * 60 * 60 * 1000;
-const datesCache = new Map(); // kinopoiskId -> { dates, at, ttl }
 
 const earliest = (items) =>
     items
@@ -190,10 +174,11 @@ const earliest = (items) =>
 async function russianDates(kinopoiskId) {
     const id = toId(kinopoiskId);
     if (!id || !process.env.KINOPOISK_API_KEY) return NO_DATES;
-    const hit = datesCache.get(id);
-    if (hit && Date.now() - hit.at < hit.ttl) return hit.dates;
+    return datesCache.fetch(id);
+}
+
+async function fetchRussianDates(id, _stale, { options }) {
     let dates = NO_DATES;
-    let ttl = DATES_TTL_MS;
     try {
         const res = await axios.get(`${KP_API}/api/v2.2/films/${id}/distributions`, {
             headers: kpHeaders(),
@@ -221,15 +206,16 @@ async function russianDates(kinopoiskId) {
     } catch (err) {
         // 404 is "no such film": as good as no dates. Anything else is tried again soon
         if (!(err.response && err.response.status === 404)) {
-            ttl = FAIL_TTL_MS;
+            options.ttl = FAIL_TTL_MS;
             dates = { ...NO_DATES, failed: true };
         }
         console.error(`[Kinopoisk] Release dates of ${id} failed: ${err.message}`);
     }
-    if (datesCache.size >= CACHE_MAX) datesCache.delete(datesCache.keys().next().value);
-    datesCache.set(id, { dates, at: Date.now(), ttl });
     return dates;
 }
+
+// kinopoiskId -> dates; two requests for one film at once make one
+const datesCache = lruCache({ max: CACHE_MAX, ttl: DATES_TTL_MS, fetchMethod: fetchRussianDates });
 
 /**
  * For the bot's card: the Kinopoisk ID and then the dates, given up on after `ms` in all, so a

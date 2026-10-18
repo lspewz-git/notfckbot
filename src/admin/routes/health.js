@@ -2,6 +2,7 @@
 const axios = require('axios');
 const { buildProxyAgent } = require('../../proxy');
 const { getKinopoiskStatus } = require('../../api/kinopoisk');
+const { lruCache } = require('../../lru');
 
 const router = require('express').Router();
 
@@ -86,24 +87,19 @@ function logChange(name, value) {
     else console.log(`[Health] ${LOG_NAMES[name]}: ${value[name] === 'off' ? 'off' : 'ok again'}`);
 }
 
-const healthCache = new Map(); // name -> { at, value }
-const healthInFlight = new Map(); // name -> pending check, shared by concurrent requests
+// name -> the check's answer; concurrent requests share one check
+const healthCache = lruCache({
+    max: Object.keys(HEALTH_CHECKS).length,
+    ttl: HEALTH_TTL_MS,
+    fetchMethod: async (name, _stale, { context: bot }) => {
+        const value = await HEALTH_CHECKS[name](bot);
+        logChange(name, value);
+        return value;
+    }
+});
 const invalidateHealth = () => healthCache.clear();
 
-function checkHealth(name, bot) {
-    const hit = healthCache.get(name);
-    if (hit && Date.now() - hit.at < HEALTH_TTL_MS) return Promise.resolve(hit.value);
-    if (healthInFlight.has(name)) return healthInFlight.get(name);
-    const run = HEALTH_CHECKS[name](bot)
-        .then((value) => {
-            healthCache.set(name, { at: Date.now(), value });
-            logChange(name, value);
-            return value;
-        })
-        .finally(() => healthInFlight.delete(name));
-    healthInFlight.set(name, run);
-    return run;
-}
+const checkHealth = (name, bot) => healthCache.fetch(name, { context: bot });
 
 // One service: what the dashboard badges use, so each shows up as soon as it's known
 router.get('/api/health/:name', async (req, res) => {

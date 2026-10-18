@@ -5,22 +5,21 @@
  * One place for every button the bot has: search, the subscriptions menu, and any added later.
  */
 
-// "chatId:messageId" -> { userId, at }. In memory: after a restart the owners of earlier
+const { lruCache } = require('../lru');
+
+// "chatId:messageId" -> userId. In memory: after a restart the owners of earlier
 // messages are unknown, and in an "owner" chat their buttons ask to call the menu up again.
-const owners = new Map();
-const OWNER_TTL_MS = 48 * 60 * 60 * 1000;
-const OWNERS_MAX = 5000;
+const owners = lruCache({ max: 5000, ttl: 48 * 60 * 60 * 1000 });
 
 const keyOf = (chatId, messageId) => `${chatId}:${messageId}`;
 
 function recordOwner(chatId, messageId, userId) {
-    if (owners.size >= OWNERS_MAX) owners.delete(owners.keys().next().value);
-    owners.set(keyOf(chatId, messageId), { userId, at: Date.now() });
+    owners.set(keyOf(chatId, messageId), userId);
 }
 
 function ownerOf(chatId, messageId) {
-    const hit = owners.get(keyOf(chatId, messageId));
-    return hit && Date.now() - hit.at < OWNER_TTL_MS ? hit.userId : null;
+    const userId = owners.get(keyOf(chatId, messageId));
+    return userId === undefined ? null : userId;
 }
 
 const isGroup = (chat) => Boolean(chat) && chat.type !== 'private';

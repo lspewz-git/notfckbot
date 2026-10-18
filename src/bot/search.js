@@ -11,6 +11,7 @@ const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
 const { recordOwner } = require('./access');
+const { lruCache } = require('../lru');
 
 const mainMenuButton = Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]]);
 
@@ -126,14 +127,12 @@ function prefetch(items) {
 }
 
 // Telegram's own id for each poster it has already fetched: sending that again skips the
-// download from TMDB, the slowest part of opening a card. Bounded, oldest out first.
-const posterFileIds = new Map();
-const POSTER_IDS_MAX = 500;
+// download from TMDB, the slowest part of opening a card. Bounded, least used out first.
+const posterFileIds = lruCache({ max: 500 });
 
 function rememberPoster(url, message) {
     const sizes = message && message.photo;
     if (!sizes || !sizes.length) return;
-    if (posterFileIds.size >= POSTER_IDS_MAX) posterFileIds.delete(posterFileIds.keys().next().value);
     posterFileIds.set(url, sizes[sizes.length - 1].file_id);
 }
 

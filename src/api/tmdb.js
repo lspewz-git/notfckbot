@@ -2,6 +2,7 @@ const axios = require('axios');
 const { getProxyAgent } = require('../proxy');
 const { installDeadline } = require('../http-deadline');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
+const { lruCache, fetchFresh } = require('../lru');
 require('dotenv').config();
 
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -164,43 +165,28 @@ const fetchDetails = async (id, media_type) => {
 // --- Details cache ---
 // Every fetch is stored, so the update check keeps the cache fresh for the tracked titles
 // and the admin panel's cards are served from it. Two intervals of lifetime: one failed
-// check doesn't send the panel back to TMDB.
+// check doesn't send the panel back to TMDB. Failures are not stored.
 const DETAILS_TTL_MS = 2 * UPDATE_INTERVAL_HOURS * 60 * 60 * 1000;
 const DETAILS_CACHE_MAX = 500;
-const detailsCache = new Map(); // "tv:1399" -> { data, at }; Map order = oldest first
-const inFlight = new Map(); // "tv:1399" -> pending fetch, shared by concurrent callers
+const detailsCache = lruCache({
+    max: DETAILS_CACHE_MAX,
+    ttl: DETAILS_TTL_MS,
+    fetchMethod: (key) => {
+        const [mediaType, id] = key.split(':');
+        return fetchDetails(id, mediaType);
+    }
+}); // "tv:1399" -> details
 
 const cacheKey = (id, media_type) => `${media_type}:${id}`;
 
-function remember(key, data) {
-    detailsCache.delete(key); // re-insert, so the entry moves to the newest end
-    detailsCache.set(key, { data, at: Date.now() });
-    if (detailsCache.size > DETAILS_CACHE_MAX) detailsCache.delete(detailsCache.keys().next().value);
-}
-
 /**
  * Always asks TMDB (the update check needs current data) and refreshes the cache.
- * Concurrent calls for the same title share one request. Failures are not cached.
+ * Concurrent calls for the same title share one request.
  */
-const getDetails = (id, media_type) => {
-    const key = cacheKey(id, media_type);
-    if (inFlight.has(key)) return inFlight.get(key);
-    const request = fetchDetails(id, media_type)
-        .then((data) => {
-            remember(key, data);
-            return data;
-        })
-        .finally(() => inFlight.delete(key));
-    inFlight.set(key, request);
-    return request;
-};
+const getDetails = (id, media_type) => detailsCache.fetch(cacheKey(id, media_type), { forceRefresh: true });
 
 /** The cached details when fresh enough, otherwise a fetch. For display only. */
-const getDetailsCached = (id, media_type) => {
-    const hit = detailsCache.get(cacheKey(id, media_type));
-    if (hit && Date.now() - hit.at < DETAILS_TTL_MS) return Promise.resolve(hit.data);
-    return getDetails(id, media_type);
-};
+const getDetailsCached = (id, media_type) => fetchFresh(detailsCache, cacheKey(id, media_type));
 
 // Returns season details including episodes
 const getSeasonDetails = async (tv_id, season_number) => {
@@ -219,26 +205,17 @@ const getSeasonDetails = async (tv_id, season_number) => {
 
 // Seasons for the bot's week and month views: the same lifetime as the details. Not refreshed
 // by the update check, which reads only the details
-const seasonCache = new Map(); // "1399:2" -> { data, at }
-const seasonInFlight = new Map();
+const seasonCache = lruCache({
+    max: DETAILS_CACHE_MAX,
+    ttl: DETAILS_TTL_MS,
+    fetchMethod: (key) => {
+        const [tvId, seasonNumber] = key.split(':');
+        return getSeasonDetails(tvId, seasonNumber);
+    }
+}); // "1399:2" -> season
 
 /** A season's episodes, from memory when fresh enough; concurrent calls share one request. */
-const getSeasonDetailsCached = (tvId, seasonNumber) => {
-    const key = `${tvId}:${seasonNumber}`;
-    const hit = seasonCache.get(key);
-    if (hit && Date.now() - hit.at < DETAILS_TTL_MS) return Promise.resolve(hit.data);
-    if (seasonInFlight.has(key)) return seasonInFlight.get(key);
-    const request = getSeasonDetails(tvId, seasonNumber)
-        .then((data) => {
-            seasonCache.delete(key);
-            seasonCache.set(key, { data, at: Date.now() });
-            if (seasonCache.size > DETAILS_CACHE_MAX) seasonCache.delete(seasonCache.keys().next().value);
-            return data;
-        })
-        .finally(() => seasonInFlight.delete(key));
-    seasonInFlight.set(key, request);
-    return request;
-};
+const getSeasonDetailsCached = (tvId, seasonNumber) => fetchFresh(seasonCache, `${tvId}:${seasonNumber}`);
 
 module.exports = {
     getSeasonDetailsCached,
