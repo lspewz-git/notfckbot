@@ -9,7 +9,6 @@ import {
     updatePopular,
     updateUpcoming,
     updateCron,
-    updateVersion,
     statsFailed,
     listFailed
 } from './dashboard.js';
@@ -70,7 +69,6 @@ export async function fetchData() {
             )
         );
         jobs.push(api('/cron').then(updateCron));
-        jobs.push(api('/version').then(updateVersion));
     }
     if (currentSection === 'history') jobs.push(loadHistory());
     if (currentSection === 'settings') jobs.push(loadSettings());

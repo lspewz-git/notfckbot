@@ -288,24 +288,6 @@ export function updatePopular(list) {
         .join('');
 }
 
-// --- Version ---
-/** The footer: "Version 6638430 · 12 Oct, 17:15", the hash linked to the commit; the subject as a tooltip. */
-export function updateVersion(v) {
-    const el = $('build-info');
-    if (!el || isUnchanged('version', v)) return;
-    el.hidden = !v.short;
-    if (!v.short) return;
-    const hash = `<code>${escapeHtml(v.short)}</code>`;
-    const link = v.url
-        ? `<a href="${escapeHtml(v.url)}" target="_blank" rel="noopener noreferrer" aria-label="Commit ${escapeHtml(v.short)} on GitHub">${hash}</a>`
-        : hash;
-    const when = v.date
-        ? ` · ${escapeHtml(new Date(v.date).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}`
-        : '';
-    el.innerHTML = `Version ${link}${when}`;
-    el.title = v.subject || '';
-}
-
 // --- Update check ---
 let cron = null;
 let clockTimer = null;

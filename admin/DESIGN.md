@@ -48,7 +48,7 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
 ## Components
 
 - **Icon rail:** 56px wide, sticky, on the page background. 44px items with 19px icons; the label
-  is a tooltip on hover and keyboard focus. Actions and Danger Zone sit at the bottom. Below
+  is a tooltip on hover and keyboard focus. Actions and About sit at the bottom. Below
   1024px the rail gives way to a bottom tab bar.
 - **Service statuses:** a 7px dot and a short label ("TG", "KP: ERR", a hollow dot for "Proxy:
   OFF"). Each opens its dialog. Any error raises a banner above the stats.

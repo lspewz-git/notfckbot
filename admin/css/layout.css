@@ -49,7 +49,7 @@
     gap: var(--space-1);
 }
 
-/* Actions and Danger Zone sit at the bottom */
+/* Actions and About sit at the bottom */
 .rail-bottom {
     margin-top: auto;
 }
@@ -119,15 +119,6 @@
 .nav-item.active {
     color: var(--text);
     background: rgba(255, 255, 255, 0.08);
-}
-
-.nav-item-danger {
-    color: var(--danger-muted);
-}
-
-.nav-item-danger:hover {
-    color: var(--danger);
-    background: var(--danger-soft);
 }
 
 .nav-tip {

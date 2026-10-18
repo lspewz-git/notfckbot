@@ -1,5 +1,5 @@
-/** Panel-wide actions: broadcast, run the update check, test notification, wipe the database. */
-const { Chat, Series, Subscription, Watchlist } = require('../../db');
+/** Panel-wide actions: broadcast, run the update check, test notification. */
+const { Chat, Series } = require('../../db');
 const { checkUpdates } = require('../../cron');
 const { buildTestMessage, TEST_MODES, EPISODE_MODES, STATUS_MODES } = require('../../cron/messages');
 const { formatWatchLinks } = require('../../constants');
@@ -159,19 +159,6 @@ router.post('/api/test-notification', async (req, res) => {
     } catch (err) {
         console.error('[Admin] Test notification error:', err.message);
         res.status(err.status || 500).json({ error: `Не удалось отправить уведомление: ${err.message}` });
-    }
-});
-
-router.post('/api/clear-all', async (req, res) => {
-    try {
-        // Order matters: children before parents (Subscription -> Chat/Series, Watchlist -> Chat)
-        const subscriptions = await Subscription.destroy({ where: {} });
-        const watchlist = await Watchlist.destroy({ where: {} });
-        const series = await Series.destroy({ where: {} });
-        const chats = await Chat.destroy({ where: {} });
-        res.json({ success: true, deleted: { subscriptions, watchlist, series, chats } });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
     }
 });
 

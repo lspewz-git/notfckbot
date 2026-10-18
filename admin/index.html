@@ -21,6 +21,7 @@
              importing it, a chain of round trips before the panel runs (tests/unit/panel-files.test.js
              keeps this list complete) -->
         <link rel="modulepreload" href="js/app.js" />
+        <link rel="modulepreload" href="js/about.js" />
         <link rel="modulepreload" href="js/api.js" />
         <link rel="modulepreload" href="js/chats.js" />
         <link rel="modulepreload" href="js/dashboard-charts.js" />
@@ -166,14 +167,12 @@
                         </svg>
                         <span class="nav-tip" aria-hidden="true">Actions</span>
                     </button>
-                    <button class="nav-item nav-item-danger" id="danger-btn" aria-label="Danger Zone">
+                    <button class="nav-item" id="about-btn" aria-label="About">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                                d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                            />
-                            <path d="M12 9v4M12 17h.01" />
+                            <rect x="3" y="3" width="18" height="18" rx="5" />
+                            <path d="M12 8h.01M12 11.5v5" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Danger Zone</span>
+                        <span class="nav-tip" aria-hidden="true">About</span>
                     </button>
                 </div>
             </aside>
@@ -586,9 +585,6 @@
                             </dl>
                             <button id="run-check" class="btn btn-outline">Run now</button>
                         </section>
-
-                        <!-- Filled from /api/version; stays hidden where the server has no .git -->
-                        <footer id="build-info" class="build-info" hidden></footer>
                     </section>
 
                     <!-- Chats Section -->
@@ -1205,18 +1201,15 @@
                                 <polyline points="9 18 15 12 9 6" /></svg
                         ></span>
                     </button>
-                    <button class="action-row action-row-danger" data-close="more-modal" data-open="danger-modal">
+                    <button class="action-row" data-action="about" data-close="more-modal" data-open="about-modal">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path
-                                    d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                                />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" /></svg
+                                <rect x="3" y="3" width="18" height="18" rx="5" />
+                                <path d="M12 8h.01M12 11.5v5" /></svg
                         ></span>
                         <span class="action-text">
-                            <span class="action-title">Danger zone</span>
-                            <span class="action-desc">Irreversible operations</span>
+                            <span class="action-title">About</span>
+                            <span class="action-desc">The version running on the server</span>
                         </span>
                         <span class="action-chevron"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1820,21 +1813,20 @@
             </div>
         </div>
 
-        <!-- Danger Zone Modal -->
-        <div id="danger-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="danger-modal-title">
+        <!-- About: the version the server runs, from /api/version (about.js) -->
+        <div id="about-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
             <div class="modal-content modal-medium">
-                <h3 id="danger-modal-title">Danger zone</h3>
-                <p class="modal-sub">Irreversible operations. Every action here asks for confirmation first.</p>
-                <div class="danger-item">
-                    <div class="danger-item-info">
-                        <div class="danger-item-title">Wipe All Data</div>
-                        <div class="danger-item-desc">
-                            Empties the database completely — all chats, subscriptions, series and watchlist entries.
-                        </div>
-                    </div>
-                    <button id="wipe-all-btn" class="btn btn-danger">Wipe</button>
-                </div>
-                <button data-close="danger-modal" class="modal-x" aria-label="Close">
+                <h3 id="about-modal-title">About</h3>
+                <p class="modal-sub">NotFckBot: the bot and this panel, one version.</p>
+                <dl id="about-version" class="kv-list about-list" aria-live="polite">
+                    <dt>Version</dt>
+                    <dd><span class="skeleton" style="width: 4rem"></span></dd>
+                    <dt>Date</dt>
+                    <dd><span class="skeleton" style="width: 8rem"></span></dd>
+                    <dt>Change</dt>
+                    <dd><span class="skeleton" style="width: 14rem"></span></dd>
+                </dl>
+                <button data-close="about-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />

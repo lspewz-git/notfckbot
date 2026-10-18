@@ -154,28 +154,15 @@
     font-size: 0.9rem;
 }
 
-/* Danger Zone */
-.danger-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
-    margin-top: 1.5rem;
-    padding: 1.25rem;
-    background: rgba(239, 68, 68, 0.05);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: var(--radius);
+/* About: the version list. A bar sits inside a line of text, so the row is as tall as the
+   text that replaces it and nothing moves when the answer comes */
+.about-list {
+    min-height: 0;
 }
 
-.danger-item-title {
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-}
-
-.danger-item-desc {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    line-height: 1.5;
+.about-list .skeleton {
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* Modals */

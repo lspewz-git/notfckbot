@@ -229,7 +229,12 @@ test.describe('narrow screens', () => {
 
         // Everything that doesn't fit in five tabs is one tap away under "More"
         await page.locator('.tab-item[data-open="more-modal"]').click();
-        await expect(page.locator('#more-modal [data-open="danger-modal"]')).toBeInViewport();
+        await expect(page.locator('#more-modal [data-open="about-modal"]')).toBeInViewport();
+        // About from the sheet: the sheet gives way, the dialog comes filled in
+        await page.locator('#more-modal [data-open="about-modal"]').click();
+        await expect(page.locator('#more-modal')).toBeHidden();
+        await expect(page.locator('#about-version dt').first()).toHaveText('Version');
+        await expect(page.locator('#about-version .skeleton')).toHaveCount(0);
         await page.keyboard.press('Escape');
 
         await page.locator('.tab-item[data-section="chats"]').click();

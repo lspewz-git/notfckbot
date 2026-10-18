@@ -710,28 +710,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* --- Footer: the deployed commit, quiet, at the very bottom --- */
-.build-info {
-    /* A flex child of the section would stretch to the full width, tooltip and all */
-    align-self: flex-start;
-    padding: var(--space-1) var(--space-1) 0;
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-}
-
-.build-info a {
-    color: var(--text-secondary);
-    text-decoration: underline;
-    text-decoration-color: var(--border-strong);
-    text-underline-offset: 3px;
-    transition: color 0.15s ease;
-}
-
-.build-info a:hover {
-    color: var(--text);
-}
-
 /* A finger needs a taller target than the text line */
 @media (pointer: coarse) {
     .status-badges .badge,

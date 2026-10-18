@@ -56,16 +56,6 @@ test("a failing service raises the banner, and its button opens that service's d
     await expect(page.locator('#service-title')).toHaveText('TMDB API');
 });
 
-test('the version footer is only as wide as its text', async ({ page }) => {
-    await mockPanel(page);
-    const footer = page.locator('#build-info');
-    await expect(footer).toBeVisible();
-    const width = await footer.evaluate((el) => el.getBoundingClientRect().width);
-    const section = await page.locator('#dashboard-section').evaluate((el) => el.getBoundingClientRect().width);
-    // Stretched it would be the section's full width; its text is far shorter on any screen
-    expect(width).toBeLessThan(section * 0.8);
-});
-
 test('the banner is not rewritten when a refresh brings the same news', async ({ page }) => {
     await mockPanel(page, { health: { kinopoisk: 'error' } });
     await expect(page.locator('#service-alert-text')).toHaveText('KP is reporting an error');
@@ -261,7 +251,7 @@ test('a dashboard request failing on the first load: a dash, no chart bars, a no
     await expect(page.locator('.chart-skeleton')).toHaveCount(0);
     await expect(page.locator('#upcoming-list .empty-note')).toHaveText(/Failed to load/);
     await expect(page.locator('#popular-list .empty-note')).toHaveText(/Failed to load/);
-    await expect(page.locator('.skeleton')).toHaveCount(0);
+    await expect(page.locator('#dashboard-section .skeleton')).toHaveCount(0);
     page.__errors.length = 0; // the failed requests are logged
 
     // The next refresh fills them in
@@ -271,26 +261,45 @@ test('a dashboard request failing on the first load: a dash, no chart bars, a no
     await expect(page.locator('#popular-list .popular-item')).not.toHaveCount(0);
 });
 
-test('the deployed commit is shown in the footer, linked to GitHub', async ({ page }) => {
+/** The sidebar's "i" on a wide screen; on a phone, the same dialog from the More sheet. */
+async function openAbout(page) {
+    const button = page.locator('#about-btn');
+    if (await button.isVisible()) return button.click();
+    await page.locator('.tab-item[data-open="more-modal"]').click();
+    await page.locator('#more-modal [data-open="about-modal"]').click();
+}
+
+test('About: the commit linked to GitHub, its date and change; no version line on the dashboard', async ({ page }) => {
     await mockPanel(page);
-    const info = page.locator('#dashboard-section > footer:last-child');
-    await expect(info).toHaveId('build-info');
-    await expect(info).toContainText('Version abc1234');
-    await expect(info).toHaveAttribute('title', 'Test commit');
-    const link = info.getByRole('link', { name: 'Commit abc1234 on GitHub' });
+    await expect(page.locator('#build-info')).toHaveCount(0);
+    await expect(page.locator('#danger-btn, #danger-modal')).toHaveCount(0);
+    await openAbout(page);
+    const list = page.locator('#about-version');
+    const link = list.getByRole('link', { name: 'Commit abc1234 on GitHub' });
     await expect(link).toHaveAttribute('href', /github\.com\/owner\/repo\/commit\/abc1234/);
     await expect(link).toHaveAttribute('target', '_blank');
+    await expect(list).toContainText('Test commit');
+    await expect(list.locator('dt')).toHaveText(['Version', 'Date', 'Change']);
 });
 
-test('the version line goes away when the server has no .git to read', async ({ page }) => {
-    // The line starts hidden, so it has to be shown first for its hiding to prove anything
-    const options = {};
+test('About on a server without .git says so; the placeholders are as tall as the answer', async ({ page }) => {
+    let release;
+    const hold = new Promise((r) => (release = r));
+    const options = { hold };
     await mockPanel(page, options);
-    await expect(page.locator('#build-info')).toBeVisible();
+    await openAbout(page);
+    const list = page.locator('#about-version');
+    await expect(list.locator('.skeleton')).toHaveCount(3);
+    // offsetHeight: the dialog opens with a scale animation, which a bounding box would include
+    const before = await list.evaluate((el) => el.offsetHeight);
+    release();
+    await expect(list.locator('.skeleton')).toHaveCount(0);
+    expectSame([await list.evaluate((el) => el.offsetHeight)], [before]);
 
     options.version = { commit: null, short: null, subject: null, date: null, url: null };
-    await page.locator('#refresh-btn').click();
-    await expect(page.locator('#build-info')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await openAbout(page);
+    await expect(list).toContainText("Git isn't connected");
 });
 
 test('auto-refresh counts down next to the switch and turns the refresh icon when it reloads', async ({ page }) => {

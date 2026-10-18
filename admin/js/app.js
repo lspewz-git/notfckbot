@@ -29,7 +29,8 @@ import {
     deleteSub,
     deleteWatchlistItem
 } from './records.js';
-import { triggerCheck, openBroadcastModal, sendBroadcast, confirmWipeAll } from './maintenance.js';
+import { triggerCheck, openBroadcastModal, sendBroadcast } from './maintenance.js';
+import { openAbout, loadAbout } from './about.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 
 const REFRESH_SECONDS = 10;
@@ -142,6 +143,7 @@ const CLICK_ACTIONS = {
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
+    about: () => loadAbout(),
     service: (el) =>
         openServiceModal(el.dataset.service, {
             label: el.dataset.label,
@@ -213,7 +215,7 @@ function setupControls() {
     $('refresh-btn').onclick = refreshNow;
 
     $('actions-btn').onclick = () => openModal('actions-modal');
-    $('danger-btn').onclick = () => openModal('danger-modal');
+    $('about-btn').onclick = openAbout;
     $('trigger-btn').onclick = triggerCheck;
     $('broadcast-btn').onclick = openBroadcastModal;
     $('test-notify-btn').onclick = () => {
@@ -222,7 +224,6 @@ function setupControls() {
         openTestNotifyModal();
     };
     $('send-broadcast').onclick = sendBroadcast;
-    $('wipe-all-btn').onclick = confirmWipeAll;
     $('confirm-add-content').onclick = submitAddContent;
     setupServiceDialog();
     setupTestNotifyDialog();
