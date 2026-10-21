@@ -6,6 +6,7 @@ const { formatWatchLinks } = require('../../constants');
 const { findKinopoiskIdQuick } = require('../../api/kinopoisk');
 const tmdb = require('../../api/tmdb');
 const { deliver } = require('../../delivery');
+const { z, valid, idOf, chatId, text } = require('../validate');
 
 const router = require('express').Router();
 const { log } = require('../../log');
@@ -16,16 +17,18 @@ const BROADCAST_TARGETS = {
     groups: { type: ['group', 'supergroup', 'channel'] }
 };
 
-router.post('/api/broadcast', async (req, res) => {
-    const { message, target = 'all' } = req.body;
-    if (!message || !message.trim()) {
-        return res.status(400).json({ error: 'Message is required' });
-    }
+const broadcastBody = z.object({
+    message: text('Message is required'),
+    target: z
+        .enum(Object.keys(BROADCAST_TARGETS), { error: (issue) => `Unknown target "${issue.input}"` })
+        .default('all')
+});
 
+router.post('/api/broadcast', async (req, res) => {
+    const body = valid(broadcastBody, req.body, res);
+    if (!body) return;
+    const { message, target } = body;
     const where = BROADCAST_TARGETS[target];
-    if (!where) {
-        return res.status(400).json({ error: `Unknown target "${target}"` });
-    }
 
     const bot = req.app.get('bot');
     try {
@@ -135,13 +138,27 @@ async function seriesTest(seriesId, mode, { season, episode, episodeName }) {
     return { title, msg, posterUrl: STATUS_MODES[mode] ? null : posterUrl };
 }
 
+// Season and episode left out: the latest aired one
+const episodeNumber = z.coerce.number().int().positive({ error: 'Season and episode: whole numbers from 1' });
+const testBody = z
+    .object({
+        chatId: chatId('chatId is required'),
+        mode: z.enum(TEST_MODES, { error: (issue) => `Unknown notification type: ${issue.input}` }).default('episode'),
+        seriesId: idOf(/^(tv_)?\d+$/, 'Bad series id').optional(),
+        filmId: idOf(/^(movie_)?\d+$/, 'Bad film id').optional(),
+        season: episodeNumber.optional(),
+        episode: episodeNumber.optional(),
+        episodeName: z.string({ error: 'Bad episodeName' }).optional()
+    })
+    .superRefine((body, ctx) => {
+        const field = body.mode === 'film' ? 'filmId' : 'seriesId';
+        if (!body[field]) ctx.addIssue({ code: 'custom', path: [field], message: `${field} is required` });
+    });
+
 router.post('/api/test-notification', async (req, res) => {
-    const { chatId, seriesId, filmId, mode = 'episode', season, episode, episodeName } = req.body;
-    if (!chatId) return res.status(400).json({ error: 'chatId is required' });
-    if (!TEST_MODES.includes(mode)) return res.status(400).json({ error: `Unknown notification type: ${mode}` });
-    if (mode === 'film' ? !filmId : !seriesId) {
-        return res.status(400).json({ error: `${mode === 'film' ? 'filmId' : 'seriesId'} is required` });
-    }
+    const body = valid(testBody, req.body, res);
+    if (!body) return;
+    const { chatId, seriesId, filmId, mode, season, episode, episodeName } = body;
 
     const bot = req.app.get('bot');
     if (!bot) return res.status(500).json({ error: 'Bot instance not available' });

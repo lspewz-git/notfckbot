@@ -10,6 +10,7 @@ const CHAT_FIELDS = ['id', 'username', 'type'];
 
 const router = require('express').Router();
 const { log } = require('../../log');
+const { z, valid, text } = require('../validate');
 
 router.get('/api/series/:tmdbId', async (req, res) => {
     try {
@@ -108,9 +109,11 @@ router.get('/api/kinopoisk/:type/:id', async (req, res) => {
 router.get('/api/poster/:size/:file', (req, res) => servePoster(req.params.size, req.params.file, res));
 
 router.get('/api/tmdb/search', async (req, res) => {
+    // One query: ?q=a&q=b arrives as an array
+    const query = valid(z.object({ q: text('Query is required') }), req.query, res);
+    if (!query) return;
+    const { q } = query;
     try {
-        const { q } = req.query;
-        if (!q) return res.status(400).json({ error: 'Query is required' });
         const results = await tmdb.searchMulti(q);
         log.info(`[Admin] Search results for "${q}": ${results.length} items found.`);
         res.json(results);

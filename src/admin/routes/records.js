@@ -4,25 +4,38 @@ const tmdb = require('../../api/tmdb');
 const { deliver } = require('../../delivery');
 const { ZONES, isHour } = require('../../quiet');
 const { sentMarkOnEnable } = require('../../cron/digests');
+const { NOTIFY_LABELS } = require('../../constants');
+const { z, valid, idOf, chatId, text } = require('../validate');
 
 const router = require('express').Router();
 const { log } = require('../../log');
 
+const seriesId = idOf(/^tv_\d+$/, 'Bad series id');
+const chatParam = z.object({ chatId: chatId() });
+
 router.delete('/api/subscription/:chatId/:seriesId', async (req, res) => {
-    const { chatId, seriesId } = req.params;
+    const params = valid(z.object({ chatId: chatId(), seriesId }), req.params, res);
+    if (!params) return;
+    const { chatId: chat, seriesId: series } = params;
     try {
-        await Subscription.destroy({ where: { chatId, seriesId } });
+        await Subscription.destroy({ where: { chatId: chat, seriesId: series } });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
+const REQUIRED = 'chatId and tmdbId are required';
+const subscriptionBody = z.object({
+    chatId: chatId(REQUIRED),
+    tmdbId: idOf(/^(tv_)?\d+$/, REQUIRED),
+    notify_type: z.enum(Object.keys(NOTIFY_LABELS), { error: 'Bad notify_type' }).optional()
+});
+
 router.post('/api/subscription', async (req, res) => {
-    const { chatId, tmdbId, notify_type } = req.body;
-    if (!chatId || !tmdbId) {
-        return res.status(400).json({ error: 'chatId and tmdbId are required' });
-    }
+    const body = valid(subscriptionBody, req.body, res);
+    if (!body) return;
+    const { chatId, tmdbId, notify_type } = body;
 
     // Ensure tmdbId has the 'tv_' prefix as expected by the bot and cron jobs
     const fulltmdbId = String(tmdbId).startsWith('tv_') ? String(tmdbId) : `tv_${tmdbId}`;
@@ -57,14 +70,25 @@ router.post('/api/subscription', async (req, res) => {
     }
 });
 
+// Up to a year; 5 minutes when the panel sends none
+const blockBody = z.object({
+    minutes: z.coerce
+        .number({ error: 'Minutes: a whole number from 1' })
+        .int({ error: 'Minutes: a whole number from 1' })
+        .min(1, { error: 'Minutes: a whole number from 1' })
+        .max(525600, { error: 'Minutes: a year at most' })
+        .default(5)
+});
+
 router.post('/api/chat/:chatId/block', async (req, res) => {
-    const { chatId } = req.params;
-    const { minutes } = req.body;
+    const params = valid(chatParam, req.params, res);
+    const body = params && valid(blockBody, req.body, res);
+    if (!body) return;
     try {
-        const chat = await Chat.findByPk(chatId);
+        const chat = await Chat.findByPk(params.chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
-        const duration = parseInt(minutes, 10) || 5;
+        const duration = body.minutes;
         const blockUntil = new Date(Date.now() + duration * 60 * 1000);
 
         await chat.update({ blockedUntil: blockUntil });
@@ -76,41 +100,41 @@ router.post('/api/chat/:chatId/block', async (req, res) => {
 
 // The chat's bot settings, the same ones its ⚙️ Settings screen in Telegram changes
 const BUTTONS_MODES = ['owner', 'all'];
-router.patch('/api/chat/:chatId/settings', async (req, res) => {
-    const body = req.body || {};
-    const { buttons_mode: buttonsMode, menu_enabled: menuEnabled } = body;
-    const changes = {};
+const QUIET = 'Quiet hours: two different hours from 0 to 23, or both off';
+const quietHour = z.union([z.null(), z.number().refine(isHour)], { error: QUIET }).optional();
+const chatSettingsBody = z
+    .object({
+        quiet_start: quietHour,
+        quiet_end: quietHour,
+        timezone: z
+            .enum(
+                ZONES.map((zone) => zone.id),
+                { error: 'Unknown time zone' }
+            )
+            .optional(),
+        digest_week: z.boolean({ error: 'Bad digest_week' }).optional(),
+        digest_month: z.boolean({ error: 'Bad digest_month' }).optional(),
+        buttons_mode: z.enum(BUTTONS_MODES, { error: 'Bad buttons_mode' }).optional(),
+        menu_enabled: z.boolean({ error: 'Bad menu_enabled' }).optional()
+    })
     // Quiet hours: both hours (0–23, not the same) or both null for off
-    if (body.quiet_start !== undefined || body.quiet_end !== undefined) {
-        const { quiet_start: start, quiet_end: end } = body;
-        const off = start === null && end === null;
-        if (!off && !(isHour(start) && isHour(end) && start !== end)) {
-            return res.status(400).json({ error: 'Quiet hours: two different hours from 0 to 23, or both off' });
-        }
-        changes.quiet_start = off ? null : start;
-        changes.quiet_end = off ? null : end;
-    }
-    if (body.timezone !== undefined) {
-        if (!ZONES.some((z) => z.id === body.timezone)) return res.status(400).json({ error: 'Unknown time zone' });
-        changes.timezone = body.timezone;
-    }
-    for (const which of ['week', 'month']) {
-        const value = body[`digest_${which}`];
-        if (value === undefined) continue;
-        if (typeof value !== 'boolean') return res.status(400).json({ error: `Bad digest_${which}` });
-        changes[`digest_${which}`] = value;
-    }
-    if (buttonsMode !== undefined) {
-        if (!BUTTONS_MODES.includes(buttonsMode)) return res.status(400).json({ error: 'Bad buttons_mode' });
-        changes.buttons_mode = buttonsMode;
-    }
-    if (menuEnabled !== undefined) {
-        if (typeof menuEnabled !== 'boolean') return res.status(400).json({ error: 'Bad menu_enabled' });
-        changes.menu_enabled = menuEnabled;
-    }
+    .refine(
+        ({ quiet_start: start, quiet_end: end }) =>
+            (start === undefined && end === undefined) ||
+            (start === null && end === null) ||
+            (isHour(start) && isHour(end) && start !== end),
+        { error: QUIET }
+    );
+
+router.patch('/api/chat/:chatId/settings', async (req, res) => {
+    const params = valid(chatParam, req.params, res);
+    const body = params && valid(chatSettingsBody, req.body, res);
+    if (!body) return;
+    // What was sent, as it is stored; what was left out stays
+    const changes = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
     if (!Object.keys(changes).length) return res.status(400).json({ error: 'Nothing to change' });
     try {
-        const chat = await Chat.findByPk(req.params.chatId);
+        const chat = await Chat.findByPk(params.chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
         // A digest turned on starts with the next one due, as in the bot (src/cron/digests.js)
         for (const which of ['week', 'month']) {
@@ -138,7 +162,9 @@ router.patch('/api/chat/:chatId/settings', async (req, res) => {
 });
 
 router.post('/api/chat/:chatId/unblock', async (req, res) => {
-    const { chatId } = req.params;
+    const params = valid(chatParam, req.params, res);
+    if (!params) return;
+    const { chatId } = params;
     try {
         const chat = await Chat.findByPk(chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
@@ -152,11 +178,12 @@ router.post('/api/chat/:chatId/unblock', async (req, res) => {
 
 // Films
 
+const watchlistBody = z.object({ chatId: chatId(REQUIRED), tmdbId: idOf(/^(movie_)?\d+$/, 'Bad film id') });
+
 router.post('/api/watchlist', async (req, res) => {
-    const { chatId, tmdbId } = req.body;
-    if (!chatId || !tmdbId) {
-        return res.status(400).json({ error: 'chatId and tmdbId are required' });
-    }
+    const body = valid(watchlistBody, req.body, res);
+    if (!body) return;
+    const { chatId, tmdbId } = body;
 
     try {
         const chat = await Chat.findByPk(chatId);
@@ -164,8 +191,7 @@ router.post('/api/watchlist', async (req, res) => {
 
         // Rows are stored as "movie_<id>": the request may send either form, so normalise it
         // before looking for a duplicate
-        const numericId = String(tmdbId).replace('movie_', '');
-        if (!/^\d+$/.test(numericId)) return res.status(400).json({ error: 'Bad film id' });
+        const numericId = tmdbId.replace('movie_', '');
         const fullTmdbId = `movie_${numericId}`;
         const rows = await Watchlist.findAll({ where: { chatId, tmdb_id: fullTmdbId } });
         if (rows.some((r) => !r.notified)) {
@@ -207,9 +233,11 @@ router.post('/api/watchlist', async (req, res) => {
 });
 
 router.post('/api/chat/:chatId/message', async (req, res) => {
-    const { chatId } = req.params;
-    const { message } = req.body;
-    if (!message || !message.trim()) return res.status(400).json({ error: 'Message is required' });
+    const params = valid(chatParam, req.params, res);
+    const body = params && valid(z.object({ message: text('Message is required') }), req.body, res);
+    if (!body) return;
+    const { chatId } = params;
+    const { message } = body;
 
     const bot = req.app.get('bot');
     try {
@@ -223,7 +251,9 @@ router.post('/api/chat/:chatId/message', async (req, res) => {
 });
 
 router.delete('/api/watchlist/:id', async (req, res) => {
-    const { id } = req.params;
+    const params = valid(z.object({ id: idOf(/^\d{1,15}$/, 'Bad id') }), req.params, res);
+    if (!params) return;
+    const { id } = params;
     try {
         await Watchlist.destroy({ where: { id } });
         res.json({ success: true });
