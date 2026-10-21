@@ -128,8 +128,13 @@ test('declining the confirmation leaves the data alone', async ({ page }) => {
     const confirm = page.locator('#confirm-modal');
     await expect(confirm).toBeVisible();
 
-    // Safe choice is the emphasised one and holds focus
-    await expect(page.locator('#modal-cancel-btn')).toBeFocused();
+    // Safe choice is the emphasised one and holds focus; on a touch screen focus stays on the
+    // dialog's box, so no focus ring shows on a button nobody pressed
+    if (isPhone(page)) {
+        expect(await page.evaluate(() => document.activeElement.className)).toContain('modal-content');
+    } else {
+        await expect(page.locator('#modal-cancel-btn')).toBeFocused();
+    }
     await page.locator('#modal-cancel-btn').click();
 
     await expect(confirm).toBeHidden();
