@@ -1,6 +1,7 @@
 /** Toasts, modals and the confirmation dialog. */
 
 import { $, setText } from './dom.js';
+import { closeDropdown } from './select.js';
 
 // --- Toasts ---
 /**
@@ -12,9 +13,12 @@ export function toast(message, type = 'info', ms = 3500) {
     const container = $('toast-container');
     if (!container) return;
 
+    placeToasts();
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
     el.innerText = message;
+    // Once in, it stays put: moving the container into or out of a dialog would replay it
+    el.addEventListener('animationend', () => (el.style.animation = 'none'), { once: true });
     container.appendChild(el);
 
     setTimeout(() => {
@@ -24,7 +28,12 @@ export function toast(message, type = 'info', ms = 3500) {
 }
 
 // --- Modals ---
+// Native <dialog>s opened with showModal(): the browser puts the dialog above everything, keeps the
+// page behind out of reach of the mouse, Tab and screen readers, and asks to close it on Escape.
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/** Open dialogs, in the order they were opened: the last one is on top. */
+const openStack = [];
 
 /** Modal id -> the element that had focus when it opened, so it can be given back. */
 const focusBeforeOpen = new Map();
@@ -39,7 +48,6 @@ function focusables(modal) {
 }
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
-const isTypingField = (el) => el.matches('input, textarea, select');
 
 /**
  * Focus a field for typing, except on touch screens: there focus opens the
@@ -53,73 +61,91 @@ export function focusField(el) {
 }
 
 /**
- * Keeps Tab inside the dialog. Without it focus walks off into the page
- * behind the backdrop, which a keyboard or screen-reader user cannot see.
- *
- * @param {KeyboardEvent} e
+ * Toasts live in the dialog on top while one is open: everything outside it sits under the dim
+ * and can't be seen. Back on the page once the last dialog closes.
  */
-function trapTab(e) {
-    if (e.key !== 'Tab') return;
-    const modal = /** @type {HTMLElement} */ (e.currentTarget);
-    const items = focusables(modal);
-    if (items.length === 0) return;
-
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-
-    if (e.shiftKey && active === first) {
-        e.preventDefault();
-        last.focus();
-    } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-    }
+function placeToasts() {
+    const container = $('toast-container');
+    const host = topmostModal() || document.body;
+    if (container && container.parentElement !== host) host.appendChild(container);
 }
 
-/** @param {string} id */
-export function openModal(id) {
-    const modal = $(id);
-    if (!modal) return;
-
-    focusBeforeOpen.set(id, /** @type {HTMLElement} */ (document.activeElement));
-    modal.style.display = 'flex';
-    modal.addEventListener('keydown', trapTab);
-
-    const first = focusables(modal)[0];
-    if (first && !(isTouch() && isTypingField(first))) {
-        first.focus();
-    } else {
-        // Keep focus inside the dialog for screen readers without raising the keyboard
-        const content = /** @type {HTMLElement} */ (modal.querySelector('.modal-content') || modal);
-        content.tabIndex = -1;
-        content.focus({ preventScroll: true });
-    }
-}
-
-/** @param {string} id */
-export function closeModal(id) {
-    const modal = $(id);
-    if (!modal) return;
-
-    modal.style.display = 'none';
-    modal.removeEventListener('keydown', trapTab);
-
-    const previous = focusBeforeOpen.get(id);
-    focusBeforeOpen.delete(id);
+/** What closing a dialog takes care of, however it was closed (by the panel or the browser). */
+function afterClose(modal) {
+    const at = openStack.indexOf(modal);
+    if (at === -1) return;
+    openStack.splice(at, 1);
+    // A list left open in it would stay behind, hidden, and take the next Escape
+    closeDropdown();
+    placeToasts();
+    const previous = focusBeforeOpen.get(modal.id);
+    focusBeforeOpen.delete(modal.id);
     // Only restore if the element is still on the page and nothing else took over
     if (previous && previous.isConnected && !isAnyModalOpen()) previous.focus();
 }
 
-/** @returns {HTMLElement | null} The dialog on top, i.e. the last open one in DOM order. */
-export function topmostModal() {
-    const open = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.modal')]).filter(
-        (m) => m.style.display === 'flex'
-    );
-    return open.length ? open[open.length - 1] : null;
+/** Once per dialog: the browser's own close (Escape) goes through the same steps as the panel's. */
+function watch(modal) {
+    if (modal.dataset.watched) return;
+    modal.dataset.watched = 'true';
+    // Escape: like Cancel, back to the menu this was opened from. The key itself is handled in
+    // app.js, whose preventDefault() keeps this event from firing; it still comes from the
+    // Android back gesture and other close requests that aren't a key
+    modal.addEventListener('cancel', (e) => {
+        e.preventDefault();
+        closeModalReturning(modal.id);
+    });
+    // Late, after the panel's own close: a dialog opened again meanwhile stays on the stack
+    modal.addEventListener('close', () => !modal.open && afterClose(modal));
 }
 
-const isAnyModalOpen = () => topmostModal() !== null;
+/** @param {string} id */
+export function openModal(id) {
+    const modal = /** @type {HTMLDialogElement | null} */ ($(id));
+    if (!modal) return;
+    // Opened again while open (a dialog redrawn after saving): only focus is put back
+    if (modal.open) return focusInside(modal);
+    watch(modal);
+    // A list open on the page would stay there, under the dim and out of reach
+    closeDropdown();
+
+    focusBeforeOpen.set(id, /** @type {HTMLElement} */ (document.activeElement));
+    // showModal() focuses the first field itself, which on a touch screen raises the keyboard:
+    // it lands on the dialog's box instead, and the field gets focus below where that is wanted
+    const content = /** @type {HTMLElement} */ (modal.querySelector('.modal-content') || modal);
+    content.tabIndex = -1;
+    content.autofocus = true;
+    modal.showModal();
+    openStack.push(modal);
+    placeToasts();
+    focusInside(modal);
+}
+
+/** @param {HTMLElement} modal */
+function focusInside(modal) {
+    const content = /** @type {HTMLElement} */ (modal.querySelector('.modal-content') || modal);
+    // On a touch screen focus stays on the box: a field would raise the keyboard, and a button
+    // would show a focus ring nobody asked for
+    const first = focusables(modal)[0];
+    if (first && !isTouch()) first.focus();
+    else content.focus({ preventScroll: true });
+}
+
+/** @param {string} id */
+export function closeModal(id) {
+    const modal = /** @type {HTMLDialogElement | null} */ ($(id));
+    if (!modal || !modal.open) return;
+    modal.close();
+    // The close event comes later; the stack and focus are settled now
+    afterClose(modal);
+}
+
+/** @returns {HTMLElement | null} The dialog on top: the last one opened. */
+export function topmostModal() {
+    return openStack.length ? openStack[openStack.length - 1] : null;
+}
+
+const isAnyModalOpen = () => openStack.length > 0;
 
 // How to reopen the parent menu when a child modal is dismissed, or null.
 // A callback rather than an id, so any menu can be returned to.
@@ -176,6 +202,6 @@ export function showConfirm({
     cancelBtn.onclick = () => closeModalReturning('confirm-modal');
 
     openModal('confirm-modal');
-    // Land on the safe choice, not the destructive one
-    cancelBtn.focus();
+    // Land on the safe choice, not the destructive one (for the keyboard: no ring on a touch screen)
+    if (!isTouch()) cancelBtn.focus();
 }

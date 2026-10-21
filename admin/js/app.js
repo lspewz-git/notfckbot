@@ -251,11 +251,18 @@ function init() {
     // One Escape handler for every dismissible layer, innermost first
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (isDropdownOpen()) return closeDropdown();
+        // Handled here: the browser's own Escape would close the dialog under an open list too
+        if (isDropdownOpen()) {
+            e.preventDefault();
+            return closeDropdown();
+        }
 
         // Same as pressing Cancel, so a child dialog returns to its menu
         const modal = topmostModal();
-        if (modal) return closeModalReturning(modal.id);
+        if (modal) {
+            e.preventDefault();
+            return closeModalReturning(modal.id);
+        }
     });
 
     fetchData(); // Initial load runs even though auto-refresh starts paused

@@ -1134,7 +1134,7 @@
 
         <!-- Modals -->
         <!-- "More" sheet behind the tab bar: what doesn't fit in five tabs -->
-        <div id="more-modal" class="modal modal-sheet" role="dialog" aria-modal="true" aria-labelledby="more-title">
+        <dialog id="more-modal" class="modal modal-sheet" aria-labelledby="more-title">
             <div class="modal-content modal-narrow">
                 <h3 id="more-title">More</h3>
                 <div class="action-list">
@@ -1224,10 +1224,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Direct Message Modal -->
-        <div id="dm-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="dm-modal-title">
+        <dialog id="dm-modal" class="modal" aria-labelledby="dm-modal-title">
             <div class="modal-content">
                 <h3 id="dm-modal-title">Direct Message</h3>
                 <p id="dm-target-info">To: @username</p>
@@ -1237,10 +1237,10 @@
                     <button data-close-return="dm-modal" class="btn btn-ghost">Cancel</button>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- Series Detail Modal -->
-        <div id="detail-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <dialog id="detail-modal" class="modal" aria-labelledby="detail-title">
             <div class="modal-content modal-wide">
                 <div id="detail-loading" class="detail-loading">Loading details…</div>
                 <div id="detail-ready" class="detail" style="display: none">
@@ -1275,10 +1275,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Per-chat action menu (replaces the row of buttons in the chats table) -->
-        <div id="sub-actions-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="sub-actions-title">
+        <dialog id="sub-actions-modal" class="modal" aria-labelledby="sub-actions-title">
             <div class="modal-content modal-narrow">
                 <h3 id="sub-actions-title">Subscription</h3>
                 <p class="modal-sub" id="sub-actions-sub"></p>
@@ -1322,9 +1322,9 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
-        <div id="chat-actions-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="chat-actions-title">
+        <dialog id="chat-actions-modal" class="modal" aria-labelledby="chat-actions-title">
             <div class="modal-content modal-narrow">
                 <h3 id="chat-actions-title">Manage chat</h3>
                 <p class="modal-sub" id="chat-actions-sub"></p>
@@ -1415,16 +1415,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Unified add modal: series and movies in one search -->
-        <div
-            id="add-content-modal"
-            class="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="add-content-modal-title"
-        >
+        <dialog id="add-content-modal" class="modal" aria-labelledby="add-content-modal-title">
             <div class="modal-content">
                 <!-- "Add for alice" from a chat's menu; "Add serial" / "Add movie" from those sections -->
                 <h3 id="add-content-modal-title">
@@ -1469,16 +1463,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- A chat's bot settings: the same as its ⚙️ Settings screen in Telegram -->
-        <div
-            id="chat-settings-modal"
-            class="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-settings-title"
-        >
+        <dialog id="chat-settings-modal" class="modal" aria-labelledby="chat-settings-title">
             <div class="modal-content modal-medium">
                 <h3 id="chat-settings-title">Settings</h3>
                 <p class="modal-sub" id="chat-settings-sub"></p>
@@ -1549,10 +1537,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- TMDB proxy settings -->
-        <div id="proxy-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="proxy-modal-title">
+        <dialog id="proxy-modal" class="modal" aria-labelledby="proxy-modal-title">
             <div class="modal-content modal-medium">
                 <h3 id="proxy-modal-title">Proxy</h3>
                 <div class="proxy-note">
@@ -1633,10 +1621,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Actions menu -->
-        <div id="actions-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="actions-modal-title">
+        <dialog id="actions-modal" class="modal" aria-labelledby="actions-modal-title">
             <div class="modal-content modal-narrow">
                 <h3 id="actions-modal-title">Actions</h3>
                 <p class="modal-sub">Manual operations you can run on demand.</p>
@@ -1695,16 +1683,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Test Notification Modal -->
-        <div
-            id="test-notify-modal"
-            class="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="test-notify-modal-title"
-        >
+        <dialog id="test-notify-modal" class="modal" aria-labelledby="test-notify-modal-title">
             <div class="modal-content modal-medium">
                 <h3 id="test-notify-modal-title">🧪 Send Test Notification</h3>
                 <p class="modal-sub">Send any alert the bot can send to a chosen chat, marked as a test.</p>
@@ -1788,10 +1770,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Broadcast Modal -->
-        <div id="broadcast-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="broadcast-modal-title">
+        <dialog id="broadcast-modal" class="modal" aria-labelledby="broadcast-modal-title">
             <div class="modal-content">
                 <h3 id="broadcast-modal-title">📢 Global Broadcast</h3>
                 <p style="color: var(--text-dim); margin-bottom: 1.5rem">
@@ -1813,10 +1795,10 @@
                     <button data-close-return="broadcast-modal" class="btn btn-ghost">Cancel</button>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- About: the version the server runs, from /api/version (about.js) -->
-        <div id="about-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
+        <dialog id="about-modal" class="modal" aria-labelledby="about-modal-title">
             <div class="modal-content modal-medium">
                 <h3 id="about-modal-title">About</h3>
                 <p class="modal-sub">NotFckBot: the bot and this panel, one version.</p>
@@ -1835,10 +1817,10 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Confirmation Modal -->
-        <div id="confirm-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <dialog id="confirm-modal" class="modal" aria-labelledby="confirm-title">
             <div class="modal-content modal-medium">
                 <h3 id="confirm-title">Are you sure?</h3>
                 <p id="confirm-text" style="color: var(--text-dim); margin: 1rem 0 1.75rem"></p>
@@ -1847,10 +1829,10 @@
                     <button id="modal-cancel-btn" class="btn btn-primary btn-grow-2">No, cancel</button>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- Notification mode editor -->
-        <div id="mode-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mode-modal-title">
+        <dialog id="mode-modal" class="modal" aria-labelledby="mode-modal-title">
             <div class="modal-content modal-narrow">
                 <h3 id="mode-modal-title">Notification mode</h3>
                 <p class="modal-sub" id="mode-target"></p>
@@ -1867,10 +1849,10 @@
                     <button data-close-return="mode-modal" class="btn btn-ghost">Cancel</button>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- Block duration (replaces window.prompt) -->
-        <div id="block-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="block-modal-title">
+        <dialog id="block-modal" class="modal" aria-labelledby="block-modal-title">
             <div class="modal-content modal-narrow">
                 <h3 id="block-modal-title">🚫 Block chat</h3>
                 <p class="modal-sub" id="block-target"></p>
@@ -1883,10 +1865,10 @@
                     <button data-close-return="block-modal" class="btn btn-ghost">Cancel</button>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <!-- External service: token and status (opened from the TG / TMDB / KP badges) -->
-        <div id="service-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="service-title">
+        <dialog id="service-modal" class="modal" aria-labelledby="service-title">
             <div class="modal-content modal-medium">
                 <h3 id="service-title">Service</h3>
                 <p class="modal-sub" id="service-state">Checking…</p>
@@ -1953,7 +1935,7 @@
                     </svg>
                 </button>
             </div>
-        </div>
+        </dialog>
 
         <!-- Toasts (replace window.alert) -->
         <div id="toast-container" class="toast-container"></div>

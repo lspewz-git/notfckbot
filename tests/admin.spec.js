@@ -187,15 +187,16 @@ test('the proxy dialog composes a URL and hides the password', async ({ page }) 
     await expect(modal).toBeHidden();
 });
 
-test('dialogs are announced, trap focus and close on Escape', async ({ page }) => {
+test('dialogs are announced, modal, and close on Escape', async ({ page }) => {
     await goToSection(page, 'chats');
     await waitForRows(page, 'chats-body');
     const opener = page.locator('#chats-body [data-action="chat-actions"]').first();
     await opener.click();
 
     const modal = page.locator('#chat-actions-modal');
-    await expect(modal).toHaveAttribute('role', 'dialog');
-    await expect(modal).toHaveAttribute('aria-modal', 'true');
+    // A native <dialog> opened with showModal(): announced as a dialog, the page behind inert
+    await expect(modal).toHaveJSProperty('tagName', 'DIALOG');
+    expect(await modal.evaluate((d) => d.matches(':modal'))).toBe(true);
 
     const labelledBy = await modal.getAttribute('aria-labelledby');
     await expect(page.locator(`#${labelledBy}`)).toBeVisible();

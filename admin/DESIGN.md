@@ -74,3 +74,9 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
 - **Hover:** changes the background or colour over 150–200ms. Nothing moves.
 - **Navigation:** rail items are real `<button>`s with `aria-label`, inside `<nav>`. The current
   section carries `aria-current="page"`.
+- **Dialogs:** native `<dialog class="modal">`, opened only through `openModal()` (`showModal()`):
+  the browser puts it on top of everything and keeps the page behind out of reach. The dialog
+  covers the screen and carries the `--scrim` dim itself; `::backdrop` stays clear. Anything that
+  floats over an open dialog goes inside it: toasts move into the dialog on top, dropdown lists
+  open in their dialog. On a touch screen focus lands on the dialog's box, never on a field or a
+  button.

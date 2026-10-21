@@ -82,7 +82,8 @@ function enhanceSelect(select) {
             panel.appendChild(row);
         });
 
-        document.body.appendChild(panel);
+        // In the open dialog when there is one: the page outside it is under the dim and out of reach
+        (trigger.closest('dialog') || document.body).appendChild(panel);
 
         // Fixed positioning keeps the panel out of the modal's overflow clipping
         const rect = trigger.getBoundingClientRect();
