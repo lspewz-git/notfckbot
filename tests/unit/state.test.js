@@ -58,12 +58,18 @@ test('clearState forgets it; a new state can be set in the same update', async (
     assert.equal(last(), 'idle');
 });
 
-test('gone 30 minutes after the last change', async () => {
+test('gone 30 minutes after the last update that used it; a read counts too', async () => {
     await say('set waiting_for_search', { user: 11, chat: 11 });
     const realNow = Date.now;
     try {
-        const later = realNow() + 31 * 60 * 1000;
-        Date.now = () => later;
+        const start = realNow();
+        // A look at 20 minutes starts the 30 over: still there at 40
+        Date.now = () => start + 20 * 60 * 1000;
+        await say('look', { user: 11, chat: 11 });
+        Date.now = () => start + 40 * 60 * 1000;
+        await say('look', { user: 11, chat: 11 });
+        assert.equal(last(), 'waiting_for_search');
+        Date.now = () => start + 71 * 60 * 1000;
         await say('look', { user: 11, chat: 11 });
         assert.equal(last(), 'idle');
     } finally {

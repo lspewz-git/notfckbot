@@ -224,6 +224,28 @@ test('a new search removes the previous one, so there is still one message', asy
     assert.match(only(chat).text, /«курьер 2»/);
 });
 
+test('a new search also removes one that has lapsed: its message is still on screen', async () => {
+    const bot = fakeBot();
+    const chat = fakeChat();
+    const { setState } = require('../../src/bot/state');
+    const search = async (q) => {
+        const ctx = chat.ctxFor(null, { message: { text: q } });
+        setState(ctx, { state: 'waiting_for_search' });
+        await bot.onText()(ctx, async () => {});
+    };
+    const realNow = Date.now;
+    let now = realNow();
+    Date.now = () => now;
+    try {
+        await search('курьер');
+        now += 45 * 60 * 1000;
+        await search('курьер 2');
+    } finally {
+        Date.now = realNow;
+    }
+    assert.match(only(chat).text, /«курьер 2»/);
+});
+
 test('a search lapses 30 minutes after its last press; pressing keeps it alive', async () => {
     const bot = fakeBot();
     const chat = fakeChat();
@@ -254,12 +276,10 @@ test('a search lapses 30 minutes after its last press; pressing keeps it alive',
 test('a button on a search this user no longer has (expired, or before a restart) leaves it alone', async () => {
     const bot = fakeBot();
     const chat = fakeChat();
-    const { clearState } = require('../../src/bot/state');
     const card = await chat.ctxFor(null).replyWithPhoto('x', {
         caption: 'card',
         reply_markup: { inline_keyboard: [[{ text: '⬅️ К результатам', callback_data: 'back_to_results' }]] }
     });
-    clearState(chat.ctxFor(null));
     await press(bot, chat, card.message_id, 'back_to_results');
     assert.equal(only(chat).text, 'card', 'the message is untouched');
     assert.match(chat.alerts.at(-1), /поиск устарел/);

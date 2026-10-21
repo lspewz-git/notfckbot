@@ -43,11 +43,12 @@ function moveSession(session, message) {
 /** Removes this user's searches in this chat from the screen, e.g. before a new one or on /cancel. */
 const clearLastMessages = async (ctx, chatId) => {
     const userId = ctx.from && ctx.from.id;
-    // A copy first: the deletes await Telegram, and the cache's order changes meanwhile as other
-    // updates come in, which would send a live iteration over entries twice or past new ones
-    for (const [key, session] of [...sessions.entries()]) {
+    // dump(): a copy, lapsed searches included (their messages are still on screen). A copy, since
+    // the deletes await Telegram while other updates reorder the cache; and each search is taken
+    // where it is now, as a press meanwhile may have moved it to another message
+    for (const [, { value: session }] of sessions.dump()) {
         if (session.chatId !== chatId || session.starter !== userId) continue;
-        sessions.delete(key);
+        sessions.delete(sessionKey(session.chatId, session.messageId));
         await ctx.telegram.deleteMessage(chatId, session.messageId).catch(() => {});
     }
 };

@@ -1,8 +1,9 @@
 /**
  * Per user and chat: where the conversation is (idle, waiting for a search query, paging results).
  * Telegraf's session() middleware keeps it in ctx.session, under "<user id>:<chat id>"; the store
- * is in memory, bounded, and drops a conversation 30 minutes after its last change. Swapping the
- * store (Valkey, a database) keeps it across restarts without touching the handlers.
+ * is in memory, bounded, and drops a conversation 30 minutes after the last update that read or
+ * changed it (Telegraf writes it back on either). Swapping the store (Valkey, a database) keeps it
+ * across restarts without touching the handlers; one session() per bot, a second one throws.
  */
 const { session } = require('telegraf');
 const { lruCache } = require('../lru');
