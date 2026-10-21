@@ -1,39 +1,27 @@
-/** Per user and chat: where the conversation is (idle, waiting for a search query, paging results). */
+/**
+ * Per user and chat: where the conversation is (idle, waiting for a search query, paging results).
+ * Telegraf's session() middleware keeps it in ctx.session, under "<user id>:<chat id>"; the store
+ * is in memory, bounded, and drops a conversation 30 minutes after its last change. Swapping the
+ * store (Valkey, a database) keeps it across restarts without touching the handlers.
+ */
+const { session } = require('telegraf');
+const { lruCache } = require('../lru');
 
-const userStates = {};
+const STATE_TTL_MS = 30 * 60 * 1000;
+const store = lruCache({ max: 10000, ttl: STATE_TTL_MS });
 
-const getStateKey = (ctx) => {
-    const chatId = ctx.chat.id;
-    const fromId = ctx.from ? ctx.from.id : 'unknown';
-    return `${chatId}:${fromId}`;
-};
+/** Registered before every other handler (src/bot/index.js). */
+const stateSession = session({ store });
 
-const getState = (ctx) => userStates[getStateKey(ctx)] || { state: 'idle' };
+const getState = (ctx) => ctx.session || { state: 'idle' };
 
 const setState = (ctx, data) => {
-    const key = getStateKey(ctx);
-    userStates[key] = { ...(userStates[key] || {}), ...data, _lastActivity: Date.now() };
+    ctx.session = { ...(ctx.session || {}), ...data };
 };
-
-// FIX: Memory leak — purge idle state entries older than 30 minutes
-const STATE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-setInterval(
-    () => {
-        const now = Date.now();
-        for (const key of Object.keys(userStates)) {
-            const last = userStates[key]._lastActivity || 0;
-            if (now - last > STATE_TTL_MS) {
-                delete userStates[key];
-            }
-        }
-    },
-    10 * 60 * 1000
-    // Every 10 minutes. unref: the bot keeps the process alive anyway; a test using this module can exit
-).unref();
 
 /** Forgets everything about this user in this chat, e.g. on /start or an auto-block. */
 const clearState = (ctx) => {
-    delete userStates[getStateKey(ctx)];
+    ctx.session = null;
 };
 
-module.exports = { getState, setState, clearState };
+module.exports = { stateSession, getState, setState, clearState };

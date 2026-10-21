@@ -224,6 +224,33 @@ test('a new search removes the previous one, so there is still one message', asy
     assert.match(only(chat).text, /«курьер 2»/);
 });
 
+test('a search lapses 30 minutes after its last press; pressing keeps it alive', async () => {
+    const bot = fakeBot();
+    const chat = fakeChat();
+    const { setState } = require('../../src/bot/state');
+    const userCtx = chat.ctxFor(null, { message: { text: 'курьер' } });
+    setState(userCtx, { state: 'waiting_for_search' });
+    await bot.onText()(userCtx, async () => {});
+    const list = only(chat);
+    const realNow = Date.now;
+    let now = realNow();
+    Date.now = () => now;
+    try {
+        // Every 20 minutes a press: 40 minutes in all, still there
+        now += 20 * 60 * 1000;
+        await press(bot, chat, list.id, 'page_1');
+        now += 20 * 60 * 1000;
+        await press(bot, chat, list.id, 'page_0');
+        assert.equal(chat.alerts.length, 0);
+        // Then 31 minutes without one: gone
+        now += 31 * 60 * 1000;
+        await press(bot, chat, list.id, 'page_1');
+        assert.match(chat.alerts.at(-1), /поиск устарел/);
+    } finally {
+        Date.now = realNow;
+    }
+});
+
 test('a button on a search this user no longer has (expired, or before a restart) leaves it alone', async () => {
     const bot = fakeBot();
     const chat = fakeChat();

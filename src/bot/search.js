@@ -19,25 +19,15 @@ const mainMenuButton = Markup.inlineKeyboard([[Markup.button.callback('🏠 В �
 // One search is one message on screen, the list or a card, and its state lives with that message
 // rather than with a user: in a chat whose buttons are open to everyone (see access.js) anyone may
 // page it. Who may press at all is decided there; here only whether the search still exists.
-const sessions = new Map(); // "chatId:messageId" -> { chatId, messageId, starter, results, query, page, busy, at }
-const SESSION_TTL_MS = 30 * 60 * 1000;
+// A search lapses 30 minutes after its last button press.
+// "chatId:messageId" -> { chatId, messageId, starter, results, query, page, busy }
+const sessions = lruCache({ max: 1000, ttl: 30 * 60 * 1000, updateAgeOnGet: true });
 const sessionKey = (chatId, messageId) => `${chatId}:${messageId}`;
-
-setInterval(
-    () => {
-        const cutoff = Date.now() - SESSION_TTL_MS;
-        for (const [key, session] of sessions) if (session.at < cutoff) sessions.delete(key);
-    },
-    10 * 60 * 1000
-    // unref: the bot keeps the process alive anyway; a test using this module can exit
-).unref();
 
 /** The search whose message a button was pressed on, or undefined if it has lapsed. */
 function sessionOf(ctx) {
     const message = ctx.callbackQuery && ctx.callbackQuery.message;
-    const session = message && sessions.get(sessionKey(ctx.chat.id, message.message_id));
-    if (session) session.at = Date.now();
-    return session;
+    return message && sessions.get(sessionKey(ctx.chat.id, message.message_id));
 }
 
 /** The search now lives on `message` (the list was edited, or replaced by a card or back). */
@@ -53,7 +43,9 @@ function moveSession(session, message) {
 /** Removes this user's searches in this chat from the screen, e.g. before a new one or on /cancel. */
 const clearLastMessages = async (ctx, chatId) => {
     const userId = ctx.from && ctx.from.id;
-    for (const [key, session] of sessions) {
+    // A copy first: the deletes await Telegram, and the cache's order changes meanwhile as other
+    // updates come in, which would send a live iteration over entries twice or past new ones
+    for (const [key, session] of [...sessions.entries()]) {
         if (session.chatId !== chatId || session.starter !== userId) continue;
         sessions.delete(key);
         await ctx.telegram.deleteMessage(chatId, session.messageId).catch(() => {});
@@ -224,8 +216,7 @@ function register(bot) {
                 starter: ctx.from.id,
                 results,
                 query: text,
-                page: 0,
-                at: Date.now()
+                page: 0
             };
             await showList(ctx, session, 0);
         } catch (error) {

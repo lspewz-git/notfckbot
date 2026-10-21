@@ -13,6 +13,8 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
     telegram: { agent: getProxyAgent() }
 });
 
+// First: every handler after it reads and writes where the conversation is (ctx.session)
+bot.use(require('./state').stateSession);
 require('./middleware').register(bot);
 // Right after the middleware, which loads the chat's settings: decides who may press buttons
 require('./access').register(bot);
