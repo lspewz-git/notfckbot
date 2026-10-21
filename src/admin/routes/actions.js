@@ -139,7 +139,11 @@ async function seriesTest(seriesId, mode, { season, episode, episodeName }) {
 }
 
 // Season and episode left out: the latest aired one
-const episodeNumber = z.coerce.number().int().positive({ error: 'Season and episode: whole numbers from 1' });
+const EPISODE_NUMBER = 'Season and episode: whole numbers from 1';
+const episodeNumber = z.coerce
+    .number({ error: EPISODE_NUMBER })
+    .int({ error: EPISODE_NUMBER })
+    .positive({ error: EPISODE_NUMBER });
 const testBody = z
     .object({
         chatId: chatId('chatId is required'),

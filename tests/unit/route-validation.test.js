@@ -111,6 +111,10 @@ test('a test notification needs the right id for its kind', async () => {
     assert.deepEqual(film.body, { error: 'filmId is required' });
     const mode = await call('POST', '/api/test-notification', { chatId: 1, mode: 'weekly', seriesId: 1 });
     assert.deepEqual(mode.body, { error: 'Unknown notification type: weekly' });
+    for (const season of [1.5, 0, 'two']) {
+        const res = await call('POST', '/api/test-notification', { chatId: 1, seriesId: 1, season });
+        assert.deepEqual(res.body, { error: 'Season and episode: whole numbers from 1' }, String(season));
+    }
     const target = await call('POST', '/api/broadcast', { message: 'hi', target: 'everyone' });
     assert.deepEqual(target.body, { error: 'Unknown target "everyone"' });
 });
