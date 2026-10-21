@@ -162,7 +162,7 @@ test('restart: the check just finished, seconds to wait: said in seconds, not as
     await mockPanel(page, { settings: { restart: { pending: [], blocked: { reason: 'started', checkAt, until } } } });
     await openSettings(page);
     await page.locator('[data-action="settings-restart"]').click();
-    await expect(page.locator('.toast-warning')).toContainText(/Restart in d+ s./);
+    await expect(page.locator('.toast-warning')).toContainText(/Restart in \d+ s\./);
 });
 
 test('restart: asks, then waits for the bot to answer again', async ({ page }) => {
