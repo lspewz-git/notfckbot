@@ -155,3 +155,30 @@ test('on a touch screen opening a dialog focuses its box, not a field: no keyboa
     const focused = await page.evaluate(() => document.activeElement && document.activeElement.className);
     expect(focused).toContain('modal-content');
 });
+
+test('on a phone the More sheet slides up from the bottom without jumping', async ({ page }) => {
+    test.skip(!narrow(page), 'the phone sheet');
+    await mockPanel(page);
+    // Every frame while it opens: the sheet's top edge and how far the dialog is scrolled
+    await page.evaluate(() => {
+        const sheet = document.getElementById('more-modal');
+        window.__frames = [];
+        const tick = () => {
+            if (sheet.open) {
+                const top = sheet.querySelector('.modal-content').getBoundingClientRect().top;
+                window.__frames.push({ top, scroll: sheet.scrollTop });
+            }
+            if (window.__frames.length < 30) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    });
+    await page.locator('.tab-item[data-open="more-modal"]').click();
+    await page.waitForFunction(() => window.__frames.length >= 30);
+    const frames = await page.evaluate(() => window.__frames);
+    // Focus moving in must not scroll it: a sheet still below the edge would jump up and back
+    expect(Math.max(...frames.map((f) => f.scroll))).toBe(0);
+    // And it rises: the top edge only ever moves up, from lower than where it ends
+    const tops = frames.map((f) => f.top);
+    for (let i = 1; i < tops.length; i++) expect(tops[i]).toBeLessThanOrEqual(tops[i - 1] + 1);
+    expect(tops[0]).toBeGreaterThan(tops[tops.length - 1]);
+});

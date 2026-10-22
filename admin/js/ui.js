@@ -110,11 +110,10 @@ export function openModal(id) {
     closeDropdown();
 
     focusBeforeOpen.set(id, /** @type {HTMLElement} */ (document.activeElement));
-    // showModal() focuses the first field itself, which on a touch screen raises the keyboard:
-    // it lands on the dialog's box instead, and the field gets focus below where that is wanted
-    const content = /** @type {HTMLElement} */ (modal.querySelector('.modal-content') || modal);
-    content.tabIndex = -1;
-    content.autofocus = true;
+    // showModal() focuses the first field itself, which on a touch screen raises the keyboard. It
+    // focuses the dialog itself instead: nothing to scroll into view (a box still sliding in would
+    // be), and the field gets focus below where that is wanted
+    modal.autofocus = true;
     modal.showModal();
     openStack.push(modal);
     placeToasts();
@@ -124,6 +123,7 @@ export function openModal(id) {
 /** @param {HTMLElement} modal */
 function focusInside(modal) {
     const content = /** @type {HTMLElement} */ (modal.querySelector('.modal-content') || modal);
+    content.tabIndex = -1;
     // On a touch screen focus stays on the box: a field would raise the keyboard, and a button
     // would show a focus ring nobody asked for
     const first = focusables(modal)[0];

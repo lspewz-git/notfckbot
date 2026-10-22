@@ -185,7 +185,10 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
+    /* clip, not just hidden: focus moving in must not scroll the dialog (a sheet still sliding
+       in from below would jump up and back) */
     overflow: hidden;
+    overflow: clip;
     animation: modal-fade 0.15s ease-out;
 }
 
