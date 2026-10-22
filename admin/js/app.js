@@ -57,6 +57,9 @@ function switchSection(id) {
     activeSection = id;
     setSection(id);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
+    // Each section opens at its top: the page keeps one scroll position for all of them, and the
+    // last section's would leave the new one scrolled down (or at the bottom, if it is shorter)
+    window.scrollTo(0, 0);
     // Sidebar items and tab-bar items; "More" counts as active for the sections it holds
     all('.nav-item, .tab-item').forEach((n) => {
         const on = n.dataset.section === id || (n.dataset.tabSections || '').split(' ').includes(id);
