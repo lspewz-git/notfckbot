@@ -110,6 +110,45 @@ async function servePoster(size, file, res) {
     upstream.data.pipe(res);
 }
 
+/**
+ * A poster's bytes for the server's own use (the year's recap cards): from disk, or from TMDB
+ * and then kept on disk like the panel's. Null when there is none to be had in `timeout`.
+ * @param {string | null} url a TMDB poster URL, "https://image.tmdb.org/t/p/w500/abc.jpg"
+ */
+async function posterBytes(url, size = 'w342', timeout = 8000) {
+    const file = String(url || '')
+        .split('/')
+        .pop();
+    if (!url || !isValid(size, file)) return null;
+    const target = path.join(cacheDir(), size, file);
+    const stored = await fs.promises.readFile(target).catch(() => null);
+    if (stored && stored.length) {
+        const now = new Date();
+        fs.promises.utimes(target, now, now).catch(() => {});
+        return stored;
+    }
+    try {
+        const answer = await axios.get(`https://image.tmdb.org/t/p/${size}/${file}`, {
+            responseType: 'arraybuffer',
+            timeout,
+            signal: AbortSignal.timeout(timeout),
+            httpsAgent: getProxyAgent(),
+            proxy: false
+        });
+        if (!String(answer.headers['content-type'] || '').startsWith('image/')) return null;
+        const bytes = Buffer.from(answer.data);
+        const temp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.part`;
+        await fs.promises
+            .mkdir(path.dirname(target), { recursive: true })
+            .then(() => fs.promises.writeFile(temp, bytes))
+            .then(() => fs.promises.rename(temp, target))
+            .catch(() => fs.promises.unlink(temp).catch(() => {}));
+        return bytes;
+    } catch {
+        return null;
+    }
+}
+
 /** Deletes posters nobody asked for in MAX_AGE_DAYS, and leftovers of broken downloads. */
 async function sweepPosters(now = Date.now()) {
     const root = cacheDir();
@@ -134,4 +173,4 @@ async function sweepPosters(now = Date.now()) {
     return removed;
 }
 
-module.exports = { servePoster, sweepPosters, cacheDir, MAX_AGE_DAYS };
+module.exports = { servePoster, posterBytes, sweepPosters, cacheDir, MAX_AGE_DAYS };

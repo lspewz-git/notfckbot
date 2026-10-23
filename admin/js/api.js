@@ -32,3 +32,18 @@ export async function api(path, options = {}) {
     }
     return data;
 }
+
+/**
+ * An image the API draws (a recap card), as a Blob: an <img> can't send the header the API asks
+ * for, so the panel fetches it and shows an object URL.
+ * @param {string} path Path under /api
+ * @returns {Promise<Blob>}
+ */
+export async function apiImage(path) {
+    const res = await fetch(`${API_URL}${path}`, { headers: { 'X-Requested-By': 'notfckbot-panel' } });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return res.blob();
+}

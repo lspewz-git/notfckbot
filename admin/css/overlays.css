@@ -727,3 +727,53 @@ html:has(.modal[open]) {
         letter-spacing: -0.04em;
     }
 }
+
+.stats-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+}
+
+/* The year's recap preview: six 4:5 cards, three across (two on a phone) */
+.modal-recap {
+    max-width: 760px;
+}
+
+.recap-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+}
+
+.recap-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+}
+
+.recap-card img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.recap-card .skeleton {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+}
+
+.recap-card .stats-failed {
+    padding: var(--space-4);
+}
+
+@media (max-width: 760px) {
+    .recap-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

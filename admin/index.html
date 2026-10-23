@@ -1494,7 +1494,26 @@
                     <div id="chat-stats-periods" class="tab-filters" role="group" aria-label="Period"></div>
                 </div>
                 <div id="chat-stats-body" aria-live="polite"></div>
+                <div class="stats-actions">
+                    <button id="chat-stats-recap" type="button" class="btn btn-outline">Preview year recap</button>
+                </div>
                 <button data-close-return="chat-stats-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
+        <!-- The year's recap cards for a chat (chat-stats.js): a preview, nothing is sent -->
+        <dialog id="recap-modal" class="modal" aria-labelledby="recap-title">
+            <div class="modal-content modal-recap">
+                <h3 id="recap-title">Year recap</h3>
+                <p class="modal-sub" id="recap-sub"></p>
+                <div id="recap-cards" class="recap-cards"></div>
+                <p class="stats-note">A preview of the six cards. Nothing is sent to the chat.</p>
+                <button data-close-return="recap-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />

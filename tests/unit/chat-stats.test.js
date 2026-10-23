@@ -233,7 +233,7 @@ describe('the statistics', () => {
 
     test('films out in the period, by their first date; how long the chat waited', () => {
         assert.deepEqual(stats.films.released, [
-            { tmdb_id: 'movie_1', title: 'Film', day: '2026-06-18', waited: 365, rating: 7.9 }
+            { tmdb_id: 'movie_1', title: 'Film', day: '2026-06-18', waited: 365, rating: 7.9, poster_url: null }
         ]);
         assert.equal(stats.films.minutes, 150);
         assert.deepEqual(stats.films.services.map((s) => s.name).sort(), ['Okko', 'Кинопоиск'].sort());
@@ -249,7 +249,14 @@ describe('the statistics', () => {
             stats.finished.map((t) => t.title),
             ['Comedy']
         );
-        assert.deepEqual(stats.ahead, { series: 1, films: 1 });
+        assert.deepEqual(stats.ahead, {
+            series: 1,
+            films: 1,
+            next: [
+                { title: 'Drama', day: '2027-02-01', kind: 'series' },
+                { title: 'Later', day: '2027-03-01', kind: 'film' }
+            ]
+        });
         assert.deepEqual(stats.added, { series: 1, films: 1, unsubscribed: 1, filmsRemoved: 0 });
     });
 

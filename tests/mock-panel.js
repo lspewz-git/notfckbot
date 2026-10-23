@@ -203,7 +203,8 @@ const PIXEL = Buffer.from(
  * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
- *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void> }} [options]
+ *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
+ *   recap?: (n: number) => Buffer }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
@@ -513,6 +514,17 @@ async function mockPanel(page, options = {}) {
             }
         ],
         [
+            // A recap card: options.recap(n) or a 1x1 image; the cards asked, for tests to check
+            /^\/api\/chat\/(-?\d+)\/recap\/(\d)$/,
+            ([, id, n], req) => {
+                panel.recapAsked = [
+                    ...(panel.recapAsked || []),
+                    { chatId: id, n: Number(n), query: new URL(req.url()).search.slice(1) }
+                ];
+                return { image: options.recap ? options.recap(Number(n)) : PIXEL };
+            }
+        ],
+        [
             // A chat's statistics: options.chatStats(query) or a year with a little of everything;
             // the queries asked, for tests to check. options.statsHold: the answer waits for it
             /^\/api\/chat\/(-?\d+)\/stats$/,
@@ -547,6 +559,8 @@ async function mockPanel(page, options = {}) {
 
     await page.route('**/*', async (route) => {
         const url = new URL(route.request().url());
+        // WebKit routes the panel's own object URLs (the recap cards) here too: they aren't ours to answer
+        if (url.protocol === 'blob:') return route.continue();
 
         // Web fonts and anything else off-site: answer empty rather than fail
         if (url.origin !== ORIGIN) {
@@ -568,6 +582,9 @@ async function mockPanel(page, options = {}) {
             if (options.failing && options.failing.includes(url.pathname))
                 return route.fulfill({ status: 500, json: { error: 'Test failure' } });
             const answer = await handler(route.request());
+            // An image: { image: Buffer }
+            if (answer && answer.image)
+                return route.fulfill({ status: 200, contentType: 'image/png', body: answer.image });
             // A handler may pick the status: { status, body }
             if (answer && answer.status && answer.body)
                 return route.fulfill({ status: answer.status, json: answer.body });

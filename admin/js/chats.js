@@ -50,7 +50,7 @@ export function openChatActions(chatId) {
     $('action-stats').onclick = () => {
         closeModal('chat-actions-modal');
         setReturnTo(backToChat);
-        openChatStats(chat, label);
+        openChatStats(chat, label, backToChat);
     };
 
     const blockBtn = $('action-block');

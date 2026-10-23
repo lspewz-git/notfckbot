@@ -14,7 +14,7 @@ const express = require('express');
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'posters-'));
 process.env.POSTER_CACHE_DIR = DIR;
-const { servePoster, sweepPosters, MAX_AGE_DAYS } = require('../../src/admin/posters');
+const { servePoster, posterBytes, sweepPosters, MAX_AGE_DAYS } = require('../../src/admin/posters');
 
 const IMAGE = Buffer.from('a poster, byte by byte');
 let upstream; // () => what axios.get resolves or throws
@@ -191,4 +191,18 @@ test('TMDB going quiet halfway: the request ends after the deadline, nothing kep
         leftovers('w342').filter((f) => f.startsWith('quiet')),
         []
     );
+});
+
+test('the recap cards take a poster from the disk; a bad address or TMDB down gives none', async () => {
+    fs.mkdirSync(path.join(DIR, 'w342'), { recursive: true });
+    fs.writeFileSync(path.join(DIR, 'w342', 'kept.jpg'), IMAGE);
+    const get = mock.method(axios, 'get', async () => {
+        throw new Error('TMDB down');
+    });
+    assert.deepEqual(await posterBytes('https://image.tmdb.org/t/p/w500/kept.jpg'), IMAGE);
+    assert.equal(get.mock.callCount(), 0);
+    assert.equal(await posterBytes('https://image.tmdb.org/t/p/w500/missing.jpg'), null);
+    assert.equal(await posterBytes('https://image.tmdb.org/t/p/w500/../../etc.jpg'), null);
+    assert.equal(await posterBytes(null), null);
+    get.mock.restore();
 });

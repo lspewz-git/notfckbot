@@ -88,8 +88,22 @@ function computeStats(
             }
         }
         if (!count) continue;
-        perSeries.push({ tmdb_id: s.tmdb_id, title: s.title, count, minutes, lastMonth, status: s.status });
-        active.push({ title: s.title, kind: 'series', rating: s.rating || null, tmdb_id: s.tmdb_id });
+        perSeries.push({
+            tmdb_id: s.tmdb_id,
+            title: s.title,
+            count,
+            minutes,
+            lastMonth,
+            status: s.status,
+            poster_url: s.poster_url || null
+        });
+        active.push({
+            title: s.title,
+            kind: 'series',
+            rating: s.rating || null,
+            tmdb_id: s.tmdb_id,
+            poster_url: s.poster_url || null
+        });
         // An interest counts once per title, whatever its number of episodes
         for (const g of split(s.genres, ',')) add(genres, g);
         for (const n of split(s.networks, ',')) add(networks, n);
@@ -103,8 +117,21 @@ function computeStats(
         if (!inPeriod(day, period) || day > today) continue;
         const added = dayOf(f.createdAt);
         const waited = added && added < day ? Math.round((Date.parse(day) - Date.parse(added)) / DAY_MS) : 0;
-        released.push({ tmdb_id: f.tmdb_id, title: f.title, day, waited, rating: f.rating || null });
-        active.push({ title: f.title, kind: 'film', rating: f.rating || null, tmdb_id: f.tmdb_id });
+        released.push({
+            tmdb_id: f.tmdb_id,
+            title: f.title,
+            day,
+            waited,
+            rating: f.rating || null,
+            poster_url: f.poster_url || null
+        });
+        active.push({
+            title: f.title,
+            kind: 'film',
+            rating: f.rating || null,
+            tmdb_id: f.tmdb_id,
+            poster_url: f.poster_url || null
+        });
         for (const g of split(f.genres, ',')) add(genres, g);
         for (const c of split(f.countries, ',')) add(countries, c);
         for (const s of split(f.ru_services, ',')) add(services, s);
@@ -169,7 +196,13 @@ function computeStats(
             top: [...perSeries]
                 .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
                 .slice(0, TOP)
-                .map(({ tmdb_id, title, count, minutes }) => ({ tmdb_id, title, count, minutes }))
+                .map(({ tmdb_id, title, count, minutes, poster_url }) => ({
+                    tmdb_id,
+                    title,
+                    count,
+                    minutes,
+                    poster_url
+                }))
         },
         films: {
             released,
@@ -184,7 +217,18 @@ function computeStats(
         finished: finishedInPeriod,
         ahead: {
             series: series.filter((s) => s.next_episode_date && s.next_episode_date > period.to).length,
-            films: films.filter((f) => !f.notified && (!filmDay(f) || filmDay(f) > period.to)).length
+            films: films.filter((f) => !f.notified && (!filmDay(f) || filmDay(f) > period.to)).length,
+            // What comes first after the period, with a date: the next episode or the film's release
+            next: [
+                ...series
+                    .filter((s) => s.next_episode_date && s.next_episode_date > period.to)
+                    .map((s) => ({ title: s.title, day: s.next_episode_date, kind: 'series' })),
+                ...films
+                    .filter((f) => !f.notified && filmDay(f) > period.to)
+                    .map((f) => ({ title: f.title, day: filmDay(f), kind: 'film' }))
+            ]
+                .sort((a, b) => a.day.localeCompare(b.day))
+                .slice(0, TOP)
         },
         notifications: {
             total: notified.length,

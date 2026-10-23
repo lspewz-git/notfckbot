@@ -1,12 +1,13 @@
 /**
  * A chat's statistics (/api/chat/:id/stats, src/chat-stats.js): what came out of what it follows,
  * what it is into, the notifications it got and how it uses the bot, for last year, this year or
- * all the time.
+ * all the time. From there, a preview of the year's recap cards (src/recap/): images only, nothing
+ * is sent.
  */
 
 import { $, escapeHtml } from './dom.js';
-import { api } from './api.js';
-import { openModal } from './ui.js';
+import { api, apiImage } from './api.js';
+import { openModal, closeModal, setReturnTo } from './ui.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FEATURES = {
@@ -25,9 +26,12 @@ const regions = new Intl.DisplayNames(['en'], { type: 'region' });
 const number = new Intl.NumberFormat('en-GB');
 
 let chatId = null;
+let chatName = '';
+// Back to the chat's menu, from the statistics (chats.js gives it)
+let backToMenu = null;
 let period = 'year';
-// Only the latest request may fill the dialog: switching the period or the chat outruns the older
-const state = { request: 0 };
+// Only the latest request may fill a dialog: switching the period or the chat outruns the older
+const state = { request: 0, recap: 0 };
 
 const thisYear = () => new Date().getFullYear();
 const today = () => new Intl.DateTimeFormat('en-CA').format(new Date());
@@ -114,10 +118,10 @@ function chart(stats) {
     if (!bars.some((b) => b.count)) return '<p class="stats-empty stats-chart-empty">No episodes in this period</p>';
     const max = Math.max(...bars.map((b) => b.count));
     const busiest = bars.find((b) => b.count === max);
-    return `<div class="stats-chart" role="img" aria-label="Episodes: ${bars.map((b) => `${b.label} ${b.count}`).join(', ')}">${bars
+    return `<div class="stats-chart" role="img" aria-label="Episodes: ${escapeHtml(bars.map((b) => `${b.label} ${b.count}`).join(', '))}">${bars
         .map(
             (b) =>
-                `<div class="stats-col"><span class="stats-col-bar${b === busiest ? ' busiest' : ''}" style="height:${Math.round((b.count / max) * 100)}%" title="${b.label}: ${b.count}"></span><span class="stats-col-label">${b.label}</span></div>`
+                `<div class="stats-col"><span class="stats-col-bar${b === busiest ? ' busiest' : ''}" style="height:${Math.round((b.count / max) * 100)}%" title="${escapeHtml(b.label)}: ${b.count}"></span><span class="stats-col-label">${escapeHtml(b.label)}</span></div>`
         )
         .join('')}</div>`;
 }
@@ -215,13 +219,24 @@ async function load() {
     }
 }
 
+/** The year the recap button shows: the period's, or this year for all time. */
+const recapYear = () => (period === 'last' ? thisYear() - 1 : thisYear());
+
+function renderRecapButton() {
+    $('chat-stats-recap').textContent = `Preview ${recapYear()} recap`;
+}
+
 /** Opens the dialog for a chat, on this year. */
-export function openChatStats(chat, label) {
+export function openChatStats(chat, label, back = null) {
     chatId = chat.id;
+    chatName = label;
+    backToMenu = back;
     chatType = chat.type || 'private';
     period = 'year';
     $('chat-stats-sub').textContent = `${label} · ${chatType}`;
     renderPeriods();
+    renderRecapButton();
+    $('chat-stats-recap').onclick = openRecap;
     openModal('chat-stats-modal');
     load();
 }
@@ -231,5 +246,48 @@ export function pickPeriod(key) {
     if (!chatId) return;
     period = key;
     renderPeriods();
+    renderRecapButton();
     load();
+}
+
+// --- The year's recap: six PNGs drawn by the server ---
+
+// The object URLs on show, freed when the next preview opens
+let shown = [];
+
+function openRecap() {
+    const year = recapYear();
+    const id = chatId;
+    const request = ++state.recap;
+    closeModal('chat-stats-modal');
+    // Closing the preview goes back to the statistics, and from there to the chat's menu
+    setReturnTo(() => {
+        openModal('chat-stats-modal');
+        if (backToMenu) setReturnTo(backToMenu);
+    });
+    for (const url of shown) URL.revokeObjectURL(url);
+    shown = [];
+    $('recap-title').textContent = `${year} recap`;
+    $('recap-sub').textContent = chatName;
+    const cards = $('recap-cards');
+    cards.innerHTML = [1, 2, 3, 4, 5, 6]
+        .map((n) => `<div class="recap-card" data-card="${n}"><span class="skeleton"></span></div>`)
+        .join('');
+    openModal('recap-modal');
+    // One after another: the first request draws all six on the server, the rest come from its cache
+    (async () => {
+        for (const n of [1, 2, 3, 4, 5, 6]) {
+            const slot = cards.querySelector(`[data-card="${n}"]`);
+            try {
+                const blob = await apiImage(`/chat/${id}/recap/${n}?year=${year}`);
+                if (request !== state.recap) return;
+                const url = URL.createObjectURL(blob);
+                shown.push(url);
+                slot.innerHTML = `<img src="${url}" alt="Card ${n} of 6" width="1080" height="1350" />`;
+            } catch (err) {
+                if (request !== state.recap) return;
+                slot.innerHTML = `<p class="stats-failed">Failed to load: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+    })();
 }

@@ -113,3 +113,33 @@ test('a failed answer: a note instead of figures, and closing goes back to the c
     await expect(page.locator('#chat-stats-modal')).toBeHidden();
     await expect(page.locator('#chat-actions-modal')).toBeVisible();
 });
+
+test("the year's recap: six cards of the period's year, and back to the statistics, then the menu", async ({
+    page
+}) => {
+    const panel = await mockPanel(page);
+    await openStats(page, -1003);
+    const button = page.locator('#chat-stats-recap');
+    await expect(button).toHaveText(`Preview ${YEAR} recap`);
+    await page.locator('#chat-stats-periods .btn', { hasText: String(YEAR - 1) }).click();
+    await expect(button).toHaveText(`Preview ${YEAR - 1} recap`);
+
+    await button.click();
+    const recap = page.locator('#recap-modal');
+    await expect(recap).toBeVisible();
+    await expect(page.locator('#chat-stats-modal')).toBeHidden();
+    await expect(page.locator('#recap-title')).toHaveText(`${YEAR - 1} recap`);
+    await expect(page.locator('#recap-sub')).toHaveText('Movie Club');
+    await expect(recap.locator('.recap-card img')).toHaveCount(6);
+    expect(panel.recapAsked.map((r) => [r.chatId, r.n, r.query])).toEqual(
+        [1, 2, 3, 4, 5, 6].map((n) => ['-1003', n, `year=${YEAR - 1}`])
+    );
+    // The cards keep the 4:5 shape whatever the image
+    const box = await recap.locator('.recap-card').first().boundingBox();
+    expect(Math.abs(box.height / box.width - 1.25)).toBeLessThan(0.02);
+
+    await recap.locator('.modal-x').click();
+    await expect(page.locator('#chat-stats-modal')).toBeVisible();
+    await page.locator('#chat-stats-modal .modal-x').click();
+    await expect(page.locator('#chat-actions-modal')).toBeVisible();
+});
