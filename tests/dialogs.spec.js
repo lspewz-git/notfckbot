@@ -156,6 +156,46 @@ test('on a touch screen opening a dialog focuses its box, not a field: no keyboa
     expect(focused).toContain('modal-content');
 });
 
+test('scrolling in an open dialog leaves the page behind it where it was', async ({ page }) => {
+    await mockPanel(page);
+    // Room to scroll, so a page that moves shows it
+    await page.evaluate(() => {
+        document.body.style.minHeight = '3000px';
+        window.scrollTo(0, 200);
+    });
+    // Opened from code: a click would scroll the page to what it clicks first
+    await page.evaluate(() => import('./js/ui.js').then((ui) => ui.openModal('detail-modal')));
+    const card = page.locator('#detail-modal');
+    await expect(card).toBeVisible();
+    const root = () => page.evaluate(() => getComputedStyle(document.documentElement).overflowY);
+    expect(await root()).toBe('hidden');
+    // Locking it doesn't throw it back to the top
+    expect(await page.evaluate(() => window.scrollY)).toBe(200);
+    // Where the browser knows the property (Safari 16+ does; Playwright's WebKit on Windows doesn't)
+    const overscroll = await card
+        .locator('.modal-content')
+        .evaluate((el) =>
+            CSS.supports('overscroll-behavior', 'contain') ? getComputedStyle(el).overscrollBehaviorY : 'contain'
+        );
+    expect(overscroll).toBe('contain');
+
+    // A real wheel over the dialog: the mobile WebKit project has no wheel, the styles above cover it
+    if (!narrow(page)) {
+        const box = await card.locator('.modal-content').boundingBox();
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        for (let i = 0; i < 5; i++) await page.mouse.wheel(0, 600);
+        await page.mouse.move(box.x - 10 > 0 ? box.x - 10 : 5, 5);
+        await page.mouse.wheel(0, 600);
+        await page.waitForTimeout(200);
+        expect(await page.evaluate(() => window.scrollY)).toBe(200);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(card).toBeHidden();
+    expect(await root()).not.toBe('hidden');
+    expect(await page.evaluate(() => window.scrollY)).toBe(200);
+});
+
 test('on a phone the More sheet slides up from the bottom without jumping', async ({ page }) => {
     test.skip(!narrow(page), 'the phone sheet');
     await mockPanel(page);

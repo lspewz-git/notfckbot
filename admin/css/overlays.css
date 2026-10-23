@@ -196,6 +196,12 @@
     display: flex;
 }
 
+/* The page behind an open dialog stays put: a dialog makes it unclickable, not unscrollable, and a
+   swipe in the dialog would otherwise move the page (scrollbar-gutter keeps the width the same) */
+html:has(.modal[open]) {
+    overflow: hidden;
+}
+
 .modal::backdrop {
     background: transparent;
 }
@@ -212,6 +218,8 @@
     padding: var(--space-6);
     position: relative;
     overflow-y: auto;
+    /* Scrolled to its end, a swipe stops here instead of passing on to the page */
+    overscroll-behavior: contain;
     animation: modal-in 0.15s ease-out;
 }
 
