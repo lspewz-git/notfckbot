@@ -156,6 +156,32 @@ test('on a touch screen opening a dialog focuses its box, not a field: no keyboa
     expect(focused).toContain('modal-content');
 });
 
+/** Elements showing a focus ring: focused for the keyboard and drawn with an outline. */
+const rings = (page) =>
+    page.evaluate(
+        () =>
+            [...document.querySelectorAll(':focus-visible')].filter(
+                (el) => getComputedStyle(el).outlineStyle !== 'none'
+            ).length
+    );
+
+test('on a touch screen closing a dialog leaves no focus ring on what opened it', async ({ page }) => {
+    test.skip(!narrow(page), 'a touch screen');
+    await mockPanel(page);
+    await page.locator('.tab-item[data-section="subs"]').tap();
+    await page.locator('#subs-body .compact-title').first().tap();
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await page.locator('#detail-modal .modal-x').tap();
+    await expect(page.locator('#detail-modal')).toBeHidden();
+    expect(await rings(page)).toBe(0);
+
+    // One dialog over another: the one left open keeps focus on its box, not on a ringed button
+    await openChatSettings(page);
+    await page.locator('#chat-settings-modal [data-close-return="chat-settings-modal"]').first().tap();
+    await expect(page.locator('#chat-actions-modal')).toBeVisible();
+    expect(await rings(page)).toBe(0);
+});
+
 test('scrolling in an open dialog leaves the page behind it where it was', async ({ page }) => {
     await mockPanel(page);
     // Room to scroll, so a page that moves shows it

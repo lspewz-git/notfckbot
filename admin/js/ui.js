@@ -80,6 +80,14 @@ function afterClose(modal) {
     placeToasts();
     const previous = focusBeforeOpen.get(modal.id);
     focusBeforeOpen.delete(modal.id);
+    if (isTouch()) {
+        // On a touch screen focus isn't handed back: no keyboard goes on from there, and the title
+        // or button that was tapped would get a focus ring. Undoes the browser's own return too
+        const top = topmostModal();
+        if (top) focusInside(top);
+        else /** @type {HTMLElement | null} */ (document.activeElement)?.blur();
+        return;
+    }
     // Only restore if the element is still on the page and nothing else took over
     if (previous && previous.isConnected && !isAnyModalOpen()) previous.focus();
 }
