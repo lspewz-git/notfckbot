@@ -9,6 +9,8 @@ const { setupCron } = require('./cron');
 const { startAdminServer } = require('./admin');
 const { warmDetailsCache } = require('./warm-cache');
 const { backfillReleaseSeasons } = require('./cron/release-seasons');
+const { backfillAiredEpisodes } = require('./cron/aired-episodes');
+const { backfillFilmFacts } = require('./cron/films');
 const { log } = require('./log');
 
 async function start() {
@@ -37,14 +39,18 @@ async function start() {
         warmDetailsCache()
             .catch((err) => log.error(`[Cache] Warm-up failed: ${err.message}`))
             .then(backfillReleaseSeasons)
-            .catch((err) => log.error(`[History] Backfill failed: ${err.message}`));
+            .catch((err) => log.error(`[History] Backfill failed: ${err.message}`))
+            // And for the chats' statistics: episodes by month, what each title is (once per title)
+            .then(backfillAiredEpisodes)
+            .then(backfillFilmFacts)
+            .catch((err) => log.error(`[Stats] Backfill failed: ${err.message}`));
 
         log.info('Launching Telegram bot...');
         bot.launch({ dropPendingUpdates: true })
             .then(() => log.info('Bot is running! 🚀'))
             .catch((err) => log.error({ err }, 'Bot launch failed'));
 
-        // Graceful stop (docker compose restart/stop): the day counts kept in memory are written
+        // Graceful stop (docker compose restart/stop): the day counts and chat events kept in memory are written
         // first, then the process ends without waiting for Docker to kill it
         for (const signal of ['SIGINT', 'SIGTERM']) {
             process.once(signal, async () => {
@@ -56,6 +62,9 @@ async function start() {
                 }
                 await require('./stats-log')
                     .flushStats()
+                    .catch(() => {});
+                await require('./chat-events')
+                    .flushEvents()
                     .catch(() => {});
                 process.exit(0);
             });

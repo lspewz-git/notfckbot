@@ -18,6 +18,8 @@ bot.use(require('./state').stateSession);
 require('./middleware').register(bot);
 // Right after the middleware, which loads the chat's settings: decides who may press buttons
 require('./access').register(bot);
+// For the chat's statistics: what it opens (only updates that got past the throttle and the block)
+require('./usage').register(bot);
 require('./commands').register(bot);
 // Before the search: its free-text handler would otherwise see "⚙️ Настройки" first
 require('./settings').register(bot);

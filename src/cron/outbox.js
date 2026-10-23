@@ -6,6 +6,7 @@ const { PendingMessage, HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
 const stats = require('../stats-log');
+const events = require('../chat-events');
 const { tally } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { log } = require('../log');
@@ -35,10 +36,23 @@ const QUEUED = { status: 'failed', error: 'Telegram was unreachable earlier in t
 /**
  * Sends one notification; a temporary failure is queued for the next check. In the chat's quiet
  * hours it is held instead, for the list that goes out when they end (src/cron/held.js).
- * @param {{ photo?: string | null, about?: string, line?: string, label?: string }} [options]
- *   about: the title, for the log; line and label: its line and button in that list
+ * @param {{ photo?: string | null, about?: string, line?: string, label?: string, event?: object | null }} [options]
+ *   about: the title, for the log; line and label: its line and button in that list; event: what it
+ *   was, for the chat's statistics (src/chat-events.js: detail, tmdb_id, title, season, episode)
  */
-async function notify(bot, chatId, text, { photo = null, about = '', line = '', label = '' } = {}) {
+async function notify(bot, chatId, text, { photo = null, about = '', line = '', label = '', event = null } = {}) {
+    const result = await send(bot, chatId, text, { photo, about, line, label });
+    if (event) events.record(chatId, { kind: 'notified', ...event, outcome: outcomeOf(result) });
+    return result;
+}
+
+/** sent, held, queued (for the next check) or failed (for good). */
+function outcomeOf(result) {
+    if (result.status === 'sent' || result.status === 'held') return result.status;
+    return result.status === 'failed' ? 'queued' : 'failed';
+}
+
+async function send(bot, chatId, text, { photo, about, line, label }) {
     if (line && isQuietNow(await chatSettings(chatId))) {
         try {
             await HeldNotification.create({ chatId, line, label: label || about || 'Уведомление', text, photo });

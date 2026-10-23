@@ -64,10 +64,24 @@ const Series = sequelize.define('Series', {
         type: DataTypes.INTEGER,
         allowNull: true
     },
+    // What the title is, for the chats' statistics (titleFacts() in src/api/tmdb.js); kept current
+    // by the update check
+    genres: { type: DataTypes.STRING, allowNull: true },
+    networks: { type: DataTypes.STRING, allowNull: true },
+    countries: { type: DataTypes.STRING(40), allowNull: true },
+    runtime: { type: DataTypes.INTEGER, allowNull: true },
+    rating: { type: DataTypes.FLOAT, allowNull: true },
     // The years in which an episode aired, with their seasons, as "2024:2;2025:2,3", for the
     // release history. Null until every season has been looked at once
     // (src/cron/release-seasons.js); "" when none aired yet.
     release_seasons: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    // How many episodes aired each month, by season, and their minutes, for the chats'
+    // statistics: "2026-03:2=4/180,3=1/45;2026-04:3=3/135" (src/cron/aired-episodes.js). Null until
+    // every season has been looked at once
+    aired_episodes: {
         type: DataTypes.TEXT,
         allowNull: true
     }

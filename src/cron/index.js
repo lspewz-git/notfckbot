@@ -14,6 +14,7 @@ const { flushPending } = require('./outbox');
 const { releaseHeld } = require('./held');
 const { sendDigests } = require('./digests');
 const stats = require('../stats-log');
+const { flushEvents } = require('../chat-events');
 const { log } = require('../log');
 
 const checkUpdates = async (bot) => {
@@ -40,6 +41,7 @@ const checkUpdates = async (bot) => {
         stats.count('checks');
         if (fatal || (lastRun && lastRun.errors)) stats.count('check_errors');
         await stats.flushStats();
+        await flushEvents();
         log.info('[Cron] Update check complete.');
     }
 };
@@ -52,6 +54,7 @@ const setupCron = (bot) => {
         await releaseHeld(bot);
         await sendDigests(bot);
         await stats.flushStats();
+        await flushEvents();
     });
     log.info(`[Cron] Scheduled: every ${UPDATE_INTERVAL_HOURS === 1 ? 'hour' : `${UPDATE_INTERVAL_HOURS} hours`}.`);
 };

@@ -6,6 +6,7 @@ const Watchlist = require('./models/Watchlist');
 const PendingMessage = require('./models/PendingMessage');
 const HeldNotification = require('./models/HeldNotification');
 const DailyStat = require('./models/DailyStat');
+const ChatEvent = require('./models/ChatEvent');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -22,4 +23,14 @@ const initDb = async () => {
     }
 };
 
-module.exports = { initDb, Chat, Series, Subscription, Watchlist, PendingMessage, HeldNotification, DailyStat };
+module.exports = {
+    initDb,
+    Chat,
+    Series,
+    Subscription,
+    Watchlist,
+    PendingMessage,
+    HeldNotification,
+    DailyStat,
+    ChatEvent
+};

@@ -1,11 +1,12 @@
 /** The series half of the update check: new episodes, finished seasons, status changes. */
-const { getDetails, nextEpisodeFields } = require('../api/tmdb');
+const { getDetails, nextEpisodeFields, titleFacts } = require('../api/tmdb');
 const { ensureKinopoiskId } = require('../api/kinopoisk');
 const { isFinishedStatus, formatWatchLinks } = require('../constants');
 const { buildSeriesMessages, buildStatusMessage, heldLine } = require('./messages');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
 const { ensureReleaseSeasons } = require('./release-seasons');
+const { ensureAiredEpisodes, seasonsToRescan } = require('./aired-episodes');
 const { log } = require('../log');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
@@ -21,6 +22,7 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
     for (const chat of item.Chats || []) {
         await notify(bot, chat.id, msg, {
             about: `${item.title}: ${newStatus}`,
+            event: { detail: 'status', tmdb_id: item.tmdb_id, title: item.title },
             ...heldLine({ kind: 'status', title: item.title, status: newStatus })
         });
     }
@@ -102,6 +104,13 @@ const notifyNewEpisodes = async (bot, item, data) => {
         await notify(bot, chat.id, messages[kind], {
             photo: item.poster_url,
             about: item.title,
+            event: {
+                detail: kind,
+                tmdb_id: item.tmdb_id,
+                title: item.title,
+                season: currentSeason,
+                episode: currentEpisode
+            },
             ...heldLine({
                 kind,
                 title: item.title,
@@ -133,10 +142,11 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             // same check that flips the status to Ended, and "new episode" should come first.
             const oldStatus = item.status;
             const statusChanged = Boolean(data.status) && data.status !== oldStatus;
-            const next = nextEpisodeFields(data);
-            const nextChanged = Object.keys(next).some((k) => String(item[k] ?? '') !== String(next[k] ?? ''));
-            if (statusChanged || nextChanged) {
-                await item.update({ ...(statusChanged ? { status: data.status } : {}), ...next });
+            // The next episode, and what the series is (genres, channel, rating) for the statistics
+            const fresh = { ...nextEpisodeFields(data), ...titleFacts(data, 'tv') };
+            const freshChanged = Object.keys(fresh).some((k) => String(item[k] ?? '') !== String(fresh[k] ?? ''));
+            if (statusChanged || freshChanged) {
+                await item.update({ ...(statusChanged ? { status: data.status } : {}), ...fresh });
             }
 
             // Cached on the row after the first hit, so this is a lookup only for new titles
@@ -147,6 +157,8 @@ const checkSeriesUpdates = async (bot, allSeries) => {
                 log.error(`[History] Release seasons for ${item.tmdb_id} failed: ${err.message}`)
             );
             if (item.release_seasons !== null && item.release_seasons !== undefined) await seasonsDone;
+            // Read before notifyNewEpisodes() moves last_season and last_episode on
+            const rescan = seasonsToRescan(item, data);
 
             try {
                 await notifyNewEpisodes(bot, item, data);
@@ -156,6 +168,14 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             }
 
             if (statusChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
+
+            // The statistics' episode counts, after the notifications so a slow TMDB never holds
+            // them up: the season with a new episode is read again; the first time, all of them,
+            // on its own like the release seasons above
+            const airedDone = ensureAiredEpisodes(item, data, rescan).catch((err) =>
+                log.error(`[Stats] Aired episodes for ${item.tmdb_id} failed: ${err.message}`)
+            );
+            if (item.aired_episodes !== null && item.aired_episodes !== undefined) await airedDone;
         } catch (err) {
             tally('errors');
             log.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"): ${err.message}`);

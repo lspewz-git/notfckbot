@@ -45,6 +45,12 @@ const Watchlist = sequelize.define('Watchlist', {
     ru_services: { type: DataTypes.STRING, allowNull: true },
     // When Kinopoisk was last asked; null = never
     ru_checked_at: { type: DataTypes.DATE, allowNull: true },
+    // What the title is, for the chats' statistics (titleFacts() in src/api/tmdb.js); kept current
+    // by the update check
+    genres: { type: DataTypes.STRING, allowNull: true },
+    countries: { type: DataTypes.STRING(40), allowNull: true },
+    runtime: { type: DataTypes.INTEGER, allowNull: true },
+    rating: { type: DataTypes.FLOAT, allowNull: true },
     // Whether we have already sent the release notification
     notified: {
         type: DataTypes.BOOLEAN,

@@ -8,6 +8,7 @@ const { NOTIFY_LABELS } = require('../../constants');
 const { z, valid, idOf, chatId, text } = require('../validate');
 
 const router = require('express').Router();
+const events = require('../../chat-events');
 const { log } = require('../../log');
 
 const seriesId = idOf(/^tv_\d+$/, 'Bad series id');
@@ -18,7 +19,12 @@ router.delete('/api/subscription/:chatId/:seriesId', async (req, res) => {
     if (!params) return;
     const { chatId: chat, seriesId: series } = params;
     try {
-        await Subscription.destroy({ where: { chatId: chat, seriesId: series } });
+        // Changes from the panel count for the chat's statistics too, with nobody as who did them
+        const removed = await Subscription.destroy({ where: { chatId: chat, seriesId: series } });
+        if (removed) {
+            const row = await Series.findByPk(series);
+            events.record(chat, { kind: 'unsubscribed', tmdb_id: series, title: row && row.title });
+        }
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -60,8 +66,17 @@ router.post('/api/subscription', async (req, res) => {
             defaults: { notify_type: notify_type || 'episode' }
         });
 
-        if (!created && notify_type) {
+        if (!created && notify_type && sub.notify_type !== notify_type) {
             await sub.update({ notify_type });
+            events.record(chatId, { kind: 'mode', detail: notify_type, tmdb_id: fulltmdbId, title: series.title });
+        }
+        if (created) {
+            events.record(chatId, {
+                kind: 'subscribed',
+                detail: sub.notify_type,
+                tmdb_id: fulltmdbId,
+                title: series.title
+            });
         }
 
         res.json({ success: true, created, subscription: sub });
@@ -223,8 +238,10 @@ router.post('/api/watchlist', async (req, res) => {
             poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
             year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
             premiere_digital: details.release_date || null,
+            ...tmdb.titleFacts(details, 'movie'),
             notified: isReleased // If already released, mark as notified so cron doesn't pick it up
         });
+        events.record(chatId, { kind: 'film_added', tmdb_id: fullTmdbId, title: entry.title });
 
         res.json({ success: true, entry, isReleased });
     } catch (err) {
@@ -255,7 +272,11 @@ router.delete('/api/watchlist/:id', async (req, res) => {
     if (!params) return;
     const { id } = params;
     try {
-        await Watchlist.destroy({ where: { id } });
+        const entry = await Watchlist.findByPk(id);
+        if (entry) {
+            await entry.destroy();
+            events.record(entry.chatId, { kind: 'film_removed', tmdb_id: entry.tmdb_id, title: entry.title });
+        }
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

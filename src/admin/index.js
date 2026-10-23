@@ -26,6 +26,7 @@ app.use(require('./routes/logs'));
 app.use(require('./routes/health').router);
 app.use(require('./routes/actions'));
 app.use(require('./routes/records'));
+app.use(require('./routes/chat-stats'));
 app.use(require('./routes/config'));
 app.use(require('./routes/services'));
 app.use(require('./routes/history'));

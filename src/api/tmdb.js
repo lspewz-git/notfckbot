@@ -112,7 +112,39 @@ function newSeriesFields(details) {
         last_episode_name: (last && last.name) || '',
         poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
         status: details.status || null,
-        ...nextEpisodeFields(details)
+        ...nextEpisodeFields(details),
+        ...titleFacts(details, 'tv')
+    };
+}
+
+/**
+ * What a title is, for the chats' statistics: genres and countries ("Драма, Комедия", "US,GB"),
+ * a series' channels ("HBO, Max"), the length in minutes (a series': its usual episode) and the
+ * TMDB rating. Columns of Series (all) and Watchlist (all but networks).
+ */
+function titleFacts(details, mediaType) {
+    const names = (list, max) =>
+        (list || [])
+            .map((x) => x.name)
+            .filter(Boolean)
+            .join(', ')
+            .slice(0, max) || null;
+    const countries =
+        mediaType === 'tv'
+            ? details.origin_country || []
+            : (details.production_countries || []).map((c) => c.iso_3166_1);
+    const runtime =
+        mediaType === 'tv'
+            ? (details.episode_run_time || [])[0] ||
+              (details.last_episode_to_air && details.last_episode_to_air.runtime)
+            : details.runtime;
+    const rating = Number(details.vote_average);
+    return {
+        genres: names(details.genres, 255),
+        ...(mediaType === 'tv' ? { networks: names(details.networks, 255) } : {}),
+        countries: countries.filter(Boolean).join(',').slice(0, 40) || null,
+        runtime: Number(runtime) > 0 ? Math.round(Number(runtime)) : null,
+        rating: rating > 0 ? Math.round(rating * 10) / 10 : null
     };
 }
 
@@ -227,5 +259,6 @@ module.exports = {
     getDetailsCached,
     nextEpisodeFields,
     newSeriesFields,
+    titleFacts,
     getSeasonDetails
 };

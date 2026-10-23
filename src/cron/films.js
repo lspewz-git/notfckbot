@@ -1,6 +1,6 @@
 /** The watchlist half of the update check: tell each chat when its film is out. */
 const { Chat, Watchlist } = require('../db');
-const { getDetails } = require('../api/tmdb');
+const { getDetails, getDetailsCached, titleFacts } = require('../api/tmdb');
 const { findKinopoiskId, russianDates } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
 const { buildFilmMessage, heldLine } = require('./messages');
@@ -71,6 +71,7 @@ const checkWatchlistReleases = async (bot) => {
             const freshYear = freshDate ? parseInt(freshDate.slice(0, 4), 10) : null;
             // Titles change too, e.g. "Мстители: Судный день" -> "Мстители: Доктор Дум"
             const freshTitle = data.title || null;
+            const facts = titleFacts(data, 'movie');
             for (const entry of filmEntries) {
                 const changes = {};
                 if (entry.premiere_digital !== freshDate) changes.premiere_digital = freshDate;
@@ -80,6 +81,8 @@ const checkWatchlistReleases = async (bot) => {
                     changes.digital_date = data.digital_release_date || null;
                 if ((entry.digital_country || null) !== (data.digital_release_country || null))
                     changes.digital_country = data.digital_release_country || null;
+                for (const [k, v] of Object.entries(facts))
+                    if (String(entry[k] ?? '') !== String(v ?? '')) changes[k] = v;
                 if (Object.keys(changes).length) await entry.update(changes);
             }
 
@@ -109,6 +112,7 @@ const checkWatchlistReleases = async (bot) => {
                 await notify(bot, entry.Chat.id, msg, {
                     photo: entry.poster_url,
                     about: entry.title,
+                    event: { detail: 'film', tmdb_id: entry.tmdb_id, title: entry.title },
                     ...heldLine({ kind: 'film', title: entry.title })
                 });
                 await entry.update({ notified: true });
@@ -120,4 +124,26 @@ const checkWatchlistReleases = async (bot) => {
     }
 };
 
-module.exports = { checkWatchlistReleases, isMovieReleased };
+/**
+ * After a start, in the background: what each film is (genres, rating, length) for the chats'
+ * statistics, where it isn't stored yet. Films already out are no longer looked at by the check.
+ */
+async function backfillFilmFacts() {
+    const entries = await Watchlist.findAll({ where: { genres: null } });
+    const byFilm = new Map();
+    for (const entry of entries) byFilm.set(entry.tmdb_id, [...(byFilm.get(entry.tmdb_id) || []), entry]);
+    let failed = 0;
+    for (const [tmdbId, rows] of byFilm) {
+        try {
+            const details = await getDetailsCached(tmdbId.split('_')[1], 'movie');
+            const facts = titleFacts(details, 'movie');
+            for (const row of rows) await row.update(facts);
+        } catch (err) {
+            failed += 1;
+            log.error(`[Stats] Film facts for ${tmdbId} failed: ${err.message}`);
+        }
+    }
+    if (byFilm.size) log.info(`[Stats] Film facts filled for ${byFilm.size - failed} of ${byFilm.size} films`);
+}
+
+module.exports = { checkWatchlistReleases, isMovieReleased, backfillFilmFacts };

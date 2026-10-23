@@ -7,6 +7,7 @@ const { Chat, Series, Subscription, Watchlist } = require('../db');
 const { NOTIFY_LABELS, isFinishedStatus } = require('../constants');
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
+const events = require('../chat-events');
 const { log } = require('../log');
 const {
     EMPTY_SUBS_TEXT,
@@ -165,7 +166,16 @@ function register(bot) {
                 await showSubsList(ctx, loc);
                 return ctx.answerCbQuery('Подписка уже удалена.');
             }
-            if (sub.notify_type !== newType) await sub.update({ notify_type: newType });
+            if (sub.notify_type !== newType) {
+                await sub.update({ notify_type: newType });
+                events.record(ctx.chat.id, {
+                    kind: 'mode',
+                    detail: newType,
+                    tmdb_id: tmdbId,
+                    title: series.title,
+                    ...events.actor(ctx)
+                });
+            }
             await editView(ctx, buildSeriesCard(series, newType, loc));
             await ctx.answerCbQuery(`Режим: ${NOTIFY_LABELS[newType]}`);
         } catch (error) {
@@ -208,7 +218,16 @@ function register(bot) {
     bot.action(/^subs_us_([a-z0-9_]+)_(a?\d+)$/, async (ctx) => {
         const [, tmdbId, loc] = ctx.match;
         try {
-            await Subscription.destroy({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
+            const removed = await Subscription.destroy({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
+            if (removed) {
+                const series = await Series.findByPk(tmdbId);
+                events.record(ctx.chat.id, {
+                    kind: 'unsubscribed',
+                    tmdb_id: tmdbId,
+                    title: series && series.title,
+                    ...events.actor(ctx)
+                });
+            }
             await showSubsList(ctx, loc);
             await ctx.answerCbQuery('Вы отписались ❌');
         } catch (error) {
@@ -220,7 +239,16 @@ function register(bot) {
     bot.action(/^subs_um_(\d+)_(a?\d+)$/, async (ctx) => {
         const [, watchlistId, loc] = ctx.match;
         try {
-            await Watchlist.destroy({ where: { id: watchlistId, chatId: ctx.chat.id } });
+            const entry = await Watchlist.findOne({ where: { id: watchlistId, chatId: ctx.chat.id } });
+            if (entry) {
+                await entry.destroy();
+                events.record(ctx.chat.id, {
+                    kind: 'film_removed',
+                    tmdb_id: entry.tmdb_id,
+                    title: entry.title,
+                    ...events.actor(ctx)
+                });
+            }
             await showSubsList(ctx, loc);
             await ctx.answerCbQuery('Удалено из списка ожидания ❌');
         } catch (error) {

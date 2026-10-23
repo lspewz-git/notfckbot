@@ -3,7 +3,7 @@
  * adding a film. The views themselves are in search-views.js.
  */
 const { Markup } = require('telegraf');
-const { searchMulti, getDetails, getDetailsCached, newSeriesFields } = require('../api/tmdb');
+const { searchMulti, getDetails, getDetailsCached, newSeriesFields, titleFacts } = require('../api/tmdb');
 const { findKinopoiskId, kinopoiskQuick } = require('../api/kinopoisk');
 const { Series, Subscription, Watchlist } = require('../db');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
@@ -11,6 +11,7 @@ const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
 const { recordOwner } = require('./access');
+const events = require('../chat-events');
 const { lruCache } = require('../lru');
 const { log } = require('../log');
 
@@ -284,6 +285,13 @@ function register(bot) {
                 defaults: { notify_type: notifyType }
             });
             if (!created) await subscription.update({ notify_type: notifyType });
+            events.record(chatId, {
+                kind: created ? 'subscribed' : 'mode',
+                detail: notifyType,
+                tmdb_id: tmdbId,
+                title: series.title,
+                ...events.actor(ctx)
+            });
 
             log.info(
                 `[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`
@@ -334,12 +342,19 @@ function register(bot) {
 
             const [, created] = await Watchlist.findOrCreate({
                 where: { chatId: ctx.chat.id, tmdb_id: tmdbId, notified: false },
-                defaults: { title, poster_url: posterUrl, year, premiere_digital: digitalDate }
+                defaults: {
+                    title,
+                    poster_url: posterUrl,
+                    year,
+                    premiere_digital: digitalDate,
+                    ...titleFacts(data, 'movie')
+                }
             });
 
             if (!created) {
                 return ctx.answerCbQuery('Уже в списке ожидания! 📌', { show_alert: false });
             }
+            events.record(ctx.chat.id, { kind: 'film_added', tmdb_id: tmdbId, title, ...events.actor(ctx) });
 
             const dateLabel = formatRuDate(digitalDate) || 'пока не объявлена';
             const digitalLine = data.digital_release_date
