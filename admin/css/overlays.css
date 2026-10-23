@@ -451,3 +451,279 @@ html:has(.modal[open]) {
         inset: -6px;
     }
 }
+
+/* A chat's statistics (chat-stats.js): figures, episodes by month, then lists two or three across */
+.modal-stats {
+    max-width: 920px;
+}
+
+.stats-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    /* clear the close button */
+    padding-right: var(--space-8);
+}
+
+.stats-heading {
+    flex: 1;
+    min-width: 0;
+}
+
+.stats-head .tab-filters {
+    flex: none;
+    margin-bottom: 0;
+}
+
+.stats-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+}
+
+.stats-kpi,
+.stats-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--space-4);
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+}
+
+.stats-kpi-label,
+.stats-kpi-note {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.stats-kpi-value {
+    margin: var(--space-1) 0 2px;
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats-kpi-value .skeleton {
+    width: 3.5rem;
+    height: 1lh;
+    padding-block: calc((1lh - 1.1rem) / 2);
+    background-clip: content-box;
+}
+
+.stats-kpi .skeleton:not(.skeleton-figure) {
+    width: 60%;
+    height: 1lh;
+    padding-block: calc((1lh - 0.7rem) / 2);
+    background-clip: content-box;
+}
+
+.stats-box {
+    margin-top: var(--space-3);
+}
+
+.stats-box-title {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.stats-box-title span {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats-subtitle {
+    margin-top: var(--space-4);
+}
+
+.stats-cols {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.stats-cols .stats-box {
+    margin-top: 0;
+}
+
+.stats-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stats-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stats-list {
+    list-style: none;
+}
+
+/* Every row the same height, the skeleton's too, so nothing jumps when the answer comes */
+.stats-row,
+.stats-meter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-3);
+    min-height: 2rem;
+    font-size: var(--text-sm);
+}
+
+.stats-meter {
+    row-gap: var(--space-1);
+    min-height: 2.5rem;
+}
+
+.stats-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Three rows each, filled or not: the skeleton and a short list take the same room */
+.stats-slot-rows {
+    min-height: 6rem;
+}
+
+.stats-slot-meters {
+    min-height: 7.5rem;
+}
+
+.stats-empty.stats-slot-rows,
+.stats-empty.stats-slot-meters {
+    align-items: flex-start;
+    padding-top: var(--space-2);
+}
+
+.stats-row .skeleton,
+.stats-meter .skeleton {
+    width: 70%;
+}
+
+.stats-count {
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stats-bar {
+    grid-column: 1 / -1;
+    height: 4px;
+    background: var(--fill-active);
+    border-radius: 999px;
+}
+
+.stats-bar i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: inherit;
+}
+
+.stats-empty {
+    display: flex;
+    align-items: center;
+    min-height: 2rem;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+/* Episodes by month: plain bars, the busiest one full strength */
+.stats-chart {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-2);
+    height: 9rem;
+}
+
+.stats-chart-empty {
+    justify-content: center;
+    height: 9rem;
+}
+
+.stats-col {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.stats-col-bar {
+    display: block;
+    min-height: 2px;
+    background: var(--accent);
+    border-radius: var(--space-1) var(--space-1) 0 0;
+    opacity: 0.45;
+}
+
+.stats-col-bar.busiest {
+    opacity: 1;
+}
+
+.stats-col-label {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats-note,
+.stats-failed {
+    margin-top: var(--space-3);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.stats-note .skeleton {
+    width: 50%;
+    height: 1lh;
+    padding-block: calc((1lh - 0.7rem) / 2);
+    background-clip: content-box;
+}
+
+.stats-failed {
+    padding: var(--space-6) 0;
+    font-size: var(--text-sm);
+    text-align: center;
+}
+
+@media (max-width: 760px) {
+    .stats-head {
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .stats-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* Two lines kept for the notes, filled or not, so the answer doesn't push the dialog down */
+    .stats-kpi-note,
+    .stats-note {
+        min-height: 2lh;
+    }
+
+    .stats-cols-3,
+    .stats-cols-2 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .stats-chart {
+        gap: 3px;
+    }
+
+    .stats-col-label {
+        letter-spacing: -0.04em;
+    }
+}

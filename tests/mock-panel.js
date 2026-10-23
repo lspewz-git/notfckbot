@@ -203,7 +203,7 @@ const PIXEL = Buffer.from(
  * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
- *   failing?: string[], poster?: boolean }} [options]
+ *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void> }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
@@ -215,6 +215,63 @@ const PIXEL = Buffer.from(
  *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
  *   served once it resolves (a page.route() of the test's would lose to this one's catch-all)
  */
+/** A chat's statistics as /api/chat/:id/stats answers them (src/chat-stats.js). */
+function chatStats(query) {
+    const year = (/year=(\d{4})/.exec(query) || [])[1] || '2026';
+    return {
+        period: { from: `${year}-01-01`, to: `${year}-12-31` },
+        following: { series: 20, running: 14, films: 3 },
+        added: { series: 12, films: 2, unsubscribed: 3, filmsRemoved: 0 },
+        episodes: {
+            count: 187,
+            minutes: 8520,
+            series: 18,
+            seasons: 23,
+            byMonth: [
+                { month: `${year}-01`, count: 9, minutes: 400 },
+                { month: `${year}-03`, count: 34, minutes: 1600 },
+                { month: `${year}-04`, count: 20, minutes: 950 }
+            ],
+            busiestMonth: { month: `${year}-03`, count: 34, minutes: 1600 },
+            top: [
+                { tmdb_id: 'tv_1', title: 'The Penguin', count: 10, minutes: 540 },
+                { tmdb_id: 'tv_2', title: 'Shōgun', count: 10, minutes: 480 }
+            ]
+        },
+        films: {
+            released: [{ tmdb_id: 'movie_1', title: 'Dune: Messiah', day: `${year}-06-18`, waited: 412, rating: 8.2 }],
+            minutes: 160,
+            longestWait: null,
+            services: []
+        },
+        favourites: {
+            genres: [
+                { name: 'драма', n: 12 },
+                { name: 'криминал', n: 7 }
+            ],
+            networks: [{ name: 'HBO', n: 6 }],
+            countries: [
+                { name: 'US', n: 14 },
+                { name: 'KR', n: 4 }
+            ]
+        },
+        best: [],
+        finished: [],
+        ahead: { series: 2, films: 1 },
+        notifications: { total: 214, outcomes: { sent: 181, held: 31, failed: 2 }, kinds: {}, busiestDay: null },
+        usage: {
+            total: 86,
+            features: [
+                { name: 'query', n: 48 },
+                { name: 'calendar', n: 21 }
+            ],
+            members: [{ name: '@ann', n: 36 }]
+        },
+        rare: [],
+        since: '2026-10-23'
+    };
+}
+
 async function mockPanel(page, options = {}) {
     const panel = {
         subs: buildSubs(),
@@ -456,6 +513,17 @@ async function mockPanel(page, options = {}) {
             }
         ],
         [
+            // A chat's statistics: options.chatStats(query) or a year with a little of everything;
+            // the queries asked, for tests to check. options.statsHold: the answer waits for it
+            /^\/api\/chat\/(-?\d+)\/stats$/,
+            async ([, id], req) => {
+                const query = new URL(req.url()).search.slice(1);
+                panel.statsAsked = [...(panel.statsAsked || []), { chatId: id, query }];
+                await options.statsHold;
+                return options.chatStats ? options.chatStats(query) : chatStats(query);
+            }
+        ],
+        [
             // A chat's settings: what the dialog sent last, for tests to check
             /^\/api\/chat\/(-?\d+)\/settings$/,
             ([, id], req) => {
@@ -524,4 +592,4 @@ async function mockPanel(page, options = {}) {
     return panel;
 }
 
-module.exports = { mockPanel, ORIGIN };
+module.exports = { mockPanel, ORIGIN, chatStats };

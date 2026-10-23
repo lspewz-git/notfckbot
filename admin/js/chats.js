@@ -8,6 +8,7 @@ import { chatLabel } from './format.js';
 import { setSelectValue } from './select.js';
 import { chatsById } from './store.js';
 import { openTestNotifyModal } from './test-notify.js';
+import { openChatStats } from './chat-stats.js';
 
 // --- The per-row menu ---
 // One button per row opens this instead of crowding the Actions column
@@ -44,6 +45,12 @@ export function openChatActions(chatId) {
         closeModal('chat-actions-modal');
         setReturnTo(backToChat);
         openChatSettings(chat, label);
+    };
+
+    $('action-stats').onclick = () => {
+        closeModal('chat-actions-modal');
+        setReturnTo(backToChat);
+        openChatStats(chat, label);
     };
 
     const blockBtn = $('action-block');

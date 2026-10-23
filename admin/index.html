@@ -23,6 +23,7 @@
         <link rel="modulepreload" href="js/app.js" />
         <link rel="modulepreload" href="js/about.js" />
         <link rel="modulepreload" href="js/api.js" />
+        <link rel="modulepreload" href="js/chat-stats.js" />
         <link rel="modulepreload" href="js/chats.js" />
         <link rel="modulepreload" href="js/dashboard-charts.js" />
         <link rel="modulepreload" href="js/dashboard.js" />
@@ -1392,6 +1393,22 @@
                                 <polyline points="9 18 15 12 9 6" /></svg
                         ></span>
                     </button>
+                    <button id="action-stats" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <line x1="18" y1="20" x2="18" y2="10" />
+                                <line x1="12" y1="20" x2="12" y2="4" />
+                                <line x1="6" y1="20" x2="6" y2="14" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Statistics</span>
+                            <span class="action-desc">Episodes, notifications and taste, by year</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
                     <button id="action-block" class="action-row">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1466,6 +1483,26 @@
         </dialog>
 
         <!-- A chat's bot settings: the same as its ⚙️ Settings screen in Telegram -->
+        <!-- A chat's statistics (chat-stats.js): the body is filled for the period picked -->
+        <dialog id="chat-stats-modal" class="modal" aria-labelledby="chat-stats-title">
+            <div class="modal-content modal-stats">
+                <div class="stats-head">
+                    <div class="stats-heading">
+                        <h3 id="chat-stats-title">Statistics</h3>
+                        <p class="modal-sub" id="chat-stats-sub"></p>
+                    </div>
+                    <div id="chat-stats-periods" class="tab-filters" role="group" aria-label="Period"></div>
+                </div>
+                <div id="chat-stats-body" aria-live="polite"></div>
+                <button data-close-return="chat-stats-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
         <dialog id="chat-settings-modal" class="modal" aria-labelledby="chat-settings-title">
             <div class="modal-content modal-medium">
                 <h3 id="chat-settings-title">Settings</h3>

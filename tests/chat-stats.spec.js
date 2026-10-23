@@ -1,0 +1,115 @@
+const { test, expect } = require('@playwright/test');
+const { mockPanel, chatStats } = require('./mock-panel');
+
+/**
+ * A chat's statistics (Chats → actions → Statistics) on the canned API: the year's figures, the
+ * period switch, a slow or failed answer.
+ */
+
+test.beforeEach(async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (m) => m.type() === 'error' && !m.text().includes('500') && errors.push(m.text()));
+    page.__errors = errors;
+});
+
+test.afterEach(async ({ page }) => {
+    expect(page.__errors, 'console should stay clean').toEqual([]);
+});
+
+const YEAR = new Date().getFullYear();
+
+async function openStats(page, chatId) {
+    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
+    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await page.locator(`[data-action="chat-actions"][data-id="${chatId}"]`).click();
+    await page.locator('#action-stats').click();
+    await expect(page.locator('#chat-stats-modal')).toBeVisible();
+}
+
+test("a group's year: the figures, its tastes by name, its members", async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openStats(page, -1003);
+    const body = page.locator('#chat-stats-body');
+    await expect(page.locator('#chat-stats-sub')).toHaveText('Movie Club · supergroup');
+    await expect(body.locator('.stats-kpi-value')).toHaveText(['187', '142', '214', '23']);
+    await expect(body.locator('.stats-kpi-note').nth(2)).toHaveText('31 after quiet hours · 2 lost');
+    await expect(body.locator('.stats-chart-box .stats-box-title span')).toHaveText('busiest: Mar, 34');
+    await expect(body.locator('.stats-col-label')).toHaveCount(12);
+    // TMDB's genres come lower case; countries as codes
+    await expect(body.locator('.stats-cols-3 .stats-box').nth(0).locator('.stats-name')).toHaveText([
+        'Драма',
+        'Криминал'
+    ]);
+    await expect(body.locator('.stats-cols-3 .stats-box').nth(2).locator('.stats-name')).toHaveText([
+        'United States',
+        'South Korea'
+    ]);
+    await expect(body.getByText('Most active members')).toBeVisible();
+    await expect(body.locator('.stats-row', { hasText: '@ann' })).toContainText('36 actions');
+    await expect(body.locator('.stats-row', { hasText: 'Dune: Messiah' })).toContainText('waited 412 days');
+    await expect(body.locator('.stats-note')).toHaveText(
+        'Notifications and bot use are counted since 23 Oct 2026, when recording began.'
+    );
+    expect(panel.statsAsked).toEqual([{ chatId: '-1003', query: `year=${YEAR}` }]);
+});
+
+test('a private chat has no members list; the periods ask for their own days', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openStats(page, 101);
+    await expect(page.locator('#chat-stats-body .stats-kpi-value').first()).toHaveText('187');
+    await expect(page.locator('#chat-stats-body').getByText('Most active members')).toHaveCount(0);
+
+    await page.locator('#chat-stats-periods .btn', { hasText: String(YEAR - 1) }).click();
+    await expect(page.locator('#chat-stats-periods .btn.active')).toHaveText(String(YEAR - 1));
+    await page.locator('#chat-stats-periods .btn', { hasText: 'All time' }).click();
+    await expect(page.locator('#chat-stats-periods .btn.active')).toHaveText('All time');
+    await expect.poll(() => panel.statsAsked.length).toBe(3);
+    expect(panel.statsAsked[1].query).toBe(`year=${YEAR - 1}`);
+    expect(panel.statsAsked[2].query).toMatch(/^from=2000-01-01&to=\d{4}-\d{2}-\d{2}$/);
+});
+
+test('a slow answer for the old period never replaces the new one', async ({ page }) => {
+    let release;
+    const slow = new Promise((resolve) => (release = resolve));
+    // This year's answer comes last, after last year's: the dialog stays on last year
+    await mockPanel(page, {
+        chatStats: async (query) => {
+            const stats = chatStats(query);
+            if (query !== `year=${YEAR}`) return stats;
+            await slow;
+            return { ...stats, episodes: { ...stats.episodes, count: 1 } };
+        }
+    });
+    await openStats(page, 101);
+    await page.locator('#chat-stats-periods .btn', { hasText: String(YEAR - 1) }).click();
+    await expect(page.locator('#chat-stats-body .stats-kpi-value').first()).toHaveText('187');
+    release();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#chat-stats-body .stats-kpi-value').first()).toHaveText('187');
+});
+
+test('while loading the dialog keeps its size', async ({ page }) => {
+    let release;
+    const hold = new Promise((resolve) => (release = resolve));
+    await mockPanel(page, { statsHold: hold });
+    await openStats(page, -1003);
+    const body = page.locator('#chat-stats-body');
+    await expect(body).toHaveAttribute('aria-busy', 'true');
+    await expect(body.locator('.stats-kpi .skeleton').first()).toBeVisible();
+    // offsetHeight: the dialog's opening animation scales it, the layout stays
+    const loading = await body.evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
+    release();
+    await expect(body.locator('.stats-kpi-value').first()).toHaveText('187');
+    const loaded = await body.evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
+    expect(Math.abs(loaded - loading)).toBeLessThanOrEqual(2);
+});
+
+test('a failed answer: a note instead of figures, and closing goes back to the chat menu', async ({ page }) => {
+    await mockPanel(page, { failing: ['/api/chat/101/stats'] });
+    await openStats(page, 101);
+    await expect(page.locator('#chat-stats-body .stats-failed')).toContainText('Failed to load');
+    await page.locator('#chat-stats-modal .modal-x').click();
+    await expect(page.locator('#chat-stats-modal')).toBeHidden();
+    await expect(page.locator('#chat-actions-modal')).toBeVisible();
+});
