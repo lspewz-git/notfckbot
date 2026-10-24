@@ -11,6 +11,7 @@ const { Chat, Subscription, Watchlist, RecapSend } = require('../db');
 const { deliverAlbum } = require('../delivery');
 const { isQuietNow } = require('../quiet');
 const { plural } = require('../calendar');
+const { escapeHtml } = require('../constants');
 const { recapImages } = require('./render');
 const { log } = require('../log');
 
@@ -24,8 +25,58 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** The years that can be sent: this one and the one before; nothing ahead. */
 const sendableYear = (year, now = new Date()) => year === now.getFullYear() || year === now.getFullYear() - 1;
 
-/** The text under the first card. */
-function caption(year, stats) {
+const MONTHS = [
+    'Январь',
+    'Февраль',
+    'Март',
+    'Апрель',
+    'Май',
+    'Июнь',
+    'Июль',
+    'Август',
+    'Сентябрь',
+    'Октябрь',
+    'Ноябрь',
+    'Декабрь'
+];
+
+/**
+ * The playful last lines, each from the chat's own figures; only those it has the figures for.
+ * The bot knows what came out, not what was watched, so none of them says anyone watched it.
+ */
+function jokes(stats, hours) {
+    const lines = [];
+    const days = hours / 24;
+    if (days >= 1) {
+        const text = Number.isInteger(days)
+            ? plural(days, 'сутки', 'суток', 'суток')
+            : `${days.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} суток`;
+        lines.push(`Если смотреть всё подряд — это ${text} без перерыва. Запасайтесь пледом.`);
+    }
+    const buckets = Math.round(hours / 2);
+    if (buckets >= 2) {
+        lines.push(
+            `Чтобы посмотреть всё, понадобится примерно ${plural(buckets, 'ведро', 'ведра', 'вёдер')} попкорна 🍿`
+        );
+    }
+    const busiest = stats.episodes.busiestMonth;
+    if (busiest && busiest.count >= 5) {
+        const month = MONTHS[Number(busiest.month.slice(5, 7)) - 1];
+        lines.push(
+            `${month} выдался жарким: ${plural(busiest.count, 'новая серия', 'новые серии', 'новых серий')}. Надеемся, вы всё успели.`
+        );
+    }
+    const wait = stats.films.longestWait;
+    if (wait && wait.waited >= 30) {
+        lines.push(
+            `«${escapeHtml(wait.title)}» вы ждали ${plural(wait.waited, 'день', 'дня', 'дней')}. Терпение — ваша суперсила.`
+        );
+    }
+    return lines;
+}
+
+/** The text under the first card: the year, its figures and one playful line picked at random. */
+function caption(year, stats, random = Math.random) {
     const hours = Math.round((stats.episodes.minutes + stats.films.minutes) / 60);
     const parts = [
         stats.episodes.count && plural(stats.episodes.count, 'серия', 'серии', 'серий'),
@@ -33,9 +84,11 @@ function caption(year, stats) {
         hours && `${plural(hours, 'час', 'часа', 'часов')} премьер`
     ].filter(Boolean);
     const summary = parts.length
-        ? `${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} и ${parts[parts.length - 1]}` : parts[0]}. `
+        ? `\n${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} и ${parts[parts.length - 1]}` : parts[0]}.`
         : '';
-    return `🎬 <b>Ваш ${year} в сериалах и фильмах</b>\n${summary}Листайте карточки →\n<i>Можно переслать друзьям.</i>`;
+    const options = jokes(stats, hours);
+    const joke = options.length ? `\n\n${options[Math.floor(random() * options.length)]}` : '';
+    return `🎬 <b>Ваш ${year} в сериалах и фильмах</b>${summary}${joke}`;
 }
 
 /**
@@ -175,4 +228,4 @@ async function sendOne(bot, row, chat, { wait, timeout }) {
     }
 }
 
-module.exports = { sendableYear, caption, audience, progress, enqueue, stop, processQueue, MAX_ATTEMPTS };
+module.exports = { sendableYear, caption, jokes, audience, progress, enqueue, stop, processQueue, MAX_ATTEMPTS };

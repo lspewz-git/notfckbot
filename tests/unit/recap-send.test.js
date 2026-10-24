@@ -49,13 +49,44 @@ const telegramError = (code, description) =>
     Object.assign(new Error(description), { description, response: { error_code: code, description } });
 
 describe('the caption', () => {
-    test('what came out, in Russian, with the year', () => {
+    test('what came out, in Russian, with the year, then one playful line', () => {
+        const first = () => 0;
         assert.equal(
-            recap.caption(2026, STATS),
-            '🎬 <b>Ваш 2026 в сериалах и фильмах</b>\n87 серий, 2 фильма и 106 часов премьер. Листайте карточки →\n<i>Можно переслать друзьям.</i>'
+            recap.caption(2026, STATS, first),
+            '🎬 <b>Ваш 2026 в сериалах и фильмах</b>\n87 серий, 2 фильма и 106 часов премьер.\n\nЕсли смотреть всё подряд — это 4,4 суток без перерыва. Запасайтесь пледом.'
         );
+        // Nothing to joke about: the heading alone
         const quiet = { episodes: { count: 0, minutes: 0 }, films: { released: [], minutes: 0 } };
-        assert.match(recap.caption(2026, quiet), /фильмах<\/b>\nЛистайте карточки/);
+        assert.equal(recap.caption(2026, quiet), '🎬 <b>Ваш 2026 в сериалах и фильмах</b>');
+    });
+
+    test('the jokes: only those the chat has figures for, none saying anything was watched', () => {
+        const full = {
+            episodes: { count: 87, minutes: 4700, busiestMonth: { month: '2026-09', count: 25 } },
+            films: { released: [], minutes: 1680, longestWait: { title: 'Мы & <Они>', waited: 189 } }
+        };
+        assert.deepEqual(recap.jokes(full, 106), [
+            'Если смотреть всё подряд — это 4,4 суток без перерыва. Запасайтесь пледом.',
+            'Чтобы посмотреть всё, понадобится примерно 53 ведра попкорна 🍿',
+            'Сентябрь выдался жарким: 25 новых серий. Надеемся, вы всё успели.',
+            '«Мы &amp; &lt;Они&gt;» вы ждали 189 дней. Терпение — ваша суперсила.'
+        ]);
+        for (const line of recap.jokes(full, 106)) assert.doesNotMatch(line, /посмотрел|смотрели|просмотр/);
+        // A whole number of days, a short wait, a quiet month: those lines change or stay out
+        const small = {
+            episodes: { count: 3, minutes: 0, busiestMonth: { month: '2026-01', count: 3 } },
+            films: { released: [], minutes: 0, longestWait: { title: 'X', waited: 10 } }
+        };
+        assert.deepEqual(recap.jokes(small, 48), [
+            'Если смотреть всё подряд — это 2 суток без перерыва. Запасайтесь пледом.',
+            'Чтобы посмотреть всё, понадобится примерно 24 ведра попкорна 🍿'
+        ]);
+        assert.deepEqual(recap.jokes(small, 1), []);
+    });
+
+    test('the line is picked at random among those that fit', () => {
+        const picks = new Set([0, 0.3, 0.6, 0.99].map((r) => recap.caption(2026, STATS, () => r).split('\n\n')[1]));
+        assert.equal(picks.size, 2);
     });
 
     test('only this year and the last can be sent', () => {
