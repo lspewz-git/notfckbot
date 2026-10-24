@@ -169,6 +169,28 @@ describe('the cards on disk', () => {
         assert.equal(drawn.filter((k) => k === 'card').length, 6);
     });
 
+    test('using the bot or a notification does not make a kept set look out of date', async () => {
+        const before = (await render.recapInputs('-104', 2026)).hash;
+        stats = {
+            ...STATS,
+            usage: { total: 9, features: [] },
+            members: { added: [], used: [{ name: '@a', n: 9 }] },
+            notifications: { total: 3 }
+        };
+        assert.equal((await render.recapInputs('-104', 2026)).hash, before);
+    });
+
+    test('the fingerprint covers every part of the figures the cards read', () => {
+        const source = fs.readFileSync(path.join(__dirname, '../../src/recap/cards.js'), 'utf8');
+        const read = new Set([...source.matchAll(/\bstats\.([a-zA-Z]+)/g)].map((m) => m[1]));
+        read.delete('js'); // "src/chat-stats.js" in a comment
+        // And what is taken apart: const { episodes, films } = stats
+        for (const m of source.matchAll(/\{([^{}]*)\}\s*=\s*stats\s*[;,)]/g)) {
+            for (const name of m[1].split(',')) read.add(name.split(':')[0].trim());
+        }
+        for (const field of read) assert.ok(render.CARD_FIELDS.includes(field), `cards.js reads stats.${field}`);
+    });
+
     test('a set cut short (its cards of another drawing) is no match', async () => {
         const images = await Promise.all([1, 2, 3, 4, 5, 6].map(() => plainPng(10, 10)));
         await store.writeSet('-102', 2026, 'old', images, images);

@@ -37,11 +37,14 @@ test("a group's year: the figures, its tastes by name, its members", async ({ pa
         'United States',
         'South Korea'
     ]);
-    await expect(body.getByText('Most active members')).toBeVisible();
-    await expect(body.locator('.stats-row', { hasText: '@ann' })).toContainText('36 actions');
+    // Who added the most (★: clearly ahead) and who used the bot the most, apart
+    const added = body.locator('.stats-subtitle', { hasText: 'Added most' }).locator('+ .stats-list .stats-row');
+    await expect(added).toHaveText(['★@masha6 series · 3 films', '@ann4 series']);
+    const used = body.locator('.stats-subtitle', { hasText: 'Used the bot most' }).locator('+ .stats-list .stats-row');
+    await expect(used).toHaveText(['@ann36 times']);
     await expect(body.locator('.stats-row', { hasText: 'Dune: Messiah' })).toContainText('waited 412 days');
     await expect(body.locator('.stats-note')).toHaveText(
-        'Notifications and bot use are counted since 23 Oct 2026, when recording began.'
+        'Notifications, bot use and who added what are counted since 23 Oct 2026, when recording began.'
     );
     expect(panel.statsAsked).toEqual([{ chatId: '-1003', query: `year=${YEAR}` }]);
 });
@@ -50,7 +53,7 @@ test('a private chat has no members list; the periods ask for their own days', a
     const panel = await mockPanel(page);
     await openStats(page, 101);
     await expect(page.locator('#chat-stats-body .stats-kpi-value').first()).toHaveText('187');
-    await expect(page.locator('#chat-stats-body').getByText('Most active members')).toHaveCount(0);
+    await expect(page.locator('#chat-stats-body .stats-subtitle', { hasText: /Added most|Used the bot/ })).toHaveCount(0);
 
     await page.locator('#chat-stats-periods .btn', { hasText: String(YEAR - 1) }).click();
     await expect(page.locator('#chat-stats-periods .btn.active')).toHaveText(String(YEAR - 1));

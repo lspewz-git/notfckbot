@@ -27,7 +27,7 @@ mock.method(tmdb, 'getSeasonDetails', async (id, season) => {
 const { ChatEvent, Chat } = require('../../src/db');
 const events = require('../../src/chat-events');
 const aired = require('../../src/cron/aired-episodes');
-const { computeStats } = require('../../src/chat-stats');
+const { computeStats, leader } = require('../../src/chat-stats');
 const { featureOf } = require('../../src/bot/usage');
 const { notify } = require('../../src/cron/outbox');
 const { fakeBot } = require('./fakes');
@@ -206,7 +206,13 @@ describe('the statistics', () => {
             { kind: 'used', detail: 'search', userId: 10, userName: '@ann', createdAt: NOW },
             { kind: 'used', detail: 'search', userId: 10, userName: '@ann', createdAt: NOW },
             { kind: 'used', detail: 'calendar', userId: 11, userName: 'Bob', createdAt: NOW },
-            { kind: 'unsubscribed', title: 'Old', userId: 11, userName: 'Bob', createdAt: NOW }
+            { kind: 'unsubscribed', title: 'Old', userId: 11, userName: 'Bob', createdAt: NOW },
+            // Bob renamed himself: still one member, under the newest name
+            { kind: 'subscribed', title: 'Drama', userId: 11, userName: '@bobby', createdAt: NOW },
+            { kind: 'film_added', title: 'Film', userId: 11, userName: '@bobby', createdAt: NOW },
+            { kind: 'mode', title: 'Drama', userId: 10, userName: '@ann', createdAt: NOW },
+            // Added from the panel: nobody's
+            { kind: 'subscribed', title: 'Comedy', createdAt: NOW }
         ],
         followers: new Map([
             ['tv_1', 3],
@@ -269,10 +275,15 @@ describe('the statistics', () => {
             { name: 'search', n: 2 },
             { name: 'calendar', n: 1 }
         ]);
-        assert.deepEqual(stats.usage.members, [
-            { name: '@ann', n: 2 },
-            { name: 'Bob', n: 2 }
-        ]);
+        assert.deepEqual(stats.members, {
+            added: [{ name: '@bobby', series: 1, films: 1, n: 2 }],
+            // 2 is too few to lead
+            leader: false,
+            used: [
+                { name: '@ann', n: 2 },
+                { name: '@bobby', n: 1 }
+            ]
+        });
         assert.equal(stats.since, '2025-12-01');
     });
 
@@ -281,5 +292,18 @@ describe('the statistics', () => {
             stats.rare.map((t) => t.title),
             ['Comedy']
         );
+    });
+});
+
+describe('who added the most', () => {
+    const member = (name, n) => ({ name, series: n, films: 0, n });
+    test('a leader only with at least 3 and clearly ahead', () => {
+        assert.equal(leader({ added: [member('@a', 3), member('@b', 2)] }).name, '@a');
+        assert.equal(leader({ added: [member('@a', 5)] }).name, '@a');
+        // A tie, too few, nobody: no leader
+        assert.equal(leader({ added: [member('@a', 4), member('@b', 4)] }), null);
+        assert.equal(leader({ added: [member('@a', 2)] }), null);
+        assert.equal(leader({ added: [] }), null);
+        assert.equal(leader(undefined), null);
     });
 });

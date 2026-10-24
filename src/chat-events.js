@@ -53,4 +53,9 @@ async function flushEvents() {
     }
 }
 
-module.exports = { record, actor, flushEvents, unwritten };
+/** A group became a supergroup (src/chat-migration.js): its events not written yet go under the new id. */
+function moveChat(fromId, toId) {
+    for (const row of pending) if (String(row.chatId) === String(fromId)) row.chatId = toId;
+}
+
+module.exports = { record, actor, flushEvents, unwritten, moveChat };

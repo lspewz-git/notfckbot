@@ -266,8 +266,15 @@ function chatStats(query) {
             features: [
                 { name: 'query', n: 48 },
                 { name: 'calendar', n: 21 }
+            ]
+        },
+        members: {
+            added: [
+                { name: '@masha', series: 6, films: 3, n: 9 },
+                { name: '@ann', series: 4, films: 0, n: 4 }
             ],
-            members: [{ name: '@ann', n: 36 }]
+            leader: true,
+            used: [{ name: '@ann', n: 36 }]
         },
         rare: [],
         since: '2026-10-23'
@@ -278,6 +285,27 @@ const PICTURES = [
     { id: 'aaaaaaaaaaaaaaaa', name: 'Sunset.jpg', size: 1400000, uploadedAt: '2026-10-24T08:00:00Z', cards: [1] },
     { id: 'bbbbbbbbbbbbbbbb', name: 'Stripes.png', size: 900000, uploadedAt: '2026-10-23T08:00:00Z', cards: [3] }
 ];
+
+/** Year recap → Schedule: off, nothing picked; the days of this season's window. */
+function recapSchedule() {
+    const y = new Date().getFullYear();
+    const days = [];
+    for (let d = 15; d <= 31; d += 1) days.push(`${y}-12-${d}`);
+    for (let d = 1; d <= 10; d += 1) days.push(`${y + 1}-01-${String(d).padStart(2, '0')}`);
+    return {
+        on: false,
+        done: false,
+        day: null,
+        hour: null,
+        year: y,
+        days,
+        suggested: { day: `${y}-12-28`, hour: 12 },
+        firstAt: null,
+        lastAt: null,
+        audience: { eligible: 3, sent: 0, queued: 0, failed: 0, nothing: 1, blocked: 0 },
+        progress: { queued: 0, sending: 0, sent: 0, failed: 0, quiet: 0, total: 0, running: false }
+    };
+}
 
 async function mockPanel(page, options = {}) {
     const panel = {
@@ -306,6 +334,9 @@ async function mockPanel(page, options = {}) {
             maxDim: 80,
             sample: { id: '-1003', name: 'Movie Club' }
         },
+        // Year recap → Schedule, and the saves asked for
+        recapSchedule: { ...recapSchedule(), ...(options.recapSchedule || {}) },
+        recapScheduleSaves: [],
         // Year recap → Ready cards: one of each state
         recapReady: options.recapReady || {
             year: new Date().getFullYear(),
@@ -349,7 +380,7 @@ async function mockPanel(page, options = {}) {
             interval: { hours: 3, active: 3, choices: [1, 2, 3, 4, 6, 8, 12, 24] },
             database: { host: 'db', name: 'series_bot', user: 'bot_user' },
             restart: { pending: [], blocked: null },
-            recap: { schedule: false },
+            recap: { on: false, day: null, hour: null, year: null },
             startedAt: new Date(Date.now() - 3600e3).toISOString(),
             ...options.settings
         }
@@ -414,7 +445,10 @@ async function mockPanel(page, options = {}) {
         // Settings: GET answers panel.settings; POST records the body and answers options.settingsSave
         // (a { status, body } for an error) or the settings with the body applied
         '/api/settings': (req) => {
-            if (req.method() === 'GET') return panel.settings;
+            if (req.method() === 'GET') {
+                const { on, done, day, hour, year } = panel.recapSchedule;
+                return { ...panel.settings, recap: { on, done, day, hour, year } };
+            }
             const body = req.postDataJSON();
             panel.lastSettingsSave = body;
             if (options.settingsSave) return options.settingsSave(body);
@@ -432,10 +466,6 @@ async function mockPanel(page, options = {}) {
                 panel.settings.tokens[name] = { configured: true, masked: 'new0*****cafe' };
                 saved.push(name);
             }
-            if (body.recapSchedule !== undefined) {
-                panel.settings.recap = { schedule: body.recapSchedule };
-                saved.push('RECAP_SCHEDULE');
-            }
             return { saved, settings: panel.settings };
         },
         // The year recap's sending: who gets it and how it goes; the sends asked for, for tests
@@ -451,7 +481,9 @@ async function mockPanel(page, options = {}) {
             const removed = panel.recap.progress.queued;
             panel.recap.progress = { ...panel.recap.progress, queued: 0, total: panel.recap.progress.total - removed };
             panel.recapStopped = true;
-            return { removed };
+            const scheduleOff = panel.recapSchedule.on;
+            panel.recapSchedule.on = false;
+            return { removed, scheduleOff, scheduleSaved: options.recapStopSaved !== false };
         },
         // Year recap → Backgrounds and Ready cards: what was asked, for tests to check
         '/api/recap/looks': () => panel.recapLooks,
@@ -483,6 +515,26 @@ async function mockPanel(page, options = {}) {
             return panel.recapReady;
         },
         '/api/recap/drawing': () => panel.recapReady.drawing,
+        // Year recap → Schedule: the saves asked for, for tests; a day moved while on is refused
+        '/api/recap/schedule': (req) => {
+            const s = panel.recapSchedule;
+            if (req.method() === 'GET') return s;
+            const body = req.postDataJSON();
+            panel.recapScheduleSaves.push(body);
+            if (options.recapScheduleError) return { status: 400, body: { error: options.recapScheduleError } };
+            if (s.on && body.on && (body.day !== s.day || body.hour !== s.hour)) {
+                return { status: 400, body: { error: 'Turn it off before changing the day' } };
+            }
+            const year = body.day ? Number(body.day.slice(0, 4)) - (body.day.slice(5, 7) === '01' ? 1 : 0) : s.year;
+            Object.assign(s, body, { year, done: false });
+            if (body.day) {
+                const [yy, mm, dd] = body.day.split('-').map(Number);
+                s.firstAt = new Date(Date.UTC(yy, mm - 1, dd, body.hour - 12)).toISOString();
+                s.lastAt = new Date(Date.UTC(yy, mm - 1, dd, body.hour - 2)).toISOString();
+            }
+            panel.settings.recap = { on: s.on, done: s.done, day: s.day, hour: s.hour, year: s.year };
+            return s;
+        },
         '/api/recap/draw': (req) => {
             panel.recapDraws = [...(panel.recapDraws || []), req.postDataJSON()];
             panel.recapReady.drawing = { running: true, left: 2 };

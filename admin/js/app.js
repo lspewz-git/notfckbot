@@ -11,6 +11,7 @@ import { setHistoryYear, setHistoryPage, setupHistory } from './history.js';
 import { pickPeriod, confirmSendOne } from './chat-stats.js';
 import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './recap.js';
 import { recapCardActions, setupRecapCards, openRecapSection } from './recap-cards.js';
+import { recapScheduleActions, setupRecapSchedule } from './recap-schedule.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
@@ -154,6 +155,7 @@ const CLICK_ACTIONS = {
     'recap-send-stop': () => stopRecapSend(),
     ...settingsActions,
     ...recapCardActions,
+    ...recapScheduleActions,
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
@@ -257,6 +259,7 @@ function init() {
     setupHistory();
     setupSettings();
     setupRecapCards();
+    setupRecapSchedule();
     setupChatSettingsForm();
     setupProxyForm();
     enhanceSelects();

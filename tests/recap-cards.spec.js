@@ -7,7 +7,8 @@ const { mockPanel } = require('./mock-panel');
  * picker, upload, delete) and the sets drawn so far (Ready cards: states, draw, view, delete).
  */
 
-watchConsole();
+// A refused save (400) and a failed load (500) are errors the browser reports itself
+watchConsole({ ignore: /status of (400|500)/ });
 
 const YEAR = new Date().getFullYear();
 // A real PNG header and a few bytes: the mock only looks at the request
@@ -144,4 +145,150 @@ test('Ready cards: draw what is missing, delete one or all (each asked first), v
     await page.locator('#modal-confirm-btn').click();
     await expect(page.locator('#recap-ready-list .recap-tag')).toHaveText(['Not drawn', 'Not drawn', 'Not drawn']);
     expect(panel.recapDeletedAll).toBe(true);
+});
+
+async function openSchedule(page) {
+    await openRecap(page);
+    await page.locator('#recap-section [data-action="recap-tab"][data-tab="schedule"]').click();
+    await expect(page.locator('#recap-sched-pane')).toHaveAttribute('aria-busy', 'false');
+}
+
+test('Schedule: off, with 28 December and 12:00 offered; showing it saves nothing, a pick saves at once', async ({
+    page
+}) => {
+    const panel = await mockPanel(page);
+    await openSchedule(page);
+    await expect(page.locator('#recap-sched-state')).toContainText('Off');
+    // The schedule has its own year: the year buttons go
+    await expect(page.locator('#recap-years')).toBeHidden();
+    await expect(page.locator('#recap-sched-pane .custom-select-trigger')).toHaveText([`28 December ${YEAR}`, '12:00']);
+    await expect(page.locator('#recap-sched-year')).toHaveText(
+        `Sends the ${YEAR} recap, at 12:00 in each chat's time zone.`
+    );
+    await expect(page.locator('#recap-sched-who li').first()).toHaveText('Will get it3 chats');
+    expect(panel.recapScheduleSaves).toEqual([]);
+
+    await page.locator('#recap-sched-pane .custom-select-trigger').nth(1).click();
+    await page.locator('.custom-select-option', { hasText: '18:00' }).click();
+    await expect.poll(() => panel.recapScheduleSaves).toEqual([{ on: false, day: `${YEAR}-12-28`, hour: 18 }]);
+    // A January day sends the year before
+    await page.locator('#recap-sched-pane .custom-select-trigger').first().click();
+    await page.locator('.custom-select-option', { hasText: `5 January ${YEAR + 1}` }).click();
+    await expect(page.locator('#recap-sched-year')).toContainText(`Sends the ${YEAR} recap`);
+    expect(panel.recapScheduleSaves.at(-1)).toEqual({ on: false, day: `${YEAR + 1}-01-05`, hour: 18 });
+});
+
+test('Schedule: turning on asks first and says when and to how many; then the day is locked', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openSchedule(page);
+    const sw = page.locator('#recap-sched-switch');
+    await sw.click();
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await expect(page.locator('#confirm-title')).toHaveText(`Send the ${YEAR} recap on 28 Dec?`);
+    await expect(page.locator('#confirm-text')).toContainText("At 12:00 in each chat's time zone, 3 chats");
+    // Cancel: nothing saved
+    await page.locator('#modal-cancel-btn').click();
+    expect(panel.recapScheduleSaves).toEqual([]);
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
+
+    await sw.click();
+    await page.locator('#modal-confirm-btn').click();
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    expect(panel.recapScheduleSaves).toEqual([{ on: true, day: `${YEAR}-12-28`, hour: 12 }]);
+    await expect(page.locator('#recap-sched-state')).toContainText(`On: 28 December ${YEAR}, 12:00 chat's time`);
+    await expect(page.locator('#recap-sched-state')).toContainText('until the first chat');
+    await expect(page.locator('#recap-sched-pane .custom-select-trigger').first()).toBeDisabled();
+
+    // Off: no question, the day stays
+    await sw.click();
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
+    expect(panel.recapScheduleSaves.at(-1)).toEqual({ on: false, day: `${YEAR}-12-28`, hour: 12 });
+    await expect(page.locator('.toast', { hasText: 'Scheduled sending is off' })).toBeVisible();
+    await expect(page.locator('#recap-sched-pane .custom-select-trigger').first()).toBeEnabled();
+});
+
+test('Schedule: a refused save says why and the fields go back', async ({ page }) => {
+    await mockPanel(page, { recapScheduleError: 'That day and hour have passed or are less than an hour away' });
+    await openSchedule(page);
+    await page.locator('#recap-sched-pane .custom-select-trigger').nth(1).click();
+    await page.locator('.custom-select-option', { hasText: '07:00' }).click();
+    await expect(page.locator('.toast', { hasText: 'less than an hour away' })).toBeVisible();
+    await expect(page.locator('#recap-sched-pane .custom-select-trigger').nth(1)).toHaveText('12:00');
+});
+
+test('Schedule: after the day it says it was sent; while sending it shows how far it is', async ({ page }) => {
+    const progress = { queued: 1, sending: 0, sent: 2, failed: 0, quiet: 1, total: 3, running: true };
+    await mockPanel(page, {
+        recapSchedule: {
+            on: false,
+            done: true,
+            day: `${YEAR}-12-28`,
+            hour: 12,
+            progress: { ...progress, queued: 0, sent: 3 }
+        }
+    });
+    await openSchedule(page);
+    await expect(page.locator('#recap-sched-state')).toContainText(`Sent on 28 December ${YEAR}`);
+    await expect(page.locator('#recap-sched-state')).toContainText('3 chats got it');
+    await expect(page.locator('#recap-sched-switch')).toHaveAttribute('aria-checked', 'false');
+});
+
+test('Schedule: on, with the first hour passed: the progress line', async ({ page }) => {
+    await mockPanel(page, {
+        recapSchedule: {
+            on: true,
+            day: `${YEAR}-12-28`,
+            hour: 12,
+            firstAt: '2000-01-01T00:00:00Z',
+            lastAt: '2000-01-01T10:00:00Z',
+            progress: { queued: 1, sending: 0, sent: 2, failed: 0, quiet: 1, total: 3, running: true }
+        }
+    });
+    await openSchedule(page);
+    await expect(page.locator('#recap-sched-state')).toContainText(
+        'Sending: 2 of 3 sent · 1 waiting for quiet hours to end'
+    );
+});
+
+test('Schedule: failed to load: a dead end, nothing to pick or switch', async ({ page }) => {
+    await mockPanel(page, { failing: ['/api/recap/schedule'] });
+    await openRecap(page);
+    await page.locator('#recap-section [data-action="recap-tab"][data-tab="schedule"]').click();
+    await expect(page.locator('#recap-sched-pane')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.locator('#recap-sched-state')).toContainText('Failed to load');
+    await expect(page.locator('#recap-sched-switch')).toBeDisabled();
+    await expect(page.locator('#recap-sched-who')).toHaveText('Failed to load-');
+    await expect(page.locator('#recap-sched-pane .skeleton')).toHaveCount(0);
+});
+
+test('Schedule: turned off during the sending, it says what is still queued and how to stop it', async ({ page }) => {
+    await mockPanel(page, {
+        recapSchedule: {
+            on: false,
+            day: `${YEAR}-12-28`,
+            hour: 12,
+            progress: { queued: 2, sending: 0, sent: 1, failed: 0, quiet: 0, total: 3, running: true }
+        }
+    });
+    await openSchedule(page);
+    await expect(page.locator('#recap-sched-state')).toContainText(
+        '2 chats already queued still go out; Stop in the Send window takes them off.'
+    );
+});
+
+test('Schedule: turned off between the first and the last hour: the rest must be sent by hand', async ({ page }) => {
+    const now = Date.now();
+    await mockPanel(page, {
+        recapSchedule: {
+            on: false,
+            day: `${YEAR}-12-28`,
+            hour: 12,
+            firstAt: new Date(now - 3600000).toISOString(),
+            lastAt: new Date(now + 3600000).toISOString()
+        }
+    });
+    await openSchedule(page);
+    await expect(page.locator('#recap-sched-state')).toContainText(
+        "Chats whose hour hasn't come won't get it by date: send them by hand."
+    );
 });

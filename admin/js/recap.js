@@ -151,11 +151,21 @@ export function confirmSendAll() {
 
 /** Stop (data-action="recap-send-stop"). */
 export async function stopRecapSend() {
+    let res = null;
     try {
-        const res = await api('/recap/stop', { method: 'POST' });
-        toast(`Stopped: ${chats(res.removed)} taken off the queue`, 'success');
+        res = await api('/recap/stop', { method: 'POST' });
+        toast(
+            `Stopped: ${chats(res.removed)} taken off the queue${res.scheduleOff ? ', sending by date turned off' : ''}`,
+            'success'
+        );
     } catch (err) {
-        toast(err.message, 'error');
+        // The queue couldn't be cleared; the schedule may still have been turned off
+        res = /** @type {{ data?: any }} */ (err).data || null;
+        toast(`${err.message}${res && res.scheduleOff ? ' (sending by date was turned off)' : ''}`, 'error');
+    }
+    // Off in the running bot, but .env still says on: a restart would turn it on again
+    if (res && res.scheduleOff && res.scheduleSaved === false) {
+        toast("Sending by date is off until a restart: .env couldn't be written", 'error', 8000);
     }
     load(false);
 }

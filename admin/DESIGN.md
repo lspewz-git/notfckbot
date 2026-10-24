@@ -19,7 +19,7 @@ last so they win over the shared styles without long selectors.
 | `--border` / `--border-row` / `--border-strong` | white at 6% / 5% / 10%            | Card edges / lines between list rows / control edges |
 | `--text` / `--text-secondary`                   | `#f3f1ec` / `#c9c5bd`             | Body / quieter labels (statuses, switch)             |
 | `--text-dim` / `--text-faint`                   | `#a29e96` / `#75716a`             | Descriptions, meta, ranks, "off" / icons, decoration |
-| `--accent` / `--on-accent`                      | `#f5b14c` / `#1a1206`             | The logo and a switch that is on. Nothing else       |
+| `--accent` / `--on-accent`                      | `#f5b14c` / `#1a1206`             | The logo, a switch that is on, a schedule that is on and the chat-stats leader (★). Nothing else |
 | `--primary` / `--on-primary`                    | `#f3f1ec` / `#161513`             | Primary button: inverted, light with dark text       |
 | `--success` / `--danger` / `--danger-dot`       | `#6fd394` / `#ff8a7f` / `#ff6b5e` | Status text and dots; `*-soft` fills where needed    |
 | `--fill-*` / `--divider`                        | white at 3–14% / 8%               | Hover, selected and skeleton fills / short rules     |

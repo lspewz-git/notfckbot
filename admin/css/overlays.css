@@ -545,6 +545,11 @@ html:has(.modal[open]) {
     margin-top: var(--space-4);
 }
 
+.stats-crown {
+    margin-right: var(--space-1);
+    color: var(--accent);
+}
+
 .stats-cols {
     display: grid;
     gap: var(--space-3);

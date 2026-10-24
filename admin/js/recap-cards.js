@@ -1,14 +1,15 @@
 /**
  * Year recap section: what each of the six cards is drawn on (Backgrounds: the pictures, upload
  * and delete, a picker with a preview drawn for a real chat) and the sets drawn so far (Ready
- * cards: ready, out of date or not drawn; view, delete, draw in the background).
- * Server: src/admin/routes/recap-cards.js.
+ * cards: ready, out of date or not drawn; view, delete, draw in the background); the third tab,
+ * Schedule, is recap-schedule.js. Server: src/admin/routes/recap-cards.js.
  */
 
 import { $, escapeHtml } from './dom.js';
 import { api, apiImage, apiUpload } from './api.js';
 import { openModal, closeModal, showConfirm, toast } from './ui.js';
 import { showRecap } from './chat-stats.js';
+import { loadSchedule } from './recap-schedule.js';
 
 export const CARD_NAMES = ['Cover', 'Episodes', 'Taste', 'Best', 'Farewells', 'Ahead'];
 const POLL_MS = 3000;
@@ -76,13 +77,18 @@ function renderYears() {
 }
 
 function renderTabs() {
-    for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-action="recap-tab"]'))) {
+    for (const btn of /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('#recap-section [data-action="recap-tab"]')
+    )) {
         const on = btn.dataset.tab === tab;
         btn.classList.toggle('active', on);
         btn.setAttribute('aria-pressed', String(on));
     }
     $('recap-looks-pane').hidden = tab !== 'looks';
     $('recap-ready-pane').hidden = tab !== 'ready';
+    $('recap-sched-pane').hidden = tab !== 'schedule';
+    // The schedule has its own year, the day's
+    $('recap-years').hidden = tab === 'schedule';
 }
 
 /** Entering the section: loads what its tab shows. */
@@ -91,6 +97,7 @@ export function openRecapSection() {
     renderTabs();
     loadLooks();
     if (tab === 'ready') loadReady();
+    if (tab === 'schedule') loadSchedule();
 }
 
 function pickYear(value) {
@@ -101,9 +108,12 @@ function pickYear(value) {
 }
 
 function pickTab(value) {
-    tab = value === 'ready' ? 'ready' : 'looks';
+    tab = ['ready', 'schedule'].includes(value) ? value : 'looks';
     renderTabs();
+    // Not in the section yet (the link in Settings): entering it loads the tab
+    if (!$('recap-section').classList.contains('active')) return;
     if (tab === 'ready') loadReady();
+    if (tab === 'schedule') loadSchedule();
 }
 
 // --- Backgrounds ---

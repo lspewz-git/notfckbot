@@ -39,6 +39,7 @@
         <link rel="modulepreload" href="js/proxy.js" />
         <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/recap-cards.js" />
+        <link rel="modulepreload" href="js/recap-schedule.js" />
         <link rel="modulepreload" href="js/records.js" />
         <link rel="modulepreload" href="js/render.js" />
         <link rel="modulepreload" href="js/select.js" />
@@ -858,27 +859,23 @@
                                 </div>
 
                                 <div class="glass-card settings-card">
-                                    <h2 class="settings-title">
-                                        Year recap <span class="settings-optional">in dev</span>
-                                    </h2>
+                                    <h2 class="settings-title">Year recap by date</h2>
                                     <p class="settings-desc">
-                                        Coming: pick a date before New Year, and every chat gets its year's six cards by
-                                        itself. This switch will turn that on; for now it does nothing. Sending by hand,
-                                        from Users / Chats or a chat's Statistics, works either way.
+                                        Every chat gets its year's six cards by itself on a day before New Year. Sending
+                                        by hand, from Users / Chats or a chat's Statistics, works either way.
                                     </p>
-                                    <button
-                                        id="settings-recap"
-                                        type="button"
-                                        class="switch"
-                                        role="switch"
-                                        aria-checked="false"
-                                        data-action="settings-recap"
-                                    >
-                                        <span class="switch-track" aria-hidden="true"
-                                            ><span class="switch-knob"></span
-                                        ></span>
-                                        <span class="switch-label">Scheduled sending</span>
-                                    </button>
+                                    <div class="settings-recap-row">
+                                        <span id="settings-recap" class="settings-recap-state">Off</span>
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline btn-compact"
+                                            data-action="recap-tab"
+                                            data-tab="schedule"
+                                            data-section="recap"
+                                        >
+                                            Open Schedule
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div class="glass-card settings-card">
@@ -980,6 +977,14 @@
                             <button class="btn btn-ghost" data-action="recap-tab" data-tab="ready" aria-pressed="false">
                                 Ready cards
                             </button>
+                            <button
+                                class="btn btn-ghost"
+                                data-action="recap-tab"
+                                data-tab="schedule"
+                                aria-pressed="false"
+                            >
+                                Schedule
+                            </button>
                         </div>
 
                         <div id="recap-looks-pane">
@@ -1014,6 +1019,82 @@
                                     View opens the preview with Send. Delete only removes the files: the cards are drawn
                                     again on the next look or send.
                                 </p>
+                            </div>
+                        </div>
+
+                        <div id="recap-sched-pane" aria-busy="true" hidden>
+                            <!-- Filled by recap-schedule.js: off, on and waiting, sending -->
+                            <div id="recap-sched-state" class="recap-sched-top">
+                                <div class="recap-sched-state">
+                                    <i class="recap-sched-dot" aria-hidden="true"></i>
+                                    <div class="recap-sched-grow">
+                                        <b><span class="skeleton recap-sched-line"></span></b
+                                        ><span><span class="skeleton recap-sched-line"></span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="recap-sched">
+                                <div class="glass-card">
+                                    <h2 class="recap-h">When <small>A day from 15 December to 10 January.</small></h2>
+                                    <div class="recap-sched-fields">
+                                        <div class="recap-sched-field">
+                                            <label class="settings-label" for="recap-sched-day">Day</label>
+                                            <select id="recap-sched-day" class="select-field"></select>
+                                        </div>
+                                        <div class="recap-sched-field">
+                                            <label class="settings-label" for="recap-sched-hour"
+                                                >Hour, chat's time</label
+                                            >
+                                            <select id="recap-sched-hour" class="select-field"></select>
+                                        </div>
+                                    </div>
+                                    <p id="recap-sched-year" class="recap-sched-year">
+                                        <span class="skeleton recap-sched-line"></span>
+                                    </p>
+                                    <div class="recap-sched-switch-row">
+                                        <div class="recap-sched-grow">
+                                            <b>Send on this day</b>
+                                            <span id="recap-sched-switch-note">Asks before turning on</span>
+                                        </div>
+                                        <button
+                                            id="recap-sched-switch"
+                                            type="button"
+                                            class="switch"
+                                            role="switch"
+                                            aria-checked="false"
+                                            aria-label="Send on this day"
+                                            data-action="recap-sched-toggle"
+                                        >
+                                            <span class="switch-track" aria-hidden="true"
+                                                ><span class="switch-knob"></span
+                                            ></span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="glass-card">
+                                    <h2 class="recap-h">
+                                        Who gets it <small>Counted now; counted again at the hour.</small>
+                                    </h2>
+                                    <ul id="recap-sched-who" class="recap-sched-who">
+                                        <li>
+                                            <span><span class="skeleton recap-sched-line"></span></span><em>&nbsp;</em>
+                                        </li>
+                                        <li>
+                                            <span><span class="skeleton recap-sched-line"></span></span><em>&nbsp;</em>
+                                        </li>
+                                        <li>
+                                            <span><span class="skeleton recap-sched-line"></span></span><em>&nbsp;</em>
+                                        </li>
+                                        <li>
+                                            <span><span class="skeleton recap-sched-line"></span></span><em>&nbsp;</em>
+                                        </li>
+                                    </ul>
+                                    <p class="recap-hint">
+                                        Each chat once a year: a chat sent by hand earlier is skipped. Cards not drawn
+                                        by then are drawn the night before, from 03:00 Moscow time. Stop in the Send
+                                        window also turns this off.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </section>

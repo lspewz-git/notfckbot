@@ -91,8 +91,8 @@ function rows(items, empty = 'Nothing yet') {
     if (!items.length) return `<p class="stats-empty stats-slot-rows">${empty}</p>`;
     return `<ul class="stats-list stats-slot-rows">${items
         .map(
-            ([name, value]) =>
-                `<li class="stats-row"><span class="stats-name">${escapeHtml(name)}</span><span class="stats-count">${escapeHtml(value)}</span></li>`
+            ([name, value, crown]) =>
+                `<li class="stats-row"><span class="stats-name">${crown ? '<span class="stats-crown" role="img" aria-label="Added clearly the most" title="Added clearly the most">★</span>' : ''}${escapeHtml(name)}</span><span class="stats-count">${escapeHtml(value)}</span></li>`
         )
         .join('')}</ul>`;
 }
@@ -137,11 +137,20 @@ export function renderStats(stats, chatType = 'private') {
         ? `busiest: ${MONTHS[Number(ep.busiestMonth.month.slice(5)) - 1]}${stats.period.from.slice(0, 4) === stats.period.to.slice(0, 4) ? '' : ` ${ep.busiestMonth.month.slice(0, 4)}`}, ${ep.busiestMonth.count}`
         : '';
     const features = stats.usage.features.map((f) => [FEATURES[f.name] || capital(f.name), number.format(f.n)]);
-    const members = stats.usage.members.map((m) => [m.name, plural(m.n, 'action')]);
+    const members = stats.members || { added: [], used: [] };
+    // The server says whether the first added clearly the most (the same rule as the caption's line)
+    const added = members.added.map((m, i) => [
+        m.name,
+        [m.series && plural(m.series, 'series', 'series'), m.films && plural(m.films, 'film')]
+            .filter(Boolean)
+            .join(' · '),
+        i === 0 && Boolean(members.leader)
+    ]);
+    const used = members.used.map((m) => [m.name, plural(m.n, 'time')]);
     const group = chatType !== 'private';
     const since = stats.since
-        ? `Notifications and bot use are counted since ${day(stats.since)}, when recording began.`
-        : 'Notifications and bot use: nothing recorded for this chat yet.';
+        ? `Notifications, bot use and who added what are counted since ${day(stats.since)}, when recording began.`
+        : 'Notifications, bot use and who added what: nothing recorded for this chat yet.';
 
     return `
         <div class="stats-kpis">
@@ -175,7 +184,8 @@ export function renderStats(stats, chatType = 'private') {
                 number.format(stats.usage.total),
                 rows(features.slice(0, 3), 'Not used yet') +
                     (group
-                        ? `<h4 class="stats-box-title stats-subtitle">Most active members</h4>${rows(members.slice(0, 3), 'Nobody yet')}`
+                        ? `<h4 class="stats-box-title stats-subtitle">Added most</h4>${rows(added.slice(0, 3), 'Nobody yet')}` +
+                          `<h4 class="stats-box-title stats-subtitle">Used the bot most</h4>${rows(used.slice(0, 3), 'Nobody yet')}`
                         : '')
             )}
         </div>
@@ -194,7 +204,7 @@ function renderSkeleton(chatType) {
         <div class="stats-cols stats-cols-3">${['Genres', 'Channels', 'Countries'].map((t) => box(t, '', meters)).join('')}</div>
         <div class="stats-cols stats-cols-2">
             ${box('Most episodes', '', list + `<h4 class="stats-box-title stats-subtitle">Films out</h4>` + list)}
-            ${box('Bot use', '', list + (chatType !== 'private' ? `<h4 class="stats-box-title stats-subtitle">Most active members</h4>${list}` : ''))}
+            ${box('Bot use', '', list + (chatType !== 'private' ? `<h4 class="stats-box-title stats-subtitle">Added most</h4>${list}<h4 class="stats-box-title stats-subtitle">Used the bot most</h4>${list}` : ''))}
         </div>
         <p class="stats-note">${line}</p>`;
 }

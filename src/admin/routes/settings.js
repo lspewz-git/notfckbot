@@ -15,6 +15,7 @@ const { UPDATE_INTERVAL_HOURS, INTERVAL_CHOICES, parseIntervalHours } = require(
 const { SERVICES, describeError } = require('./services');
 const { invalidateHealth } = require('./health');
 const { restartBlock, restartSoon } = require('../restart');
+const { readSchedule } = require('../../recap/schedule');
 
 const router = require('express').Router();
 const { log } = require('../../log');
@@ -54,9 +55,8 @@ function currentSettings(bot) {
             name: process.env.DB_NAME || '',
             user: process.env.DB_USER || ''
         },
-        // The year recap sent by date to every chat: not built yet, the switch only keeps its place.
-        // Sending by hand (src/recap/send.js) doesn't depend on it
-        recap: { schedule: process.env.RECAP_SCHEDULE === 'on' },
+        // The year recap sent by date: shown here, set in Year recap → Schedule (routes/recap-schedule.js)
+        recap: readSchedule(),
         restart: { pending: pendingRestart(bot), blocked: restartBlock() },
         // When this process started: the panel shows "running since"
         startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString()
@@ -68,7 +68,7 @@ router.get('/api/settings', (req, res) => {
 });
 
 /**
- * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, proxyUrl?, intervalHours?, recapSchedule? }; what is
+ * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, proxyUrl?, intervalHours? }; what is
  * left out stays as it is. On a problem nothing is written, and `fields` says which field it is.
  */
 router.post('/api/settings', async (req, res) => {
@@ -83,11 +83,6 @@ router.post('/api/settings', async (req, res) => {
         else if (hours !== parseIntervalHours(process.env.UPDATE_INTERVAL_HOURS, { quiet: true })) {
             changes.UPDATE_INTERVAL_HOURS = String(hours);
         }
-    }
-
-    if (body.recapSchedule !== undefined) {
-        if (typeof body.recapSchedule !== 'boolean') fields.recap = 'On or off';
-        else changes.RECAP_SCHEDULE = body.recapSchedule ? 'on' : 'off';
     }
 
     if (body.proxyUrl !== undefined) {

@@ -15,6 +15,8 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 
 // First: every handler after it reads and writes where the conversation is (ctx.session)
 bot.use(require('./state').stateSession);
+// Before the middleware creates a row for it: a group turned supergroup takes its data along
+require('./migration').register(bot);
 require('./middleware').register(bot);
 // Right after the middleware, which loads the chat's settings: decides who may press buttons
 require('./access').register(bot);

@@ -14,6 +14,7 @@ const { flushPending } = require('./outbox');
 const { releaseHeld } = require('./held');
 const { sendDigests } = require('./digests');
 const { processQueue: sendRecaps } = require('../recap/send');
+const { runSchedule } = require('../recap/schedule');
 const stats = require('../stats-log');
 const { flushEvents } = require('../chat-events');
 const { log } = require('../log');
@@ -54,8 +55,11 @@ const setupCron = (bot) => {
     cron.schedule('*/10 * * * *', async () => {
         await releaseHeld(bot);
         await sendDigests(bot);
-        // The year's recap queued from the panel: chats whose quiet hours have ended, and retries.
-        // In the background: a long queue mustn't hold up the counts below (it logs its own errors)
+        // The year's recap by date: the chats whose hour has come join the queue
+        await runSchedule().catch((err) => log.error(`[Recap] Scheduled sending failed: ${err.message}`));
+        // The year's recap queued from the panel or by date: chats whose quiet hours have ended,
+        // and retries. In the background: a long queue mustn't hold up the counts below (it logs
+        // its own errors)
         sendRecaps(bot);
         await stats.flushStats();
         await flushEvents();

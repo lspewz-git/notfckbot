@@ -25,6 +25,12 @@ async function posterUri(url) {
     return `data:${type};base64,${bytes.toString('base64')}`;
 }
 
+// What the cards show of the statistics (cards.js reads only these; a test keeps the two in step).
+// The rest, the notifications and the use of the bot, changes with every button pressed and would
+// make a kept set look out of date for nothing
+const CARD_FIELDS = ['period', 'following', 'episodes', 'films', 'favourites', 'best', 'finished', 'ahead', 'rare'];
+const drawnFrom = (stats) => Object.fromEntries(CARD_FIELDS.map((k) => [k, stats[k]]));
+
 /**
  * What a chat's year is drawn from, and its fingerprint; null for a chat that isn't there.
  * @param {Array} [looks] cardLooks(), when asked for many chats at once
@@ -40,7 +46,7 @@ async function recapInputs(chatId, year, { now = new Date(), looks } = {}) {
     const hash = store.fingerprint({
         year: Number(year),
         chatName,
-        stats,
+        stats: drawnFrom(stats),
         looks: cardLooks.map((l) => [l.background, l.dim]),
         poster
     });
@@ -185,6 +191,7 @@ function drawInBackground(chatIds, year) {
 const drawingState = () => ({ ...drawing });
 
 module.exports = {
+    CARD_FIELDS,
     recapImages,
     recapInputs,
     renderCard,

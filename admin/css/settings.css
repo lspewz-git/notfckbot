@@ -37,6 +37,18 @@
     font-size: var(--text-sm);
 }
 
+.settings-recap-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+.settings-recap-state {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
 .settings-optional {
     color: var(--text-dim);
     font-size: var(--text-xs);

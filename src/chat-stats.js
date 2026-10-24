@@ -37,6 +37,49 @@ function add(counts, key, n = 1) {
     if (key) counts[key] = (counts[key] || 0) + n;
 }
 
+/**
+ * Who in the chat did what, from the events that name a member (the bot's buttons; the panel's
+ * changes and the notifications name nobody): who added the most series and films, who used the
+ * bot the most. A member is one Telegram id, under the latest name seen, so a new @username
+ * doesn't split them in two.
+ */
+function membersOf(chatEvents) {
+    const people = new Map();
+    for (const e of chatEvents) {
+        if (!e.userId) continue;
+        const id = String(e.userId);
+        const person = people.get(id) || { name: id, series: 0, films: 0, used: 0 };
+        if (e.userName) person.name = e.userName;
+        if (e.kind === 'subscribed') person.series += 1;
+        else if (e.kind === 'film_added') person.films += 1;
+        else if (e.kind === 'used') person.used += 1;
+        people.set(id, person);
+    }
+    const all = [...people.values()];
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    const added = all
+        .map(({ name, series, films }) => ({ name, series, films, n: series + films }))
+        .filter((p) => p.n)
+        .sort((a, b) => b.n - a.n || byName(a, b))
+        .slice(0, TOP);
+    return {
+        added,
+        // The first of `added` added clearly the most: the panel's ★ and the caption's line
+        leader: Boolean(leader({ added })),
+        used: all
+            .filter((p) => p.used)
+            .map(({ name, used }) => ({ name, n: used }))
+            .sort((a, b) => b.n - a.n || byName(a, b))
+            .slice(0, TOP)
+    };
+}
+
+/** The member who added clearly the most: at least 3 and more than anyone else; else null. */
+function leader(members) {
+    const [first, second] = (members && members.added) || [];
+    return first && first.n >= 3 && (!second || second.n < first.n) ? first : null;
+}
+
 /** A film's date in Russia or anywhere, whichever is first: when it came out for the chat. */
 function filmDay(film) {
     return [film.premiere_digital, film.ru_premiere, film.ru_digital]
@@ -155,9 +198,7 @@ function computeStats(
     const busiestDay = ranked(notifyDays, 1)[0] || null;
     const used = inside.filter((e) => e.kind === 'used');
     const features = {};
-    const members = {};
     for (const e of used) add(features, e.detail);
-    for (const e of inside) if (e.userId && e.kind !== 'notified') add(members, e.userName || String(e.userId));
 
     const finishedInPeriod = perSeries
         .filter((s) => isFinishedStatus(s.status) && s.lastMonth && monthInPeriod(s.lastMonth, period))
@@ -236,7 +277,8 @@ function computeStats(
             kinds,
             busiestDay: busiestDay && { day: busiestDay.name, n: busiestDay.n }
         },
-        usage: { total: used.length, features: ranked(features, 20), members: ranked(members) },
+        usage: { total: used.length, features: ranked(features, 20) },
+        members: membersOf(inside),
         rare,
         // Since when the events (notifications, use) are counted: the earliest one recorded
         since:
@@ -295,4 +337,4 @@ async function loadChatStats(chatId, period, now = new Date()) {
     );
 }
 
-module.exports = { computeStats, loadChatStats, filmDay };
+module.exports = { computeStats, loadChatStats, filmDay, leader };

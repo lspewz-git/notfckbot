@@ -20,11 +20,14 @@ const GONE =
 
 /**
  * What a failed send means.
- * @returns {{ kind: 'gone' | 'rejected' | 'flood' | 'temporary', retryAfter?: number }}
+ * @returns {{ kind: 'gone' | 'rejected' | 'flood' | 'temporary' | 'moved', retryAfter?: number, to?: string }}
+ *   moved: the group became a supergroup, `to` its new id
  */
 function classify(err) {
     const code = err && err.response ? err.response.error_code : undefined;
     const text = (err && (err.description || err.message)) || '';
+    const to = err && err.response && err.response.parameters && err.response.parameters.migrate_to_chat_id;
+    if (to) return { kind: 'moved', to: String(to) };
     if (code === 429) {
         const retryAfter = Number(err.response.parameters && err.response.parameters.retry_after) || 5;
         return { kind: 'flood', retryAfter };
@@ -74,7 +77,23 @@ function withTimeout(promise, ms) {
  *   the network didn't answer after a few tries, so a later attempt may still work
  */
 async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sleep } = {}) {
-    return withRetries(() => sendOnce(bot, chatId, text, photo, extra), wait);
+    return followingMove(chatId, (id) => withRetries(() => sendOnce(bot, id, text, photo, extra), wait));
+}
+
+/**
+ * A send to a group that became a supergroup the bot didn't hear about: its data moves to the new
+ * id (src/chat-migration.js) and the send goes there, once.
+ */
+async function followingMove(chatId, send) {
+    const result = await send(chatId);
+    if (result.status !== 'moved') return result;
+    try {
+        await require('./chat-migration').migrateChat(chatId, result.to);
+    } catch (err) {
+        log.error(`[Delivery] Moving group ${chatId} to supergroup ${result.to} failed: ${err.message}`);
+    }
+    const again = await send(result.to);
+    return again.status === 'moved' ? { status: 'gone', error: again.error } : again;
 }
 
 /**
@@ -96,9 +115,9 @@ async function deliverAlbum(bot, chatId, images, caption, { wait = sleep, timeou
         media: { source: image },
         ...(i === 0 ? { caption, parse_mode: 'HTML' } : {})
     }));
-    return withRetries(() => bot.telegram.sendMediaGroup(chatId, media), wait, timeout, {
-        retryNoAnswer: false
-    });
+    return followingMove(chatId, (id) =>
+        withRetries(() => bot.telegram.sendMediaGroup(id, media), wait, timeout, { retryNoAnswer: false })
+    );
 }
 
 /** One send, tried again after a short failure or a flood wait; the outcome as deliver() gives it. */
@@ -109,11 +128,14 @@ async function withRetries(send, wait, timeout = TRY_TIMEOUT_MS, { retryNoAnswer
             return { status: 'sent' };
         } catch (err) {
             if (err.noAnswer && !retryNoAnswer) return { status: 'failed', error: err.message, uncertain: true };
-            const { kind, retryAfter } = classify(err);
+            const { kind, retryAfter, to } = classify(err);
+            if (kind === 'moved') return { status: 'moved', to, error: err.message };
             if (kind === 'gone' || kind === 'rejected') return { status: kind, error: err.message };
-            if (attempt >= TRIES || (kind === 'flood' && retryAfter > MAX_FLOOD_WAIT_S)) {
-                return { status: 'failed', error: err.message };
+            // A long flood wait: the caller is told how long, to hold off rather than try the next chat
+            if (kind === 'flood' && retryAfter > MAX_FLOOD_WAIT_S) {
+                return { status: 'failed', error: err.message, retryAfter };
             }
+            if (attempt >= TRIES) return { status: 'failed', error: err.message };
             await wait(kind === 'flood' ? retryAfter * 1000 : attempt * 2000);
         }
     }

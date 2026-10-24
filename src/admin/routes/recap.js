@@ -4,6 +4,7 @@
  */
 const { Chat, RecapSend } = require('../../db');
 const recap = require('../../recap/send');
+const schedule = require('../../recap/schedule');
 const { z, valid, chatId } = require('../validate');
 const { log } = require('../../log');
 
@@ -53,12 +54,18 @@ router.post('/api/recap/send', async (req, res) => {
 });
 
 router.post('/api/recap/stop', async (req, res) => {
+    // Stop means nothing more goes: the schedule off first (at once in this process, so a run
+    // queuing right now takes its rows back; it doesn't throw), then the queue
+    const { off: scheduleOff, saved } = schedule.turnOff();
     try {
         const removed = await recap.stop();
-        log.info(`[Admin] Year recap stopped: ${removed} chat(s) taken off the queue`);
-        res.json({ removed });
+        log.info(
+            `[Admin] Year recap stopped: ${removed} chat(s) taken off the queue${scheduleOff ? ', schedule turned off' : ''}`
+        );
+        res.json({ removed, scheduleOff, scheduleSaved: saved });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        // The queue stays, but the schedule is off all the same: the panel says so
+        res.status(500).json({ error: err.message, scheduleOff, scheduleSaved: saved });
     }
 });
 

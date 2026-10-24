@@ -199,7 +199,7 @@ function fillFields(settings) {
     $('settings-db-name').textContent = settings.database.name || '—';
     $('settings-db-user').textContent = settings.database.user || '—';
 
-    renderRecapSwitch(settings);
+    renderRecapSchedule(settings);
     renderRestart(settings);
     showErrors();
     refreshChanges();
@@ -208,29 +208,19 @@ function fillFields(settings) {
     if (proxyOnScreen() !== proxyBefore) renderChecks();
 }
 
-/**
- * The year recap's schedule switch (in development: the sending by date isn't built yet, sending by
- * hand doesn't depend on it). Saved as soon as it is flipped, apart from the fields and their Save.
- */
-function renderRecapSwitch(settings) {
-    $('settings-recap').setAttribute('aria-checked', String(Boolean(settings.recap && settings.recap.schedule)));
-}
-
-async function toggleRecap(button) {
-    if (!saved || button.hasAttribute('aria-busy')) return;
-    const on = button.getAttribute('aria-checked') !== 'true';
-    button.setAttribute('aria-busy', 'true');
-    try {
-        // Only this value: edits waiting in the fields stay as they are
-        const res = await api('/settings', { method: 'POST', body: { recapSchedule: on } });
-        saved = { ...saved, recap: res.settings.recap };
-        renderRecapSwitch(saved);
-        toast(on ? 'Scheduled recap is on (in development)' : 'Scheduled recap is off', 'success');
-    } catch (err) {
-        toast(err.message, 'error');
-    } finally {
-        button.removeAttribute('aria-busy');
-    }
+/** The year recap by date: only what is set; it is set in Year recap → Schedule. */
+function renderRecapSchedule(settings) {
+    const r = settings.recap || {};
+    const when = r.day
+        ? `${new Date(`${r.day}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, ${String(r.hour).padStart(2, '0')}:00 chat's time`
+        : '';
+    $('settings-recap').textContent = r.on
+        ? `On · ${when}`
+        : r.done
+          ? `Sent · ${when}`
+          : when
+            ? `Off · ${when} picked`
+            : 'Off';
 }
 
 /** Opening the section and the auto-refresh: never over edits in progress. */
@@ -245,10 +235,10 @@ function isEditing() {
 export async function loadSettings() {
     const settings = await api('/settings');
     if (saved && isEditing()) {
-        // Only what can't conflict with them: the restart state and the recap switch
+        // Only what can't conflict with them: the restart state and the recap schedule
         saved = { ...saved, restart: settings.restart, recap: settings.recap };
         renderRestart(saved);
-        renderRecapSwitch(saved);
+        renderRecapSchedule(saved);
         return;
     }
     saved = settings;
@@ -378,8 +368,7 @@ export const settingsActions = {
     'settings-save': () => save(),
     'settings-discard': () => discard(),
     'settings-proxy-test': (el) => testProxy(el),
-    'settings-restart': () => restart(),
-    'settings-recap': (el) => toggleRecap(el)
+    'settings-restart': () => restart()
 };
 
 /** Typing anywhere in the section updates the marks; a closed tab asks first if there's something unsaved. */

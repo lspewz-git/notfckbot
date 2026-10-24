@@ -10,10 +10,14 @@ const express = require('express');
 
 const render = require('../../src/recap/render');
 const STATS = { episodes: { count: 87, minutes: 4700 }, films: { released: [{}, {}], minutes: 1680 } };
-mock.method(render, 'recapImages', async () => ({
-    images: [1, 2, 3, 4, 5, 6].map((n) => Buffer.from([n])),
-    stats: STATS
-}));
+// The figures the drawn cards come with; a test may give them members
+let drawnStats = STATS;
+// What happens while a chat's cards are drawn (a test may look, or fail it)
+let whileDrawing = null;
+mock.method(render, 'recapImages', async (chatId) => {
+    if (whileDrawing) await whileDrawing(chatId);
+    return { images: [1, 2, 3, 4, 5, 6].map((n) => Buffer.from([n])), stats: drawnStats };
+});
 
 const { Chat, Subscription, Watchlist, RecapSend } = require('../../src/db');
 const recap = require('../../src/recap/send');
@@ -29,9 +33,10 @@ const stub = (object, name, impl) => {
 afterEach(() => {
     // Newest first: a stub over a stub gives back the one under it, then the real method
     for (const m of stubs.splice(0).reverse()) m.mock.restore();
+    whileDrawing = null;
 });
 
-/** Runs fn with RECAP_SCHEDULE set to each value the Settings switch can leave, then restores it. */
+/** Runs fn with RECAP_SCHEDULE set to each value the schedule's switch can leave, then restores it. */
 async function withEachSchedule(fn) {
     const saved = process.env.RECAP_SCHEDULE;
     try {
@@ -112,6 +117,28 @@ describe('the caption', () => {
         assert.deepEqual(recap.jokes(small, 1), []);
     });
 
+    test('in a group, who added clearly the most; never in a private chat', () => {
+        const members = { added: [{ name: '@masha', series: 6, films: 1, n: 7 }], used: [] };
+        const text = recap.caption(2026, { ...STATS, members }, () => 0, true);
+        assert.ok(text.includes('\n🏆 Главный по новинкам — @masha: 6 сериалов и 1 фильм.\n\n'), text);
+        assert.doesNotMatch(
+            recap.caption(2026, { ...STATS, members }, () => 0, false),
+            /🏆/
+        );
+        // A tie: no line
+        const tie = { added: [members.added[0], { name: '@kostya', series: 7, films: 0, n: 7 }], used: [] };
+        assert.doesNotMatch(
+            recap.caption(2026, { ...STATS, members: tie }, () => 0, true),
+            /🏆/
+        );
+        // A name with HTML in it is shown, not read
+        const odd = { added: [{ name: 'A<b>', series: 0, films: 3, n: 3 }], used: [] };
+        assert.match(
+            recap.caption(2026, { ...STATS, members: odd }, () => 0, true),
+            /A&lt;b&gt;: 3 фильма\./
+        );
+    });
+
     test('the line is picked at random among those that fit', () => {
         const picks = new Set([0, 0.3, 0.6, 0.99].map((r) => recap.caption(2026, STATS, () => r).split('\n\n')[1]));
         assert.equal(picks.size, 2);
@@ -147,13 +174,28 @@ describe('the queue', () => {
         });
     });
 
-    test('the Settings switch (the schedule, in development) has no say: what was queued by hand goes', async () => {
+    test("the schedule's switch has no say: what was queued by hand goes", async () => {
         await withEachSchedule(async (value) => {
             for (const r of rows) r.status = 'queued';
             const bot = albumBot();
             await recap.processQueue(bot, { pause: 0 });
             assert.equal(bot.sent.length, 2, `RECAP_SCHEDULE=${value}`);
         });
+    });
+
+    test('who added the most is named in a group’s caption, not in a private chat’s', async () => {
+        chats[1].type = 'private';
+        chats[2].type = 'group';
+        drawnStats = { ...STATS, members: { added: [{ name: '@m', series: 5, films: 0, n: 5 }], used: [] } };
+        try {
+            const bot = albumBot();
+            await recap.processQueue(bot, { pause: 0 });
+            const captions = bot.sent.map((s) => s.media[0].caption);
+            assert.doesNotMatch(captions[0], /🏆/);
+            assert.match(captions[1], /🏆 Главный по новинкам — @m: 5 сериалов\./);
+        } finally {
+            drawnStats = STATS;
+        }
     });
 
     test('each chat gets one album of six with the caption under the first; the row says sent', async () => {
@@ -233,6 +275,69 @@ describe('the queue', () => {
         await recap.processQueue(bot, { pause: 0 });
         assert.deepEqual(
             bot.sent.map((s) => s.chatId),
+            [1, 2]
+        );
+    });
+
+    test('drawn while still queued: a restart while drawing leaves it to be sent, not "may have been sent"', async () => {
+        const seen = [];
+        whileDrawing = (chatId) => seen.push(rows.find((r) => r.chatId === chatId).status);
+        await recap.processQueue(albumBot(), { pause: 0 });
+        assert.deepEqual(seen, ['queued', 'queued']);
+        assert.deepEqual(
+            rows.map((r) => r.status),
+            ['sent', 'sent']
+        );
+    });
+
+    test('drawing fails (the database, memory): queued again, failed after the third try, nothing sent', async () => {
+        rows = [row({ chatId: 1, year: 2026 })];
+        whileDrawing = () => {
+            throw new Error('Database gone');
+        };
+        for (let run = 1; run <= recap.MAX_ATTEMPTS; run += 1) {
+            const bot = albumBot();
+            await recap.processQueue(bot, { pause: 0 });
+            assert.deepEqual(bot.sent, []);
+            assert.equal(rows[0].attempts, run);
+            assert.equal(rows[0].status, run < recap.MAX_ATTEMPTS ? 'queued' : 'failed');
+            assert.match(rows[0].error, /Drawing failed: Database gone/);
+        }
+    });
+
+    test('Telegram asks to wait long: the chat waits without losing a try, and so does the rest', async () => {
+        // A clock of its own, so the wait it leaves behind is long over for the tests after it
+        let clock = 1_000_000;
+        stub(Date, 'now', () => clock);
+        const flood = Object.assign(new Error('Too Many Requests: retry after 120'), {
+            description: 'Too Many Requests: retry after 120',
+            response: { error_code: 429, description: 'Too Many Requests', parameters: { retry_after: 120 } }
+        });
+        const bot = albumBot([flood]);
+        await recap.processQueue(bot, { pause: 0, wait: async () => {} });
+        assert.deepEqual(
+            bot.sent.map((s) => s.chatId),
+            [1],
+            'chat 2 not asked'
+        );
+        assert.deepEqual(
+            rows.map((r) => [r.status, r.attempts]),
+            [
+                ['queued', 0],
+                ['queued', 0]
+            ]
+        );
+        // Ten minutes later: still inside the wait, nothing goes
+        clock += 60_000;
+        const early = albumBot();
+        await recap.processQueue(early, { pause: 0 });
+        assert.deepEqual(early.sent, []);
+        // After it: both go
+        clock += 61_000;
+        const after = albumBot();
+        await recap.processQueue(after, { pause: 0 });
+        assert.deepEqual(
+            after.sent.map((s) => s.chatId),
             [1, 2]
         );
     });

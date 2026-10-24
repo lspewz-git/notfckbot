@@ -85,16 +85,33 @@ test('every chat: the counts, a second "yes", then the progress with Stop', asyn
     expect(panel.recapStopped).toBe(true);
 });
 
-test('Settings: the schedule switch is marked in development and saves at once, apart from the other fields', async ({
+test('Settings: the recap by date only says what is set, and opens Year recap → Schedule', async ({ page }) => {
+    // The first chat far ahead: the tab shows it waiting
+    await mockPanel(page, {
+        recapSchedule: { on: true, day: `${YEAR}-12-28`, hour: 12, firstAt: `${YEAR + 5}-12-28T00:00:00Z` }
+    });
+    await openSection(page, 'settings');
+    await expect(page.locator('.settings-title', { hasText: 'Year recap' })).not.toContainText('in dev');
+    await expect(page.locator('#settings-recap')).toHaveText(`On · 28 Dec ${YEAR}, 12:00 chat's time`);
+    await page.locator('#settings-section [data-tab="schedule"]').click();
+    await expect(page.locator('#recap-section')).toHaveClass(/active/);
+    await expect(page.locator('#recap-sched-pane')).toBeVisible();
+    await expect(page.locator('#recap-sched-state')).toContainText(`On: 28 December ${YEAR}, 12:00 chat's time`);
+});
+
+test('Stop with sending by date on, .env not writable: a warning that a restart turns it on again', async ({
     page
 }) => {
-    const panel = await mockPanel(page);
-    await openSection(page, 'settings');
-    await expect(page.locator('.settings-title', { hasText: 'Year recap' })).toContainText('in dev');
-    const sw = page.locator('#settings-recap');
-    await expect(sw).toHaveAttribute('aria-checked', 'false');
-    await sw.click();
-    await expect(sw).toHaveAttribute('aria-checked', 'true');
-    expect(panel.lastSettingsSave).toEqual({ recapSchedule: true });
-    await expect(page.locator('#settings-bar')).toHaveAttribute('data-dirty', 'false');
+    await mockPanel(page, {
+        recapSchedule: { on: true, day: `${YEAR}-12-28`, hour: 12, firstAt: `${YEAR + 5}-12-28T00:00:00Z` },
+        recapStopSaved: false
+    });
+    await openSection(page, 'chats');
+    await page.locator('#chats-section [data-action="recap-send-open"]').click();
+    const dialog = page.locator('#recap-send-modal');
+    await dialog.locator('[data-action="recap-send-all"]').click();
+    await page.locator('#modal-confirm-btn').click();
+    await dialog.locator('[data-action="recap-send-stop"]').click();
+    await expect(page.locator('.toast', { hasText: 'sending by date turned off' })).toBeVisible();
+    await expect(page.locator('.toast', { hasText: "off until a restart: .env couldn't be written" })).toBeVisible();
 });
