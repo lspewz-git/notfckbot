@@ -159,6 +159,7 @@ function pictureSize(bytes, type) {
  * - { kind: 'thumb', png }: a small copy of a card for the panel's lists;
  * - { kind: 'fit', bytes }: an uploaded PNG or JPEG cropped to a card's 1080x1350, as PNG; throws
  *   for anything else, or a file that draws nothing.
+ * - { kind: 'luma', png }: how light a picture is on average, 0 to 1 (the card's text then light or dark).
  */
 module.exports = async function run(task) {
     await wasmReady;
@@ -188,6 +189,19 @@ module.exports = async function run(task) {
         for (let i = 3; i < pixels.length && !seen; i += 4 * 97) seen = pixels[i] !== 0;
         if (!seen) throw new Error('This picture could not be read');
         return png;
+    }
+    if (task.kind === 'luma') {
+        // How light a picture is, 0 (black) to 1 (white): read from a small copy, enough for an average
+        const uri = `data:image/png;base64,${Buffer.from(task.png).toString('base64')}`;
+        const { pixels } = draw(pictureSvg(uri, WIDTH, HEIGHT), { fitTo: { mode: 'width', value: 36 }, pixels: true });
+        let sum = 0;
+        let count = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+            const alpha = pixels[i + 3] / 255;
+            sum += ((0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]) / 255) * alpha;
+            count += alpha;
+        }
+        return count ? sum / count : 0;
     }
     throw new Error(`Unknown task: ${task.kind}`);
 };

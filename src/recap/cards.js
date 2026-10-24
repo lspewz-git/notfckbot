@@ -39,6 +39,16 @@ const THEMES = [
     { bg: '#f3f1ec', fg: '#161513', accent: '#e9405b' }
 ];
 
+// Text on a picture: light on a dark one, dark on a light one (backgrounds.js measures which).
+// bar: the quiet bars of the episodes chart, pill: the chips of the last card, in the same tone
+const TONES = {
+    light: { fg: '#f3f1ec', bar: 'rgba(255,255,255,0.3)', pill: 'rgba(255,255,255,0.16)', shadow: 'rgba(0,0,0,0.55)' },
+    dark: { fg: '#161513', bar: 'rgba(0,0,0,0.22)', pill: 'rgba(0,0,0,0.1)', shadow: 'rgba(255,255,255,0.55)' }
+};
+
+/** Card i's palette; on a picture, its text in the tone that reads on it. */
+const themeOf = (i, { tone } = {}) => (TONES[tone] ? { ...THEMES[i], ...TONES[tone], tone } : THEMES[i]);
+
 /** An element: satori's { type, props } with the style first. */
 function h(type, style, ...children) {
     const flat = children.flat().filter((c) => c !== null && c !== undefined && c !== false && c !== '');
@@ -72,7 +82,7 @@ const fit = (value, size, chars) =>
 const short = (s, max) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
 /** The frame every card shares: brand top left, "n/6" top right, the content, a footer. */
-function frame(n, theme, kicker, content, footer, extra = []) {
+function frame(n, theme, kicker, content, footer) {
     // The margin sits on an inner block of a fixed size: padding on the card would add to its width
     return box(
         {
@@ -80,10 +90,11 @@ function frame(n, theme, kicker, content, footer, extra = []) {
             height: HEIGHT,
             background: theme.bg,
             color: theme.fg,
+            // On a picture, a soft halo keeps the letters apart from what is behind them
+            ...(theme.tone ? { textShadow: `0 2px 18px ${theme.shadow}` } : {}),
             position: 'relative',
             overflow: 'hidden'
         },
-        ...extra,
         box(
             {
                 position: 'absolute',
@@ -138,8 +149,9 @@ function ranks(items, mark = (i) => String(i + 1)) {
 
 // --- The six cards ---
 
-function cover(stats, { year, chatName }) {
-    const theme = THEMES[0];
+function cover(stats, options) {
+    const { year, chatName } = options;
+    const theme = themeOf(0, options);
     const h1 = hours(stats.episodes.minutes + stats.films.minutes);
     const main = h1
         ? [
@@ -164,23 +176,14 @@ function cover(stats, { year, chatName }) {
             text({ fontSize: 60, fontWeight: 800, lineHeight: 1.15 }, 'и фильмах'),
             ...main
         ],
-        `${short(chatName, 28)} · листайте ›`,
-        [
-            box({
-                position: 'absolute',
-                width: 640,
-                height: 640,
-                borderRadius: 320,
-                background: theme.accent,
-                right: -230,
-                top: -200
-            })
-        ]
+        // No decoration: on a picture a circle would cover it (the user's choice 24.10)
+        `${short(chatName, 28)} · листайте ›`
     );
 }
 
-function episodes(stats, { year }) {
-    const theme = THEMES[1];
+function episodes(stats, options) {
+    const { year } = options;
+    const theme = themeOf(1, options);
     const ep = stats.episodes;
     if (!ep.count) {
         return frame(
@@ -218,7 +221,7 @@ function episodes(stats, { year }) {
                         marginLeft: i ? 16 : 0,
                         height: `${Math.max(2, Math.round((n / max) * 100))}%`,
                         borderRadius: '12px 12px 0 0',
-                        background: i === busiest ? theme.accent : 'rgba(255,255,255,0.25)'
+                        background: i === busiest ? theme.accent : theme.bar || 'rgba(255,255,255,0.25)'
                     })
                 )
             ),
@@ -243,8 +246,8 @@ function episodes(stats, { year }) {
     );
 }
 
-function taste(stats) {
-    const theme = THEMES[2];
+function taste(stats, options) {
+    const theme = themeOf(2, options);
     const { genres, networks, countries } = stats.favourites;
     if (!genres.length) {
         return frame(
@@ -286,8 +289,9 @@ function taste(stats) {
     );
 }
 
-function best(stats, { posters }) {
-    const theme = THEMES[3];
+function best(stats, options) {
+    const { posters } = options;
+    const theme = themeOf(3, options);
     const winner = stats.best[0];
     const most = stats.episodes.top[0];
     if (!winner && !most) {
@@ -349,8 +353,8 @@ function best(stats, { posters }) {
     );
 }
 
-function farewells(stats) {
-    const theme = THEMES[4];
+function farewells(stats, options) {
+    const theme = themeOf(4, options);
     const gone = stats.finished.slice(0, 3);
     const wait = stats.films.longestWait;
     const content = [
@@ -387,8 +391,11 @@ function farewells(stats) {
     return frame(5, theme, 'Прощания и ожидание', content, null);
 }
 
-function ahead(stats, { year }) {
-    const theme = { ...THEMES[5], pill: 'rgba(0,0,0,0.07)' };
+function ahead(stats, options) {
+    const { year } = options;
+    // Its own plain background is light: dark chips
+    const base = themeOf(5, options);
+    const theme = base.tone ? base : { ...base, pill: 'rgba(0,0,0,0.07)' };
     const next = Number(year) + 1;
     const { series, films } = stats.ahead;
     const soon = stats.ahead.next.filter((t) => t.day.startsWith(String(next)));
@@ -426,9 +433,10 @@ function ahead(stats, { year }) {
 
 /**
  * A card drawn on a picture (Year recap → Backgrounds in the panel): the picture under everything,
- * darkened by dim percent so the text stays readable; the text keeps its card's colours.
+ * darkened by dim percent; the text turns light or dark to read on it (themeOf).
  * @param {object} card
- * @param {{ uri: string, dim?: number } | null} [look] uri: a data URI of a picture already 1080x1350
+ * @param {{ uri: string, dim?: number, tone?: 'light' | 'dark' } | null} [look] uri: a data URI of a
+ *   picture already 1080x1350
  */
 function onPicture(card, look) {
     if (!look || !look.uri) return card;
@@ -442,14 +450,16 @@ function onPicture(card, look) {
  * The six cards for a chat's year.
  * @param {object} stats computeStats() for the year
  * @param {{ year: number | string, chatName: string, posters?: Map<string, string>,
- *   looks?: Array<{ uri: string, dim?: number } | null> }} options
+ *   looks?: Array<{ uri: string, dim?: number, tone?: string } | null> }} options
  *   posters: poster URL → data URI, for the best rated title's card; looks: a picture for each
  *   card in turn, or none (its plain colour)
  */
 function recapCards(stats, { year, chatName, posters = new Map(), looks = [] }) {
     // A name of emoji alone has nothing left to draw
     const options = { year: String(year), chatName: drawable(chatName) || 'ваш чат', posters };
-    return [cover, episodes, taste, best, farewells, ahead].map((card, i) => onPicture(card(stats, options), looks[i]));
+    return [cover, episodes, taste, best, farewells, ahead].map((card, i) =>
+        onPicture(card(stats, { ...options, tone: looks[i] && looks[i].uri ? looks[i].tone : undefined }), looks[i])
+    );
 }
 
 module.exports = { recapCards, drawable, WIDTH, HEIGHT };

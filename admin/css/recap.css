@@ -539,6 +539,13 @@ button.recap-thumb:focus-visible {
     gap: var(--space-3);
 }
 
+/* One line each: a day that doesn't fit is cut, never wrapped into a taller field */
+.recap-sched .custom-select-trigger {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 /* While it is on the day and the hour stay: the fields say so */
 .recap-sched .custom-select-trigger:disabled {
     opacity: 0.5;
@@ -603,8 +610,9 @@ button.recap-thumb:focus-visible {
         grid-template-columns: minmax(0, 1fr);
     }
 
+    /* A phone is too narrow for "28 December 2026" beside the hour: one under the other */
     .recap-sched-fields {
-        grid-template-columns: minmax(0, 1fr) 110px;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .recap-sched-state {

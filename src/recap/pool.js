@@ -27,8 +27,14 @@ function getPool() {
     return pool;
 }
 
-/** Runs one drawing task in a thread (see worker.js for the tasks); its answer as a Buffer. */
-const draw = async (task) => Buffer.from(await getPool().run(task));
+/**
+ * Runs one drawing task in a thread (see worker.js for the tasks): a picture comes back as a Buffer
+ * (the thread hands over its bytes as a plain array), a measure (luma) as the number it is.
+ */
+const draw = async (task) => {
+    const answer = await getPool().run(task);
+    return typeof answer === 'number' ? answer : Buffer.from(answer);
+};
 
 /** Ends the threads now (on shutdown, and in tests). */
 async function closePool() {

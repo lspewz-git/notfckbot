@@ -269,6 +269,34 @@ describe('the cards on disk, when things go wrong', () => {
 });
 
 describe('backgrounds', () => {
+    test('a picture’s lightness, measured in the drawing thread: black near 0, white near 1', async () => {
+        const dark = await pool.draw({ kind: 'luma', png: await plainPng(1080, 1350, '#0b1238') });
+        const light = await pool.draw({ kind: 'luma', png: await plainPng(1080, 1350, '#f3f1ec') });
+        assert.ok(dark < 0.1, `dark ${dark}`);
+        assert.ok(light > 0.85, `light ${light}`);
+    });
+
+    test('the text reads on the picture: light on a dark one, dark on a light one, light once dimmed enough', () => {
+        assert.equal(backgrounds.toneFor(0.1, 0), 'light');
+        assert.equal(backgrounds.toneFor(0.9, 0), 'dark');
+        // A light picture dimmed by 60% is dark enough for light text
+        assert.equal(backgrounds.toneFor(0.9, 60), 'light');
+    });
+
+    test('a card on a dark picture gets light text with a halo; the cover’s own dark text stays for its colour', () => {
+        const { recapCards } = require('../../src/recap/cards');
+        const [onPhoto] = recapCards(STATS, {
+            year: 2026,
+            chatName: 'club',
+            looks: [{ uri: 'data:x', tone: 'light' }]
+        });
+        const [plain] = recapCards(STATS, { year: 2026, chatName: 'club' });
+        assert.equal(onPhoto.props.style.color, '#f3f1ec');
+        assert.match(onPhoto.props.style.textShadow, /rgba\(0,0,0/);
+        assert.equal(plain.props.style.color, '#1a1206');
+        assert.equal(plain.props.style.textShadow, undefined);
+    });
+
     test('uploaded, listed, put on a card (which changes the fingerprint), removed (back to the colour)', async () => {
         const plain = await render.recapInputs('-104', 2026);
         const picture = await backgrounds.addBackground('Sunset <1>.png', await plainPng(800, 600, '#f5b14c'));

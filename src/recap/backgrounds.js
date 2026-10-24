@@ -97,9 +97,29 @@ async function setCardLook(card, { background, dim = 0 }) {
     await RecapLook.upsert({ card, background: background || null, dim: value });
 }
 
+// How light each picture is, by id: a picture never changes under its id, so measured once
+const lightness = new Map();
+
+/** A picture's average lightness, 0 to 1, measured in the drawing thread. */
+function lightnessOf(id, bytes) {
+    if (!lightness.has(id)) {
+        const measuring = draw({ kind: 'luma', png: bytes });
+        lightness.set(id, measuring);
+        measuring.catch(() => lightness.delete(id));
+    }
+    return lightness.get(id);
+}
+
 /**
- * The looks for drawing: for each card, { uri, dim } of its picture, or null; missing: whether a
- * picture a card should have could not be read (drawn without it, and not to be kept as if it had).
+ * Light or dark text for a picture dimmed by dim percent: whichever reads on it. The cards' own
+ * colours are for their plain backgrounds; on a photo the dark text of the cover would vanish.
+ */
+const toneFor = (light, dim) => (light * (1 - dim / 100) < 0.5 ? 'light' : 'dark');
+
+/**
+ * The looks for drawing: for each card, { uri, dim, tone } of its picture, or null; missing:
+ * whether a picture a card should have could not be read (drawn without it, and not to be kept as
+ * if it had).
  */
 async function looksForDrawing(looks) {
     let missing = false;
@@ -107,8 +127,12 @@ async function looksForDrawing(looks) {
         looks.map(async (look) => {
             if (!look.background) return null;
             const bytes = await backgroundBytes(look.background);
-            if (!bytes) missing = true;
-            return bytes ? { uri: `data:image/png;base64,${bytes.toString('base64')}`, dim: look.dim } : null;
+            if (!bytes) {
+                missing = true;
+                return null;
+            }
+            const tone = toneFor(await lightnessOf(look.background, bytes), look.dim || 0);
+            return { uri: `data:image/png;base64,${bytes.toString('base64')}`, dim: look.dim, tone };
         })
     );
     return { looks: drawn, missing };
@@ -123,5 +147,6 @@ module.exports = {
     removeBackground,
     cardLooks,
     setCardLook,
-    looksForDrawing
+    looksForDrawing,
+    toneFor
 };
