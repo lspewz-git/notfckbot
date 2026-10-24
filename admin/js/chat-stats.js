@@ -7,7 +7,7 @@
 
 import { $, escapeHtml } from './dom.js';
 import { api, apiImage } from './api.js';
-import { openModal, closeModal, setReturnTo } from './ui.js';
+import { openModal, closeModal, setReturnTo, showConfirm, toast } from './ui.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FEATURES = {
@@ -254,6 +254,8 @@ export function pickPeriod(key) {
 
 // The object URLs on show, freed when the next preview opens
 let shown = [];
+// The preview on screen: its chat and year, and how closing it goes back to the statistics
+const preview = { id: null, year: null, back: null };
 
 function openRecap() {
     const year = recapYear();
@@ -261,10 +263,13 @@ function openRecap() {
     const request = ++state.recap;
     closeModal('chat-stats-modal');
     // Closing the preview goes back to the statistics, and from there to the chat's menu
-    setReturnTo(() => {
+    const menu = backToMenu;
+    const back = () => {
         openModal('chat-stats-modal');
-        if (backToMenu) setReturnTo(backToMenu);
-    });
+        if (menu) setReturnTo(menu);
+    };
+    Object.assign(preview, { id, year, back });
+    setReturnTo(back);
     for (const url of shown) URL.revokeObjectURL(url);
     shown = [];
     $('recap-title').textContent = `${year} recap`;
@@ -274,6 +279,7 @@ function openRecap() {
         .map((n) => `<div class="recap-card" data-card="${n}"><span class="skeleton"></span></div>`)
         .join('');
     openModal('recap-modal');
+    loadRecapStatus(request);
     // One after another: the first request draws all six on the server, the rest come from its cache
     (async () => {
         for (const n of [1, 2, 3, 4, 5, 6]) {
@@ -290,4 +296,75 @@ function openRecap() {
             }
         }
     })();
+}
+
+// --- Sending this chat its year (src/recap/send.js): queued, then sent in the background ---
+
+const when = (iso) =>
+    new Date(iso).toLocaleString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+/** The preview's footer: whether this chat has its year, and the button. */
+async function loadRecapStatus(request) {
+    const status = $('recap-status');
+    status.textContent = 'Checking whether it was sent…';
+    $('recap-actions').innerHTML = '';
+    try {
+        const answer = await api(`/chat/${preview.id}/recap-status?year=${preview.year}`);
+        if (request !== state.recap) return;
+        renderRecapStatus(answer);
+    } catch (err) {
+        if (request !== state.recap) return;
+        status.textContent = `Couldn't check whether it was sent: ${err.message}`;
+    }
+}
+
+/** @param {{ status: string | null, sentAt: string | null, error: string | null }} answer */
+function renderRecapStatus(answer) {
+    const status = $('recap-status');
+    const actions = $('recap-actions');
+    const button = (label, extra = '') => `<button type="button" class="btn btn-primary"${extra}>${label}</button>`;
+    if (answer.status === 'sent') {
+        status.innerHTML = `<span class="recap-dot" aria-hidden="true"></span>Sent ${escapeHtml(when(answer.sentAt))}`;
+        actions.innerHTML = button('Sent', ' disabled');
+        return;
+    }
+    if (answer.status === 'queued' || answer.status === 'sending') {
+        status.textContent = "Queued: goes out shortly, or when the chat's quiet hours end.";
+        actions.innerHTML = button('Queued', ' disabled');
+        return;
+    }
+    const failed = answer.status === 'failed' ? `Failed: ${answer.error || 'unknown error'}. ` : '';
+    const label = answer.status === 'failed' ? 'Send again' : 'Send to this chat';
+    status.textContent = failed || 'Not sent to this chat yet.';
+    actions.innerHTML = button(label, ' data-action="recap-send-one"');
+}
+
+/** The footer's button (data-action="recap-send-one"): asks first, then queues it. */
+export function confirmSendOne() {
+    const { id, year, back } = preview;
+    if (!id) return;
+    // "No" or Escape on the question leaves the preview open, and closing it still goes back
+    setReturnTo(() => setReturnTo(back));
+    showConfirm({
+        title: `Send the ${year} recap?`,
+        text: `Six pictures in one message to ${chatName}. A chat gets its year once; this can't be undone. In the chat's quiet hours it goes out when they end.`,
+        confirmLabel: 'Send',
+        cancelLabel: 'No, cancel',
+        onConfirm: async () => {
+            setReturnTo(back);
+            try {
+                await api(`/chat/${id}/recap/send`, { method: 'POST', body: { year } });
+                toast('Queued: the recap goes out shortly', 'success');
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+            if (preview.id === id && preview.year === year) loadRecapStatus(state.recap);
+        }
+    });
 }

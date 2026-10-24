@@ -56,7 +56,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function withTimeout(promise, ms) {
     let timer;
     const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`No answer from Telegram in ${ms / 1000} s`)), ms);
+        // Marked: Telegram may still have got it (see deliverAlbum)
+        const err = Object.assign(new Error(`No answer from Telegram in ${ms / 1000} s`), { noAnswer: true });
+        timer = setTimeout(() => reject(err), ms);
     });
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -72,11 +74,41 @@ function withTimeout(promise, ms) {
  *   the network didn't answer after a few tries, so a later attempt may still work
  */
 async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sleep } = {}) {
+    return withRetries(() => sendOnce(bot, chatId, text, photo, extra), wait);
+}
+
+/**
+ * Several pictures as one message, an album (the year's recap): the caption, HTML, goes under the
+ * first. Retried like deliver(), except after no answer at all: the album may have arrived, and a
+ * once-a-year message twice is worse than once missing. No fallback to text either.
+ * @param {object} bot Telegraf instance
+ * @param {number | string} chatId
+ * @param {Buffer[]} images PNG, 2 to 10
+ * @param {string} caption HTML
+ * @param {{ wait?: (ms: number) => Promise<void>, timeout?: number }} [options] timeout: ms a try may take
+ * @returns {Promise<{ status: 'sent' | 'gone' | 'rejected' | 'failed', error?: string, uncertain?: boolean }>}
+ *   as deliver(); uncertain: Telegram never answered, so it may have been sent
+ */
+// Pictures take longer to upload than a message: twice the time a try may take
+async function deliverAlbum(bot, chatId, images, caption, { wait = sleep, timeout = TRY_TIMEOUT_MS * 2 } = {}) {
+    const media = images.map((image, i) => ({
+        type: 'photo',
+        media: { source: image },
+        ...(i === 0 ? { caption, parse_mode: 'HTML' } : {})
+    }));
+    return withRetries(() => bot.telegram.sendMediaGroup(chatId, media), wait, timeout, {
+        retryNoAnswer: false
+    });
+}
+
+/** One send, tried again after a short failure or a flood wait; the outcome as deliver() gives it. */
+async function withRetries(send, wait, timeout = TRY_TIMEOUT_MS, { retryNoAnswer = true } = {}) {
     for (let attempt = 1; ; attempt += 1) {
         try {
-            await withTimeout(sendOnce(bot, chatId, text, photo, extra), TRY_TIMEOUT_MS);
+            await withTimeout(send(), timeout);
             return { status: 'sent' };
         } catch (err) {
+            if (err.noAnswer && !retryNoAnswer) return { status: 'failed', error: err.message, uncertain: true };
             const { kind, retryAfter } = classify(err);
             if (kind === 'gone' || kind === 'rejected') return { status: kind, error: err.message };
             if (attempt >= TRIES || (kind === 'flood' && retryAfter > MAX_FLOOD_WAIT_S)) {
@@ -87,4 +119,4 @@ async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sle
     }
 }
 
-module.exports = { deliver, classify };
+module.exports = { deliver, deliverAlbum, classify };

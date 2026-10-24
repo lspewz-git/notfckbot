@@ -45,11 +45,11 @@ router.get('/api/chat/:chatId/recap/:n', async (req, res) => {
     if (!query) return;
     const year = query.year || new Date().getFullYear();
     try {
-        const images = await recapImages(params.chatId, year);
-        if (!images) return res.status(404).json({ error: 'Chat not found' });
+        const recap = await recapImages(params.chatId, year);
+        if (!recap) return res.status(404).json({ error: 'Chat not found' });
         res.set('Content-Type', 'image/png');
         res.set('Cache-Control', 'no-store');
-        res.send(images[params.n - 1]);
+        res.send(recap.images[params.n - 1]);
     } catch (err) {
         log.error(`[Admin] Recap card ${params.n} for ${params.chatId} failed: ${err.message}`);
         res.status(500).json({ error: err.message });

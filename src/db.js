@@ -7,6 +7,7 @@ const PendingMessage = require('./models/PendingMessage');
 const HeldNotification = require('./models/HeldNotification');
 const DailyStat = require('./models/DailyStat');
 const ChatEvent = require('./models/ChatEvent');
+const RecapSend = require('./models/RecapSend');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -32,5 +33,6 @@ module.exports = {
     PendingMessage,
     HeldNotification,
     DailyStat,
-    ChatEvent
+    ChatEvent,
+    RecapSend
 };

@@ -214,7 +214,7 @@ test('Services and Proxy on the left, the rest on the right; both columns end on
         );
     const [left, right] = await columns();
     expect(left.titles).toEqual(['Services', 'Proxy']);
-    expect(right.titles).toEqual(['Update check', 'Database', 'Bot']);
+    expect(right.titles).toEqual(['Update check', 'Year recap', 'Database', 'Bot']);
     expect(left.bottom).toBe(right.bottom);
     // A proxy turned on makes the left column taller: the right one follows
     await pick(page, 'settings-proxy-scheme', 'SOCKS5h');

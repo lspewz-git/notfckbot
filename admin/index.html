@@ -36,6 +36,7 @@
         <link rel="modulepreload" href="js/pager.js" />
         <link rel="modulepreload" href="js/proxy-url.js" />
         <link rel="modulepreload" href="js/proxy.js" />
+        <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/records.js" />
         <link rel="modulepreload" href="js/render.js" />
         <link rel="modulepreload" href="js/select.js" />
@@ -592,6 +593,7 @@
                     <section id="chats-section" class="section">
                         <header>
                             <h1>Users / Chats</h1>
+                            <button class="btn btn-outline" data-action="recap-send-open">Year recap…</button>
                         </header>
                         <div class="glass-card">
                             <div class="search-box">
@@ -844,6 +846,30 @@
                                             <p class="field-error" id="settings-error-interval" hidden></p>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">
+                                        Year recap <span class="settings-optional">in dev</span>
+                                    </h2>
+                                    <p class="settings-desc">
+                                        Coming: pick a date before New Year, and every chat gets its year's six cards by
+                                        itself. This switch will turn that on; for now it does nothing. Sending by hand,
+                                        from Users / Chats or a chat's Statistics, works either way.
+                                    </p>
+                                    <button
+                                        id="settings-recap"
+                                        type="button"
+                                        class="switch"
+                                        role="switch"
+                                        aria-checked="false"
+                                        data-action="settings-recap"
+                                    >
+                                        <span class="switch-track" aria-hidden="true"
+                                            ><span class="switch-knob"></span
+                                        ></span>
+                                        <span class="switch-label">Scheduled sending</span>
+                                    </button>
                                 </div>
 
                                 <div class="glass-card settings-card">
@@ -1512,8 +1538,27 @@
                 <h3 id="recap-title">Year recap</h3>
                 <p class="modal-sub" id="recap-sub"></p>
                 <div id="recap-cards" class="recap-cards"></div>
-                <p class="stats-note">A preview of the six cards. Nothing is sent to the chat.</p>
+                <div class="recap-foot">
+                    <p id="recap-status" class="recap-status">&nbsp;</p>
+                    <div id="recap-actions" class="recap-actions"></div>
+                </div>
                 <button data-close-return="recap-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
+        <!-- Sending the year's recap to every chat that has something to show (recap.js) -->
+        <dialog id="recap-send-modal" class="modal" aria-labelledby="recap-send-title">
+            <div class="modal-content modal-medium">
+                <h3 id="recap-send-title">Send the year recap</h3>
+                <p class="modal-sub">Each chat gets its own six cards, once a year.</p>
+                <div id="recap-send-years" class="tab-filters recap-years" role="group" aria-label="Year"></div>
+                <div id="recap-send-body" aria-live="polite"></div>
+                <button data-close="recap-send-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />

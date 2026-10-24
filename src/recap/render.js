@@ -69,7 +69,10 @@ async function posterUri(url) {
     return `data:${type};base64,${bytes.toString('base64')}`;
 }
 
-/** The six PNGs of a chat's year; undefined (not kept by the cache) for a chat that isn't there. */
+/**
+ * The six PNGs of a chat's year and the statistics they show (for the message's caption);
+ * undefined (not kept by the cache) for a chat that isn't there.
+ */
 async function drawRecap(chatId, year, now = new Date()) {
     const chat = await Chat.findByPk(chatId);
     if (!chat) return undefined;
@@ -84,7 +87,7 @@ async function drawRecap(chatId, year, now = new Date()) {
     const chatName = chat.username || String(chat.id);
     const images = [];
     for (const card of recapCards(stats, { year, chatName, posters })) images.push(await renderCard(card));
-    return images;
+    return { images, stats };
 }
 
 // Ten minutes: long enough to look at all six, short enough that a fresh look shows fresh figures
@@ -97,7 +100,10 @@ const recapCache = lruCache({
     }
 });
 
-/** The six PNGs (Buffers) of a chat's year, drawn once and kept for ten minutes; null for no chat. */
+/**
+ * A chat's year: { images: six PNG Buffers, stats }, drawn once and kept for ten minutes; null
+ * for no chat.
+ */
 const recapImages = async (chatId, year) => (await recapCache.fetch(`${chatId}:${year}`)) || null;
 
 module.exports = { recapImages, renderCard, drawRecap };

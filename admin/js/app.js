@@ -8,7 +8,8 @@ import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.
 import { fillPagers } from './pager.js';
 import { filterLogs } from './logs.js';
 import { setHistoryYear, setHistoryPage, setupHistory } from './history.js';
-import { pickPeriod } from './chat-stats.js';
+import { pickPeriod, confirmSendOne } from './chat-stats.js';
+import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './recap.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
@@ -144,6 +145,11 @@ const CLICK_ACTIONS = {
     'history-year': (el) => setHistoryYear(Number(el.dataset.year)),
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step)),
     'chat-stats-period': (el) => pickPeriod(el.dataset.period),
+    'recap-send-one': () => confirmSendOne(),
+    'recap-send-open': () => openRecapSend(),
+    'recap-send-year': (el) => pickRecapYear(el.dataset.year),
+    'recap-send-all': () => confirmSendAll(),
+    'recap-send-stop': () => stopRecapSend(),
     ...settingsActions,
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),

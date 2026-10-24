@@ -777,3 +777,114 @@ html:has(.modal[open]) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+/* The preview's footer: whether this chat got its year, and the button */
+.recap-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    min-height: var(--control-h);
+}
+
+.recap-status {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.recap-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: var(--space-2);
+    border-radius: 50%;
+    background: var(--success);
+    vertical-align: middle;
+}
+
+.recap-actions {
+    flex: none;
+}
+
+/* Sending to every chat: a year, the counts, the buttons */
+.recap-years {
+    margin-top: var(--space-4);
+}
+
+.recap-facts {
+    list-style: none;
+    margin-top: var(--space-1);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.recap-fact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 3.25rem;
+    padding: var(--space-2) var(--space-4);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+}
+
+.recap-fact + .recap-fact {
+    border-top: 1px solid var(--border-row);
+}
+
+.recap-fact-label small {
+    display: block;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.recap-fact b {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.recap-fact-skeleton {
+    width: 2rem;
+}
+
+.recap-hint {
+    min-height: 2lh;
+    margin-top: var(--space-3);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.recap-send-actions {
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+}
+
+.recap-bar {
+    height: 6px;
+    margin: var(--space-4) 0 var(--space-3);
+    background: var(--fill-active);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.recap-bar i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+@media (max-width: 560px) {
+    .recap-foot {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .recap-actions .btn {
+        width: 100%;
+    }
+}

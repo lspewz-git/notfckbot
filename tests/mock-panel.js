@@ -204,7 +204,7 @@ const PIXEL = Buffer.from(
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
  *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
- *   recap?: (n: number) => Buffer }} [options]
+ *   recap?: (n: number) => Buffer, recapStatus?: object }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
@@ -278,6 +278,17 @@ async function mockPanel(page, options = {}) {
         subs: buildSubs(),
         sub,
         series,
+        // The year recap: options.recap* override
+        recap: {
+            audience: { eligible: 37, sent: 3, queued: 0, failed: 0, nothing: 5, blocked: 2 },
+            progress: { queued: 0, sending: 0, sent: 3, failed: 0, quiet: 0, total: 3, running: false }
+        },
+        recapStatus: {
+            status: null,
+            sentAt: null,
+            error: null,
+            ...options.recapStatus
+        },
         health: { telegram: true, tmdb: true, proxy: 'off', kinopoisk: 'ok', ...options.health },
         // The update check: "Run now" starts it, and it reports running for two polls
         cron: {
@@ -297,6 +308,7 @@ async function mockPanel(page, options = {}) {
             interval: { hours: 3, active: 3, choices: [1, 2, 3, 4, 6, 8, 12, 24] },
             database: { host: 'db', name: 'series_bot', user: 'bot_user' },
             restart: { pending: [], blocked: null },
+            recap: { schedule: false },
             startedAt: new Date(Date.now() - 3600e3).toISOString(),
             ...options.settings
         }
@@ -379,7 +391,26 @@ async function mockPanel(page, options = {}) {
                 panel.settings.tokens[name] = { configured: true, masked: 'new0*****cafe' };
                 saved.push(name);
             }
+            if (body.recapSchedule !== undefined) {
+                panel.settings.recap = { schedule: body.recapSchedule };
+                saved.push('RECAP_SCHEDULE');
+            }
             return { saved, settings: panel.settings };
+        },
+        // The year recap's sending: who gets it and how it goes; the sends asked for, for tests
+        '/api/recap': () => panel.recap,
+        '/api/recap/send': (req) => {
+            panel.recapSends = [...(panel.recapSends || []), req.postDataJSON()];
+            const queued = panel.recap.audience.eligible;
+            panel.recap.progress = { ...panel.recap.progress, queued, total: panel.recap.progress.total + queued };
+            panel.recap.audience = { ...panel.recap.audience, eligible: 0, queued };
+            return { queued, progress: panel.recap.progress };
+        },
+        '/api/recap/stop': () => {
+            const removed = panel.recap.progress.queued;
+            panel.recap.progress = { ...panel.recap.progress, queued: 0, total: panel.recap.progress.total - removed };
+            panel.recapStopped = true;
+            return { removed };
         },
         '/api/restart': () => {
             panel.restarted = true;
@@ -533,6 +564,19 @@ async function mockPanel(page, options = {}) {
                 panel.statsAsked = [...(panel.statsAsked || []), { chatId: id, query }];
                 await options.statsHold;
                 return options.chatStats ? options.chatStats(query) : chatStats(query);
+            }
+        ],
+        [
+            // A chat's year recap: whether it was sent (options.recapStatus) and a send asked for
+            /^\/api\/chat\/(-?\d+)\/recap-status$/,
+            () => panel.recapStatus
+        ],
+        [
+            /^\/api\/chat\/(-?\d+)\/recap\/send$/,
+            ([, id], req) => {
+                panel.recapSendOne = { chatId: id, body: req.postDataJSON() };
+                panel.recapStatus = { ...panel.recapStatus, status: 'queued' };
+                return { queued: 1 };
             }
         ],
         [
