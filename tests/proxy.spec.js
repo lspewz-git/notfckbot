@@ -1,18 +1,10 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /** The proxy dialog's Test button: Telegram, TMDB and a neutral site, each reported. */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+watchConsole();
 
 /** Opens the dialog and fills in a SOCKS5h proxy, then presses Test. */
 async function testProxy(page) {

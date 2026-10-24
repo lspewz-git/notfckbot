@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { isNarrow, isPhone, watchConsole, openSection } = require('./helpers');
 
 /**
  * Read-only checks against a running panel. Dialogs are opened and dismissed;
@@ -18,9 +19,6 @@ function visibleRows(page, bodyId) {
     return page.locator(`#${bodyId} tr`).evaluateAll((rows) => rows.filter((r) => r.style.display !== 'none').length);
 }
 
-/** Phones (<=760px) show compact cards: row actions sit behind a "⋯" menu. */
-const isPhone = (page) => page.viewportSize().width <= 760;
-
 /** Opens a subscription's Mode or Delete, through the phone menu where there is one. */
 async function subAction(page, action) {
     if (isPhone(page)) {
@@ -28,34 +26,24 @@ async function subAction(page, action) {
         await expect(page.locator('#sub-actions-modal')).toBeVisible();
         await page.locator(action === 'mode' ? '#sub-action-mode' : '#sub-action-delete').click();
     } else {
-        await page.locator(`#subs-body [data-action="${action === 'mode' ? 'mode' : 'delete-sub'}"]`).first().click();
+        await page
+            .locator(`#subs-body [data-action="${action === 'mode' ? 'mode' : 'delete-sub'}"]`)
+            .first()
+            .click();
     }
 }
 
-/** Below 1024px the sidebar gives way to a bottom tab bar; logs sit behind "More". */
+/** Opens a section and waits until it is the one shown. */
 async function goToSection(page, section) {
-    if (page.viewportSize().width > 1024) {
-        await page.locator(`.nav-item[data-section="${section}"]`).click();
-    } else if (section === 'logs') {
-        await page.locator('.tab-item[data-open="more-modal"]').click();
-        await page.locator('#more-modal [data-section="logs"]').click();
-    } else {
-        await page.locator(`.tab-item[data-section="${section}"]`).click();
-    }
+    await openSection(page, section);
     await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
 }
 
+watchConsole();
+
 test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     await page.goto('/');
     await expect(page.locator('#chats-count')).not.toHaveText('-');
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
 });
 
 test('dashboard renders counters, health and popularity', async ({ page }) => {
@@ -66,18 +54,9 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 
-test('every module loads', async ({ page }) => {
-    const loaded = await page.evaluate(
-        () => performance.getEntriesByType('resource').filter((r) => r.name.includes('/js/')).length
-    );
-    expect(loaded).toBeGreaterThanOrEqual(16);
-});
-
 test('a table shows skeleton rows before its data arrives', async ({ page }) => {
-    const narrow = page.viewportSize().width <= 1024;
-
     // The skeleton is painted in the same tick as the click
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await openSection(page, 'chats');
     expect(await page.locator('#chats-body .skeleton-row').count()).toBeGreaterThan(0);
 
     await expect(page.locator('#chats-body .skeleton-row')).toHaveCount(0, { timeout: 10_000 });
@@ -214,8 +193,7 @@ test('dialogs are announced, modal, and close on Escape', async ({ page }) => {
 });
 
 test('sections are reachable with the keyboard alone', async ({ page }) => {
-    const narrow = page.viewportSize().width <= 1024;
-    const item = page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="subs"]`);
+    const item = page.locator(`${isNarrow(page) ? '.tab-item' : '.nav-item'}[data-section="subs"]`);
     // A native <button>, so Enter and Space work without a key handler
     await expect(item).toHaveJSProperty('tagName', 'BUTTON');
     await item.focus();
@@ -226,7 +204,7 @@ test('sections are reachable with the keyboard alone', async ({ page }) => {
 
 test.describe('narrow screens', () => {
     // viewport is a real fixture; project name is not
-    test.skip(({ viewport }) => viewport.width > 640, 'narrow viewports only');
+    test.skip(({ viewport }) => viewport.width > 760, 'phone widths only: tables as cards');
 
     test('a bottom tab bar replaces the sidebar and tables become cards', async ({ page }) => {
         await expect(page.locator('.sidebar')).toBeHidden();

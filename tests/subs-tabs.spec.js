@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -21,8 +22,7 @@ function visibleRows(page) {
 }
 
 async function goToSubs(page) {
-    const narrow = page.viewportSize().width <= 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="subs"]`).click();
+    await openSection(page, 'subs');
     await expect(page.locator('#subs-section')).toHaveClass(/active/);
     await expect(page.locator('#subs-body .skeleton-row')).toHaveCount(0, { timeout: 15_000 });
 }
@@ -31,17 +31,11 @@ const tab = (page, name) => page.locator(`.tab-filters [data-subs-tab="${name}"]
 
 let panel;
 
+watchConsole();
+
 test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     panel = await mockPanel(page);
     await expect(page.locator('#chats-count')).not.toHaveText('-');
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
 });
 
 test('the dashboard counts only active subscriptions and notes the archived ones', async ({ page }) => {
@@ -240,8 +234,7 @@ test('the dashboard card opens the Active tab', async ({ page }) => {
     await goToSubs(page);
     await tab(page, 'archive').click();
 
-    const narrow = page.viewportSize().width <= 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="dashboard"]`).click();
+    await openSection(page, 'dashboard');
     await page.locator('.stat-card[data-section="subs"]').click();
 
     await expect(page.locator('#subs-section')).toHaveClass(/active/);
@@ -255,6 +248,8 @@ for (const [width, height] of [
 ]) {
     test.describe(`at ${width}px`, () => {
         test.use({ viewport: { width, height } });
+        // The size is set here, so the desktop project would only repeat the phone's run
+        test.skip(({ isMobile }) => !isMobile, 'run once, on the touch device');
 
         test('nothing scrolls sideways and the tabs sit on one row', async ({ page }) => {
             const overflows = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
@@ -277,7 +272,9 @@ for (const [width, height] of [
 
             const first = page.locator('#subs-body tr').first();
             const shownCells = () =>
-                first.locator('td').evaluateAll((tds) => tds.filter((td) => getComputedStyle(td).display !== 'none').length);
+                first
+                    .locator('td')
+                    .evaluateAll((tds) => tds.filter((td) => getComputedStyle(td).display !== 'none').length);
             if (width <= 760) {
                 // Compact card: the summary cell and one icon button, about a quarter of the old card
                 expect(await shownCells()).toBe(2);

@@ -102,6 +102,12 @@ describe("TMDB's digital release", () => {
         });
         assert.deepEqual(digitalRelease(list()), { date: null, country: null });
     });
+
+    test('a theatrical date is not a digital one; nothing known at all', () => {
+        const theatrical = { iso_3166_1: 'RU', release_dates: [{ type: 3, release_date: '2027-02-27' }] };
+        assert.equal(digitalReleaseDate({ results: [theatrical] }), null);
+        assert.equal(digitalReleaseDate(undefined), null);
+    });
 });
 
 describe('the lines in the card and the message', () => {

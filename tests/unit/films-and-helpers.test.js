@@ -1,21 +1,15 @@
 /**
  * Film release decisions and the helpers behind every notification: dates, the next
- * episode, watch links, the schedule. Run: npm run test:unit
+ * episode, watch links. Run: npm run test:unit
  */
 // Dates are formatted the way the server does it, in UTC, whatever machine runs the tests
 process.env.TZ = 'UTC';
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { isMovieReleased, buildFilmMessage, nextRunAt } = require('../../src/cron');
-const { digitalReleaseDate, nextEpisodeFields } = require('../../src/api/tmdb');
-const {
-    getWatchLinks,
-    formatWatchLinks,
-    formatDigitalDate,
-    isFinishedStatus,
-    UPDATE_INTERVAL_HOURS
-} = require('../../src/constants');
+const { isMovieReleased, buildFilmMessage } = require('../../src/cron');
+const { nextEpisodeFields } = require('../../src/api/tmdb');
+const { getWatchLinks, formatWatchLinks, formatDigitalDate, isFinishedStatus } = require('../../src/constants');
 
 const NOW = new Date('2026-10-12T12:00:00Z');
 
@@ -75,33 +69,6 @@ describe('buildFilmMessage', () => {
     test('the director, escaped', () => {
         const msg = buildFilmMessage({ entry, data: { director_name: 'A <B>' }, links: '', now: NOW });
         assert.match(msg, /Режиссер: <b>A &lt;B&gt;<\/b>/);
-    });
-});
-
-describe('digitalReleaseDate', () => {
-    // TMDB release types: 3 theatrical, 4 digital
-    const country = (code, ...dates) => ({ iso_3166_1: code, release_dates: dates });
-    const digital = (date) => ({ type: 4, release_date: `${date}T00:00:00.000Z` });
-    const theatrical = (date) => ({ type: 3, release_date: `${date}T00:00:00.000Z` });
-
-    test('Russia first, then the US, then the earliest anywhere', () => {
-        const all = [
-            country('DE', digital('2026-01-05')),
-            country('US', digital('2026-02-01')),
-            country('RU', digital('2026-03-01'))
-        ];
-        assert.equal(digitalReleaseDate({ results: all }), '2026-03-01');
-        assert.equal(digitalReleaseDate({ results: all.slice(0, 2) }), '2026-02-01');
-        assert.equal(digitalReleaseDate({ results: all.slice(0, 1) }), '2026-01-05');
-    });
-
-    test('a theatrical date is not a digital one', () => {
-        assert.equal(digitalReleaseDate({ results: [country('RU', theatrical('2026-03-01'))] }), null);
-    });
-
-    test('nothing known', () => {
-        assert.equal(digitalReleaseDate(undefined), null);
-        assert.equal(digitalReleaseDate({ results: [] }), null);
     });
 });
 
@@ -176,29 +143,5 @@ describe('small helpers', () => {
         assert.equal(isFinishedStatus('Canceled'), true);
         assert.equal(isFinishedStatus('Returning Series'), false);
         assert.equal(isFinishedStatus(null), false);
-    });
-
-    describe('nextRunAt', () => {
-        const at = (h, m) => new Date(2026, 9, 12, h, m);
-        const midnight = new Date(2026, 9, 13, 0, 0);
-
-        // The configured interval, whatever it is: expectations follow the constant
-        const H = UPDATE_INTERVAL_HOURS;
-        const lastSlot = Math.floor(23 / H) * H;
-
-        test(`the configured interval (${H} h): the next slot, then midnight after the last one`, () => {
-            // Just before a slot
-            assert.deepEqual(nextRunAt(at(H - 1, 30)), at(H, 0));
-            // Exactly on a slot: the one after it
-            assert.deepEqual(nextRunAt(at(H, 0)), lastSlot >= 2 * H ? at(2 * H, 0) : midnight);
-            // Past the day's last slot
-            assert.deepEqual(nextRunAt(at(lastSlot, 30)), midnight);
-        });
-
-        test('an interval that does not divide 24 still restarts at midnight, like cron', () => {
-            // */5 fires at 0, 5, 10, 15, 20: after 20:00 comes 00:00, not 01:00
-            assert.deepEqual(nextRunAt(at(20, 10), 5), midnight);
-            assert.deepEqual(nextRunAt(at(14, 0), 5), at(15, 0));
-        });
     });
 });

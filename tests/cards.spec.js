@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -6,16 +7,7 @@ const { mockPanel } = require('./mock-panel');
  * Kinopoisk button, which goes straight to the title once the server knows its ID.
  */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+watchConsole();
 
 const card = (page) => page.locator('#detail-modal');
 

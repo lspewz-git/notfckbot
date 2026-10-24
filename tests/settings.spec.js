@@ -1,30 +1,15 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /** Settings: the server's .env as fields, saved all at once, and the restart button. */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    // A refused save or restart is a 4xx the browser reports itself
-    const real = page.__errors.filter((e) => !/status of 4\d\d/.test(e));
-    expect(real, 'console should stay clean').toEqual([]);
-});
+// A refused save or restart is a 4xx the browser reports itself
+watchConsole({ ignore: /status of 4\d\d/ });
 
 /** The rail on a wide screen; on a phone, More → Settings. */
 async function openSettings(page) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    if (narrow) {
-        await page.locator('.tab-item[data-open="more-modal"]').click();
-        await page.locator('#more-modal [data-section="settings"]').click();
-    } else {
-        await page.locator('.nav-item[data-section="settings"]').click();
-    }
+    await openSection(page, 'settings');
     await expect(page.locator('#settings-section')).toHaveClass(/active/);
     await expect(page.locator('#settings-masked-telegram')).toHaveText('8123*****xYz4');
 }
@@ -127,10 +112,7 @@ test('leaving with unsaved changes asks first: Stay keeps them, Discard leaves',
     await pick(page, 'settings-interval', '12 hours');
 
     const leave = async () => {
-        const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-        await page
-            .locator(narrow ? '.tab-item[data-section="dashboard"]' : '.nav-item[data-section="dashboard"]')
-            .click();
+        await openSection(page, 'dashboard');
     };
     await leave();
     await expect(page.locator('#confirm-modal')).toBeVisible();
@@ -190,13 +172,7 @@ test('a refresh does not close a token field opened for pasting', async ({ page 
     await expect(page.locator('#settings-token-tmdb')).toBeVisible();
     // The server's restart state changes meanwhile; the open field stays, the new state shows
     panel.settings.restart.pending = ['interval'];
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    if (narrow) {
-        await page.locator('.tab-item[data-open="more-modal"]').click();
-        await page.locator('#more-modal [data-section="settings"]').click();
-    } else {
-        await page.locator('.nav-item[data-section="settings"]').click();
-    }
+    await openSection(page, 'settings');
     await expect(page.locator('#settings-restart-text')).toContainText('the update interval');
     await expect(page.locator('#settings-token-tmdb')).toBeVisible();
 });
@@ -262,13 +238,7 @@ test('a refresh keeps the connection check; Discard of a proxy change clears it'
     await expect(page.locator('[data-check="telegram"]')).toHaveText('✓ 180 ms');
 
     // The same section again: a reload of the saved values, as the auto-refresh does
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    if (narrow) {
-        await page.locator('.tab-item[data-open="more-modal"]').click();
-        await page.locator('#more-modal [data-section="settings"]').click();
-    } else {
-        await page.locator('.nav-item[data-section="settings"]').click();
-    }
+    await openSection(page, 'settings');
     await page.waitForTimeout(300);
     await expect(page.locator('[data-check="telegram"]')).toHaveText('✓ 180 ms');
 
@@ -287,13 +257,7 @@ test('while the settings load, nothing shows that would then jump away', async (
         release = resolve;
     });
     await mockPanel(page, { hold });
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    if (narrow) {
-        await page.locator('.tab-item[data-open="more-modal"]').click();
-        await page.locator('#more-modal [data-section="settings"]').click();
-    } else {
-        await page.locator('.nav-item[data-section="settings"]').click();
-    }
+    await openSection(page, 'settings');
     await expect(page.locator('#settings-section')).toHaveClass(/active/);
     // The answer is held: the proxy fields stay hidden, as they will be with no proxy saved
     await expect(page.locator('#settings-proxy-fields')).toBeHidden();

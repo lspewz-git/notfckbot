@@ -1,28 +1,14 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /** History: what came out in a year, serials and movies apart, on the canned API. */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+watchConsole();
 
 /** The rail on a wide screen; on a phone, More → History. */
 async function openHistory(page) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    if (narrow) {
-        await page.locator('.tab-item[data-open="more-modal"]').click();
-        await page.locator('#more-modal [data-section="history"]').click();
-    } else {
-        await page.locator('.nav-item[data-section="history"]').click();
-    }
+    await openSection(page, 'history');
     await expect(page.locator('#history-section')).toHaveClass(/active/);
 }
 

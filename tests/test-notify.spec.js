@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -6,23 +7,13 @@ const { mockPanel } = require('./mock-panel');
  * a film alert picks a film, and status alerts don't ask for a season and episode.
  */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+watchConsole();
 
 const dialog = (page) => page.locator('#test-notify-modal');
 
 /** Chats → alice's menu → Send test notification. */
 async function openForAlice(page) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await openSection(page, 'chats');
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await page.locator('#action-test-notify').click();
     await expect(dialog(page)).toBeVisible();

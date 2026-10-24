@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel, chatStats } = require('./mock-panel');
 
 /**
@@ -6,22 +7,13 @@ const { mockPanel, chatStats } = require('./mock-panel');
  * period switch, a slow or failed answer.
  */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && !m.text().includes('500') && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+// The failed-answer test's 500 is one the browser reports itself
+watchConsole({ ignore: /500/ });
 
 const YEAR = new Date().getFullYear();
 
 async function openStats(page, chatId) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await openSection(page, 'chats');
     await page.locator(`[data-action="chat-actions"][data-id="${chatId}"]`).click();
     await page.locator('#action-stats').click();
     await expect(page.locator('#chat-stats-modal')).toBeVisible();

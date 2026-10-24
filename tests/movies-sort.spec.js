@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { isPhone, watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -7,8 +8,7 @@ const { mockPanel } = require('./mock-panel');
  */
 
 async function goToMovies(page) {
-    const narrow = page.viewportSize().width <= 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="watchlist"]`).click();
+    await openSection(page, 'watchlist');
     await expect(page.locator('#watchlist-section')).toHaveClass(/active/);
     await expect(page.locator('#watchlist-body .skeleton-row')).toHaveCount(0, { timeout: 15_000 });
 }
@@ -17,22 +17,15 @@ const titles = (page) => page.locator('#watchlist-body [data-label="Film Title"]
 
 // Column headers on wide screens; the header row is hidden on phones, where a Sort strip stands in
 function sortButton(page, key) {
-    const narrow = page.viewportSize().width <= 760;
-    return page.locator(`${narrow ? '.sort-bar' : 'thead'} [data-action="sort"][data-sort="${key}"]`);
+    return page.locator(`${isPhone(page) ? '.sort-bar' : 'thead'} [data-action="sort"][data-sort="${key}"]`);
 }
 
+watchConsole();
+
 test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     await mockPanel(page);
     await expect(page.locator('#chats-count')).not.toHaveText('-');
-    page.__errors = errors;
     await goToMovies(page);
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
 });
 
 test('the section is called Movies and keeps the API order until asked', async ({ page }) => {

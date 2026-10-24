@@ -14,8 +14,12 @@ mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
 const MARK = '🧪 <b>[Тестовое уведомление]</b>\n\n';
 const parts = { title: 'Test Show', season: 2, episode: 8, episodeName: 'Finale', links: '<links>' };
 
-test('every alert the bot sends can be tested', () => {
-    assert.deepEqual(TEST_MODES, ['episode', 'first_and_full', 'season', 'ended', 'canceled', 'renewed', 'film']);
+test('every subscription mode a chat can pick has its test alert, and so do films', () => {
+    // From the model, not a copy: a mode added to the bot without a test alert fails here
+    const { Subscription } = require('../../src/db');
+    for (const mode of [...Subscription.getAttributes().notify_type.values, 'film']) {
+        assert.ok(TEST_MODES.includes(mode), mode);
+    }
 });
 
 describe('episode alerts are the real messages, marked', () => {

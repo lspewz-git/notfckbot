@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -6,20 +7,10 @@ const { mockPanel } = require('./mock-panel');
  * may press the bot's buttons (groups only) and the bottom menu.
  */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+watchConsole();
 
 async function openSettings(page, chatId) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await openSection(page, 'chats');
     await page.locator(`[data-action="chat-actions"][data-id="${chatId}"]`).click();
     await page.locator('#action-settings').click();
     await expect(page.locator('#chat-settings-modal')).toBeVisible();
@@ -46,7 +37,15 @@ test('a group: choose who presses the buttons and the menu, then save', async ({
     await expect(page.locator('#chat-settings-modal')).toBeHidden();
     expect(panel.lastSettings).toEqual({
         chatId: '-1003',
-        body: { menu_enabled: false, buttons_mode: 'all', quiet_start: null, quiet_end: null, timezone: 'Europe/Moscow', digest_week: false, digest_month: false }
+        body: {
+            menu_enabled: false,
+            buttons_mode: 'all',
+            quiet_start: null,
+            quiet_end: null,
+            timezone: 'Europe/Moscow',
+            digest_week: false,
+            digest_month: false
+        }
     });
 });
 
@@ -56,7 +55,17 @@ test('a private chat has no "who presses" choice: only the menu is sent', async 
     await expect(page.locator('#chat-settings-buttons-field')).toBeHidden();
     await page.locator('#chat-settings-save').click();
     await expect(page.locator('.toast', { hasText: 'Settings saved' })).toBeVisible();
-    expect(panel.lastSettings).toEqual({ chatId: '101', body: { menu_enabled: true, quiet_start: null, quiet_end: null, timezone: 'Europe/Moscow', digest_week: false, digest_month: false } });
+    expect(panel.lastSettings).toEqual({
+        chatId: '101',
+        body: {
+            menu_enabled: true,
+            quiet_start: null,
+            quiet_end: null,
+            timezone: 'Europe/Moscow',
+            digest_week: false,
+            digest_month: false
+        }
+    });
 });
 
 test('× goes back to the chat menu', async ({ page }) => {

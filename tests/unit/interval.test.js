@@ -37,6 +37,15 @@ test('the next check follows the interval', () => {
     assert.equal(nextRunAt(at(19, 20), 2).getHours(), 20);
     assert.equal(nextRunAt(at(19, 20), 1).getHours(), 20);
     assert.equal(nextRunAt(at(19, 20), 24).getDate(), 14, 'once a day: tomorrow at midnight');
+    assert.deepEqual(nextRunAt(at(2, 30), 3), at(3, 0), 'just before a slot: that slot');
+    assert.deepEqual(nextRunAt(at(3, 0), 3), at(6, 0), 'exactly on a slot: the one after it');
+});
+
+test('an interval that does not divide 24 still restarts at midnight, like cron', () => {
+    const at = (h, m) => new Date(2026, 9, 12, h, m);
+    // */5 fires at 0, 5, 10, 15, 20: after 20:00 comes 00:00, not 01:00
+    assert.deepEqual(nextRunAt(at(20, 10), 5), new Date(2026, 9, 13, 0, 0));
+    assert.deepEqual(nextRunAt(at(14, 0), 5), at(15, 0));
 });
 
 test('quiet: the panel reading it on every refresh logs nothing', () => {

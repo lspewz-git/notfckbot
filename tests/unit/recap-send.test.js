@@ -4,7 +4,7 @@
  * the row. The database, the cards and Telegram are stand-ins.
  * Run: npm run test:unit
  */
-const { test, describe, mock, beforeEach, before, after } = require('node:test');
+const { test, describe, mock, beforeEach, afterEach, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 
@@ -17,6 +17,34 @@ mock.method(render, 'recapImages', async () => ({
 
 const { Chat, Subscription, Watchlist, RecapSend } = require('../../src/db');
 const recap = require('../../src/recap/send');
+
+// Database stand-ins last one test: a test that forgets one reaches the real database (and
+// waits 60 s for it) instead of quietly borrowing the one an earlier test left behind
+const stubs = [];
+const stub = (object, name, impl) => {
+    const m = mock.method(object, name, impl);
+    stubs.push(m);
+    return m;
+};
+afterEach(() => {
+    // Newest first: a stub over a stub gives back the one under it, then the real method
+    for (const m of stubs.splice(0).reverse()) m.mock.restore();
+});
+
+/** Runs fn with RECAP_SCHEDULE set to each value the Settings switch can leave, then restores it. */
+async function withEachSchedule(fn) {
+    const saved = process.env.RECAP_SCHEDULE;
+    try {
+        for (const value of ['on', 'off', undefined]) {
+            if (value === undefined) delete process.env.RECAP_SCHEDULE;
+            else process.env.RECAP_SCHEDULE = value;
+            await fn(value);
+        }
+    } finally {
+        if (saved === undefined) delete process.env.RECAP_SCHEDULE;
+        else process.env.RECAP_SCHEDULE = saved;
+    }
+}
 
 /** A RecapSend row whose update() keeps the changes. */
 function row(fields) {
@@ -107,10 +135,10 @@ describe('the queue', () => {
             2: { id: 2, username: 'two', quiet_start: null, quiet_end: null, timezone: 'Europe/Moscow' }
         };
         rows = [row({ chatId: 1, year: 2026 }), row({ chatId: 2, year: 2026 })];
-        mock.method(Chat, 'findByPk', async (id) => chats[id] || null);
-        mock.method(RecapSend, 'findAll', async () => rows.filter((r) => r.status === 'queued'));
+        stub(Chat, 'findByPk', async (id) => chats[id] || null);
+        stub(RecapSend, 'findAll', async () => rows.filter((r) => r.status === 'queued'));
         // The "taken" update: only a row still queued is taken
-        mock.method(RecapSend, 'update', async (changes, { where }) => {
+        stub(RecapSend, 'update', async (changes, { where }) => {
             if (!where.id) return [0];
             const target = rows.find((r) => r.id === where.id && r.status === where.status);
             if (!target) return [0];
@@ -120,10 +148,12 @@ describe('the queue', () => {
     });
 
     test('the Settings switch (the schedule, in development) has no say: what was queued by hand goes', async () => {
-        process.env.RECAP_SCHEDULE = 'off';
-        const bot = albumBot();
-        await recap.processQueue(bot, { pause: 0 });
-        assert.equal(bot.sent.length, 2);
+        await withEachSchedule(async (value) => {
+            for (const r of rows) r.status = 'queued';
+            const bot = albumBot();
+            await recap.processQueue(bot, { pause: 0 });
+            assert.equal(bot.sent.length, 2, `RECAP_SCHEDULE=${value}`);
+        });
     });
 
     test('each chat gets one album of six with the caption under the first; the row says sent', async () => {
@@ -210,7 +240,7 @@ describe('the queue', () => {
     test('a row taken off the queue meanwhile (Stop) is not sent', async () => {
         // Stop happens between reading the queue and taking the row
         const queued = rows.slice();
-        mock.method(RecapSend, 'findAll', async () => queued);
+        stub(RecapSend, 'findAll', async () => queued);
         rows[0].status = 'gone';
         const bot = albumBot();
         await recap.processQueue(bot, { pause: 0 });
@@ -224,7 +254,7 @@ describe('the queue', () => {
 describe('who gets it', () => {
     test('only chats following something, not blocked, not sent or queued for that year', async () => {
         const future = new Date(Date.now() + 3600e3);
-        mock.method(Chat, 'findAll', async () => [
+        stub(Chat, 'findAll', async () => [
             { id: 1 }, // follows, eligible
             { id: 2 }, // follows, sent
             { id: 3 }, // nothing followed
@@ -232,9 +262,9 @@ describe('who gets it', () => {
             { id: 5 }, // queued
             { id: 6 } // failed
         ]);
-        mock.method(Subscription, 'findAll', async () => [{ chatId: 1 }, { chatId: 2 }, { chatId: 4 }]);
-        mock.method(Watchlist, 'findAll', async () => [{ chatId: 5 }, { chatId: 6 }]);
-        mock.method(RecapSend, 'findAll', async () => [
+        stub(Subscription, 'findAll', async () => [{ chatId: 1 }, { chatId: 2 }, { chatId: 4 }]);
+        stub(Watchlist, 'findAll', async () => [{ chatId: 5 }, { chatId: 6 }]);
+        stub(RecapSend, 'findAll', async () => [
             { chatId: 2, status: 'sent' },
             { chatId: 5, status: 'queued' },
             { chatId: 6, status: 'failed' }
@@ -273,23 +303,31 @@ describe('the API', () => {
         });
     const year = new Date().getFullYear();
 
-    test('with the schedule switch off, both buttons still queue', async () => {
-        process.env.RECAP_SCHEDULE = 'off';
-        mock.method(Chat, 'findAll', async () => [{ id: 1 }]);
-        mock.method(Chat, 'findByPk', async () => ({ id: 1 }));
-        mock.method(Subscription, 'findAll', async () => [{ chatId: 1 }]);
-        mock.method(Watchlist, 'findAll', async () => []);
-        mock.method(RecapSend, 'findAll', async () => []);
-        mock.method(RecapSend, 'findOne', async () => null);
-        mock.method(RecapSend, 'update', async () => [0]);
-        mock.method(RecapSend, 'count', async () => 0);
-        const created = mock.method(RecapSend, 'bulkCreate', async () => {});
-        assert.equal((await post('/api/recap/send', { year })).status, 200);
-        assert.equal((await post('/api/chat/1/recap/send', { year })).status, 200);
-        assert.deepEqual(
-            created.mock.calls.map((c) => c.arguments[0]),
-            [[{ chatId: '1', year }], [{ chatId: '1', year }]]
-        );
+    // Everything the routes and the queue they start in the background ask the database: one chat
+    // following something, nothing sent yet. Each test changes only what it is about
+    let created;
+    beforeEach(() => {
+        stub(Chat, 'findAll', async () => [{ id: 1 }]);
+        stub(Chat, 'findByPk', async () => ({ id: 1 }));
+        stub(Subscription, 'findAll', async () => [{ chatId: 1 }]);
+        stub(Watchlist, 'findAll', async () => []);
+        stub(RecapSend, 'findAll', async () => []);
+        stub(RecapSend, 'findOne', async () => null);
+        stub(RecapSend, 'update', async () => [0]);
+        stub(RecapSend, 'count', async () => 0);
+        created = stub(RecapSend, 'bulkCreate', async () => {});
+    });
+
+    test('whatever the schedule switch says, both buttons queue', async () => {
+        await withEachSchedule(async (value) => {
+            created.mock.resetCalls();
+            assert.equal((await post('/api/recap/send', { year })).status, 200, `RECAP_SCHEDULE=${value}`);
+            assert.equal((await post('/api/chat/1/recap/send', { year })).status, 200, `RECAP_SCHEDULE=${value}`);
+            assert.deepEqual(
+                created.mock.calls.map((c) => c.arguments[0]),
+                [[{ chatId: '1', year }], [{ chatId: '1', year }]]
+            );
+        });
     });
 
     test('a year ahead or long past is refused', async () => {
@@ -298,19 +336,14 @@ describe('the API', () => {
     });
 
     test('one chat: refused when already sent or queued; a failed one may be tried again', async () => {
-        mock.method(Chat, 'findByPk', async () => ({ id: 1 }));
-        mock.method(RecapSend, 'findAll', async () => []);
-        const created = mock.method(RecapSend, 'bulkCreate', async () => {});
-        mock.method(RecapSend, 'count', async () => 0);
-
-        mock.method(RecapSend, 'findOne', async () => ({ status: 'sent' }));
+        stub(RecapSend, 'findOne', async () => ({ status: 'sent' }));
         const sent = await post('/api/chat/1/recap/send', { year });
         assert.equal(sent.status, 409);
         assert.match((await sent.json()).error, /Already sent/);
         assert.equal(created.mock.callCount(), 0);
 
         let destroyed = false;
-        mock.method(RecapSend, 'findOne', async () => ({
+        stub(RecapSend, 'findOne', async () => ({
             status: 'failed',
             destroy: async () => {
                 destroyed = true;
@@ -322,14 +355,8 @@ describe('the API', () => {
     });
 
     test('"Send again": a sent chat goes once more when asked on purpose; a queued one never twice', async () => {
-        mock.method(Chat, 'findByPk', async () => ({ id: 1 }));
-        mock.method(RecapSend, 'findAll', async () => []);
-        mock.method(RecapSend, 'update', async () => [0]);
-        mock.method(RecapSend, 'count', async () => 0);
-        const created = mock.method(RecapSend, 'bulkCreate', async () => {});
-
         let destroyed = false;
-        mock.method(RecapSend, 'findOne', async () => ({
+        stub(RecapSend, 'findOne', async () => ({
             status: 'sent',
             destroy: async () => {
                 destroyed = true;
@@ -341,7 +368,7 @@ describe('the API', () => {
         assert.equal(destroyed, true);
         assert.equal(created.mock.callCount(), 1);
 
-        mock.method(RecapSend, 'findOne', async () => ({ status: 'queued' }));
+        stub(RecapSend, 'findOne', async () => ({ status: 'queued' }));
         const queued = await post('/api/chat/1/recap/send', { year, again: true });
         assert.equal(queued.status, 409);
         assert.match((await queued.json()).error, /Already queued/);

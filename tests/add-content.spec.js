@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -6,21 +7,11 @@ const { mockPanel } = require('./mock-panel');
  * scrolls only downwards, and the add button shows it is working until the server answers.
  */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
+watchConsole();
 
 /** Chats → alice's actions → Add, then a search that finds six long-titled results. */
 async function searchForAlice(page) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await openSection(page, 'chats');
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await page.locator('#action-add').click();
     await page.locator('#content-search-input').fill('long title');
@@ -102,12 +93,6 @@ test('an add that ends after the dialog was reopened for another chat leaves tha
     await expect(page.locator('#add-content-modal')).toBeVisible();
     await expect(page.locator('#add-content-target')).toHaveText('bob');
 });
-
-/** Opens a section by its nav item (the tab bar on phones). */
-async function openSection(page, section) {
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="${section}"]`).click();
-}
 
 test('Serials adds a series for a chat picked in the dialog, searching series only', async ({ page }) => {
     const panel = await mockPanel(page);
@@ -223,11 +208,15 @@ test('after picking a result the Add button is in view without scrolling, and ×
     await expect(page.locator('#add-content-modal')).toBeHidden();
 });
 
-test('on a phone held sideways the dialog scrolls, so the Add button can still be reached', async ({ page }) => {
+test('on a phone held sideways the dialog scrolls, so the Add button can still be reached', async ({
+    page,
+    isMobile
+}) => {
+    // The size is set here, so the desktop project would only repeat the phone's run
+    test.skip(!isMobile, 'run once, on the touch device');
     await page.setViewportSize({ width: 812, height: 375 });
     await mockPanel(page);
-    const narrow = (page.viewportSize() || { width: 1280 }).width < 1024;
-    await page.locator(`${narrow ? '.tab-item' : '.nav-item'}[data-section="subs"]`).click();
+    await openSection(page, 'subs');
     await page.locator('#subs-section [data-action="add-content"]').click();
     await page.locator('#content-search-input').fill('long title');
     // A series: its notification mode makes the picked block taller

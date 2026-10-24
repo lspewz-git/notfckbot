@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { isNarrow, watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -7,21 +8,10 @@ const { mockPanel } = require('./mock-panel');
  * them, Escape closing the innermost layer first, focus given back on closing.
  */
 
-test.beforeEach(async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-    page.__errors = errors;
-});
-
-test.afterEach(async ({ page }) => {
-    expect(page.__errors, 'console should stay clean').toEqual([]);
-});
-
-const narrow = (page) => (page.viewportSize() || { width: 1280 }).width < 1024;
+watchConsole();
 
 async function openChatSettings(page) {
-    await page.locator(`${narrow(page) ? '.tab-item' : '.nav-item'}[data-section="chats"]`).click();
+    await openSection(page, 'chats');
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await page.locator('#action-settings').click();
     await expect(page.locator('#chat-settings-modal')).toBeVisible();
@@ -48,7 +38,7 @@ test('a dialog is modal: the page behind is out of reach', async ({ page }) => {
     await expect(card).toBeVisible();
     expect(await card.evaluate((d) => d.matches(':modal'))).toBe(true);
     // The sidebar or tab bar under the dim does not take the click
-    const behind = page.locator(narrow(page) ? '.tab-item[data-section="chats"]' : '.nav-item[data-section="chats"]');
+    const behind = page.locator(isNarrow(page) ? '.tab-item[data-section="chats"]' : '.nav-item[data-section="chats"]');
     expect(await onTop(behind)).toBe(false);
 });
 
@@ -82,7 +72,7 @@ test('a dialog closed by the panel itself (a save) takes an open list with it', 
 });
 
 test('Tab and Shift+Tab never reach the page behind an open dialog', async ({ page }) => {
-    test.skip(narrow(page), 'a keyboard');
+    test.skip(isNarrow(page), 'a keyboard');
     await mockPanel(page);
     await openChatSettings(page);
     for (const key of ['Tab', 'Shift+Tab']) {
@@ -99,7 +89,7 @@ test('Tab and Shift+Tab never reach the page behind an open dialog', async ({ pa
 
 test('a confirmation lands on its safe choice on a computer, on its box on a touch screen', async ({ page }) => {
     await mockPanel(page);
-    if (narrow(page)) {
+    if (isNarrow(page)) {
         await page.locator('.tab-item[data-open="more-modal"]').click();
         await page.locator('#more-modal [data-section="settings"]').click();
     } else {
@@ -107,7 +97,7 @@ test('a confirmation lands on its safe choice on a computer, on its box on a tou
     }
     await page.locator('[data-action="settings-restart"]').click();
     await expect(page.locator('#confirm-modal')).toBeVisible();
-    if (narrow(page)) {
+    if (isNarrow(page)) {
         expect(await page.evaluate(() => document.activeElement.className)).toContain('modal-content');
     } else {
         await expect(page.locator('#modal-cancel-btn')).toBeFocused();
@@ -135,7 +125,7 @@ test('a dropdown list in a dialog is above it and can be picked from; Escape clo
 });
 
 test('on a computer focus goes into the dialog and back to the button that opened it', async ({ page }) => {
-    test.skip(narrow(page), 'a keyboard and mouse');
+    test.skip(isNarrow(page), 'a keyboard and mouse');
     await mockPanel(page);
     const opener = page.locator('#popular-list [data-action="series"]').first();
     await opener.focus();
@@ -149,7 +139,7 @@ test('on a computer focus goes into the dialog and back to the button that opene
 });
 
 test('on a touch screen opening a dialog focuses its box, not a field: no keyboard, no ring', async ({ page }) => {
-    test.skip(!narrow(page), 'a touch screen');
+    test.skip(!isNarrow(page), 'a touch screen');
     await mockPanel(page);
     await openChatSettings(page);
     const focused = await page.evaluate(() => document.activeElement && document.activeElement.className);
@@ -166,7 +156,7 @@ const rings = (page) =>
     );
 
 test('on a touch screen closing a dialog leaves no focus ring on what opened it', async ({ page }) => {
-    test.skip(!narrow(page), 'a touch screen');
+    test.skip(!isNarrow(page), 'a touch screen');
     await mockPanel(page);
     await page.locator('.tab-item[data-section="subs"]').tap();
     await page.locator('#subs-body .compact-title').first().tap();
@@ -206,7 +196,7 @@ test('scrolling in an open dialog leaves the page behind it where it was', async
     expect(overscroll).toBe('contain');
 
     // A real wheel over the dialog: the mobile WebKit project has no wheel, the styles above cover it
-    if (!narrow(page)) {
+    if (!isNarrow(page)) {
         const box = await card.locator('.modal-content').boundingBox();
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         for (let i = 0; i < 5; i++) await page.mouse.wheel(0, 600);
@@ -223,7 +213,7 @@ test('scrolling in an open dialog leaves the page behind it where it was', async
 });
 
 test('on a phone the More sheet slides up from the bottom without jumping', async ({ page }) => {
-    test.skip(!narrow(page), 'the phone sheet');
+    test.skip(!isNarrow(page), 'the phone sheet');
     await mockPanel(page);
     // Every frame while it opens: the sheet's top edge and how far the dialog is scrolled
     await page.evaluate(() => {
