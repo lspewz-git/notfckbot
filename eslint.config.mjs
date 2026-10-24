@@ -27,7 +27,10 @@ const NODE_GLOBALS = {
     clearInterval: 'readonly',
     AbortController: 'readonly',
     AbortSignal: 'readonly',
-    URL: 'readonly'
+    URL: 'readonly',
+    // node:test's uploads (Node 18+ has them built in)
+    FormData: 'readonly',
+    Blob: 'readonly'
 };
 
 const BROWSER_GLOBALS = {
@@ -47,6 +50,8 @@ const BROWSER_GLOBALS = {
     AbortSignal: 'readonly',
     Event: 'readonly',
     URL: 'readonly',
+    URLSearchParams: 'readonly',
+    FormData: 'readonly',
     getComputedStyle: 'readonly'
 };
 

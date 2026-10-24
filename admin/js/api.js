@@ -34,6 +34,24 @@ export async function api(path, options = {}) {
 }
 
 /**
+ * Sends a file as a form (multipart): the browser sets its own Content-Type with the boundary.
+ * Throws like api().
+ * @param {string} path Path under /api
+ * @param {FormData} form
+ * @returns {Promise<any>}
+ */
+export async function apiUpload(path, form) {
+    const res = await fetch(`${API_URL}${path}`, {
+        method: 'POST',
+        headers: { 'X-Requested-By': 'notfckbot-panel' },
+        body: form
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+}
+
+/**
  * An image the API draws (a recap card), as a Blob: an <img> can't send the header the API asks
  * for, so the panel fetches it and shows an object URL.
  * @param {string} path Path under /api

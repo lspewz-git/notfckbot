@@ -66,6 +66,14 @@
 
     /* Overlays: what sits above the page */
     --scrim: rgba(0, 0, 0, 0.6); /* behind a dialog */
+    /* The year recap's six cards, their plain colours (src/recap/cards.js, THEMES) */
+    --recap-1: #f5b14c;
+    --recap-2: #1d2b6b;
+    --recap-3: #e9405b;
+    --recap-4: #0f3d2e;
+    --recap-5: #2b1840;
+    --recap-6: #f3f1ec;
+    --recap-shade: #000; /* the dim over a card's picture, as the server draws it */
     --well: rgba(0, 0, 0, 0.4); /* sunken area: the log viewer */
     --bar-glass: rgba(14, 13, 12, 0.86); /* the phone tab bar, over blur */
     --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55); /* dropdowns */

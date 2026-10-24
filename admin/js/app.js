@@ -10,6 +10,7 @@ import { filterLogs } from './logs.js';
 import { setHistoryYear, setHistoryPage, setupHistory } from './history.js';
 import { pickPeriod, confirmSendOne } from './chat-stats.js';
 import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './recap.js';
+import { recapCardActions, setupRecapCards, openRecapSection } from './recap-cards.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
@@ -70,6 +71,7 @@ function switchSection(id) {
         if (on) n.setAttribute('aria-current', 'page');
         else n.removeAttribute('aria-current');
     });
+    if (id === 'recap') openRecapSection();
     fetchData();
 }
 
@@ -151,6 +153,7 @@ const CLICK_ACTIONS = {
     'recap-send-all': () => confirmSendAll(),
     'recap-send-stop': () => stopRecapSend(),
     ...settingsActions,
+    ...recapCardActions,
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
@@ -253,6 +256,7 @@ function init() {
     // Before enhanceSelects(), like setupFilters: the styled dropdowns start on the remembered size
     setupHistory();
     setupSettings();
+    setupRecapCards();
     setupChatSettingsForm();
     setupProxyForm();
     enhanceSelects();

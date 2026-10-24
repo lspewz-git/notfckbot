@@ -68,7 +68,7 @@ test('a chat that has its year: when, and "Send again" behind its own question',
 test('every chat: the counts, a second "yes", then the progress with Stop', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSection(page, 'chats');
-    await page.locator('[data-action="recap-send-open"]').click();
+    await page.locator('#chats-section [data-action="recap-send-open"]').click();
     const dialog = page.locator('#recap-send-modal');
     await expect(dialog.locator('.recap-fact b')).toHaveText(['37', '3', '5', '2']);
     await expect(dialog.locator('#recap-send-years .btn.active')).toHaveText(String(YEAR));

@@ -1,65 +1,21 @@
 /**
- * The recap cards as PNG images: satori lays a card out into SVG, resvg draws the SVG. resvg's
- * WebAssembly build, not the native one: the native one kept about 40 MB more after every six
- * cards (measured 23.10), the WebAssembly one stays at its first size. The six of
- * a chat's year are drawn together (about a second) and kept for a while, so the panel's preview
- * and, later, the sending don't draw them again for every look.
+ * The recap cards as PNG images. The elements come from cards.js, the drawing happens in the
+ * drawing threads (pool.js, worker.js), so the bot keeps answering meanwhile; finished sets are
+ * kept on disk (store.js) and drawn again only when what they show has changed. The panel's
+ * preview and the sending share them.
  */
-const fs = require('fs');
-const path = require('path');
-const resvg = require('@resvg/resvg-wasm');
 const { Chat } = require('../db');
 const { loadChatStats } = require('../chat-stats');
 const { posterBytes } = require('../admin/posters');
 const { lruCache } = require('../lru');
-const { recapCards, WIDTH, HEIGHT } = require('./cards');
-
-// satori is an ES module with a CommonJS build; loaded on first use, so the bot starts without it
-let satori = null;
-let fonts = null;
-let wasmReady = null;
-
-const FONT_DIR = path.join(__dirname, '../../node_modules/@fontsource');
-// Each family comes as Latin and Cyrillic files; satori takes the first font of a name, so the
-// Cyrillic half goes under a name of its own and the cards ask for "Manrope, Manrope Cyr"
-const FONT_FILES = [
-    ['Unbounded', 'unbounded', 700],
-    ['Unbounded', 'unbounded', 900],
-    ['Manrope', 'manrope', 600],
-    ['Manrope', 'manrope', 700],
-    ['Manrope', 'manrope', 800]
-];
-
-function loadFonts() {
-    if (fonts) return fonts;
-    fonts = FONT_FILES.flatMap(([name, dir, weight]) =>
-        ['latin', 'cyrillic'].map((subset) => ({
-            name: subset === 'latin' ? name : `${name} Cyr`,
-            data: fs.readFileSync(path.join(FONT_DIR, dir, 'files', `${dir}-${subset}-${weight}-normal.woff`)),
-            weight,
-            style: 'normal'
-        }))
-    );
-    return fonts;
-}
+const { log } = require('../log');
+const { recapCards } = require('./cards');
+const { draw } = require('./pool');
+const backgrounds = require('./backgrounds');
+const store = require('./store');
 
 /** One card's PNG. */
-async function renderCard(element) {
-    if (!satori) satori = require('satori').default;
-    if (!wasmReady) wasmReady = resvg.initWasm(fs.readFileSync(require.resolve('@resvg/resvg-wasm/index_bg.wasm')));
-    await wasmReady;
-    const svg = await satori(element, { width: WIDTH, height: HEIGHT, fonts: loadFonts() });
-    // Text is already shapes in satori's SVG: resvg needs no fonts of its own
-    const drawing = new resvg.Resvg(svg, { font: { loadSystemFonts: false } });
-    const image = drawing.render();
-    try {
-        return Buffer.from(image.asPng());
-    } finally {
-        // WebAssembly memory isn't the garbage collector's: freed by hand
-        image.free();
-        drawing.free();
-    }
-}
+const renderCard = (element) => draw({ kind: 'card', element });
 
 /** A poster as a data URI for a card, or null (none, or TMDB not answering). */
 async function posterUri(url) {
@@ -70,29 +26,98 @@ async function posterUri(url) {
 }
 
 /**
- * The six PNGs of a chat's year and the statistics they show (for the message's caption);
- * undefined (not kept by the cache) for a chat that isn't there.
+ * What a chat's year is drawn from, and its fingerprint; null for a chat that isn't there.
+ * @param {Array} [looks] cardLooks(), when asked for many chats at once
  */
-async function drawRecap(chatId, year, now = new Date()) {
+async function recapInputs(chatId, year, { now = new Date(), looks } = {}) {
     const chat = await Chat.findByPk(chatId);
-    if (!chat) return undefined;
+    if (!chat) return null;
     const stats = await loadChatStats(chatId, { from: `${year}-01-01`, to: `${year}-12-31` }, now);
-    if (!stats) return undefined;
-    const posters = new Map();
-    const winner = stats.best[0];
-    if (winner && winner.poster_url) {
-        const uri = await posterUri(winner.poster_url);
-        if (uri) posters.set(winner.poster_url, uri);
-    }
+    if (!stats) return null;
+    const cardLooks = looks || (await backgrounds.cardLooks());
     const chatName = chat.username || String(chat.id);
-    const images = [];
-    for (const card of recapCards(stats, { year, chatName, posters })) images.push(await renderCard(card));
-    return { images, stats };
+    const poster = (stats.best[0] && stats.best[0].poster_url) || null;
+    const hash = store.fingerprint({
+        year: Number(year),
+        chatName,
+        stats,
+        looks: cardLooks.map((l) => [l.background, l.dim]),
+        poster
+    });
+    return { stats, chatName, looks: cardLooks, poster, hash };
 }
 
-// Ten minutes: long enough to look at all six, short enough that a fresh look shows fresh figures
+/**
+ * The six elements for a year's inputs, with the poster and pictures they need. complete: false
+ * when one of them could not be had (TMDB not answering for the poster, a picture gone): the cards
+ * are drawn without it, and not kept as if they showed it.
+ */
+async function elementsFor(inputs, year, looks = inputs.looks) {
+    const posters = new Map();
+    let complete = true;
+    if (inputs.poster) {
+        const uri = await posterUri(inputs.poster);
+        if (uri) posters.set(inputs.poster, uri);
+        else complete = false;
+    }
+    const pictures = await backgrounds.looksForDrawing(looks);
+    if (pictures.missing) complete = false;
+    const elements = recapCards(inputs.stats, { year, chatName: inputs.chatName, posters, looks: pictures.looks });
+    return { elements, complete };
+}
+
+// Bumped when a chat's files or the backgrounds change: a drawing started before doesn't write
+// its (now old) set back. One counter for all, as "every chat" changes are rare
+let generation = 0;
+// A chat's year drawn once at a time: a second ask joins the drawing under way
+const drawingNow = new Map();
+
+async function drawAndKeep(chatId, year, now) {
+    const started = generation;
+    const inputs = await recapInputs(chatId, year, { now });
+    if (!inputs) return undefined;
+    const kept = await store.readSet(chatId, year, inputs.hash).catch(() => null);
+    if (kept) return { images: kept, stats: inputs.stats };
+
+    const { elements, complete } = await elementsFor(inputs, year);
+    // All at once: the pool runs as many as it has threads, the rest wait their turn
+    const images = await Promise.all(elements.map(renderCard));
+    if (complete && started === generation) {
+        const thumbs = await Promise.all(images.map((png) => draw({ kind: 'thumb', png })));
+        // A disk that refuses the write still gets the chat its cards
+        await store
+            .writeSet(chatId, year, inputs.hash, images, thumbs)
+            .catch((err) => log.error(`[Recap] Could not keep the cards of ${chatId}: ${err.message}`));
+    }
+    return { images, stats: inputs.stats };
+}
+
+/**
+ * The six PNGs of a chat's year and the statistics they show (for the message's caption): from
+ * the disk when they are there and still show the same, else drawn and kept. Undefined (not kept
+ * by the memory cache) for a chat that isn't there.
+ */
+function drawRecap(chatId, year, now = new Date()) {
+    const key = `${chatId}:${year}`;
+    if (!drawingNow.has(key)) {
+        drawingNow.set(
+            key,
+            drawAndKeep(chatId, year, now).finally(() => drawingNow.delete(key))
+        );
+    }
+    return drawingNow.get(key);
+}
+
+// The panel asks for the six one by one: one drawing (or one read from the disk) answers them all.
+// Bounded by bytes too: six cards on photos are about 15 MB
 const recapCache = lruCache({
     max: 20,
+    maxSize: 60 * 1024 * 1024,
+    sizeCalculation: (value) =>
+        Math.max(
+            1,
+            value.images.reduce((sum, png) => sum + png.length, 0)
+        ),
     ttl: 10 * 60 * 1000,
     fetchMethod: (key) => {
         const [chatId, year] = key.split(':');
@@ -101,9 +126,71 @@ const recapCache = lruCache({
 });
 
 /**
- * A chat's year: { images: six PNG Buffers, stats }, drawn once and kept for ten minutes; null
- * for no chat.
+ * A chat's year: { images: six PNG Buffers, stats }; null for no chat.
  */
 const recapImages = async (chatId, year) => (await recapCache.fetch(`${chatId}:${year}`)) || null;
 
-module.exports = { recapImages, renderCard, drawRecap };
+/**
+ * Forgets what memory holds of a chat's year (or of every chat's), after its files or the
+ * backgrounds changed; a drawing under way then keeps its cards to itself.
+ */
+function forgetRecap(chatId, year) {
+    generation += 1;
+    if (chatId === undefined) recapCache.clear();
+    else recapCache.delete(`${chatId}:${year}`);
+}
+
+/**
+ * Card n of a chat's year drawn on another look ({ background, dim }), for the panel's picker:
+ * drawn every time, never kept. Null for no chat.
+ */
+async function previewCard(chatId, year, n, look) {
+    const inputs = await recapInputs(chatId, year);
+    if (!inputs) return null;
+    const looks = inputs.looks.map((l) => (l.card === n ? { ...l, ...look } : l));
+    const { elements } = await elementsFor(inputs, year, looks);
+    return renderCard(elements[n - 1]);
+}
+
+// "Draw missing and out of date": one run at a time, a chat after another
+const drawing = { running: false, left: 0 };
+
+/**
+ * Draws these chats' years in the background, one after another, at the drawing threads' low
+ * priority; a chat already drawn and still the same is only read. Returns at once; false when a
+ * run is already going.
+ */
+function drawInBackground(chatIds, year) {
+    if (drawing.running) return false;
+    drawing.running = true;
+    drawing.left = chatIds.length;
+    (async () => {
+        for (const chatId of chatIds) {
+            try {
+                // Straight to the disk: through the memory cache it would fill it with every chat
+                await drawRecap(chatId, year);
+            } catch (err) {
+                log.error(`[Recap] Drawing the cards of ${chatId} failed: ${err.message}`);
+            }
+            drawing.left -= 1;
+        }
+    })().finally(() => {
+        drawing.running = false;
+        drawing.left = 0;
+    });
+    return true;
+}
+
+/** How the background drawing goes: { running, left }. */
+const drawingState = () => ({ ...drawing });
+
+module.exports = {
+    recapImages,
+    recapInputs,
+    renderCard,
+    drawRecap,
+    forgetRecap,
+    previewCard,
+    drawInBackground,
+    drawingState
+};

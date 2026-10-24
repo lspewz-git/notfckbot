@@ -9,6 +9,7 @@
         <link rel="stylesheet" href="css/cards.css" />
         <link rel="stylesheet" href="css/logs.css" />
         <link rel="stylesheet" href="css/history.css" />
+        <link rel="stylesheet" href="css/recap.css" />
         <link rel="stylesheet" href="css/settings.css" />
         <link rel="stylesheet" href="css/tables.css" />
         <link rel="stylesheet" href="css/buttons.css" />
@@ -37,6 +38,7 @@
         <link rel="modulepreload" href="js/proxy-url.js" />
         <link rel="modulepreload" href="js/proxy.js" />
         <link rel="modulepreload" href="js/recap.js" />
+        <link rel="modulepreload" href="js/recap-cards.js" />
         <link rel="modulepreload" href="js/records.js" />
         <link rel="modulepreload" href="js/render.js" />
         <link rel="modulepreload" href="js/select.js" />
@@ -143,6 +145,13 @@
                             <path d="M16 2v4M8 2v4M3 10h18" />
                         </svg>
                         <span class="nav-tip" aria-hidden="true">History</span>
+                    </button>
+                    <button class="nav-item" data-section="recap" aria-label="Year recap">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="5" y="3" width="14" height="18" rx="2" />
+                            <path d="M9 8h6M9 12h6M9 16h3" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Year recap</span>
                     </button>
                     <span class="rail-divider" aria-hidden="true"></span>
                     <button class="nav-item" data-section="logs" aria-label="Activity Logs">
@@ -950,6 +959,65 @@
                         </div>
                     </section>
 
+                    <section id="recap-section" class="section">
+                        <header class="section-header">
+                            <h1>Year recap</h1>
+                            <div class="recap-head-actions">
+                                <!-- Filled by recap-cards.js: last year and this one -->
+                                <div id="recap-years" class="tab-filters" role="group" aria-label="Year"></div>
+                                <button class="btn btn-outline" data-action="recap-send-open">Send…</button>
+                            </div>
+                        </header>
+                        <div class="tab-filters recap-tabs" role="group" aria-label="What to show">
+                            <button
+                                class="btn btn-ghost active"
+                                data-action="recap-tab"
+                                data-tab="looks"
+                                aria-pressed="true"
+                            >
+                                Backgrounds
+                            </button>
+                            <button class="btn btn-ghost" data-action="recap-tab" data-tab="ready" aria-pressed="false">
+                                Ready cards
+                            </button>
+                        </div>
+
+                        <div id="recap-looks-pane">
+                            <div class="glass-card">
+                                <h2 class="recap-h">
+                                    The six cards
+                                    <small
+                                        >A change applies to every chat's cards: they are drawn again when next
+                                        needed.</small
+                                    >
+                                </h2>
+                                <div id="recap-slots" class="recap-slots" aria-busy="true"></div>
+                            </div>
+                            <div class="glass-card">
+                                <h2 class="recap-h">
+                                    Pictures
+                                    <small
+                                        >PNG or JPEG up to 5 MB. Best at 1080 × 1350 (4:5); other sizes are cropped to
+                                        fit.</small
+                                    >
+                                </h2>
+                                <div id="recap-pictures" class="recap-pictures"></div>
+                                <input type="file" id="recap-upload" accept="image/png,image/jpeg" hidden />
+                            </div>
+                        </div>
+
+                        <div id="recap-ready-pane" hidden>
+                            <div id="recap-ready-summary" class="recap-summary"></div>
+                            <div class="glass-card">
+                                <ul id="recap-ready-list" class="recap-ready" aria-busy="true"></ul>
+                                <p class="recap-hint">
+                                    View opens the preview with Send. Delete only removes the files: the cards are drawn
+                                    again on the next look or send.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
                     <section id="watchlist-section" class="section">
                         <header class="section-header">
                             <h1>Movies</h1>
@@ -1148,7 +1216,7 @@
             <button
                 class="tab-item"
                 data-open="more-modal"
-                data-tab-sections="logs history settings"
+                data-tab-sections="logs history recap settings"
                 aria-haspopup="dialog"
             >
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1174,6 +1242,21 @@
                         <span class="action-text">
                             <span class="action-title">History</span>
                             <span class="action-desc">What came out, year by year</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                    <button class="action-row" data-section="recap" data-close="more-modal">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <rect x="5" y="3" width="14" height="18" rx="2" />
+                                <path d="M9 8h6M9 12h6M9 16h3" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Year recap</span>
+                            <span class="action-desc">Card backgrounds, ready cards</span>
                         </span>
                         <span class="action-chevron"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1543,6 +1626,37 @@
                     <div id="recap-actions" class="recap-actions"></div>
                 </div>
                 <button data-close-return="recap-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
+        <!-- What a recap card is drawn on: a picture and how dimmed, with the card drawn for a chat (recap-cards.js) -->
+        <dialog id="recap-look-modal" class="modal" aria-labelledby="recap-look-title">
+            <div class="modal-content modal-recap">
+                <h3 id="recap-look-title">Card</h3>
+                <p class="modal-sub" id="recap-look-sub"></p>
+                <div class="recap-pick">
+                    <div id="recap-look-preview" class="recap-card"></div>
+                    <div class="recap-pick-side">
+                        <div id="recap-look-choices" class="recap-choices"></div>
+                        <label class="recap-dim" for="recap-dim">
+                            <span>Dim the picture</span><b id="recap-dim-value">0%</b>
+                        </label>
+                        <input type="range" id="recap-dim" min="0" max="80" step="5" value="0" />
+                        <p class="recap-hint">0% shows the picture as it is. The text keeps the card's colours.</p>
+                    </div>
+                </div>
+                <div class="modal-actions recap-look-actions">
+                    <button type="button" class="btn btn-ghost" data-close="recap-look-modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="recap-look-save" data-action="recap-look-save">
+                        Use for this card
+                    </button>
+                </div>
+                <button data-close="recap-look-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />

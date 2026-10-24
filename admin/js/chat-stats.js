@@ -258,16 +258,26 @@ let shown = [];
 const preview = { id: null, year: null, back: null, sentAt: null };
 
 function openRecap() {
-    const year = recapYear();
-    const id = chatId;
-    const request = ++state.recap;
     closeModal('chat-stats-modal');
     // Closing the preview goes back to the statistics, and from there to the chat's menu
     const menu = backToMenu;
-    const back = () => {
+    showRecap(chatId, chatName, recapYear(), () => {
         openModal('chat-stats-modal');
         if (menu) setReturnTo(menu);
-    };
+    });
+}
+
+/**
+ * The preview of a chat's year: its six cards and whether it was sent, with the button. Also from
+ * Year recap → Ready cards.
+ * @param {string | number} id
+ * @param {string} name
+ * @param {number} year
+ * @param {(() => void) | null} back what closing it goes back to
+ */
+export function showRecap(id, name, year, back = null) {
+    const request = ++state.recap;
+    chatName = name;
     Object.assign(preview, { id, year, back, sentAt: null });
     setReturnTo(back);
     for (const url of shown) URL.revokeObjectURL(url);

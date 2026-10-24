@@ -6,8 +6,7 @@
  */
 const { plural } = require('../calendar');
 
-const WIDTH = 1080;
-const HEIGHT = 1350;
+const { WIDTH, HEIGHT } = require('./size');
 const PAD = 80;
 const DISPLAY = 'Unbounded, Unbounded Cyr';
 const TEXT = 'Manrope, Manrope Cyr';
@@ -426,15 +425,31 @@ function ahead(stats, { year }) {
 }
 
 /**
+ * A card drawn on a picture (Year recap → Backgrounds in the panel): the picture under everything,
+ * darkened by dim percent so the text stays readable; the text keeps its card's colours.
+ * @param {object} card
+ * @param {{ uri: string, dim?: number } | null} [look] uri: a data URI of a picture already 1080x1350
+ */
+function onPicture(card, look) {
+    if (!look || !look.uri) return card;
+    const full = { position: 'absolute', left: 0, top: 0, width: WIDTH, height: HEIGHT };
+    const layers = [{ type: 'img', props: { src: look.uri, width: WIDTH, height: HEIGHT, style: full } }];
+    if (look.dim) layers.push(box({ ...full, background: `rgba(0,0,0,${look.dim / 100})` }));
+    return { ...card, props: { ...card.props, children: [...layers, ...[].concat(card.props.children)] } };
+}
+
+/**
  * The six cards for a chat's year.
  * @param {object} stats computeStats() for the year
- * @param {{ year: number | string, chatName: string, posters?: Map<string, string> }} options
- *   posters: poster URL → data URI, for the best rated title's card
+ * @param {{ year: number | string, chatName: string, posters?: Map<string, string>,
+ *   looks?: Array<{ uri: string, dim?: number } | null> }} options
+ *   posters: poster URL → data URI, for the best rated title's card; looks: a picture for each
+ *   card in turn, or none (its plain colour)
  */
-function recapCards(stats, { year, chatName, posters = new Map() }) {
+function recapCards(stats, { year, chatName, posters = new Map(), looks = [] }) {
     // A name of emoji alone has nothing left to draw
     const options = { year: String(year), chatName: drawable(chatName) || 'ваш чат', posters };
-    return [cover, episodes, taste, best, farewells, ahead].map((card) => card(stats, options));
+    return [cover, episodes, taste, best, farewells, ahead].map((card, i) => onPicture(card(stats, options), looks[i]));
 }
 
 module.exports = { recapCards, drawable, WIDTH, HEIGHT };

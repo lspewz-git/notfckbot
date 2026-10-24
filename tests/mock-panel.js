@@ -204,7 +204,8 @@ const PIXEL = Buffer.from(
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
  *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
- *   recap?: (n: number) => Buffer, recapStatus?: object }} [options]
+ *   recap?: (n: number) => Buffer, recapStatus?: object, recapLooks?: object, recapReady?: object,
+ *   recapImage?: (what: string) => Buffer }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
@@ -273,6 +274,11 @@ function chatStats(query) {
     };
 }
 
+const PICTURES = [
+    { id: 'aaaaaaaaaaaaaaaa', name: 'Sunset.jpg', size: 1400000, uploadedAt: '2026-10-24T08:00:00Z', cards: [1] },
+    { id: 'bbbbbbbbbbbbbbbb', name: 'Stripes.png', size: 900000, uploadedAt: '2026-10-23T08:00:00Z', cards: [3] }
+];
+
 async function mockPanel(page, options = {}) {
     const panel = {
         subs: buildSubs(),
@@ -288,6 +294,41 @@ async function mockPanel(page, options = {}) {
             sentAt: null,
             error: null,
             ...options.recapStatus
+        },
+        // Year recap → Backgrounds: two pictures, one on card 1, the other on card 3 dimmed
+        recapLooks: options.recapLooks || {
+            cards: [1, 2, 3, 4, 5, 6].map((card) => ({
+                card,
+                background: card === 1 ? PICTURES[0].id : card === 3 ? PICTURES[1].id : null,
+                dim: card === 3 ? 35 : 0
+            })),
+            pictures: PICTURES.map((p) => ({ ...p })),
+            maxDim: 80,
+            sample: { id: '-1003', name: 'Movie Club' }
+        },
+        // Year recap → Ready cards: one of each state
+        recapReady: options.recapReady || {
+            year: new Date().getFullYear(),
+            chats: [
+                {
+                    chatId: '-1003',
+                    name: 'Movie Club',
+                    type: 'supergroup',
+                    state: 'ready',
+                    drawnAt: '2026-10-24T07:40:00Z',
+                    bytes: 428000
+                },
+                {
+                    chatId: '101',
+                    name: 'alice',
+                    type: 'private',
+                    state: 'old',
+                    drawnAt: '2026-10-22T09:00:00Z',
+                    bytes: 410000
+                },
+                { chatId: '102', name: 'bob', type: 'private', state: 'none', drawnAt: null, bytes: 0 }
+            ],
+            drawing: { running: false, left: 0 }
         },
         health: { telegram: true, tmdb: true, proxy: 'off', kinopoisk: 'ok', ...options.health },
         // The update check: "Run now" starts it, and it reports running for two polls
@@ -411,6 +452,41 @@ async function mockPanel(page, options = {}) {
             panel.recap.progress = { ...panel.recap.progress, queued: 0, total: panel.recap.progress.total - removed };
             panel.recapStopped = true;
             return { removed };
+        },
+        // Year recap → Backgrounds and Ready cards: what was asked, for tests to check
+        '/api/recap/looks': () => panel.recapLooks,
+        '/api/recap/backgrounds': (req) => {
+            const picture = {
+                id: 'cccccccccccccccc',
+                name: 'upload.png',
+                size: 1000,
+                uploadedAt: new Date().toISOString(),
+                cards: []
+            };
+            panel.recapUploads = (panel.recapUploads || 0) + 1;
+            panel.recapUploadType = req.headers()['content-type'];
+            panel.recapLooks.pictures = [picture, ...panel.recapLooks.pictures];
+            return { status: 201, body: picture };
+        },
+        '/api/recap/ready': (req) => {
+            if (req.method() === 'DELETE') {
+                const removed = panel.recapReady.chats.filter((c) => c.state !== 'none').length;
+                panel.recapReady.chats = panel.recapReady.chats.map((c) => ({
+                    ...c,
+                    state: 'none',
+                    bytes: 0,
+                    drawnAt: null
+                }));
+                panel.recapDeletedAll = true;
+                return { removed };
+            }
+            return panel.recapReady;
+        },
+        '/api/recap/drawing': () => panel.recapReady.drawing,
+        '/api/recap/draw': (req) => {
+            panel.recapDraws = [...(panel.recapDraws || []), req.postDataJSON()];
+            panel.recapReady.drawing = { running: true, left: 2 };
+            return { drawing: panel.recapReady.drawing };
         },
         '/api/restart': () => {
             panel.restarted = true;
@@ -577,6 +653,59 @@ async function mockPanel(page, options = {}) {
                 panel.recapSendOne = { chatId: id, body: req.postDataJSON() };
                 panel.recapStatus = { ...panel.recapStatus, status: 'queued' };
                 return { queued: 1 };
+            }
+        ],
+        [
+            /^\/api\/recap\/backgrounds\/([a-f0-9]{16})$/,
+            ([, id], req) => {
+                if (req.method() !== 'DELETE')
+                    return { image: options.recapImage ? options.recapImage(`picture:${id}`) : PIXEL };
+                panel.recapPictureDeleted = id;
+                panel.recapLooks.pictures = panel.recapLooks.pictures.filter((p) => p.id !== id);
+                panel.recapLooks.cards = panel.recapLooks.cards.map((c) =>
+                    c.background === id ? { ...c, background: null, dim: 0 } : c
+                );
+                return { removed: true };
+            }
+        ],
+        [
+            /^\/api\/recap\/looks\/(\d)$/,
+            ([, card], req) => {
+                const body = req.postDataJSON();
+                panel.recapLookSaved = { card: Number(card), ...body };
+                panel.recapLooks.cards = panel.recapLooks.cards.map((c) =>
+                    c.card === Number(card) ? { card: c.card, ...body } : c
+                );
+                return { cards: panel.recapLooks.cards };
+            }
+        ],
+        [
+            /^\/api\/recap\/preview\/(\d)$/,
+            ([, card], req) => {
+                const query = new URL(req.url()).searchParams;
+                panel.recapPreviews = [
+                    ...(panel.recapPreviews || []),
+                    { card: Number(card), background: query.get('background'), dim: query.get('dim') }
+                ];
+                return {
+                    image: options.recapImage
+                        ? options.recapImage(`preview:${card}:${query.get('background') || ''}:${query.get('dim')}`)
+                        : PIXEL
+                };
+            }
+        ],
+        [
+            /^\/api\/recap\/ready\/(-?\d+)\/thumb\/(\d)$/,
+            ([, id, n]) => ({ image: options.recapImage ? options.recapImage(`thumb:${id}:${n}`) : PIXEL })
+        ],
+        [
+            /^\/api\/recap\/ready\/(-?\d+)$/,
+            ([, id]) => {
+                panel.recapDeleted = id;
+                panel.recapReady.chats = panel.recapReady.chats.map((c) =>
+                    c.chatId === id ? { ...c, state: 'none', bytes: 0, drawnAt: null } : c
+                );
+                return { removed: 1 };
             }
         ],
         [

@@ -1,0 +1,530 @@
+/* Year recap: the cards' backgrounds and the sets drawn so far (recap-cards.js) */
+
+.recap-head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.recap-head-actions .tab-filters {
+    margin: 0;
+}
+
+.recap-tabs {
+    margin-bottom: var(--space-4);
+}
+
+.recap-h {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-base);
+    font-weight: 600;
+}
+
+.recap-h small {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: 400;
+}
+
+.recap-hint {
+    margin-top: var(--space-3);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+/* A card's picture in small: 4:5, its plain colour when it has none */
+.recap-thumb {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.recap-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.recap-thumb .skeleton {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+}
+
+.recap-colour-1 {
+    background: var(--recap-1);
+}
+.recap-colour-2 {
+    background: var(--recap-2);
+}
+.recap-colour-3 {
+    background: var(--recap-3);
+}
+.recap-colour-4 {
+    background: var(--recap-4);
+}
+.recap-colour-5 {
+    background: var(--recap-5);
+}
+.recap-colour-6 {
+    background: var(--recap-6);
+}
+
+.recap-dim-layer {
+    position: absolute;
+    inset: 0;
+    background: var(--recap-shade);
+}
+
+/* "3/6" on a slot's picture: readable on any of them */
+.recap-thumb-label {
+    position: absolute;
+    left: var(--space-2);
+    top: var(--space-2);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--scrim);
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+
+button.recap-thumb {
+    cursor: pointer;
+}
+
+button.recap-thumb:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* The six cards in a row (three on a phone) */
+.recap-slots {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.recap-slot {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.recap-slot-name {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.recap-slot-what {
+    min-height: 1.4em;
+    overflow: hidden;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recap-slot-change {
+    margin-top: var(--space-2);
+}
+
+/* The pictures: the upload tile first */
+.recap-pictures {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--space-3);
+}
+
+.recap-picture {
+    position: relative;
+    min-width: 0;
+}
+
+.recap-picture-x {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--scrim);
+    color: var(--text);
+    font-size: var(--text-base);
+    cursor: pointer;
+}
+
+.recap-picture-x:hover {
+    background: var(--danger-fill);
+}
+
+.recap-picture-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.recap-picture-meta b {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recap-picture-meta span {
+    flex-shrink: 0;
+}
+
+.recap-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    padding: var(--space-2);
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    text-align: center;
+    cursor: pointer;
+}
+
+.recap-upload:hover,
+.recap-upload.dragging {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.recap-upload-plus {
+    color: var(--text);
+    font-size: var(--text-2xl);
+    line-height: 1;
+}
+
+/* The picker: the card as drawn on the left, the choices on the right */
+.recap-pick {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: var(--space-5);
+    margin-top: var(--space-4);
+}
+
+.recap-pick .recap-card[aria-busy='true'] img {
+    opacity: 0.6;
+}
+
+.recap-choices {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--space-2);
+}
+
+.recap-choice {
+    padding: 3px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.recap-choice.active {
+    border-color: var(--accent);
+}
+
+.recap-choice small {
+    display: block;
+    margin-top: var(--space-1);
+    overflow: hidden;
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recap-look-actions {
+    justify-content: flex-end;
+    margin-top: var(--space-5);
+}
+
+.recap-dim {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--space-4);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
+#recap-dim {
+    width: 100%;
+    margin-top: var(--space-2);
+    accent-color: var(--accent);
+}
+
+/* Ready cards: the figures, then a row per chat */
+.recap-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.recap-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.recap-stat {
+    min-width: 130px;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+}
+
+.recap-stat b {
+    display: block;
+    min-height: 1.3em;
+    font-size: var(--text-xl);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.recap-stat span {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.recap-stat-skeleton {
+    display: inline-block;
+    width: 3ch;
+    height: 1em;
+}
+
+.recap-ready-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.recap-ready {
+    list-style: none;
+}
+
+.recap-row {
+    display: grid;
+    /* Fixed for the strip and the buttons: each row is a grid of its own, and they must line up */
+    grid-template-columns: minmax(140px, 1.2fr) 200px minmax(180px, 1fr) 150px;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 4rem;
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--border-row);
+}
+
+.recap-row:first-child {
+    border-top: 0;
+}
+
+.recap-row-who,
+.recap-row-state {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.recap-row-who b {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recap-row-who span,
+.recap-row-state > span:last-child {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.recap-row .skeleton {
+    display: block;
+    width: 60%;
+    height: 1em;
+}
+
+.recap-strip {
+    display: flex;
+    gap: 4px;
+}
+
+.recap-strip-card {
+    position: relative;
+    width: 30px;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: 5px;
+    background: var(--surface-2);
+}
+
+.recap-strip-empty {
+    opacity: 0.4;
+}
+
+.recap-strip-card img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.recap-row-actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+}
+
+.recap-tag {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    font-size: var(--text-xs);
+}
+
+.recap-tag::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.recap-tag-ok {
+    color: var(--success);
+}
+
+.recap-tag-old {
+    color: var(--warning);
+}
+
+.recap-tag-none {
+    color: var(--text-dim);
+}
+
+@media (max-width: 1100px) {
+    .recap-slots {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .recap-head-actions .btn-outline {
+        display: none;
+    }
+
+    .recap-pictures {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .recap-upload-or {
+        display: none;
+    }
+
+    .recap-pick {
+        grid-template-columns: 1fr;
+    }
+
+    .recap-pick .recap-card {
+        width: 60%;
+        margin: 0 auto;
+    }
+
+    .recap-choices {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    /* Two by two: four in a row leave no room for a figure and its label */
+    .recap-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .recap-stat {
+        min-width: 0;
+    }
+
+    .recap-ready-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .recap-ready-actions .btn:first-child {
+        flex: 1;
+    }
+
+    /* A row as a small card: who and the button, the state, the six under them */
+    .recap-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-2) var(--space-3);
+    }
+
+    .recap-row-state {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .recap-row-actions {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        flex-direction: column;
+    }
+
+    .recap-strip {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
+    .recap-strip-card {
+        flex: 1;
+        width: auto;
+    }
+}
+
+@media (pointer: coarse) {
+    .recap-picture-x::after {
+        content: '';
+        position: absolute;
+        inset: -9px;
+    }
+}
