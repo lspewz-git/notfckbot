@@ -320,4 +320,31 @@ describe('the API', () => {
         assert.equal(destroyed, true);
         assert.equal(created.mock.callCount(), 1);
     });
+
+    test('"Send again": a sent chat goes once more when asked on purpose; a queued one never twice', async () => {
+        mock.method(Chat, 'findByPk', async () => ({ id: 1 }));
+        mock.method(RecapSend, 'findAll', async () => []);
+        mock.method(RecapSend, 'update', async () => [0]);
+        mock.method(RecapSend, 'count', async () => 0);
+        const created = mock.method(RecapSend, 'bulkCreate', async () => {});
+
+        let destroyed = false;
+        mock.method(RecapSend, 'findOne', async () => ({
+            status: 'sent',
+            destroy: async () => {
+                destroyed = true;
+            }
+        }));
+        // Only a real true counts: "true" as a string is not asking on purpose
+        assert.equal((await post('/api/chat/1/recap/send', { year, again: 'true' })).status, 409);
+        assert.equal((await post('/api/chat/1/recap/send', { year, again: true })).status, 200);
+        assert.equal(destroyed, true);
+        assert.equal(created.mock.callCount(), 1);
+
+        mock.method(RecapSend, 'findOne', async () => ({ status: 'queued' }));
+        const queued = await post('/api/chat/1/recap/send', { year, again: true });
+        assert.equal(queued.status, 409);
+        assert.match((await queued.json()).error, /Already queued/);
+        assert.equal(created.mock.callCount(), 1);
+    });
 });

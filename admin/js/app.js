@@ -145,7 +145,7 @@ const CLICK_ACTIONS = {
     'history-year': (el) => setHistoryYear(Number(el.dataset.year)),
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step)),
     'chat-stats-period': (el) => pickPeriod(el.dataset.period),
-    'recap-send-one': () => confirmSendOne(),
+    'recap-send-one': (el) => confirmSendOne(el.dataset.again === 'true'),
     'recap-send-open': () => openRecapSend(),
     'recap-send-year': (el) => pickRecapYear(el.dataset.year),
     'recap-send-all': () => confirmSendAll(),

@@ -255,7 +255,7 @@ export function pickPeriod(key) {
 // The object URLs on show, freed when the next preview opens
 let shown = [];
 // The preview on screen: its chat and year, and how closing it goes back to the statistics
-const preview = { id: null, year: null, back: null };
+const preview = { id: null, year: null, back: null, sentAt: null };
 
 function openRecap() {
     const year = recapYear();
@@ -268,7 +268,7 @@ function openRecap() {
         openModal('chat-stats-modal');
         if (menu) setReturnTo(menu);
     };
-    Object.assign(preview, { id, year, back });
+    Object.assign(preview, { id, year, back, sentAt: null });
     setReturnTo(back);
     for (const url of shown) URL.revokeObjectURL(url);
     shown = [];
@@ -330,8 +330,10 @@ function renderRecapStatus(answer) {
     const actions = $('recap-actions');
     const button = (label, extra = '') => `<button type="button" class="btn btn-primary"${extra}>${label}</button>`;
     if (answer.status === 'sent') {
+        preview.sentAt = answer.sentAt;
         status.innerHTML = `<span class="recap-dot" aria-hidden="true"></span>Sent ${escapeHtml(when(answer.sentAt))}`;
-        actions.innerHTML = button('Sent', ' disabled');
+        // Once more on purpose only: its own question says it already got it
+        actions.innerHTML = `<button type="button" class="btn btn-ghost" data-action="recap-send-one" data-again="true">Send again</button>`;
         return;
     }
     if (answer.status === 'queued' || answer.status === 'sending') {
@@ -345,21 +347,27 @@ function renderRecapStatus(answer) {
     actions.innerHTML = button(label, ' data-action="recap-send-one"');
 }
 
-/** The footer's button (data-action="recap-send-one"): asks first, then queues it. */
-export function confirmSendOne() {
-    const { id, year, back } = preview;
+/**
+ * The footer's button (data-action="recap-send-one"): asks first, then queues it. `again`: the
+ * chat already got its year, and the question says so.
+ */
+export function confirmSendOne(again = false) {
+    const { id, year, back, sentAt } = preview;
     if (!id) return;
     // "No" or Escape on the question leaves the preview open, and closing it still goes back
     setReturnTo(() => setReturnTo(back));
+    const quiet = "In the chat's quiet hours it goes out when they end.";
     showConfirm({
-        title: `Send the ${year} recap?`,
-        text: `Six pictures in one message to ${chatName}. A chat gets its year once; this can't be undone. In the chat's quiet hours it goes out when they end.`,
-        confirmLabel: 'Send',
+        title: again ? `Send the ${year} recap again?` : `Send the ${year} recap?`,
+        text: again
+            ? `${chatName} already got it on ${sentAt ? when(sentAt) : 'an earlier day'}. It will get the six pictures once more. ${quiet}`
+            : `Six pictures in one message to ${chatName}. This can't be undone. ${quiet}`,
+        confirmLabel: again ? 'Send again' : 'Send',
         cancelLabel: 'No, cancel',
         onConfirm: async () => {
             setReturnTo(back);
             try {
-                await api(`/chat/${id}/recap/send`, { method: 'POST', body: { year } });
+                await api(`/chat/${id}/recap/send`, { method: 'POST', body: again ? { year, again: true } : { year } });
                 toast('Queued: the recap goes out shortly', 'success');
             } catch (err) {
                 toast(err.message, 'error');

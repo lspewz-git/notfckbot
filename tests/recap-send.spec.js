@@ -83,12 +83,23 @@ test('one chat: "No" sends nothing; "Send" queues it once, and the footer says s
     await expect(page.locator('#chat-stats-modal')).toBeVisible();
 });
 
-test('a chat that has its year: when, and no button to send it again', async ({ page }) => {
-    await mockPanel(page, { recapStatus: { status: 'sent', sentAt: '2026-12-31T07:02:00Z' } });
+test('a chat that has its year: when, and "Send again" behind its own question', async ({ page }) => {
+    const panel = await mockPanel(page, { recapStatus: { status: 'sent', sentAt: '2026-12-31T07:02:00Z' } });
     await openPreview(page);
     await expect(page.locator('#recap-status')).toContainText('Sent 31 Dec 2026');
-    await expect(page.locator('#recap-actions .btn')).toHaveText('Sent');
-    await expect(page.locator('#recap-actions .btn')).toBeDisabled();
+    const again = page.locator('[data-action="recap-send-one"][data-again="true"]');
+    await expect(again).toHaveText('Send again');
+
+    await again.click();
+    await expect(page.locator('#confirm-title')).toHaveText(`Send the ${YEAR} recap again?`);
+    await expect(page.locator('#confirm-text')).toContainText('Movie Club already got it on 31 Dec 2026');
+    await page.locator('#modal-cancel-btn').click();
+    expect(panel.recapSendOne).toBeUndefined();
+
+    await again.click();
+    await page.locator('#modal-confirm-btn').click();
+    await expect(page.locator('#recap-actions .btn')).toHaveText('Queued');
+    expect(panel.recapSendOne).toEqual({ chatId: '-1003', body: { year: YEAR, again: true } });
 });
 
 test('every chat: the counts, a second "yes", then the progress with Stop', async ({ page }) => {

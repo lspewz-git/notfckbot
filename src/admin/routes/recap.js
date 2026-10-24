@@ -82,17 +82,25 @@ router.post('/api/chat/:chatId/recap/send', async (req, res) => {
     const params = valid(z.object({ chatId: chatId() }), req.params, res);
     const year = params && yearOf(req.body || {}, res);
     if (!year) return;
+    // { again: true }: the preview's "Send again", asked a second time in the panel
+    const again = Boolean(req.body && req.body.again === true);
     try {
         const chat = await Chat.findByPk(params.chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
         const row = await RecapSend.findOne({ where: { chatId: params.chatId, year } });
-        // Sent or on its way: a chat gets its year once. A failed one may be tried again by hand
-        if (row && row.status !== 'failed') {
-            return res.status(409).json({ error: `Already ${row.status === 'sent' ? 'sent' : 'queued'} for ${year}` });
+        // On its way: never twice at once. Sent: only when asked for again on purpose (the whole
+        // list never sends a chat its year twice). A failed one may always be tried again
+        if (row && (row.status === 'queued' || row.status === 'sending')) {
+            return res.status(409).json({ error: `Already queued for ${year}` });
+        }
+        if (row && row.status === 'sent' && !again) {
+            return res.status(409).json({ error: `Already sent for ${year}` });
         }
         if (row) await row.destroy();
         await recap.enqueue([params.chatId], year);
-        log.info(`[Admin] Year recap ${year} queued for chat ${params.chatId}`);
+        log.info(
+            `[Admin] Year recap ${year} queued for chat ${params.chatId}${row ? ` (again: was ${row.status})` : ''}`
+        );
         kick(req);
         res.json({ queued: 1 });
     } catch (err) {
