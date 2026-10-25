@@ -1,6 +1,6 @@
 services:
   db:
-    image: mariadb:10.6
+    image: mariadb:11.4
     container_name: series_bot_db
     restart: always
     environment:
@@ -8,12 +8,14 @@ services:
       MARIADB_DATABASE: ${DB_NAME:-series_bot}
       MARIADB_USER: ${DB_USER:-bot_user}
       MARIADB_PASSWORD: ${DB_PASSWORD:-bot_password}
+      # Runs mariadb-upgrade after a version bump (system tables are backed up first).
+      MARIADB_AUTO_UPGRADE: "1"
     ports:
       - "3306:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u\"$$MARIADB_USER\" -p\"$$MARIADB_PASSWORD\" --silent" ]
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
       interval: 10s
       timeout: 5s
       retries: 5

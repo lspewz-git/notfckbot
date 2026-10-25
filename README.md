@@ -43,7 +43,7 @@
 ## Технологии
 
 - Node.js + Telegraf (Telegram Bot API)
-- Sequelize ORM + MariaDB
+- Sequelize ORM + MariaDB 11.4 LTS
 - Express — API и раздача панели
 - Docker + Docker Compose
 - Axios + socks-proxy-agent / https-proxy-agent — исходящий трафик через прокси
