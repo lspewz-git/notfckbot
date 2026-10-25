@@ -4,6 +4,7 @@
  * req.app.get('bot').
  */
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const { panelOnly } = require('./panel-only');
 const { sweepPosters } = require('./posters');
@@ -11,6 +12,11 @@ const { log } = require('../log');
 
 const app = express();
 const PORT = 3000;
+
+// Brotli (light, level 4) or gzip, whichever the browser takes, for the page, its modules, styles
+// and the API's JSON: 685 KB of panel files go as ~200 KB (measured 25.10). Pictures (posters,
+// recap cards) are left alone: they are compressed already
+app.use(compression());
 
 // No CORS: the panel is served from here, and no other site may call the API
 app.use('/api', panelOnly);
@@ -49,4 +55,4 @@ function startAdminServer(bot) {
     setInterval(sweep, 24 * 60 * 60 * 1000).unref();
 }
 
-module.exports = { startAdminServer };
+module.exports = { startAdminServer, app };
