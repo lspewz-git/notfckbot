@@ -8,7 +8,11 @@ import {
     formatReleaseDate,
     releaseExtras,
     formatNextEpisode,
-    MODE_LABELS
+    MODE_LABELS,
+    activeLine,
+    botLeft,
+    chatStatus,
+    lastSeenText
 } from './format.js';
 import { subKey } from './store.js';
 
@@ -64,19 +68,35 @@ export const TABLES = {
     chats: {
         body: 'chats-body',
         filter: 'chats-filter',
-        columns: ['Chat ID', 'User / Group', 'Type', 'Status', 'Actions'],
+        columns: ['Chat ID', 'User / Group', 'Type', 'Status', 'Last active', 'Actions'],
+        tabs: {
+            all: { label: 'All', matches: () => true, empty: 'No chats yet.' },
+            active: { label: 'Active', matches: (item) => !botLeft(item), empty: 'No active chats.' },
+            // Blocked the bot, took it out of the group, or gone (src/bot-status.js)
+            left: {
+                label: 'Left the bot',
+                matches: botLeft,
+                empty: 'No chat has left the bot.',
+                hint: 'chats-left-hint'
+            }
+        },
         row: (item) => {
-            const isBlocked = item.blockedUntil && new Date(item.blockedUntil) > new Date();
-            const status = isBlocked
-                ? '<span class="badge error">Blocked</span>'
-                : '<span class="badge ok">Active</span>';
+            const { badge, note } = chatStatus(item);
+            const seen = lastSeenText(item.last_seen_at);
+            const noteLine = note ? `<span class="status-note">${escapeHtml(note)}</span>` : '';
             return `
                 <tr class="row-compact">
                     <td data-label="Chat ID"><code>${item.id}</code></td>
                     <td data-label="User / Group">${chatDisplayName(item)}</td>
                     <td data-label="Type"><span class="chat-type">${item.type}</span></td>
-                    <td data-label="Status">${status}</td>
-                    ${compactCell({ title: chatDisplayName(item), badge: status, meta: [item.type, String(item.id)] })}
+                    <td data-label="Status"><div class="status-cell">${badge}${noteLine}</div></td>
+                    <td data-label="Last active"><span class="last-active">${seen}</span></td>
+                    ${compactCell({
+                        title: chatDisplayName(item),
+                        badge,
+                        meta: [item.type, String(item.id), activeLine(item.last_seen_at)],
+                        more: note ? [note] : []
+                    })}
                     <td data-label="Actions">
                         <button class="btn btn-row" data-action="chat-actions" data-id="${item.id}" aria-label="Actions for ${escapeHtml(chatLabel(item))}">${ICON.more}${btnLabel('Actions')}</button>
                     </td>

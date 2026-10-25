@@ -16,6 +16,9 @@ const { parseAired } = require('./cron/aired-episodes');
 
 const TOP = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// The bot added, removed, blocked or started in the chat (src/bot-status.js): the latest few
+const BOT_KINDS = ['bot_on', 'bot_off'];
+const BOT_HISTORY = 5;
 
 const inPeriod = (day, { from, to }) => Boolean(day) && day >= from && day <= to;
 const monthInPeriod = (month, { from, to }) => month >= from.slice(0, 7) && month <= to.slice(0, 7);
@@ -295,11 +298,13 @@ async function loadChatStats(chatId, period, now = new Date()) {
         [Op.gte]: new Date(Date.parse(period.from) - DAY_MS),
         [Op.lt]: new Date(Date.parse(period.to) + 2 * DAY_MS)
     };
-    const [subs, films, stored, firstEvent] = await Promise.all([
+    const [subs, films, stored, firstEvent, botEvents] = await Promise.all([
         Subscription.findAll({ where: { chatId }, include: [{ model: Series }] }),
         Watchlist.findAll({ where: { chatId } }),
         ChatEvent.findAll({ where: { chatId, createdAt: window }, order: [['id', 'ASC']] }),
-        ChatEvent.min('createdAt', { where: { chatId } })
+        ChatEvent.min('createdAt', { where: { chatId } }),
+        // The bot's own comings and goings, whatever the period
+        ChatEvent.findAll({ where: { chatId, kind: BOT_KINDS }, order: [['id', 'DESC']], limit: BOT_HISTORY })
     ]);
     // How many chats follow each of its titles
     const [seriesFollowers, filmFollowers] = await Promise.all([
@@ -323,7 +328,7 @@ async function loadChatStats(chatId, period, now = new Date()) {
         .filter((s) => s.Series)
         .map((s) => ({ ...s.Series.get({ plain: true }), mode: s.notify_type, subscribedAt: s.createdAt }));
     const unwritten = events.unwritten().filter((e) => String(e.chatId) === String(chatId));
-    return computeStats(
+    const stats = computeStats(
         {
             chat,
             series,
@@ -335,6 +340,30 @@ async function loadChatStats(chatId, period, now = new Date()) {
         period,
         now
     );
+    return { ...stats, bot: botOf(chat, [...botEvents.map((e) => e.get({ plain: true })), ...unwritten]) };
 }
 
-module.exports = { computeStats, loadChatStats, filmDay, leader };
+/**
+ * Whether the bot is still in the chat, when the chat last used it, and the latest times it was
+ * added, removed, blocked or started, newest first (src/bot-status.js).
+ */
+function botOf(chat, chatEvents) {
+    const history = chatEvents
+        .filter((e) => BOT_KINDS.includes(e.kind))
+        .map((e) => ({
+            kind: e.kind,
+            detail: e.detail,
+            by: e.userName || null,
+            at: new Date(e.createdAt).toISOString()
+        }))
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+        .slice(0, BOT_HISTORY);
+    return {
+        status: chat.bot_status || 'active',
+        since: chat.bot_status_at || null,
+        lastSeen: chat.last_seen_at || null,
+        history
+    };
+}
+
+module.exports = { computeStats, loadChatStats, filmDay, leader, botOf };

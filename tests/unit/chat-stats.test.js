@@ -33,6 +33,8 @@ const { notify } = require('../../src/cron/outbox');
 const { fakeBot } = require('./fakes');
 
 mock.method(Chat, 'findByPk', async () => null);
+// A send refused as "blocked" marks the chat (src/bot-status.js), written at the events' flush
+mock.method(Chat, 'findAll', async () => []);
 
 describe('aired episodes by month', () => {
     test('stored as text and read back the same', () => {

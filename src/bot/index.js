@@ -17,6 +17,8 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 bot.use(require('./state').stateSession);
 // Before the middleware creates a row for it: a group turned supergroup takes its data along
 require('./migration').register(bot);
+// Before the throttle: a block or a removal right after a button tap must not be dropped
+require('./membership').register(bot);
 require('./middleware').register(bot);
 // Right after the middleware, which loads the chat's settings: decides who may press buttons
 require('./access').register(bot);

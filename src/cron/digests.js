@@ -7,6 +7,7 @@
 const { Op } = require('sequelize');
 const { Chat } = require('../db');
 const { deliver } = require('../delivery');
+const { isLeft } = require('../bot-status');
 const { isQuietNow, hourIn } = require('../quiet');
 const { todayIn, weekStart } = require('../calendar');
 const { calendarView } = require('../bot/calendar');
@@ -51,6 +52,7 @@ async function sendDigests(bot, now = new Date()) {
         const chats = await Chat.findAll({ where: { [Op.or]: [{ digest_week: true }, { digest_month: true }] } });
         for (const chat of chats) {
             if (chat.blockedUntil && new Date(chat.blockedUntil) > now) continue;
+            if (isLeft(chat)) continue;
             if (isQuietNow(chat, now)) continue;
             for (const kind of dueDigests(chat, now)) {
                 const field = kind === 'w' ? 'digest_week_sent' : 'digest_month_sent';

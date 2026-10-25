@@ -9,10 +9,12 @@
 const sequelize = require('./database');
 const { Chat, Subscription, Watchlist, PendingMessage, HeldNotification, ChatEvent, RecapSend } = require('./db');
 const events = require('./chat-events');
+const botStatus = require('./bot-status');
 const { log } = require('./log');
 
-// The chat's own settings, carried over to the new id (its name and type come from Telegram)
-const KEEP = ['id', 'type', 'username', 'createdAt', 'updatedAt'];
+// The chat's own settings, carried over to the new id (its name and type come from Telegram, and
+// whether the bot is in it is the new chat's own: src/bot-status.js)
+const KEEP = ['id', 'type', 'username', 'createdAt', 'updatedAt', 'bot_status', 'bot_status_at', 'bot_status_by'];
 
 /**
  * Moves a chat's data from its old id to the new one. Rows the new chat already has for the same
@@ -52,8 +54,9 @@ async function migrateChat(fromId, toId) {
         return true;
     });
     if (moved) {
-        // Events recorded but not written yet carry the old id too
+        // Events and statuses noted but not written yet carry the old id too
         events.moveChat(from, to);
+        botStatus.moveChat(from, to);
         log.info(`[Chat] Group ${from} became supergroup ${to}: its data moved`);
     }
     return moved;

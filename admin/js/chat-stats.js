@@ -6,6 +6,7 @@
  */
 
 import { $, escapeHtml } from './dom.js';
+import { activeLine, shortDay } from './format.js';
 import { api, apiImage } from './api.js';
 import { openModal, closeModal, setReturnTo, showConfirm, toast } from './ui.js';
 
@@ -97,6 +98,29 @@ function rows(items, empty = 'Nothing yet') {
         .join('')}</ul>`;
 }
 
+/** One of the bot's comings and goings in the chat (src/bot-status.js), as a line. */
+function botEventLine({ kind, detail, by }, chatType) {
+    const lines = {
+        started: 'Started the bot',
+        added: by ? `Added by ${by}` : 'Added to the group',
+        returned: 'Came back',
+        stopped: 'Stopped the bot',
+        removed: by ? `Removed by ${by}` : 'Removed from the group',
+        deleted: chatType === 'private' ? 'Account deleted' : 'Chat deleted'
+    };
+    return lines[detail] || (kind === 'bot_on' ? 'Came back' : 'Left the bot');
+}
+
+/** "Bot in this chat": the latest times it was added, removed, blocked or started; nothing if none. */
+function botHistory(bot, chatType) {
+    const history = (bot && bot.history) || [];
+    if (!history.length) return '';
+    return (
+        `<h4 class="stats-box-title stats-subtitle">Bot in this chat</h4>` +
+        rows(history.map((e) => [botEventLine(e, chatType), shortDay(e.at)]))
+    );
+}
+
 /** Bars: the year's months, or for all time one bar a year. */
 function chart(stats) {
     const single = stats.period.from.slice(0, 4) === stats.period.to.slice(0, 4);
@@ -186,7 +210,8 @@ export function renderStats(stats, chatType = 'private') {
                     (group
                         ? `<h4 class="stats-box-title stats-subtitle">Added most</h4>${rows(added.slice(0, 3), 'Nobody yet')}` +
                           `<h4 class="stats-box-title stats-subtitle">Used the bot most</h4>${rows(used.slice(0, 3), 'Nobody yet')}`
-                        : '')
+                        : '') +
+                    botHistory(stats.bot, chatType)
             )}
         </div>
         <p class="stats-note">${escapeHtml(since)}</p>`;
@@ -243,7 +268,7 @@ export function openChatStats(chat, label, back = null) {
     backToMenu = back;
     chatType = chat.type || 'private';
     period = 'year';
-    $('chat-stats-sub').textContent = `${label} · ${chatType}`;
+    $('chat-stats-sub').textContent = [label, chatType, activeLine(chat.last_seen_at)].filter(Boolean).join(' · ');
     renderPeriods();
     renderRecapButton();
     $('chat-stats-recap').onclick = openRecap;

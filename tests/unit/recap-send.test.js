@@ -357,7 +357,7 @@ describe('the queue', () => {
 });
 
 describe('who gets it', () => {
-    test('only chats following something, not blocked, not sent or queued for that year', async () => {
+    test('only chats following something, not blocked, still reachable, not sent or queued for that year', async () => {
         const future = new Date(Date.now() + 3600e3);
         stub(Chat, 'findAll', async () => [
             { id: 1 }, // follows, eligible
@@ -365,9 +365,10 @@ describe('who gets it', () => {
             { id: 3 }, // nothing followed
             { id: 4, blockedUntil: future }, // blocked
             { id: 5 }, // queued
-            { id: 6 } // failed
+            { id: 6 }, // failed
+            { id: 7, bot_status: 'stopped' } // blocked the bot
         ]);
-        stub(Subscription, 'findAll', async () => [{ chatId: 1 }, { chatId: 2 }, { chatId: 4 }]);
+        stub(Subscription, 'findAll', async () => [{ chatId: 1 }, { chatId: 2 }, { chatId: 4 }, { chatId: 7 }]);
         stub(Watchlist, 'findAll', async () => [{ chatId: 5 }, { chatId: 6 }]);
         stub(RecapSend, 'findAll', async () => [
             { chatId: 2, status: 'sent' },
@@ -380,7 +381,8 @@ describe('who gets it', () => {
             queued: 1,
             failed: 1,
             nothing: 1,
-            blocked: 1
+            blocked: 1,
+            left: 1
         });
     });
 });

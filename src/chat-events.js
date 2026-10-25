@@ -42,6 +42,8 @@ const unwritten = () => pending.map((row) => ({ ...row }));
 
 /** Writes what was recorded; on a failure keeps it for the next time. */
 async function flushEvents() {
+    // First the chats' statuses (src/bot-status.js): each change adds an event to this batch
+    await require('./bot-status').flushStatus();
     if (!pending.length) return;
     const batch = pending;
     pending = [];

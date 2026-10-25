@@ -100,6 +100,16 @@ describe('moving a group to its supergroup', () => {
         assert.equal(await migrateChat('-100', '-1001'), false);
     });
 
+    test("whether the bot is in the chat is the supergroup's own, not the old group's", async () => {
+        // Telegram may say the bot left the old group as it closes
+        Object.assign(chats.get('-100'), { bot_status: 'removed', bot_status_at: new Date(), bot_status_by: '@ann' });
+        chats.set('-1001', { id: '-1001', type: 'supergroup', username: 'Club', bot_status: 'active' });
+        await migrateChat('-100', '-1001');
+        assert.equal(chats.get('-1001').bot_status, 'active');
+        assert.equal(chats.get('-1001').bot_status_by, undefined);
+        assert.equal(chats.get('-1001').timezone, 'Asia/Omsk');
+    });
+
     test('events recorded but not written yet go under the new id too', async () => {
         events.record('-100', { kind: 'used', detail: 'search' });
         await migrateChat('-100', '-1001');

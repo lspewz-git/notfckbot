@@ -338,6 +338,25 @@ tbody tr:hover .avatar-mark {
     text-transform: uppercase;
 }
 
+/* A chat's status: the badge, and under it since when or until when */
+.status-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+}
+
+.status-note {
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+
+.last-active {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .log-time {
     color: var(--text-dim);
     font-size: var(--text-xs);

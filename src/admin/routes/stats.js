@@ -7,6 +7,7 @@ const { unwritten } = require('../../stats-log');
 const { getCronStatus } = require('../../cron');
 const { getVersion } = require('../version');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('../../constants');
+const { LEFT } = require('../../bot-status');
 
 const router = require('express').Router();
 
@@ -120,9 +121,11 @@ router.get('/api/stats/charts', async (req, res) => {
 
 router.get('/api/stats', async (req, res) => {
     try {
-        const [chatsCount, seriesCount, subsCount, archivedSubsCount, filmsCount, releasedFilmsCount] =
+        const [chatsCount, chatsLeft, seriesCount, subsCount, archivedSubsCount, filmsCount, releasedFilmsCount] =
             await Promise.all([
                 Chat.count(),
+                // Blocked the bot or took it out of the group (src/bot-status.js)
+                Chat.count({ where: { bot_status: { [Op.in]: LEFT } } }),
                 Series.count(),
                 Subscription.count(),
                 Subscription.count({
@@ -139,6 +142,7 @@ router.get('/api/stats', async (req, res) => {
         res.json({
             ...(await recentChanges()),
             chatsCount,
+            chatsLeft,
             seriesCount,
             subsCount,
             activeSubsCount,

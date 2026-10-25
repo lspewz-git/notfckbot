@@ -137,7 +137,8 @@ function fill(s) {
         row('Already got it or queued', a.sent + a.queued) +
         (a.failed ? row('Failed earlier (send by hand)', a.failed) : '') +
         row('Nothing to show for the year', a.nothing) +
-        row('Blocked in the panel', a.blocked);
+        row('Blocked in the panel', a.blocked) +
+        (a.left ? row('Left the bot', a.left) : '');
     $('recap-sched-pane').setAttribute('aria-busy', 'false');
 }
 

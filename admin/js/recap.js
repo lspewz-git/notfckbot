@@ -74,6 +74,7 @@ export function renderRecapSend(answer) {
         fact('Nothing to show', who.nothing, 'no subscriptions or films'),
         fact('Blocked in the panel', who.blocked)
     ];
+    if (who.left) rows.push(fact('Left the bot', who.left, 'blocked it or removed it from the group'));
     if (who.failed) rows.splice(2, 0, fact('Failed earlier', who.failed, "send again from the chat's Statistics"));
     const hint =
         'One chat at a time, about a second each. Chats in quiet hours get it when their hours end. The panel can be closed meanwhile.';

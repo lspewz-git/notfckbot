@@ -7,6 +7,7 @@ const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
 const stats = require('../stats-log');
 const events = require('../chat-events');
+const { isLeft } = require('../bot-status');
 const { tally } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { log } = require('../log');
@@ -36,11 +37,15 @@ const QUEUED = { status: 'failed', error: 'Telegram was unreachable earlier in t
 /**
  * Sends one notification; a temporary failure is queued for the next check. In the chat's quiet
  * hours it is held instead, for the list that goes out when they end (src/cron/held.js).
+ * Returns deliver()'s outcome, held, or left for a chat the bot has lost (not tried).
  * @param {{ photo?: string | null, about?: string, line?: string, label?: string, event?: object | null }} [options]
  *   about: the title, for the log; line and label: its line and button in that list; event: what it
  *   was, for the chat's statistics (src/chat-events.js: detail, tmdb_id, title, season, episode)
  */
 async function notify(bot, chatId, text, { photo = null, about = '', line = '', label = '', event = null } = {}) {
+    // A chat that blocked the bot or took it out (src/bot-status.js) isn't tried: it would only
+    // fail. Its subscriptions stay, and news goes out again once it is back
+    if (isLeft(await chatSettings(chatId))) return { status: 'left' };
     const result = await send(bot, chatId, text, { photo, about, line, label });
     if (event) events.record(chatId, { kind: 'notified', ...event, outcome: outcomeOf(result) });
     return result;
@@ -104,8 +109,14 @@ async function flushPending(bot, now = new Date()) {
         }
         // Telegram down: the rest wait for the next check, untried (their age still runs out)
         if (unreachable) break;
+        const chat = await chatSettings(message.chatId);
+        // Lost to a chat that blocked the bot meanwhile, as a new one would be
+        if (isLeft(chat)) {
+            await message.destroy();
+            continue;
+        }
         // A retry is still a notification: not in the chat's quiet hours; a later check sends it
-        if (isQuietNow(await chatSettings(message.chatId), now)) continue;
+        if (isQuietNow(chat, now)) continue;
         const result = await deliver(bot, message.chatId, message.text, { photo: message.photo });
         if (result.status === 'failed') {
             unreachable = true;

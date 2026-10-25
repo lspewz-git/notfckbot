@@ -47,6 +47,8 @@ function setAside(id, n, text) {
 export function updateStats(stats) {
     setText('chats-count', stats.chatsCount);
     setDelta('chats-delta', stats.chatsNew30, 'new in 30 days', 'None new in 30 days');
+    // Blocked the bot or took it out of the group
+    setAside('chats-left-count', stats.chatsLeft, 'left');
     // activeSubsCount is newer than the panel's first backend — fall back to the total
     setText('subs-count', stats.activeSubsCount ?? stats.subsCount);
     setDelta('subs-delta', stats.subsNew30, 'new in 30 days', 'None new in 30 days');

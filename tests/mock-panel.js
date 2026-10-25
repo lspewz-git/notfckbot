@@ -30,7 +30,11 @@ const chat = (id, username, type = 'private') => ({
     type,
     blockedUntil: null,
     menu_enabled: true,
-    buttons_mode: 'owner'
+    buttons_mode: 'owner',
+    bot_status: 'active',
+    bot_status_at: null,
+    bot_status_by: null,
+    last_seen_at: null
 });
 
 const CHATS = [chat(101, 'alice'), chat(102, 'bob'), chat(-1003, 'Movie Club', 'supergroup')];
@@ -159,6 +163,7 @@ function stats(subs) {
     const archived = subs.filter((s) => FINISHED.includes(s.Series && s.Series.status)).length;
     return {
         chatsCount: CHATS.length,
+        chatsLeft: 0,
         seriesCount: SERIES.length,
         subsCount: subs.length,
         activeSubsCount: subs.length - archived,
@@ -205,7 +210,7 @@ const PIXEL = Buffer.from(
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
  *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
  *   recap?: (n: number) => Buffer, recapStatus?: object, recapLooks?: object, recapReady?: object,
- *   recapImage?: (what: string) => Buffer }} [options]
+ *   recapImage?: (what: string) => Buffer, chats?: object[] }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
@@ -214,6 +219,7 @@ const PIXEL = Buffer.from(
  *   `hold`: API answers wait for it, so a test can see the loading state;
  *   `failing`: API paths ('/api/stats') that answer 500;
  *   `poster`: a series card gets a poster (a 1x1 image);
+ *   `chats`: the Users / Chats rows instead of the three default ones;
  *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
  *   served once it resolves (a page.route() of the test's would lose to this one's catch-all)
  */
@@ -277,7 +283,8 @@ function chatStats(query) {
             used: [{ name: '@ann', n: 36 }]
         },
         rare: [],
-        since: '2026-10-23'
+        since: '2026-10-23',
+        bot: { status: 'active', since: null, lastSeen: null, history: [] }
     };
 }
 
@@ -433,7 +440,7 @@ async function mockPanel(page, options = {}) {
                 url: 'https://github.com/owner/repo/commit/abc1234def5678abc1234def5678abc1234def56'
             },
         '/api/logs': () => [{ type: 'log', time: '12:00:00', text: 'Started' }],
-        '/api/data/chats': () => CHATS,
+        '/api/data/chats': () => options.chats || CHATS,
         // Like the real API: the archived flag is derived from Series.status on every response
         '/api/data/subs': () =>
             panel.subs.map((s) => ({ ...s, archived: FINISHED.includes(s.Series && s.Series.status) })),

@@ -86,14 +86,20 @@ async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sle
  */
 async function followingMove(chatId, send) {
     const result = await send(chatId);
-    if (result.status !== 'moved') return result;
+    if (result.status !== 'moved') return noted(chatId, result);
     try {
         await require('./chat-migration').migrateChat(chatId, result.to);
     } catch (err) {
         log.error(`[Delivery] Moving group ${chatId} to supergroup ${result.to} failed: ${err.message}`);
     }
     const again = await send(result.to);
-    return again.status === 'moved' ? { status: 'gone', error: again.error } : again;
+    return again.status === 'moved' ? { status: 'gone', error: again.error } : noted(result.to, again);
+}
+
+/** A chat that blocked the bot or took it out is marked so (src/bot-status.js): later sends skip it. */
+function noted(chatId, result) {
+    if (result.status === 'gone') require('./bot-status').noteSendFailed(chatId, result.error);
+    return result;
 }
 
 /**

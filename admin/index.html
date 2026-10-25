@@ -305,7 +305,10 @@
                                 <span id="chats-count" class="stat-value"
                                     ><span class="skeleton" aria-hidden="true"></span
                                 ></span>
-                                <span id="chats-delta" class="stat-delta">&nbsp;</span>
+                                <span class="stat-delta"
+                                    ><span id="chats-delta">&nbsp;</span
+                                    ><span id="chats-left-count" class="stat-aside" hidden></span
+                                ></span>
                             </div>
                             <div
                                 class="stat-card"
@@ -606,17 +609,33 @@
                             <button class="btn btn-outline" data-action="recap-send-open">Year recap…</button>
                         </header>
                         <div class="glass-card">
+                            <div class="tab-filters" role="group" aria-label="Which chats to show">
+                                <button class="btn btn-ghost active" data-chats-tab="all" aria-pressed="true">
+                                    All
+                                </button>
+                                <button class="btn btn-ghost" data-chats-tab="active" aria-pressed="false">
+                                    Active
+                                </button>
+                                <button class="btn btn-ghost" data-chats-tab="left" aria-pressed="false">
+                                    Left the bot
+                                </button>
+                            </div>
+                            <p id="chats-left-hint" class="tab-hint" hidden>
+                                Chats that blocked the bot or removed it from the group. Their subscriptions stay, and
+                                notifications start again by themselves when the bot is back.
+                            </p>
                             <div class="search-box">
                                 <input type="text" id="chats-filter" placeholder="Filter by ID or Username..." />
                             </div>
                             <div class="table-wrap">
-                                <table id="chats-table">
+                                <table id="chats-table" data-tab="all">
                                     <thead>
                                         <tr>
                                             <th>Chat ID</th>
                                             <th>User / Group</th>
                                             <th>Type</th>
                                             <th>Status</th>
+                                            <th>Last active</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>

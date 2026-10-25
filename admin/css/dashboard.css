@@ -343,7 +343,11 @@
     color: var(--text-dim);
 }
 
-/* "· 8 archived" after the change */
+/* "· 8 archived" after the change; wraps as a whole, not "8" on one line and "archived" on the next */
+.stat-aside {
+    white-space: nowrap;
+}
+
 .stat-aside::before {
     content: ' · ';
 }

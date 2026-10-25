@@ -158,3 +158,68 @@ export const BROADCAST_AUDIENCE_LABELS = {
     private: 'every private chat',
     groups: 'every group and channel'
 };
+
+/** "12 Oct", with the year when it isn't this one; in the viewer's time. Plain text. */
+export function shortDay(iso, now = new Date()) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear() === now.getFullYear() ? undefined : 'numeric';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year });
+}
+
+/** When a chat last used the bot: "Just now", "5 min ago", "2 h ago", "Yesterday", "9 Oct"; "-" if never seen. */
+export function lastSeenText(iso, now = new Date()) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return '-';
+    const minutes = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 60000));
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} min ago`;
+    if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return d.toDateString() === yesterday.toDateString() ? 'Yesterday' : shortDay(iso, now);
+}
+
+/** "active 2 h ago", "active yesterday" for a line after a chat's name; empty if never seen. */
+export function activeLine(iso, now = new Date()) {
+    const seen = lastSeenText(iso, now);
+    return seen === '-' ? '' : `active ${seen.replace(/^(Yesterday|Just now)$/, (w) => w.toLowerCase())}`;
+}
+
+/** The statuses of a chat the bot can't reach (src/bot-status.js); the panel's block is separate. */
+const LEFT_LABELS = {
+    stopped: () => 'Stopped the bot',
+    removed: () => 'Removed from group',
+    deleted: (chat) => (chat.type === 'private' ? 'Account deleted' : 'Chat deleted')
+};
+
+/** Whether the bot has lost the chat: blocked by the user, removed from the group, deleted. */
+export const botLeft = (chat) => Boolean(LEFT_LABELS[chat.bot_status]);
+
+/**
+ * A chat's status badge and the quiet line under it: lost to the bot (and since when, by whom),
+ * blocked in the panel (until when), or active (and back since when, if it had left).
+ * @returns {{ badge: string, note: string }} badge: HTML; note: plain text, escape it for HTML
+ */
+export function chatStatus(chat, now = new Date()) {
+    const since = chat.bot_status_at ? shortDay(chat.bot_status_at, now) : '';
+    if (botLeft(chat)) {
+        const by = chat.bot_status_by ? `by ${chat.bot_status_by}` : '';
+        const note = by ? [by, since].filter(Boolean).join(' · ') : since && `since ${since}`;
+        return {
+            badge: `<span class="badge warn">${LEFT_LABELS[chat.bot_status](chat)}</span>`,
+            note
+        };
+    }
+    const until = chat.blockedUntil ? new Date(chat.blockedUntil) : null;
+    if (until && until > now) {
+        const when = until.toLocaleString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        return { badge: '<span class="badge error">Blocked</span>', note: `until ${when}` };
+    }
+    return { badge: '<span class="badge ok">Active</span>', note: since ? `came back ${since}` : '' };
+}

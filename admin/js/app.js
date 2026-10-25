@@ -170,19 +170,20 @@ const CLICK_ACTIONS = {
 };
 
 const DELEGATED =
-    '[data-action], [data-section], [data-close], [data-close-return], [data-open], [data-log-filter], [data-subs-tab], [data-films-tab]';
+    '[data-action], [data-section], [data-close], [data-close-return], [data-open], [data-log-filter], [data-subs-tab], [data-films-tab], [data-chats-tab]';
 
 function setupDelegation() {
     document.addEventListener('click', (e) => {
         const el = closest(e, DELEGATED);
         if (!el) return;
 
-        const { action, section, close, closeReturn, open, logFilter, subsTab, filmsTab } = el.dataset;
+        const { action, section, close, closeReturn, open, logFilter, subsTab, filmsTab, chatsTab } = el.dataset;
 
         if (action && CLICK_ACTIONS[action]) CLICK_ACTIONS[action](el);
         // Before the section switch, so the dashboard card lands on the right tab
         if (subsTab) setTableTab('subs', subsTab);
         if (filmsTab) setTableTab('films', filmsTab);
+        if (chatsTab) setTableTab('chats', chatsTab);
         if (section) switchSection(section);
         if (close) closeModal(close);
         if (closeReturn) closeModalReturning(closeReturn);

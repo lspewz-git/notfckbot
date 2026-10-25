@@ -9,6 +9,7 @@
 const { Op } = require('sequelize');
 const { Chat, Subscription, Watchlist, RecapSend } = require('../db');
 const { deliverAlbum } = require('../delivery');
+const { isLeft } = require('../bot-status');
 const { isQuietNow } = require('../quiet');
 const { plural } = require('../calendar');
 const { escapeHtml } = require('../constants');
@@ -111,19 +112,19 @@ function caption(year, stats, random = Math.random, group = false) {
 
 /**
  * Who the year would go to: chats with a subscription or a film (the rest have nothing to show),
- * not blocked in the panel, not sent or queued for that year already.
- * @returns {Promise<{ eligible: string[], sent: number, queued: number, failed: number, nothing: number, blocked: number }>}
+ * not blocked in the panel, still reachable (src/bot-status.js), not sent or queued for that year already.
+ * @returns {Promise<{ eligible: string[], sent: number, queued: number, failed: number, nothing: number, blocked: number, left: number }>}
  */
 async function audience(year, now = new Date()) {
     const [chats, subs, films, rows] = await Promise.all([
-        Chat.findAll({ attributes: ['id', 'blockedUntil'] }),
+        Chat.findAll({ attributes: ['id', 'blockedUntil', 'bot_status'] }),
         Subscription.findAll({ attributes: ['chatId'], group: ['chatId'], raw: true }),
         Watchlist.findAll({ attributes: ['chatId'], group: ['chatId'], raw: true }),
         RecapSend.findAll({ where: { year }, attributes: ['chatId', 'status'], raw: true })
     ]);
     const following = new Set([...subs, ...films].map((r) => String(r.chatId)));
     const status = new Map(rows.map((r) => [String(r.chatId), r.status]));
-    const result = { eligible: [], sent: 0, queued: 0, failed: 0, nothing: 0, blocked: 0 };
+    const result = { eligible: [], sent: 0, queued: 0, failed: 0, nothing: 0, blocked: 0, left: 0 };
     for (const chat of chats) {
         const id = String(chat.id);
         const row = status.get(id);
@@ -132,6 +133,7 @@ async function audience(year, now = new Date()) {
         else if (row === 'failed') result.failed += 1;
         else if (!following.has(id)) result.nothing += 1;
         else if (chat.blockedUntil && new Date(chat.blockedUntil) > now) result.blocked += 1;
+        else if (isLeft(chat)) result.left += 1;
         else result.eligible.push(id);
     }
     return result;

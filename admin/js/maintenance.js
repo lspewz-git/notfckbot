@@ -44,7 +44,8 @@ export function sendBroadcast() {
             try {
                 const res = await api('/broadcast', { method: 'POST', body: { message, target } });
                 const failed = res.failCount ? `, ${res.failCount} failed` : '';
-                toast(`Delivered to ${res.successCount} chats${failed}`, res.failCount ? 'warning' : 'success');
+                const left = res.leftCount ? `, ${res.leftCount} left the bot (skipped)` : '';
+                toast(`Delivered to ${res.successCount} chats${failed}${left}`, res.failCount ? 'warning' : 'success');
                 clearReturnTo();
                 closeModal('broadcast-modal');
                 $field('broadcast-msg').value = '';

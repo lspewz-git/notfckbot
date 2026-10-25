@@ -67,6 +67,28 @@ const Chat = sequelize.define('Chat', {
     blockedUntil: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    // Whether the bot can still reach the chat (src/bot-status.js): active; stopped, a user who
+    // blocked the bot; removed, a group that took it out; deleted, an account or chat that is gone.
+    // The panel's own block is blockedUntil, not this.
+    bot_status: {
+        type: DataTypes.STRING(10),
+        allowNull: false,
+        defaultValue: 'active'
+    },
+    // When it last changed (null: never, since recording began) and who did it in a group
+    bot_status_at: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    bot_status_by: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    // The chat's last message or button to the bot, written every ten minutes at most
+    last_seen_at: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 });
 

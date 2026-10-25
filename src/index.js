@@ -49,6 +49,10 @@ async function start() {
         bot.launch({ dropPendingUpdates: true })
             .then(() => log.info('Bot is running! 🚀'))
             .catch((err) => log.error({ err }, 'Bot launch failed'));
+        // Groups that added the bot back while it was down: their update was dropped above
+        require('./bot/membership')
+            .recheckRemoved(bot, botInfo.id)
+            .catch((err) => log.error(`[Status] Rechecking removed groups failed: ${err.message}`));
 
         // Graceful stop (docker compose restart/stop): the day counts and chat events kept in memory are written
         // first, then the process ends without waiting for Docker to kill it

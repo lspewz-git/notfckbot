@@ -6,6 +6,7 @@ const { formatWatchLinks } = require('../../constants');
 const { findKinopoiskIdQuick } = require('../../api/kinopoisk');
 const tmdb = require('../../api/tmdb');
 const { deliver } = require('../../delivery');
+const { isLeft } = require('../../bot-status');
 const { z, valid, idOf, chatId, text } = require('../validate');
 
 const router = require('express').Router();
@@ -35,16 +36,24 @@ router.post('/api/broadcast', async (req, res) => {
         const chats = await Chat.findAll({ where });
         let successCount = 0;
         let failCount = 0;
+        let leftCount = 0;
 
         for (const chat of chats) {
+            // Blocked the bot or took it out of the group: it would only fail (src/bot-status.js)
+            if (isLeft(chat)) {
+                leftCount++;
+                continue;
+            }
             const result = await deliver(bot, chat.id, `📣 <b>ОБЪЯВЛЕНИЕ:</b>\n\n${message}`);
             if (result.status === 'sent') successCount++;
             else failCount++;
             // FIX: Rate limit — Telegram allows ~30 messages/sec; 50ms keeps us safe
             await new Promise((r) => setTimeout(r, 50));
         }
-        log.info(`[Admin] Broadcast to "${target}": ${successCount} delivered, ${failCount} failed.`);
-        res.json({ success: true, successCount, failCount });
+        log.info(
+            `[Admin] Broadcast to "${target}": ${successCount} delivered, ${failCount} failed, ${leftCount} left the bot.`
+        );
+        res.json({ success: true, successCount, failCount, leftCount });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
