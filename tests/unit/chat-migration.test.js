@@ -11,7 +11,15 @@ const sequelize = require('../../src/database');
 const db = require('../../src/db');
 const events = require('../../src/chat-events');
 
-const MODELS = ['Subscription', 'Watchlist', 'PendingMessage', 'HeldNotification', 'ChatEvent', 'RecapSend'];
+const MODELS = [
+    'Subscription',
+    'Watchlist',
+    'PendingMessage',
+    'HeldNotification',
+    'ChatEvent',
+    'RecapSend',
+    'AlertRecipient'
+];
 let chats;
 let tables;
 
@@ -52,6 +60,8 @@ for (const name of MODELS) {
     });
 }
 
+stub(db.AlertRecipient, 'findByPk', async (id) => tables.AlertRecipient.find((r) => r.chatId === String(id)) || null);
+
 const { migrateChat, migratedTo } = require('../../src/chat-migration');
 const { migrationOf } = require('../../src/bot/migration');
 const { deliver, classify } = require('../../src/delivery');
@@ -67,6 +77,8 @@ beforeEach(() => {
     tables.PendingMessage.push({ chatId: '-100' });
     tables.ChatEvent.push({ chatId: '-100', kind: 'subscribed' });
     tables.RecapSend.push({ chatId: '-100', year: 2026, status: 'queued' });
+    // The owners' group gets the alerts (src/alerts/)
+    tables.AlertRecipient.push({ chatId: '-100', preset: 'all' });
 });
 
 describe('moving a group to its supergroup', () => {
@@ -91,10 +103,12 @@ describe('moving a group to its supergroup', () => {
         chats.set('-1001', { id: '-1001', type: 'supergroup', username: 'Club' });
         tables.Subscription.push({ chatId: '-1001', seriesId: 'tv_1', own: true });
         tables.RecapSend.push({ chatId: '-1001', year: 2026, status: 'sent', own: true });
+        tables.AlertRecipient.push({ chatId: '-1001', preset: 'critical', own: true });
         await migrateChat('-100', '-1001');
         assert.deepEqual(tables.Subscription.map((r) => r.seriesId).sort(), ['tv_1', 'tv_2']);
         assert.ok(tables.Subscription.find((r) => r.seriesId === 'tv_1').own);
         assert.deepEqual(tables.RecapSend, [{ chatId: '-1001', year: 2026, status: 'sent', own: true }]);
+        assert.deepEqual(tables.AlertRecipient, [{ chatId: '-1001', preset: 'critical', own: true }]);
         // The group's settings carried over to the existing row
         assert.equal(chats.get('-1001').timezone, 'Asia/Omsk');
         assert.equal(await migrateChat('-100', '-1001'), false);

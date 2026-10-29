@@ -11,11 +11,40 @@ const { warmDetailsCache } = require('./warm-cache');
 const { backfillReleaseSeasons } = require('./cron/release-seasons');
 const { backfillAiredEpisodes } = require('./cron/aired-episodes');
 const { backfillFilmFacts } = require('./cron/films');
+const { startAlerts, markShutdown, lastShutdown } = require('./alerts/watch');
+const { getVersion } = require('./admin/version');
 const { log } = require('./log');
 
 async function start() {
     try {
         log.info('Starting NotFckBot...');
+        // How the last run ended, read (and the mark cleared) before anything here can fail: a
+        // start that dies early must not leave the old mark for the next crash to hide behind
+        const ended = lastShutdown();
+
+        // Graceful stop (docker compose restart/stop), set first: a stop during startup isn't a
+        // crash either (node is PID 1 and ignores SIGTERM without a handler). The day counts and
+        // chat events kept in memory are written first, then the process ends without waiting for
+        // Docker to kill it
+        for (const signal of ['SIGINT', 'SIGTERM']) {
+            process.once(signal, async () => {
+                // Not a crash: the next start says so (a restart from the panel has marked it already)
+                markShutdown('signal', { keep: true });
+                // Throws when polling never started (a stop during startup)
+                try {
+                    bot.stop(signal);
+                } catch {
+                    // nothing to stop
+                }
+                await require('./stats-log')
+                    .flushStats()
+                    .catch(() => {});
+                await require('./chat-events')
+                    .flushEvents()
+                    .catch(() => {});
+                process.exit(0);
+            });
+        }
 
         // Initialize Database
         await initDb();
@@ -33,6 +62,9 @@ async function start() {
 
         // Start Admin Dashboard
         startAdminServer(bot);
+
+        // Alerts to the people in Settings → Alerts; first, how the last run ended
+        startAlerts(bot, { version: getVersion().short, ended });
 
         // In the background: the panel's cards are quick from the first one after a restart
         // Then the release history's years for series that have none yet (once per series)
@@ -53,26 +85,6 @@ async function start() {
         require('./bot/membership')
             .recheckRemoved(bot, botInfo.id)
             .catch((err) => log.error(`[Status] Rechecking removed groups failed: ${err.message}`));
-
-        // Graceful stop (docker compose restart/stop): the day counts and chat events kept in memory are written
-        // first, then the process ends without waiting for Docker to kill it
-        for (const signal of ['SIGINT', 'SIGTERM']) {
-            process.once(signal, async () => {
-                // Throws when polling never started (a stop during startup)
-                try {
-                    bot.stop(signal);
-                } catch {
-                    // nothing to stop
-                }
-                await require('./stats-log')
-                    .flushStats()
-                    .catch(() => {});
-                await require('./chat-events')
-                    .flushEvents()
-                    .catch(() => {});
-                process.exit(0);
-            });
-        }
     } catch (err) {
         log.error({ err }, 'Fatal error during startup');
         process.exit(1);

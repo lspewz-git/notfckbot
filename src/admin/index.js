@@ -40,6 +40,7 @@ app.use(require('./routes/config'));
 app.use(require('./routes/services'));
 app.use(require('./routes/history'));
 app.use(require('./routes/settings'));
+app.use(require('./routes/alerts'));
 
 function startAdminServer(bot) {
     app.set('bot', bot);

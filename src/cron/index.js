@@ -4,7 +4,7 @@
  * subscribed chats. The texts are in messages.js, the dashboard's run status in status.js.
  */
 const cron = require('node-cron');
-const { Series, Chat } = require('../db');
+const { Series, Chat, PendingMessage } = require('../db');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { beginRun, endRun, getCronStatus, nextRunAt } = require('./status');
 const { checkSeriesUpdates, notifyNewEpisodes, notifyStatusChange, isSeasonComplete } = require('./series');
@@ -17,6 +17,7 @@ const { processQueue: sendRecaps } = require('../recap/send');
 const { runSchedule } = require('../recap/schedule');
 const stats = require('../stats-log');
 const { flushEvents } = require('../chat-events');
+const { afterCheck } = require('../alerts/watch');
 const { log } = require('../log');
 
 const checkUpdates = async (bot) => {
@@ -44,6 +45,12 @@ const checkUpdates = async (bot) => {
         if (fatal || (lastRun && lastRun.errors)) stats.count('check_errors');
         await stats.flushStats();
         await flushEvents();
+        // Failed, ended with errors, lost messages: the alerts (src/alerts/) decide whom to tell
+        // Not awaited: an alert's retries while Telegram is down mustn't hold up the check's end
+        PendingMessage.count()
+            .catch(() => 0)
+            .then((queued) => afterCheck(lastRun, queued))
+            .catch((err) => log.error(`[Alerts] After the check: ${err.message}`));
         log.info('[Cron] Update check complete.');
     }
 };

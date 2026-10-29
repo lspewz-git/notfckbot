@@ -9,6 +9,8 @@ const DailyStat = require('./models/DailyStat');
 const ChatEvent = require('./models/ChatEvent');
 const RecapSend = require('./models/RecapSend');
 const RecapLook = require('./models/RecapLook');
+const AlertRecipient = require('./models/AlertRecipient');
+const AlertLog = require('./models/AlertLog');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -36,5 +38,7 @@ module.exports = {
     DailyStat,
     ChatEvent,
     RecapSend,
-    RecapLook
+    RecapLook,
+    AlertRecipient,
+    AlertLog
 };

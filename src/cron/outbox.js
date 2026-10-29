@@ -8,7 +8,7 @@ const { isQuietNow } = require('../quiet');
 const stats = require('../stats-log');
 const events = require('../chat-events');
 const { isLeft } = require('../bot-status');
-const { tally } = require('./status');
+const { tally, noteFailure } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { log } = require('../log');
 
@@ -75,6 +75,10 @@ async function send(bot, chatId, text, { photo, about, line, label }) {
         return result;
     }
     tally('failed');
+    // A chat that blocked the bot is no sign of trouble for the alert; the queued rest say only
+    // that Telegram failed earlier: the alert quotes the real error
+    if (result.status === 'gone') tally('gone');
+    else if (result !== QUEUED) noteFailure(result.error);
     const what = about ? ` about "${about}"` : '';
     // The day counts take a failure once it is final: a queued message may still go out
     if (result.status !== 'failed') {

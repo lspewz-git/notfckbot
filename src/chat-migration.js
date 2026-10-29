@@ -7,7 +7,16 @@
  * send that fails with the new id (src/delivery.js).
  */
 const sequelize = require('./database');
-const { Chat, Subscription, Watchlist, PendingMessage, HeldNotification, ChatEvent, RecapSend } = require('./db');
+const {
+    Chat,
+    Subscription,
+    Watchlist,
+    PendingMessage,
+    HeldNotification,
+    ChatEvent,
+    RecapSend,
+    AlertRecipient
+} = require('./db');
 const events = require('./chat-events');
 const botStatus = require('./bot-status');
 const { log } = require('./log');
@@ -46,8 +55,21 @@ async function migrateChat(fromId, toId) {
         if (films.length) await Watchlist.destroy({ where: { chatId: from, tmdb_id: films }, transaction });
         const years = await clashing(RecapSend, 'year');
         if (years.length) await RecapSend.destroy({ where: { chatId: from, year: years }, transaction });
+        // An alert recipient is the chat itself (its id is the key): the old row goes when the new is one already
+        if (await AlertRecipient.findByPk(to, { transaction })) {
+            await AlertRecipient.destroy({ where: { chatId: from }, transaction });
+        }
 
-        for (const model of [Subscription, Watchlist, PendingMessage, HeldNotification, ChatEvent, RecapSend]) {
+        const models = [
+            Subscription,
+            Watchlist,
+            PendingMessage,
+            HeldNotification,
+            ChatEvent,
+            RecapSend,
+            AlertRecipient
+        ];
+        for (const model of models) {
             await model.update({ chatId: to }, { where: { chatId: from }, transaction });
         }
         await old.destroy({ transaction });

@@ -16,6 +16,7 @@ import { setLogs, renderLogs } from './logs.js';
 import { loadHistory } from './history.js';
 import { updateCharts, chartsFailed } from './dashboard-charts.js';
 import { loadSettings } from './settings.js';
+import { loadAlerts } from './alerts.js';
 
 // Which /api/data/:type each section needs, if any
 const SECTION_TABLES = {
@@ -71,7 +72,7 @@ export async function fetchData() {
         jobs.push(api('/cron').then(updateCron));
     }
     if (currentSection === 'history') jobs.push(loadHistory());
-    if (currentSection === 'settings') jobs.push(loadSettings());
+    if (currentSection === 'settings') jobs.push(loadSettings(), loadAlerts());
     if (currentSection === 'logs') {
         jobs.push(
             api('/logs').then((logs) => {

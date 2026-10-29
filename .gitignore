@@ -14,6 +14,9 @@ playwright-report/
 # Last update-check run, shown on the admin dashboard
 .cron-status.json
 
+# How the bot's last run ended, for the restart alert (src/alerts/watch.js)
+.shutdown.json
+
 # Claude Code: local working rules (server address, deploy steps)
 CLAUDE.md
 .env.bak
@@ -21,3 +24,6 @@ CLAUDE.md
 
 # Posters cached on the server (src/admin/posters.js)
 data/
+
+# UI mockups shown before building a feature
+mockups/

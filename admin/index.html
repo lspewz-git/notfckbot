@@ -23,6 +23,7 @@
              keeps this list complete) -->
         <link rel="modulepreload" href="js/app.js" />
         <link rel="modulepreload" href="js/about.js" />
+        <link rel="modulepreload" href="js/alerts.js" />
         <link rel="modulepreload" href="js/api.js" />
         <link rel="modulepreload" href="js/chat-stats.js" />
         <link rel="modulepreload" href="js/chats.js" />
@@ -929,6 +930,131 @@
                                     <button class="btn btn-ghost" id="settings-restart" data-action="settings-restart">
                                         Restart bot
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Alerts (admin/js/alerts.js): saved at once, not through the bar above -->
+                        <div class="settings-grid alerts-grid">
+                            <div class="glass-card settings-card">
+                                <h2 class="settings-title">
+                                    Alerts <span class="settings-optional">from the bot</span>
+                                </h2>
+                                <p class="settings-desc">
+                                    The bot writes to these chats when something breaks and when it's fixed. Each picks
+                                    what to hear about. Changes here apply at once.
+                                </p>
+                                <!-- Rows of the real rows' size until the first answer (alerts.js loadAlerts) -->
+                                <div id="alerts-people" class="alerts-people" aria-busy="true">
+                                    <div class="alert-skeleton-rows" aria-hidden="true">
+                                        <div class="alert-person alert-skeleton">
+                                            <span class="alert-ava"></span>
+                                            <span class="alert-who"
+                                                ><span class="alert-name"><span class="skeleton"></span></span
+                                                ><span class="alert-meta"><span class="skeleton"></span></span
+                                            ></span>
+                                        </div>
+                                        <div class="alert-person alert-skeleton">
+                                            <span class="alert-ava"></span>
+                                            <span class="alert-who"
+                                                ><span class="alert-name"><span class="skeleton"></span></span
+                                                ><span class="alert-meta"><span class="skeleton"></span></span
+                                            ></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="alerts-add">
+                                    <button class="btn btn-primary" data-action="alerts-add">+ Add recipient</button>
+                                    <button
+                                        class="btn btn-outline"
+                                        id="alerts-test-all"
+                                        data-action="alerts-test-all"
+                                        hidden
+                                    >
+                                        Send test to everyone
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="settings-col">
+                                <!-- Inert until the rules arrive: the fields' defaults are not the saved values -->
+                                <div id="alerts-rules" class="glass-card settings-card alerts-rules" inert>
+                                    <h2 class="settings-title">When to alert</h2>
+                                    <p class="settings-desc">The same for everyone on the left.</p>
+                                    <div class="alerts-rule">
+                                        <label for="alerts-down-minutes">
+                                            A service is down for
+                                            <span class="field-hint">TMDB, Kinopoisk, proxy, Telegram; low memory</span>
+                                        </label>
+                                        <select
+                                            id="alerts-down-minutes"
+                                            class="select-field"
+                                            data-alert-rule="downMinutes"
+                                        >
+                                            <option value="5">5 minutes</option>
+                                            <option value="10">10 minutes</option>
+                                            <option value="15">15 minutes</option>
+                                            <option value="30">30 minutes</option>
+                                            <option value="60">1 hour</option>
+                                        </select>
+                                    </div>
+                                    <div class="alerts-rule">
+                                        <label for="alerts-send-share">
+                                            Sending fails for
+                                            <span class="field-hint">Share of one check's messages</span>
+                                        </label>
+                                        <select id="alerts-send-share" class="select-field" data-alert-rule="sendShare">
+                                            <option value="any">Any message</option>
+                                            <option value="quarter">A quarter or more</option>
+                                            <option value="half">Half or more</option>
+                                            <option value="all">All of them</option>
+                                        </select>
+                                    </div>
+                                    <div class="alerts-rule">
+                                        <label for="alerts-repeat-hours">
+                                            Repeat the same alert
+                                            <span class="field-hint">While it's still broken</span>
+                                        </label>
+                                        <select
+                                            id="alerts-repeat-hours"
+                                            class="select-field"
+                                            data-alert-rule="repeatHours"
+                                        >
+                                            <option value="0">Never</option>
+                                            <option value="1">Every hour</option>
+                                            <option value="3">Every 3 hours</option>
+                                            <option value="6">Every 6 hours</option>
+                                            <option value="12">Every 12 hours</option>
+                                            <option value="24">Once a day</option>
+                                        </select>
+                                    </div>
+                                    <div class="alerts-rule">
+                                        <span id="alerts-fixed-label">
+                                            Say when it's fixed
+                                            <span class="field-hint">"TMDB is back", "checks pass again"</span>
+                                        </span>
+                                        <button
+                                            id="alerts-fixed"
+                                            class="switch"
+                                            role="switch"
+                                            aria-checked="true"
+                                            aria-labelledby="alerts-fixed-label"
+                                            data-action="alerts-fixed"
+                                        >
+                                            <span class="switch-track" aria-hidden="true"
+                                                ><span class="switch-knob"></span
+                                            ></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="glass-card settings-card">
+                                    <h2 class="settings-title">
+                                        Recent alerts <span class="settings-optional">last 7 days</span>
+                                    </h2>
+                                    <ul id="alerts-log" class="alerts-log">
+                                        <li class="alerts-empty">Loading…</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
@@ -1848,6 +1974,79 @@
                 </div>
                 <button id="chat-settings-save" class="btn btn-primary btn-block">Save</button>
                 <button data-close-return="chat-settings-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
+        <!-- Settings → Alerts: what one recipient gets (admin/js/alerts.js) -->
+        <dialog id="alert-person-modal" class="modal" aria-labelledby="alert-person-title">
+            <div class="modal-content modal-medium">
+                <div class="alert-person-head">
+                    <span class="alert-ava" id="alert-person-ava" aria-hidden="true"></span>
+                    <div>
+                        <h3 id="alert-person-title">Recipient</h3>
+                        <p class="modal-sub" id="alert-person-sub"></p>
+                    </div>
+                </div>
+                <div class="tab-filters alert-presets" role="group" aria-label="What to send">
+                    <button class="btn btn-ghost" data-action="alert-preset" data-preset="all" aria-pressed="false">
+                        Everything
+                    </button>
+                    <button
+                        class="btn btn-ghost"
+                        data-action="alert-preset"
+                        data-preset="critical"
+                        aria-pressed="false"
+                    >
+                        Critical only
+                    </button>
+                    <button class="btn btn-ghost" data-action="alert-preset" data-preset="custom" aria-pressed="false">
+                        Custom
+                    </button>
+                </div>
+                <p class="field-hint">Critical: the bot can't do its job. Turning a switch below makes it Custom.</p>
+                <div id="alert-person-events" class="alert-events"></div>
+                <div class="alert-legend">
+                    <span><span class="alert-dot is-critical" aria-hidden="true"></span>critical</span>
+                    <span><span class="alert-dot" aria-hidden="true"></span>other</span>
+                </div>
+                <div class="alert-person-foot">
+                    <button class="btn btn-danger-quiet" data-action="alert-remove">Remove</button>
+                    <button class="btn btn-ghost" data-action="alert-test-one">Send test</button>
+                    <button class="btn btn-primary" data-action="alert-save">Save</button>
+                </div>
+                <button data-close-return="alert-person-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
+        <!-- Settings → Alerts: a new recipient, picked from the chats the bot knows -->
+        <dialog id="alert-add-modal" class="modal" aria-labelledby="alert-add-title">
+            <div class="modal-content modal-medium">
+                <h3 id="alert-add-title">Add recipient</h3>
+                <p class="modal-sub">Anyone who has started the bot, or a group it's in.</p>
+                <input
+                    id="alert-add-search"
+                    class="input-field"
+                    type="search"
+                    placeholder="Name or chat id"
+                    aria-label="Search chats"
+                    autocomplete="off"
+                />
+                <div id="alert-add-list" class="alert-pick-list" role="group" aria-label="Chats"></div>
+                <p class="field-hint">They start with Critical only; open their row to change it.</p>
+                <button class="btn btn-primary btn-block" id="alert-add-confirm" data-action="alert-add-confirm">
+                    Add
+                </button>
+                <button data-close="alert-add-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />

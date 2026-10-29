@@ -10,20 +10,20 @@ last so they win over the shared styles without long selectors.
 
 ## Colour
 
-| Token                                           | Value                             | Use                                                  |
-| ----------------------------------------------- | --------------------------------- | ---------------------------------------------------- |
-| `--bg`                                          | `#0e0d0c`                         | Page and icon rail (the content has no inset panel)  |
-| `--surface-1`                                   | `#161513`                         | Cards                                                |
-| `--surface-2`                                   | `#1f1e1b`                         | Hover, rows, inputs                                  |
-| `--surface-3`                                   | `#26241f`                         | Selected items, tooltips, secondary buttons          |
-| `--border` / `--border-row` / `--border-strong` | white at 6% / 5% / 10%            | Card edges / lines between list rows / control edges |
-| `--text` / `--text-secondary`                   | `#f3f1ec` / `#c9c5bd`             | Body / quieter labels (statuses, switch)             |
-| `--text-dim` / `--text-faint`                   | `#a29e96` / `#75716a`             | Descriptions, meta, ranks, "off" / icons, decoration |
+| Token                                           | Value                             | Use                                                                                              |
+| ----------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--bg`                                          | `#0e0d0c`                         | Page and icon rail (the content has no inset panel)                                              |
+| `--surface-1`                                   | `#161513`                         | Cards                                                                                            |
+| `--surface-2`                                   | `#1f1e1b`                         | Hover, rows, inputs                                                                              |
+| `--surface-3`                                   | `#26241f`                         | Selected items, tooltips, secondary buttons                                                      |
+| `--border` / `--border-row` / `--border-strong` | white at 6% / 5% / 10%            | Card edges / lines between list rows / control edges                                             |
+| `--text` / `--text-secondary`                   | `#f3f1ec` / `#c9c5bd`             | Body / quieter labels (statuses, switch)                                                         |
+| `--text-dim` / `--text-faint`                   | `#a29e96` / `#75716a`             | Descriptions, meta, ranks, "off" / icons, decoration                                             |
 | `--accent` / `--on-accent`                      | `#f5b14c` / `#1a1206`             | The logo, a switch that is on, a schedule that is on and the chat-stats leader (★). Nothing else |
-| `--primary` / `--on-primary`                    | `#f3f1ec` / `#161513`             | Primary button: inverted, light with dark text       |
-| `--success` / `--danger` / `--danger-dot`       | `#6fd394` / `#ff8a7f` / `#ff6b5e` | Status text and dots; `*-soft` fills where needed    |
-| `--fill-*` / `--divider`                        | white at 3–14% / 8%               | Hover, selected and skeleton fills / short rules     |
-| `--scrim` / `--well` / `--shadow-*`             | black at 60% / 40%                | Behind a dialog / the log viewer / floating layers   |
+| `--primary` / `--on-primary`                    | `#f3f1ec` / `#161513`             | Primary button: inverted, light with dark text                                                   |
+| `--success` / `--danger` / `--danger-dot`       | `#6fd394` / `#ff8a7f` / `#ff6b5e` | Status text and dots; `*-soft` fills where needed                                                |
+| `--fill-*` / `--divider`                        | white at 3–14% / 8%               | Hover, selected and skeleton fills / short rules                                                 |
+| `--scrim` / `--well` / `--shadow-*`             | black at 60% / 40%                | Behind a dialog / the log viewer / floating layers                                               |
 
 Colour means status. The accent is used sparingly; links and the active nav item use plain
 foreground.

@@ -15,6 +15,7 @@ const { plural } = require('../calendar');
 const { escapeHtml } = require('../constants');
 const { recapImages } = require('./render');
 const { leader } = require('../chat-stats');
+const alerts = require('../alerts');
 const { log } = require('../log');
 
 // A temporary failure (Telegram or the network down) is tried again on the next round, this often
@@ -251,6 +252,28 @@ async function drawFor(row) {
     }
 }
 
+// A batch that fails whole (Telegram, the proxy) mustn't send the owners an alert per chat
+const RECAP_ALERTS_PER_HOUR = 3;
+let recapAlerted = [];
+
+/**
+ * The alert for a recap that won't arrive: a gone chat is no news, it left the bot. One per chat
+ * an hour, and a few an hour in all: the rest are in Year recap's list.
+ */
+async function recapFailed(row, chat, error, status, now = Date.now()) {
+    if (status === 'gone') return;
+    recapAlerted = recapAlerted.filter((at) => now - at < 60 * 60 * 1000);
+    if (recapAlerted.length >= RECAP_ALERTS_PER_HOUR) return;
+    recapAlerted.push(now);
+    await alerts.once(
+        'recap_failed',
+        () =>
+            `🟠 <b>Итоги ${row.year} года не дошли до чата</b>\n${escapeHtml(chat.username || String(row.chatId))}: ` +
+            `<code>${escapeHtml(error.slice(0, 200))}</code>\nПодробности — в разделе «Итоги года».`,
+        { id: row.chatId }
+    );
+}
+
 /**
  * One chat's album; the row says how it went.
  * @returns {Promise<'flood' | undefined>} flood: Telegram asked to wait long, the row is queued again
@@ -287,6 +310,8 @@ async function sendOne(bot, row, chat, recap, { wait, timeout }) {
             : String(result.error || result.status);
         await row.update({ status: final ? 'failed' : 'queued', attempts, error: error.slice(0, 255) });
         log.error(`[Recap] ${row.year} to chat ${row.chatId} not sent (${result.status}): ${result.error}`);
+        // Not awaited: the alert's own retries mustn't hold up the next chat's recap (once() logs its errors)
+        if (final) recapFailed(row, chat, error, result.status);
     } catch (err) {
         await row.update({ status: 'failed', error: String(err.message).slice(0, 255) }).catch(() => {});
         log.error(`[Recap] ${row.year} to chat ${row.chatId} failed: ${err.message}`);

@@ -114,4 +114,4 @@ router.get('/api/health', async (req, res) => {
     res.json(Object.assign({}, ...parts));
 });
 
-module.exports = { router, invalidateHealth, reasonOf, logChange };
+module.exports = { router, invalidateHealth, reasonOf, logChange, checkHealth };

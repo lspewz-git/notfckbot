@@ -13,6 +13,7 @@ import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './r
 import { recapCardActions, setupRecapCards, openRecapSection } from './recap-cards.js';
 import { recapScheduleActions, setupRecapSchedule } from './recap-schedule.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
+import { alertsActions, setupAlerts } from './alerts.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
@@ -154,6 +155,7 @@ const CLICK_ACTIONS = {
     'recap-send-all': () => confirmSendAll(),
     'recap-send-stop': () => stopRecapSend(),
     ...settingsActions,
+    ...alertsActions,
     ...recapCardActions,
     ...recapScheduleActions,
     'chart-subs': (el) => setSubsChart(el.dataset.by),
@@ -259,6 +261,7 @@ function init() {
     // Before enhanceSelects(), like setupFilters: the styled dropdowns start on the remembered size
     setupHistory();
     setupSettings();
+    setupAlerts();
     setupRecapCards();
     setupRecapSchedule();
     setupChatSettingsForm();

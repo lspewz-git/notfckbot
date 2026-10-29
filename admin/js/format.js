@@ -183,7 +183,7 @@ export function lastSeenText(iso, now = new Date()) {
 /** "active 2 h ago", "active yesterday" for a line after a chat's name; empty if never seen. */
 export function activeLine(iso, now = new Date()) {
     const seen = lastSeenText(iso, now);
-    return seen === '-' ? '' : `active ${seen.replace(/^(Yesterday|Just now)$/, (w) => w.toLowerCase())}`;
+    return seen === '-' ? '' : `active ${seenInLine(iso, now)}`;
 }
 
 /** The statuses of a chat the bot can't reach (src/bot-status.js); the panel's block is separate. */
@@ -195,6 +195,13 @@ const LEFT_LABELS = {
 
 /** Whether the bot has lost the chat: blocked by the user, removed from the group, deleted. */
 export const botLeft = (chat) => Boolean(LEFT_LABELS[chat.bot_status]);
+
+/** How the bot lost the chat ("Stopped the bot"), or '' when it hasn't. */
+export const leftLabel = (chat) => (botLeft(chat) ? LEFT_LABELS[chat.bot_status](chat) : '');
+
+/** "2 h ago", "yesterday", "9 Oct": lastSeenText for the middle of a line. */
+export const seenInLine = (iso, now = new Date()) =>
+    lastSeenText(iso, now).replace(/^(Yesterday|Just now)$/, (w) => w.toLowerCase());
 
 /**
  * A chat's status badge and the quiet line under it: lost to the bot (and since when, by whom),

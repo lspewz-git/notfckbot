@@ -28,6 +28,13 @@ const tally = (key) => {
     if (current) current[key] += 1;
 };
 
+/** Why a send of the current run failed, counted by the error's text: the alert names the commonest. */
+const noteFailure = (error) => {
+    if (!current) return;
+    const text = String(error || 'unknown').slice(0, 120);
+    current.reasons[text] = (current.reasons[text] || 0) + 1;
+};
+
 /**
  * When node-cron fires next: minute 0 of the next hour divisible by the interval. "*\/N"
  * restarts at midnight, so after the day's last slot comes 00:00, not last slot + N
@@ -42,6 +49,14 @@ function nextRunAt(now = new Date(), interval = UPDATE_INTERVAL_HOURS) {
     return next;
 }
 
+/** When node-cron last fired, at or before `now`: minute 0 of the last hour divisible by the interval. */
+function lastSlotAt(now = new Date(), interval = UPDATE_INTERVAL_HOURS) {
+    const slot = new Date(now);
+    slot.setMinutes(0, 0, 0);
+    slot.setHours(Math.floor(now.getHours() / interval) * interval);
+    return slot;
+}
+
 const getCronStatus = () => ({
     running: isRunning,
     startedAt: current ? current.startedAt : null,
@@ -54,7 +69,19 @@ const getCronStatus = () => ({
 function beginRun() {
     if (isRunning) return false;
     isRunning = true;
-    current = { startedAt: new Date().toISOString(), series: 0, films: 0, sent: 0, failed: 0, errors: 0 };
+    current = {
+        startedAt: new Date().toISOString(),
+        // The schedule it ran on: a run from an older interval says nothing about the new one's times
+        intervalHours: UPDATE_INTERVAL_HOURS,
+        series: 0,
+        films: 0,
+        sent: 0,
+        failed: 0,
+        // of the failed, chats that blocked the bot or are gone: not Telegram's fault
+        gone: 0,
+        errors: 0,
+        reasons: {}
+    };
     return true;
 }
 
@@ -76,4 +103,4 @@ function endRun(fatal) {
     }
 }
 
-module.exports = { tally, nextRunAt, getCronStatus, beginRun, endRun };
+module.exports = { tally, noteFailure, nextRunAt, lastSlotAt, getCronStatus, beginRun, endRun };

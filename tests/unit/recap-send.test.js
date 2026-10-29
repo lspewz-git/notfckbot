@@ -21,6 +21,7 @@ mock.method(render, 'recapImages', async (chatId) => {
 
 const { Chat, Subscription, Watchlist, RecapSend } = require('../../src/db');
 const recap = require('../../src/recap/send');
+const alerts = require('../../src/alerts');
 
 // Database stand-ins last one test: a test that forgets one reaches the real database (and
 // waits 60 s for it) instead of quietly borrowing the one an earlier test left behind
@@ -30,6 +31,15 @@ const stub = (object, name, impl) => {
     stubs.push(m);
     return m;
 };
+// The owners' alert for a recap that won't arrive (src/alerts/): recorded, not sent
+let alerted = [];
+beforeEach(() => {
+    alerted = [];
+    stub(alerts, 'once', async (key, text, options) => {
+        alerted.push({ key, text: text(() => '00:00'), id: options && options.id });
+        return null;
+    });
+});
 afterEach(() => {
     // Newest first: a stub over a stub gives back the one under it, then the real method
     for (const m of stubs.splice(0).reverse()) m.mock.restore();
@@ -233,6 +243,8 @@ describe('the queue', () => {
         assert.equal(rows[0].status, 'queued');
         assert.equal(rows[1].status, 'failed');
         assert.match(rows[1].error, /blocked/);
+        // A chat that blocked the bot left it: no news for the owners
+        assert.deepEqual(alerted, []);
     });
 
     test('Telegram down: back to the queue, failed after the third try', async () => {
@@ -244,6 +256,12 @@ describe('the queue', () => {
             assert.equal(rows[0].attempts, run);
             assert.equal(rows[0].status, run < recap.MAX_ATTEMPTS ? 'queued' : 'failed');
         }
+        // Told once, when it is final, about this chat
+        assert.deepEqual(
+            alerted.map((a) => [a.key, a.id]),
+            [['recap_failed', 1]]
+        );
+        assert.match(alerted[0].text, /ETIMEDOUT/);
     });
 
     test('no answer from Telegram: one try only, and the row says it may have arrived', async () => {

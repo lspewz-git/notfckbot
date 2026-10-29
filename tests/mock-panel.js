@@ -39,6 +39,44 @@ const chat = (id, username, type = 'private') => ({
 
 const CHATS = [chat(101, 'alice'), chat(102, 'bob'), chat(-1003, 'Movie Club', 'supergroup')];
 
+// Settings → Alerts: the server's catalog (src/alerts/catalog.js) and a log
+const ALERT_CATALOG = (() => {
+    const { EVENTS, GROUPS } = require('../src/alerts/catalog');
+    return { events: EVENTS, groups: GROUPS };
+})();
+
+const alertsState = () => ({
+    rules: { downMinutes: 10, sendShare: 'half', repeatHours: 6, fixed: true },
+    recipients: [
+        {
+            chatId: '101',
+            name: 'alice',
+            type: 'private',
+            preset: 'all',
+            events: null,
+            lastAlertAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+            unreachable: null,
+            unreachableAt: null
+        },
+        {
+            chatId: '-1003',
+            name: 'Movie Club',
+            type: 'supergroup',
+            preset: 'custom',
+            events: ['check_failed', 'tmdb_down'],
+            lastAlertAt: null,
+            unreachable: 'removed',
+            unreachableAt: '2026-10-28T10:00:00Z'
+        }
+    ],
+    log: [
+        { event: 'tmdb_down', kind: 'fixed', sent: 1, failed: 0, sentTo: 'alice', at: new Date().toISOString() },
+        { event: 'check_failed', kind: 'alert', sent: 1, failed: 1, sentTo: 'alice', at: '2026-10-27T15:00:00Z' }
+    ],
+    saves: [],
+    tests: []
+});
+
 // Six of the series will never air again — their subscriptions are the archive
 const SERIES = [
     ['1399', 'Game of Thrones', 'Ended'],
@@ -344,6 +382,8 @@ async function mockPanel(page, options = {}) {
         // Year recap → Schedule, and the saves asked for
         recapSchedule: { ...recapSchedule(), ...(options.recapSchedule || {}) },
         recapScheduleSaves: [],
+        // Settings → Alerts: options.alerts overrides; saves and tests asked for, for tests to check
+        alerts: { ...alertsState(), ...options.alerts },
         // Year recap → Ready cards: one of each state
         recapReady: options.recapReady || {
             year: new Date().getFullYear(),
@@ -414,6 +454,11 @@ async function mockPanel(page, options = {}) {
         }
         return panel.cron;
     }
+
+    const alertsView = () => {
+        const { rules, recipients, log } = panel.alerts;
+        return { ...ALERT_CATALOG, rules, recipients, log };
+    };
 
     const api = {
         '/api/stats': () => ({ ...stats(panel.subs), ...options.stats }),
@@ -522,6 +567,48 @@ async function mockPanel(page, options = {}) {
             return panel.recapReady;
         },
         '/api/recap/drawing': () => panel.recapReady.drawing,
+        // Settings → Alerts, as src/admin/routes/alerts.js answers
+        '/api/alerts': () => alertsView(),
+        // As the server: active chats not on the list yet, by name or exact id
+        '/api/alerts/candidates': (req) => {
+            const q = (new URL(req.url()).searchParams.get('q') || '').replace(/^@/, '').toLowerCase();
+            return CHATS.filter(
+                (c) =>
+                    c.bot_status === 'active' &&
+                    !panel.alerts.recipients.some((r) => r.chatId === String(c.id)) &&
+                    (!q || c.username.toLowerCase().includes(q) || String(c.id) === q)
+            ).map((c) => ({ chatId: String(c.id), name: c.username, type: c.type, lastSeenAt: null }));
+        },
+        '/api/alerts/recipients': (req) => {
+            const { chatId } = req.postDataJSON();
+            const c = CHATS.find((x) => String(x.id) === chatId);
+            panel.alerts.recipients.push({
+                chatId,
+                name: c ? c.username : null,
+                type: c ? c.type : 'private',
+                preset: 'critical',
+                events: null,
+                lastAlertAt: null,
+                unreachable: null,
+                unreachableAt: null
+            });
+            return alertsView();
+        },
+        '/api/alerts/test': (req) => {
+            const body = req.postDataJSON();
+            panel.alerts.tests.push(body);
+            const to = panel.alerts.recipients.filter((r) => !body.chatId || r.chatId === body.chatId);
+            return {
+                sent: to.filter((r) => !r.unreachable).length,
+                failed: to.filter((r) => r.unreachable).length,
+                wanted: to.length
+            };
+        },
+        '/api/alerts/rules': (req) => {
+            panel.alerts.rules = req.postDataJSON();
+            panel.alerts.saves.push({ rules: panel.alerts.rules });
+            return alertsView();
+        },
         // Year recap → Schedule: the saves asked for, for tests; a day moved while on is refused
         '/api/recap/schedule': (req) => {
             const s = panel.recapSchedule;
@@ -765,6 +852,26 @@ async function mockPanel(page, options = {}) {
                     c.chatId === id ? { ...c, state: 'none', bytes: 0, drawnAt: null } : c
                 );
                 return { removed: 1 };
+            }
+        ],
+        [
+            // Settings → Alerts: one recipient's choice (PUT) or its removal (DELETE)
+            /^\/api\/alerts\/recipients\/(-?\d+)$/,
+            ([, id], req) => {
+                const list = panel.alerts.recipients;
+                if (req.method() === 'DELETE') {
+                    panel.alerts.recipients = list.filter((r) => r.chatId !== id);
+                    panel.alerts.saves.push({ removed: id });
+                    return alertsView();
+                }
+                const body = req.postDataJSON();
+                panel.alerts.saves.push({ chatId: id, ...body });
+                panel.alerts.recipients = list.map((r) =>
+                    r.chatId === id
+                        ? { ...r, preset: body.preset, events: body.preset === 'custom' ? body.events : null }
+                        : r
+                );
+                return alertsView();
             }
         ],
         [

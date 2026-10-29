@@ -6,6 +6,7 @@
 const { getCronStatus } = require('../cron/status');
 const { flushStats } = require('../stats-log');
 const { flushEvents } = require('../chat-events');
+const { markShutdown } = require('../alerts/watch');
 const { log } = require('../log');
 
 // No restart this close before a scheduled check. After it: not until that check has finished
@@ -45,6 +46,8 @@ function restartBlock(now = new Date(), status = getCronStatus()) {
 /** Exits shortly, so the answer to the request that asked for it gets out first. */
 function restartSoon(why) {
     log.info(`[Admin] Restarting the bot: ${why}`);
+    // The next start says "restarted from the panel", not "after a crash"
+    markShutdown('panel');
     // The day counts and chat events kept in memory go to the database first
     setTimeout(async () => {
         await flushStats().catch(() => {});

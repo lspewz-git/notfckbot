@@ -7,10 +7,13 @@
 const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
+// The run's status file (src/cron/status.js) in a temporary place, not the project's
+process.env.CRON_STATUS_FILE = require('path').join(require('os').tmpdir(), `delivery-test-${process.pid}.json`);
 const { PendingMessage, Chat } = require('../../src/db');
 const { deliver } = require('../../src/delivery');
 const { notify, flushPending, MAX_ATTEMPTS } = require('../../src/cron/outbox');
 const { notifyNewEpisodes } = require('../../src/cron');
+const runStatus = require('../../src/cron/status');
 const { fakeSeries, ep, tmdbSeries } = require('./fakes');
 
 // A chat's settings (quiet hours) come from the database: none here, so none set
@@ -181,8 +184,16 @@ describe('the outbox', () => {
         assert.deepEqual(queued, [{ chatId: 10, text: 'S2E4', photo: 'p.jpg' }]);
 
         await flushPending(scriptedBot()); // the next check
-        await notify(scriptedBot([telegramError(403, 'Forbidden: bot was blocked by the user')]), 11, 'x');
+        runStatus.beginRun();
+        try {
+            await notify(scriptedBot([telegramError(403, 'Forbidden: bot was blocked by the user')]), 11, 'x');
+        } finally {
+            runStatus.endRun(null);
+        }
         assert.equal(queued.length, 1);
+        // Failed, but the chat's own doing: the alert doesn't count it as Telegram's trouble
+        const { lastRun } = runStatus.getCronStatus();
+        assert.deepEqual([lastRun.failed, lastRun.gone, lastRun.reasons], [1, 1, {}]);
     });
 
     test("the next check sends the queue first; what still fails stays, counting tries; what's too old is dropped", async () => {
@@ -226,13 +237,21 @@ describe('the outbox', () => {
 
     test('Telegram down: after the first failure the rest of the check queues without trying', async () => {
         const down = scriptedBot([networkError(), networkError(), networkError()]);
-        await notifyWhileDown(down, 10, 'first');
-        assert.equal(down.calls.length, 3);
+        // A run's counters: the alerts quote the error that stopped it (src/alerts/watch.js)
+        runStatus.beginRun();
+        try {
+            await notifyWhileDown(down, 10, 'first');
+            assert.equal(down.calls.length, 3);
 
-        // The next one goes straight to the queue: no three more tries, no waiting
-        const result = await notify(down, 11, 'second');
-        assert.equal(result.status, 'failed');
-        assert.equal(down.calls.length, 3);
+            // The next one goes straight to the queue: no three more tries, no waiting
+            const result = await notify(down, 11, 'second');
+            assert.equal(result.status, 'failed');
+            assert.equal(down.calls.length, 3);
+        } finally {
+            runStatus.endRun(null);
+        }
+        // Only the real error: the one queued untried says nothing new
+        assert.deepEqual(runStatus.getCronStatus().lastRun.reasons, { 'connect ETIMEDOUT 149.154.167.220:443': 1 });
         assert.deepEqual(
             queued.map((q) => q.text),
             ['first', 'second']
