@@ -17,6 +17,7 @@ import { loadHistory } from './history.js';
 import { updateCharts, chartsFailed } from './dashboard-charts.js';
 import { loadSettings } from './settings.js';
 import { loadAlerts } from './alerts.js';
+import { loadMine } from './account.js';
 
 // Which /api/data/:type each section needs, if any
 const SECTION_TABLES = {
@@ -72,6 +73,8 @@ export async function fetchData() {
         jobs.push(api('/cron').then(updateCron));
     }
     if (currentSection === 'history') jobs.push(loadHistory());
+    // The user's own chats (account.js)
+    if (currentSection.startsWith('my-')) jobs.push(loadMine(currentSection));
     if (currentSection === 'settings') jobs.push(loadSettings(), loadAlerts());
     if (currentSection === 'logs') {
         jobs.push(

@@ -110,6 +110,11 @@ function enhanceSelect(select) {
     };
 }
 
+/** Styles the selects added later, inside `root` (the account pages render theirs on load). */
+export function enhanceIn(root) {
+    root.querySelectorAll('select.select-field').forEach(enhanceSelect);
+}
+
 export function enhanceSelects() {
     document.querySelectorAll('select.select-field').forEach(enhanceSelect);
 

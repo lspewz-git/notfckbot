@@ -112,6 +112,12 @@ function period(kind, offset, zoneId, now = new Date()) {
     return { kind, offset, from, to: addDays(from, 6), today };
 }
 
+/** The panel's one-list calendar: from the first of last month to the end of the month after next. */
+function listPeriod(zoneId, now = new Date()) {
+    const today = todayIn(zoneId, now);
+    return { from: addMonths(today, -1), to: monthEnd(addMonths(today, 2)), today };
+}
+
 // --- What comes out in a period ---
 
 const SEASONS_PER_SERIES = 4;
@@ -145,7 +151,12 @@ function seasonsToAsk(series, details, from, to) {
         .slice(0, SEASONS_PER_SERIES);
 }
 
-/** One series' episodes in the period: [{ date, tmdbId, title, season, episode, note }]. */
+const NOTES = { premiere: 'премьера сезона', finale: 'финал сезона', '': '' };
+
+/**
+ * One series' episodes in the period: [{ date, tmdbId, title, season, episode, note, mark, name, overview,
+ * poster, kinopoiskId }]; `note` is the bot's Russian word for `mark` ('premiere' | 'finale' | '').
+ */
 async function seriesEpisodes(series, from, to) {
     const numericId = String(series.tmdb_id).replace('tv_', '');
     const details = await getDetailsCached(numericId, 'tv').catch(() => null);
@@ -156,12 +167,7 @@ async function seriesEpisodes(series, from, to) {
         for (const ep of (data && data.episodes) || []) {
             if (!ep.air_date || ep.air_date < from || ep.air_date > to) continue;
             const total = counts.get(season);
-            const note =
-                ep.episode_number === 1
-                    ? 'премьера сезона'
-                    : total && ep.episode_number === total
-                      ? 'финал сезона'
-                      : '';
+            const mark = ep.episode_number === 1 ? 'premiere' : total && ep.episode_number === total ? 'finale' : '';
             items.push({
                 date: ep.air_date,
                 kind: 'tv',
@@ -169,7 +175,12 @@ async function seriesEpisodes(series, from, to) {
                 title: series.title,
                 season,
                 episode: ep.episode_number,
-                note
+                note: NOTES[mark],
+                mark,
+                name: ep.name || '',
+                overview: ep.overview || '',
+                poster: series.poster_url || null,
+                kinopoiskId: series.kinopoisk_id || null
             });
         }
     }
@@ -199,7 +210,7 @@ async function periodItems(chatId, from, to) {
         const date = f.premiere_digital && String(f.premiere_digital).slice(0, 10);
         if (!date || date < from || date > to || seenFilms.has(f.tmdb_id)) continue;
         seenFilms.add(f.tmdb_id);
-        items.push({ date, kind: 'movie', tmdbId: f.tmdb_id, title: f.title });
+        items.push({ date, kind: 'movie', tmdbId: f.tmdb_id, title: f.title, poster: f.poster_url || null });
     }
     items.sort(
         (a, b) =>
@@ -322,6 +333,7 @@ module.exports = {
     monthStart,
     addMonths,
     period,
+    listPeriod,
     periodItems,
     calendarText,
     seasonsToAsk,

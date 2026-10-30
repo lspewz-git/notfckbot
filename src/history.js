@@ -49,13 +49,13 @@ async function genresOf(numericId, type) {
 }
 
 /** A list entry: what the panel and the bot show for one title. */
-async function entry({ tmdbId, title, kinopoiskId, seasons }) {
+async function entry({ tmdbId, title, kinopoiskId, seasons, poster = null }) {
     const [type, numericId] = tmdbId.split('_');
     const mediaType = type === 'tv' ? 'tv' : 'movie';
     const id = kinopoiskId || knownKinopoiskId(tmdbId);
     const link = getWatchLinks({ title, kinopoiskId: id, mediaType }).find((l) => l.kind === 'info');
     const genres = await genresOf(numericId, mediaType);
-    return { tmdbId, title, ...(seasons ? { seasons } : {}), genres, kinopoiskUrl: link.url };
+    return { tmdbId, title, ...(seasons ? { seasons } : {}), genres, kinopoiskUrl: link.url, poster };
 }
 
 /**
@@ -78,12 +78,13 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
     for (const f of filmRows) {
         const filmYear = airedYear(f.premiere_digital, now);
         if (filmYear && !films.has(f.tmdb_id))
-            films.set(f.tmdb_id, { tmdbId: f.tmdb_id, title: f.title, year: filmYear });
+            films.set(f.tmdb_id, { tmdbId: f.tmdb_id, title: f.title, year: filmYear, poster: f.poster_url || null });
     }
     const series = seriesRows.map((s) => ({
         tmdbId: s.tmdb_id,
         title: s.title,
         kinopoiskId: s.kinopoisk_id,
+        poster: s.poster_url || null,
         byYear: parseSeasons(s.release_seasons)
     }));
 

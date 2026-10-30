@@ -21,6 +21,8 @@ export async function api(path, options = {}) {
     });
 
     const data = await res.json().catch(() => ({}));
+    // The session is over (or never was): session.js shows the sign-in screen
+    if (res.status === 401) window.dispatchEvent(new Event('session-ended'));
     if (!res.ok || data.error) {
         // The body goes along: some answers say more than the message (Settings: which field)
         const err = /** @type {Error & { status?: number, data?: any }} */ (

@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>NotFckBot Admin</title>
+        <base href="/" />
         <link rel="stylesheet" href="css/base.css" />
         <link rel="stylesheet" href="css/layout.css" />
         <link rel="stylesheet" href="css/cards.css" />
@@ -18,13 +19,17 @@
         <link rel="stylesheet" href="css/utilities.css" />
         <link rel="stylesheet" href="css/responsive.css" />
         <link rel="stylesheet" href="css/dashboard.css" />
+        <link rel="stylesheet" href="css/account.css" />
         <!-- Every module at once: otherwise the browser finds each one only after loading the one
              importing it, a chain of round trips before the panel runs (tests/unit/panel-files.test.js
              keeps this list complete) -->
         <link rel="modulepreload" href="js/app.js" />
         <link rel="modulepreload" href="js/about.js" />
+        <link rel="modulepreload" href="js/account.js" />
+        <link rel="modulepreload" href="js/session.js" />
         <link rel="modulepreload" href="js/alerts.js" />
         <link rel="modulepreload" href="js/api.js" />
+        <link rel="modulepreload" href="js/changes.js" />
         <link rel="modulepreload" href="js/chat-stats.js" />
         <link rel="modulepreload" href="js/chats.js" />
         <link rel="modulepreload" href="js/dashboard-charts.js" />
@@ -100,6 +105,19 @@
                 </defs>
             </symbol>
         </svg>
+        <!-- Before a session: the sign-in screen over everything (session.js) -->
+        <div id="login-gate" class="login-gate" hidden>
+            <div class="glass-card login-card">
+                <div class="rail-logo login-logo" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
+                        <path d="m6.2 5.3 3.1 3.9M12.4 3.4l3.1 4M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+                    </svg>
+                </div>
+                <h1>NotFckBot</h1>
+                <div id="login-body" aria-live="polite"></div>
+            </div>
+        </div>
         <div class="app-container">
             <!-- Icon rail: labels show on hover and keyboard focus; phones use the tab bar instead -->
             <aside class="sidebar">
@@ -173,6 +191,26 @@
                         </svg>
                         <span class="nav-tip" aria-hidden="true">Settings</span>
                     </button>
+                    <span class="rail-divider nav-mine" aria-hidden="true"></span>
+                    <button class="nav-item nav-mine" data-section="my-subs" aria-label="My subscriptions">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">My subscriptions</span>
+                    </button>
+                    <button class="nav-item nav-mine" data-section="my-calendar" aria-label="Calendar">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                            <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Calendar</span>
+                    </button>
+                    <button class="nav-item nav-mine" data-section="my-settings" aria-label="Chat settings">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Chat settings</span>
+                    </button>
                 </nav>
                 <div class="rail-bottom">
                     <button class="nav-item" id="actions-btn" aria-label="Actions">
@@ -187,6 +225,12 @@
                             <path d="M12 8h.01M12 11.5v5" />
                         </svg>
                         <span class="nav-tip" aria-hidden="true">About</span>
+                    </button>
+                    <button class="nav-item nav-mine" data-action="logout" aria-label="Sign out">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                        </svg>
+                        <span class="nav-tip" aria-hidden="true">Sign out</span>
                     </button>
                 </div>
             </aside>
@@ -974,6 +1018,26 @@
                                 </div>
 
                                 <div class="glass-card settings-card">
+                                    <h2 class="settings-title">Chat change log</h2>
+                                    <p class="settings-desc">
+                                        Who changed a chat's list or settings: in Users / Chats → Changes, and for a
+                                        group's admins on their pages.
+                                    </p>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-changes">Keep for</label>
+                                        <div class="settings-field">
+                                            <select
+                                                id="settings-changes"
+                                                class="select-field settings-interval"
+                                                data-setting="changes"
+                                            ></select>
+                                            <p class="field-hint">Saved when picked</p>
+                                            <p class="field-error" id="settings-error-changes" hidden></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="glass-card settings-card">
                                     <h2 class="settings-title">Year recap by date</h2>
                                     <p class="settings-desc">
                                         Every chat gets its year's six cards by itself on a day before New Year. Sending
@@ -1154,6 +1218,77 @@
                                 </div>
                             </div>
                         </div>
+                    </section>
+
+                    <section id="my-subs-section" class="section mine-section">
+                        <header>
+                            <div class="header-info">
+                                <h1>My subscriptions</h1>
+                                <p>Series and films the bot writes about in the chosen chat.</p>
+                            </div>
+                            <div class="mine-chat" data-chat-picker></div>
+                        </header>
+                        <div class="tab-filters mine-switch" role="group" aria-label="My account">
+                            <button
+                                type="button"
+                                class="btn btn-ghost active"
+                                data-section="my-subs"
+                                aria-current="page"
+                            >
+                                Subscriptions</button
+                            ><button type="button" class="btn btn-ghost" data-section="my-calendar">Calendar</button
+                            ><button type="button" class="btn btn-ghost" data-section="my-settings">Settings</button>
+                        </div>
+                        <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
+                    </section>
+
+                    <section id="my-calendar-section" class="section mine-section">
+                        <header>
+                            <div class="header-info">
+                                <h1>Calendar</h1>
+                                <p>What comes out among the chosen chat's subscriptions.</p>
+                            </div>
+                            <div class="mine-chat" data-chat-picker></div>
+                        </header>
+                        <div class="tab-filters mine-switch" role="group" aria-label="My account">
+                            <button type="button" class="btn btn-ghost" data-section="my-subs">Subscriptions</button
+                            ><button
+                                type="button"
+                                class="btn btn-ghost active"
+                                data-section="my-calendar"
+                                aria-current="page"
+                            >
+                                Calendar</button
+                            ><button type="button" class="btn btn-ghost" data-section="my-settings">Settings</button>
+                        </div>
+                        <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
+                    </section>
+
+                    <section id="my-settings-section" class="section mine-section">
+                        <header>
+                            <div class="header-info">
+                                <h1>Chat settings</h1>
+                                <p>The same as “Settings” in the bot.</p>
+                            </div>
+                            <div class="mine-chat" data-chat-picker></div>
+                        </header>
+                        <div class="tab-filters mine-switch" role="group" aria-label="My account">
+                            <button type="button" class="btn btn-ghost" data-section="my-subs">Subscriptions</button
+                            ><button type="button" class="btn btn-ghost" data-section="my-calendar">Calendar</button
+                            ><button
+                                type="button"
+                                class="btn btn-ghost active"
+                                data-section="my-settings"
+                                aria-current="page"
+                            >
+                                Settings
+                            </button>
+                        </div>
+                        <div id="my-settings-body" class="mine-body" aria-live="polite"></div>
+                        <!-- Phones have no rail: signing out lives here (and in More for an admin) -->
+                        <button type="button" class="btn btn-outline btn-block mine-logout" data-action="logout">
+                            Sign out
+                        </button>
                     </section>
 
                     <section id="history-section" class="section">
@@ -1538,7 +1673,7 @@
             <button
                 class="tab-item"
                 data-open="more-modal"
-                data-tab-sections="logs history recap settings"
+                data-tab-sections="logs history recap settings my-subs my-calendar my-settings"
                 aria-haspopup="dialog"
             >
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1547,14 +1682,49 @@
                     <circle cx="5" cy="12" r="1" /></svg
                 ><span>More</span>
             </button>
+            <button class="tab-item tab-mine" data-section="my-subs">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg
+                ><span>Subscriptions</span>
+            </button>
+            <button class="tab-item tab-mine" data-section="my-calendar">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></svg
+                ><span>Calendar</span>
+            </button>
+            <button class="tab-item tab-mine" data-section="my-settings">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg
+                ><span>Settings</span>
+            </button>
         </nav>
 
         <!-- Modals -->
+        <!-- A title on the user's own list (account.js) -->
+        <dialog id="mine-card-modal" class="modal" aria-labelledby="mine-card-title">
+            <div class="modal-content modal-narrow" id="mine-card-body"></div>
+        </dialog>
+
         <!-- "More" sheet behind the tab bar: what doesn't fit in five tabs -->
         <dialog id="more-modal" class="modal modal-sheet" aria-labelledby="more-title">
             <div class="modal-content modal-narrow">
                 <h3 id="more-title">More</h3>
                 <div class="action-list">
+                    <button class="action-row" data-section="my-subs" data-close="more-modal">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">My account</span>
+                            <span class="action-desc">Subscriptions, calendar and settings of your chats</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
                     <button class="action-row" data-section="history" data-close="more-modal">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1840,6 +2010,23 @@
                                 <polyline points="9 18 15 12 9 6" /></svg
                         ></span>
                     </button>
+                    <button id="action-changes" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="8" y1="13" x2="16" y2="13" />
+                                <line x1="8" y1="17" x2="16" y2="17" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Changes</span>
+                            <span class="action-desc">Who changed the list and settings</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
                     <button id="action-block" class="action-row">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1914,6 +2101,21 @@
         </dialog>
 
         <!-- A chat's bot settings: the same as its ⚙️ Settings screen in Telegram -->
+        <!-- A chat's change log (changes.js): search and pages, filled when opened -->
+        <dialog id="changes-modal" class="modal" aria-labelledby="changes-title">
+            <div class="modal-content modal-medium">
+                <h3 id="changes-title">Changes</h3>
+                <p class="modal-sub" id="changes-sub"></p>
+                <div id="changes-root" class="changes"></div>
+                <button data-close-return="changes-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+        </dialog>
+
         <!-- A chat's statistics (chat-stats.js): the body is filled for the period picked -->
         <dialog id="chat-stats-modal" class="modal" aria-labelledby="chat-stats-title">
             <div class="modal-content modal-stats">

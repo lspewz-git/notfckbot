@@ -6,6 +6,9 @@ const { defineConfig, devices } = require('@playwright/test');
  *
  *   ADMIN_URL=http://localhost:8088 npm test
  *
+ * The live panel needs a session: ADMIN_SESSION=<token from `node login-link.js --session` on the
+ * server>. The tests on the API mock (tests/mock-panel.js) don't.
+ *
  * Every test is read-only: dialogs are opened and dismissed, nothing is
  * created, edited or deleted, so it is safe against a live instance.
  */
@@ -20,6 +23,9 @@ module.exports = defineConfig({
     reporter: process.env.CI ? 'line' : 'list',
     use: {
         baseURL: process.env.ADMIN_URL || 'http://localhost:8088',
+        ...(process.env.ADMIN_SESSION
+            ? { extraHTTPHeaders: { Cookie: `nfb_session=${process.env.ADMIN_SESSION}` } }
+            : {}),
         trace: 'retain-on-failure'
     },
     projects: [

@@ -213,6 +213,7 @@ function fillFields(settings, card) {
     if (!card || card === 'services') fillServices(settings);
     if (!card || card === 'proxy') fillProxy(settings);
     if (!card || card === 'interval') fillInterval(settings);
+    if (!card) fillChangesKeep(settings);
 
     $('settings-db-host').textContent = settings.database.host || '—';
     $('settings-db-name').textContent = settings.database.name || '—';
@@ -274,6 +275,42 @@ function fillInterval(settings) {
         interval.dataset.choices = choices;
     }
     setSelectValue('settings-interval', String(settings.interval.hours));
+}
+
+/** How long the chats' change log is kept: a select of its own, saved when picked. */
+function fillChangesKeep(settings) {
+    if (!settings.changes) return;
+    const select = $field('settings-changes');
+    const choices = settings.changes.choices.map(String).join(',');
+    if (select.dataset.choices !== choices) {
+        select.innerHTML = settings.changes.choices.map((d) => `<option value="${d}">${d} days</option>`).join('');
+        select.dataset.choices = choices;
+    }
+    setSelectValue('settings-changes', String(settings.changes.days));
+}
+
+async function saveChangesKeep() {
+    const select = $field('settings-changes');
+    select.setAttribute('aria-busy', 'true');
+    try {
+        const res = await api('/settings', { method: 'POST', body: { changesKeepDays: Number(select.value) } });
+        saves += 1;
+        saved = { ...saved, changes: res.settings.changes };
+        toast('Change log period saved.', 'success');
+    } catch (err) {
+        // A refused pick goes back to the saved value
+        if (saved) {
+            filling = true;
+            try {
+                fillChangesKeep(saved);
+            } finally {
+                filling = false;
+            }
+        }
+        toast(err.message, 'error');
+    } finally {
+        select.removeAttribute('aria-busy');
+    }
 }
 
 /** The year recap by date: only what is set; it is set in Year recap → Schedule. */
@@ -500,6 +537,9 @@ export function setupSettings() {
     // The update interval has no Save: picked is saved
     $field('settings-interval').addEventListener('change', () => {
         if (!filling) save('interval');
+    });
+    $field('settings-changes').addEventListener('change', () => {
+        if (!filling) saveChangesKeep();
     });
     // Enter in a field saves its card, as in a form
     section.addEventListener('keydown', (e) => {

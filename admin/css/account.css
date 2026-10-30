@@ -1,0 +1,437 @@
+/* The sign-in screen, the roles, and the user's own chats ("My subscriptions", "Calendar", "Chat
+   settings", admin/js/account.js). Tokens from base.css only. */
+
+/* --- Roles: a user sees only their own sections; an admin sees everything --- */
+
+.tab-mine {
+    display: none;
+}
+
+body.role-user .rail-nav .nav-item:not(.nav-mine),
+body.role-user .rail-nav .rail-divider,
+body.role-user #actions-btn,
+body.role-user #about-btn,
+body.role-user .tabbar .tab-item:not(.tab-mine) {
+    display: none;
+}
+
+body.role-user .tabbar .tab-mine {
+    display: flex;
+}
+
+body.role-user .tabbar {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* --- Sign-in --- */
+
+.login-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: var(--space-4);
+    background: var(--bg);
+    overflow-y: auto;
+}
+
+.login-gate[hidden] {
+    display: none;
+}
+
+body.signed-out .app-container,
+body.signed-out .tabbar {
+    visibility: hidden;
+}
+
+.login-card {
+    width: min(380px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.login-card h1 {
+    font-size: var(--text-2xl);
+}
+
+.login-text {
+    color: var(--text-secondary);
+}
+
+.login-hint {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.login-error {
+    color: var(--danger);
+    font-size: var(--text-sm);
+}
+
+#login-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+#login-tg[aria-disabled='true'] {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* --- The user's sections --- */
+
+.mine-section header {
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.mine-chat {
+    min-width: 220px;
+}
+
+/* Between the three sections: for an admin on a phone or tablet, who reaches them from one row in More */
+.mine-switch {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    body:not(.role-user) .mine-switch {
+        display: inline-flex;
+        align-self: flex-start;
+    }
+}
+
+/* On a phone it is one full-width segmented control, like every other tab strip there */
+@media (max-width: 768px) {
+    body:not(.role-user) .mine-switch {
+        display: flex;
+        align-self: stretch;
+    }
+}
+
+.mine-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.mine-dim {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.mine-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mine-count {
+    color: var(--text-faint);
+}
+
+.mine-rows {
+    list-style: none;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+}
+
+.mine-rows li + li {
+    border-top: 1px solid var(--border-row);
+}
+
+.mine-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    width: 100%;
+    min-height: 3.25rem;
+    padding: var(--space-2) 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+button.mine-row {
+    cursor: pointer;
+}
+
+button.mine-row:hover .mine-row-title {
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 4px;
+}
+
+.mine-row-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.mine-row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.mine-poster {
+    width: 36px;
+    height: 54px;
+    flex: none;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    background: var(--fill-subtle);
+}
+
+.mine-poster-empty {
+    display: inline-block;
+}
+
+.mine-poster-big {
+    width: 84px;
+    height: 126px;
+}
+
+.mine-chip {
+    flex: none;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+}
+
+.mine-empty {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.mine-empty-title {
+    font-weight: 600;
+}
+
+.mine-note {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-banner);
+    background: var(--fill-faint);
+    color: var(--text-secondary);
+}
+
+/* --- Search --- */
+
+.mine-search {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.mine-search input {
+    flex: 1;
+    min-width: 0;
+}
+
+/* --- The card --- */
+
+.mine-card-head {
+    display: flex;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.mine-card-head h3 {
+    margin-bottom: var(--space-1);
+}
+
+.mine-modes {
+    border: 0;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+}
+
+.mine-radio {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--control-h);
+    cursor: pointer;
+}
+
+.mine-radio input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+
+.mine-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.mine-links .btn {
+    flex: 1;
+}
+
+.mine-confirm {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--fill-faint);
+}
+
+/* --- Calendar --- */
+
+/* A month of the list: date, poster, title and episode, how soon */
+.mine-cal-month h3 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+}
+
+.mine-cal-row {
+    gap: var(--space-3);
+}
+
+.mine-cal-row.past {
+    opacity: 0.6;
+}
+
+.mine-cal-date {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    width: 2.25rem;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.mine-cal-date b {
+    color: var(--text);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.mine-cal-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mine-cal-when {
+    flex: none;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.mine-cal-when.today {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.mine-overview {
+    margin-bottom: var(--space-4);
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* --- Settings --- */
+
+.mine-sets {
+    list-style: none;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+}
+
+.mine-set {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: 3.5rem;
+    padding: var(--space-3) 0;
+}
+
+.mine-set + .mine-set {
+    border-top: 1px solid var(--border-row);
+}
+
+.mine-set-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mine-set .custom-select {
+    min-width: 190px;
+}
+
+#mine-card-body .modal-actions {
+    margin-top: var(--space-2);
+}
+
+@media (max-width: 560px) {
+    .mine-section header {
+        align-items: stretch;
+    }
+
+    .mine-chat {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .mine-toolbar .tab-filters {
+        width: 100%;
+    }
+
+    .mine-toolbar .tab-filters .btn {
+        flex: 1;
+    }
+
+    .mine-toolbar > .btn {
+        width: 100%;
+    }
+
+    .mine-set {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* A switch stays on its row's right, like the panel's own settings */
+    .mine-set:has(> .switch) {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .mine-set .custom-select {
+        min-width: 0;
+    }
+}
+
+.login-check {
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--fill-faint);
+    text-align: center;
+    font-size: var(--text-lg);
+    font-variant-numeric: tabular-nums;
+}
+
+.mine-logout {
+    margin-top: var(--space-6);
+}

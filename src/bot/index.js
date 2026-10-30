@@ -24,6 +24,8 @@ require('./middleware').register(bot);
 require('./access').register(bot);
 // For the chat's statistics: what it opens (only updates that got past the throttle and the block)
 require('./usage').register(bot);
+// Before the commands: "/start L<code>" is a sign-in to the panel, not the usual /start
+require('./login').register(bot);
 require('./commands').register(bot);
 // Before the search: its free-text handler would otherwise see "⚙️ Настройки" first
 require('./settings').register(bot);

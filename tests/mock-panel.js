@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { accountState, accountAnswer, changesPage } = require('./mock-account');
 
 /**
  * Serves the panel straight from admin/ with a canned API, entirely inside the
@@ -260,7 +261,9 @@ const PIXEL = Buffer.from(
  *   `poster`: a series card gets a poster (a 1x1 image);
  *   `chats`: the Users / Chats rows instead of the three default ones;
  *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
- *   served once it resolves (a page.route() of the test's would lose to this one's catch-all)
+ *   served once it resolves (a page.route() of the test's would lose to this one's catch-all);
+ *   `role`: 'user' signs in as a user (default 'admin'), `signedOut`: the sign-in screen,
+ *   `groupAdmin`: the user is an admin of the group "Киноклуб"; `path`: the page opened first
  */
 /** A chat's statistics as /api/chat/:id/stats answers them (src/chat-stats.js). */
 function chatStats(query) {
@@ -355,6 +358,8 @@ function recapSchedule() {
 
 async function mockPanel(page, options = {}) {
     const panel = {
+        // Signing in and the user's own chats (tests/mock-account.js): an admin unless told
+        account: accountState(options),
         subs: buildSubs(),
         sub,
         series,
@@ -426,10 +431,12 @@ async function mockPanel(page, options = {}) {
             },
             proxy: { url: '', hasPassword: false },
             interval: { hours: 3, active: 3, choices: [1, 2, 3, 4, 6, 8, 12, 24] },
+            changes: { days: 30, choices: [7, 30, 90, 365] },
             database: { host: 'db', name: 'series_bot', user: 'bot_user' },
             restart: { pending: [], blocked: null },
             recap: { on: false, day: null, hour: null, year: null },
-            startedAt: new Date(Date.now() - 3600e3).toISOString(),
+            // An hour ago, but never before today's midnight: the card says "since today" at 00:30 too
+            startedAt: new Date(Math.max(Date.now() - 3600e3, new Date().setHours(0, 0, 0, 0))).toISOString(),
             ...options.settings
         }
     };
@@ -519,6 +526,10 @@ async function mockPanel(page, options = {}) {
                 panel.settings.interval.hours = body.intervalHours;
                 panel.settings.restart.pending = ['interval'];
                 saved.push('UPDATE_INTERVAL_HOURS');
+            }
+            if (body.changesKeepDays !== undefined) {
+                panel.settings.changes.days = body.changesKeepDays;
+                saved.push('CHANGES_KEEP_DAYS');
             }
             if (body.proxyUrl !== undefined) {
                 panel.settings.proxy.url = body.proxyUrl.replace(/:[^:@/]*@/, '@');
@@ -799,6 +810,15 @@ async function mockPanel(page, options = {}) {
             }
         ],
         [
+            // A chat's change log: 23 rows (options.changes overrides); the queries asked, for tests
+            /^\/api\/chat\/(-?\d+)\/changes$/,
+            ([, id], req) => {
+                const url = new URL(req.url());
+                panel.changesAsked = [...(panel.changesAsked || []), { chatId: id, query: url.search.slice(1) }];
+                return changesPage(url, options.changes);
+            }
+        ],
+        [
             // A chat's year recap: whether it was sent (options.recapStatus) and a send asked for
             /^\/api\/chat\/(-?\d+)\/recap-status$/,
             () => panel.recapStatus
@@ -916,9 +936,23 @@ async function mockPanel(page, options = {}) {
             return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
         }
 
-        if (url.pathname.startsWith('/api/poster/') && options.poster)
+        if (url.pathname.startsWith('/api/poster/'))
             return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
         if (url.pathname.startsWith('/api/')) {
+            const mine = accountAnswer(panel.account, route.request(), url);
+            if (mine) {
+                if (route.request().headers()['x-requested-by'] !== 'notfckbot-panel')
+                    return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
+                if (mine.status && mine.body) return route.fulfill({ status: mine.status, json: mine.body });
+                return route.fulfill({ status: 200, json: mine });
+            }
+            // As src/account/guard.js: the rest of the API is for a signed-in admin (posters are open)
+            if (!url.pathname.startsWith('/api/poster/')) {
+                if (!panel.account.signedIn)
+                    return route.fulfill({ status: 401, json: { error: 'Sign in: /login in the bot' } });
+                if (panel.account.role !== 'admin')
+                    return route.fulfill({ status: 403, json: { error: 'Only for the panel admins' } });
+            }
             const card = cards.map(([re, fn]) => [url.pathname.match(re), fn]).find(([m]) => m);
             const handler = api[url.pathname] || (card && ((req) => card[1](card[0], req)));
             if (!handler) return route.fulfill({ status: 404, json: { error: 'Not mocked' } });
@@ -940,7 +974,9 @@ async function mockPanel(page, options = {}) {
             return route.fulfill({ status: 200, json: answer });
         }
 
-        const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1));
+        // A sign-in link from the bot is the panel's own page
+        const isPage = url.pathname === '/' || url.pathname.startsWith('/login/');
+        const rel = isPage ? 'index.html' : decodeURIComponent(url.pathname.slice(1));
         const asked = options.files && options.files[rel];
         if (asked === 'missing') return route.abort();
         if (asked) await asked;
@@ -954,7 +990,7 @@ async function mockPanel(page, options = {}) {
         });
     });
 
-    await page.goto(`${ORIGIN}/`);
+    await page.goto(`${ORIGIN}${options.path || '/'}`);
     return panel;
 }
 

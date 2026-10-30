@@ -84,6 +84,12 @@ describe('dates', () => {
         assert.deepEqual(pick(calendar.period('m', -10, 'Europe/Moscow', NOW)), ['2025-12-01', '2025-12-31']);
     });
 
+    test("the panel's one list runs from last month to the end of the month after next, across years", () => {
+        assert.deepEqual(pick(calendar.listPeriod('Europe/Moscow', NOW)), ['2026-09-01', '2026-12-31']);
+        const december = new Date('2026-12-10T12:00:00Z');
+        assert.deepEqual(pick(calendar.listPeriod('Europe/Moscow', december)), ['2026-11-01', '2027-02-28']);
+    });
+
     test("today is the chat's: late on Sunday in Moscow is Monday in Vladivostok", () => {
         const sunday = new Date('2026-10-18T18:00:00Z');
         assert.equal(calendar.todayIn('Europe/Moscow', sunday), '2026-10-18');

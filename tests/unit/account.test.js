@@ -1,0 +1,401 @@
+/**
+ * Signing in to the panel and the users' own chats (src/account/): who may sign in and as what,
+ * the one-time links, the codes the bot confirms, sessions, which API a role may call, and who may
+ * open and change which chat. The database and Telegram are stubbed.
+ * Run: node --test tests/unit/account.test.js
+ */
+const { test, mock, beforeEach, afterEach } = require('node:test');
+const assert = require('node:assert/strict');
+const express = require('express');
+const { AccountSession, LoginLink, Chat, Watchlist, Subscription } = require('../../src/db');
+const auth = require('../../src/account/auth');
+const members = require('../../src/account/members');
+const { guard } = require('../../src/account/guard');
+const { panelOnly } = require('../../src/admin/panel-only');
+
+const ENV = ['ADMIN_USERS', 'ACCOUNT_USERS', 'PANEL_URL'];
+let savedEnv;
+let sessions;
+let links;
+
+beforeEach(() => {
+    savedEnv = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
+    process.env.ADMIN_USERS = '42';
+    process.env.ACCOUNT_USERS = '7, 8';
+    process.env.PANEL_URL = 'http://box/';
+    sessions = new Map();
+    links = new Map();
+    const table = (rows) => ({
+        create: async (row) => {
+            rows.set(row.id, row);
+            return row;
+        },
+        findByPk: async (id) => rows.get(id) || null,
+        destroy: async ({ where }) => (typeof where.id === 'string' && rows.delete(where.id) ? 1 : 0)
+    });
+    for (const [model, rows] of [
+        [AccountSession, sessions],
+        [LoginLink, links]
+    ]) {
+        const fake = table(rows);
+        for (const method of ['create', 'findByPk', 'destroy']) mock.method(model, method, fake[method]);
+    }
+    members.forget();
+});
+
+afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
+    mock.restoreAll();
+});
+
+const tokenOf = (link) => link.split('/login/')[1];
+
+test('roles: ADMIN_USERS get the panel, ACCOUNT_USERS their chats, nobody else gets in', () => {
+    assert.equal(auth.roleOf(42), 'admin');
+    assert.equal(auth.roleOf('8'), 'user');
+    assert.equal(auth.roleOf(99), null);
+    process.env.ACCOUNT_USERS = '42';
+    assert.equal(auth.roleOf(42), 'admin', 'an admin on both lists is an admin');
+});
+
+test('a link: only for allowed users with PANEL_URL set; works once; only hashes are stored', async () => {
+    assert.equal(await auth.createLink({ id: 99 }), null);
+    const link = await auth.createLink({ id: 7, name: '@u7' }, -100);
+    assert.match(link, /^http:\/\/box\/login\/[A-Za-z0-9_-]{43}$/);
+    const token = tokenOf(link);
+    assert.ok(![...links.keys()].includes(token), 'the token itself is not stored');
+
+    const first = await auth.redeemLink(token);
+    assert.equal(first.chatId, '-100');
+    assert.equal(await auth.redeemLink(token), null, 'second use');
+    const session = await auth.sessionOf({ headers: { cookie: `x=1; nfb_session=${first.token}` } });
+    assert.deepEqual([session.userId, session.role], ['7', 'user']);
+
+    delete process.env.PANEL_URL;
+    assert.equal(await auth.createLink({ id: 7 }), null);
+});
+
+test('a link expires after five minutes; a user taken off the list loses link and session', async () => {
+    const now = Date.now();
+    const late = tokenOf(await auth.createLink({ id: 7 }, null, now));
+    assert.equal(await auth.redeemLink(late, now + auth.LINK_TTL_MS + 1), null, 'expired');
+
+    const { token } = await auth.redeemLink(tokenOf(await auth.createLink({ id: 8 }, null, now)), now);
+    const req = { headers: { cookie: `nfb_session=${token}` } };
+    assert.ok(await auth.sessionOf(req, now));
+    process.env.ACCOUNT_USERS = '7';
+    assert.equal(await auth.sessionOf(req, now), null);
+    process.env.ACCOUNT_USERS = '7,8';
+    assert.equal(await auth.sessionOf(req, now + auth.SESSION_TTL_MS + 1), null, 'session expired');
+});
+
+test('"Войти через Telegram": in only after "Да" in the bot, only for the page with the secret, once', async () => {
+    const { code, secret } = auth.startCode();
+    assert.equal(auth.isWaiting(code), true);
+    assert.deepEqual(await auth.pollCode(code, secret), { state: 'waiting' });
+    assert.equal(auth.answerCode(code, { id: 99 }, true), false, 'not allowed in');
+    assert.equal(auth.answerCode(code, { id: 7, name: '@u7' }, true), true);
+    assert.equal(auth.answerCode(code, { id: 8 }, true), false, 'answered already');
+    // Someone who only saw the bot link (the code) has no secret
+    assert.deepEqual(await auth.pollCode(code, 'x'.repeat(43)), { state: 'gone' });
+    const result = await auth.pollCode(code, secret);
+    assert.equal(result.state, 'in');
+    const session = await auth.sessionOf({ headers: { cookie: `nfb_session=${result.token}` } });
+    assert.equal(session.userId, '7');
+    assert.deepEqual(await auth.pollCode(code, secret), { state: 'gone' }, 'used up');
+
+    const refused = auth.startCode();
+    auth.answerCode(refused.code, { id: 7 }, false);
+    assert.deepEqual(await auth.pollCode(refused.code, refused.secret), { state: 'refused' });
+});
+
+/** Telegram's answer about members: chatId → userId → status, or an Error */
+function fakeBot(statuses, sent = []) {
+    return {
+        botInfo: { username: 'notfckbot' },
+        telegram: {
+            getChatMember: async (chatId, userId) => {
+                const status = (statuses[chatId] || {})[userId] || 'left';
+                if (status instanceof Error) throw status;
+                return { status };
+            },
+            getChat: async (chatId) => ({ title: `Группа ${chatId}` }),
+            sendMessage: async (chatId, text) => {
+                sent.push({ chatId: String(chatId), text });
+                return { message_id: 1 };
+            }
+        }
+    };
+}
+
+test('own chat for its user, a group for its members, its settings for its admins only', async (t) => {
+    const types = { '-1': 'supergroup', '-2': 'group', '-3': 'channel' };
+    t.mock.method(Chat, 'findByPk', async (id) => (types[id] ? { type: types[id] } : null));
+    members.useBot(
+        fakeBot({
+            '-1': { 42: 'administrator', 7: 'member' },
+            '-2': { 42: new Error('Too Many Requests: retry after 5') },
+            // The bot is an admin of its channels: every subscriber is a "member" to Telegram
+            '-3': { 7: 'member' }
+        })
+    );
+    assert.deepEqual(await members.accessTo('42', '42'), { edit: true, settings: true });
+    assert.equal(await members.accessTo('42', '7'), null, "someone else's private chat");
+    assert.deepEqual(await members.accessTo('42', '-1'), { edit: true, settings: true });
+    assert.deepEqual(await members.accessTo('7', '-1'), { edit: true, settings: false });
+    assert.equal(await members.accessTo('99', '-1'), null, 'not in the group');
+    assert.equal(await members.accessTo('7', '-3'), null, "a channel's subscriber can't change its list");
+    assert.equal(await members.accessTo('7', '-9'), null, 'a group the bot has never seen');
+    // Telegram didn't answer: no access on a guess, and not "not a member" for minutes either
+    await assert.rejects(members.accessTo('42', '-2'), { status: 503 });
+    members.forget();
+    members.useBot(fakeBot({ '-2': { 42: 'member' } }));
+    assert.deepEqual(await members.accessTo('42', '-2'), { edit: true, settings: false });
+});
+
+test('Telegram hanging: a membership question gives up after 3 s, and the next one fails at once', async (t) => {
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'group' }));
+    members.useBot({ telegram: { getChatMember: () => new Promise(() => {}) } });
+    const started = Date.now();
+    await assert.rejects(members.accessTo('42', '-1'), { status: 503 });
+    const took = Date.now() - started;
+    assert.ok(took >= 2900 && took < 4000, String(took));
+    const again = Date.now();
+    await assert.rejects(members.accessTo('42', '-1'), { status: 503 });
+    assert.ok(Date.now() - again < 100, 'not asked again for 30 s');
+});
+
+// --- The API, as src/admin/index.js puts it together ---
+
+async function serve(bot) {
+    members.useBot(bot);
+    const app = express();
+    app.set('bot', bot);
+    app.use('/api', panelOnly);
+    app.use('/api', guard);
+    app.use(express.json());
+    app.use(require('../../src/account/routes').router);
+    app.get('/api/stats', (req, res) => res.json({ admin: true }));
+    // eslint-disable-next-line no-unused-vars
+    app.use('/api', (err, req, res, next) => res.status(err.status || 500).json({ error: 'Bad request' }));
+    const server = app.listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const call = (method, path, { body, cookie, raw } = {}) =>
+        fetch(`${base}${path}`, {
+            method,
+            headers: {
+                'X-Requested-By': 'notfckbot-panel',
+                ...(cookie ? { Cookie: `nfb_session=${cookie}` } : {}),
+                ...(body || raw ? { 'Content-Type': 'application/json' } : {})
+            },
+            body: raw || (body ? JSON.stringify(body) : undefined)
+        }).then(async (res) => ({
+            status: res.status,
+            headers: res.headers,
+            body: await res.json().catch(() => null)
+        }));
+    return { server, call };
+}
+
+async function signIn(call, userId) {
+    const token = tokenOf(await auth.createLink({ id: userId, name: `@u${userId}` }));
+    const res = await call('POST', '/api/login', { body: { token } });
+    assert.equal(res.status, 200);
+    const cookie = res.headers.get('set-cookie');
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /SameSite=Lax/);
+    return /nfb_session=([^;]+)/.exec(cookie)[1];
+}
+
+test('the API: a session for everything but signing in; the panel itself for admins only', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => null);
+    t.mock.method(Chat, 'findAll', async () => []);
+    assert.equal((await call('GET', '/api/stats')).status, 401);
+    assert.equal((await call('GET', '/api/account/me')).status, 401);
+    assert.equal((await call('POST', '/api/login', { body: { token: 'x'.repeat(43) } })).status, 401);
+    const broken = await call('POST', '/api/login', { raw: '{"token":' });
+    assert.deepEqual([broken.status, broken.body], [400, { error: 'Bad request' }], 'no page with the stack');
+
+    const user = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/stats', { cookie: user })).status, 403);
+    const me = await call('GET', '/api/account/me', { cookie: user });
+    assert.deepEqual(me.body.user, { id: '7', name: '@u7', role: 'user' });
+    assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, []);
+
+    const admin = await signIn(call, 42);
+    assert.equal((await call('GET', '/api/stats', { cookie: admin })).status, 200);
+    assert.equal((await call('POST', '/api/logout', { cookie: admin })).status, 200);
+    assert.equal((await call('GET', '/api/stats', { cookie: admin })).status, 401, 'signed out');
+});
+
+test('the API: the Telegram code goes with the bot link; the poll lets in the confirmed page', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const start = await call('POST', '/api/login/telegram');
+    assert.match(start.body.url, /^https:\/\/t\.me\/notfckbot\?start=L[A-Za-z0-9_-]{32}$/);
+    assert.equal(start.body.url.endsWith(start.body.code), true);
+    const poll = () =>
+        call('POST', '/api/login/telegram/poll', { body: { code: start.body.code, secret: start.body.secret } });
+    assert.equal((await poll()).body.state, 'waiting');
+    auth.answerCode(start.body.code, { id: 42 }, true);
+    const done = await poll();
+    assert.equal(done.body.state, 'in');
+    assert.match(done.headers.get('set-cookie'), /nfb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly/);
+});
+
+test("the API: a chat the user isn't in is closed; a member can't change a group's settings", async (t) => {
+    const sent = [];
+    const { server, call } = await serve(fakeBot({ '-1': { 42: 'administrator', 7: 'member' } }, sent));
+    t.after(() => server.close());
+    let updated = null;
+    const chat = {
+        id: -1,
+        type: 'supergroup',
+        quiet_start: null,
+        quiet_end: null,
+        timezone: 'Europe/Moscow',
+        digest_week: false,
+        get: () => ({}),
+        update: async (changes) => {
+            updated = changes;
+            Object.assign(chat, changes);
+        }
+    };
+    t.mock.method(Chat, 'findByPk', async () => chat);
+    t.mock.method(Subscription, 'findAll', async () => []);
+    t.mock.method(Watchlist, 'findAll', async () => []);
+
+    const member = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/account/chats/-5/list', { cookie: member })).status, 403);
+    assert.equal((await call('GET', '/api/account/chats/42/list', { cookie: member })).status, 403, 'another user');
+    assert.equal((await call('GET', '/api/account/chats/-1/list', { cookie: member })).status, 200);
+    const refused = await call('PATCH', '/api/account/chats/-1/settings', {
+        cookie: member,
+        body: { digest_week: true }
+    });
+    assert.equal(refused.status, 403);
+    assert.equal(updated, null);
+
+    const admin = await signIn(call, 42);
+    const bad = await call('PATCH', '/api/account/chats/-1/settings', { cookie: admin, body: { quiet_start: 3 } });
+    assert.equal(bad.status, 400);
+    const ok = await call('PATCH', '/api/account/chats/-1/settings', {
+        cookie: admin,
+        body: { quiet_start: 23, quiet_end: 9 }
+    });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(updated, { quiet_start: 23, quiet_end: 9 });
+    // The group is told who changed what, and from what to what
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].chatId, '-1');
+    assert.equal(sent[0].text, '⚙️ @u42 изменил(а) настройки:\nТихие часы: выключены → 23:00–09:00');
+
+    await call('PATCH', '/api/account/chats/-1/settings', {
+        cookie: admin,
+        body: { timezone: 'Asia/Omsk', digest_week: true }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(
+        sent[1].text,
+        '⚙️ @u42 изменил(а) настройки:\nЧасовой пояс: Москва (UTC+3) → Омск (UTC+6)\n' +
+            'Сводка недели: выключена → по понедельникам в 10:00'
+    );
+    // Nothing really changed: nothing to tell
+    await call('PATCH', '/api/account/chats/-1/settings', { cookie: admin, body: { timezone: 'Asia/Omsk' } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(sent.length, 2);
+});
+
+test('the API: a film is removed only from the chat in the path', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    let destroyed = false;
+    t.mock.method(Watchlist, 'findByPk', async () => ({
+        chatId: 999,
+        tmdb_id: 'movie_1',
+        title: 'X',
+        destroy: async () => {
+            destroyed = true;
+        }
+    }));
+    const cookie = await signIn(call, 42);
+    const res = await call('DELETE', '/api/account/chats/42/films/5', { cookie });
+    assert.deepEqual(res.body, { removed: false });
+    assert.equal(destroyed, false);
+});
+
+// --- The bot ---
+
+function botHandlers() {
+    const handlers = { commands: {}, actions: [] };
+    require('../../src/bot/login').register({
+        command: (name, fn) => (handlers.commands[name] = fn),
+        action: (re, fn) => handlers.actions.push([re, fn])
+    });
+    return handlers;
+}
+
+test('/login: refused to users not on the lists; in a group the link goes to the private chat', async () => {
+    const { commands } = botHandlers();
+    const replies = [];
+    const sent = [];
+    const ctx = (from, chat) => ({
+        from,
+        chat,
+        reply: async (text) => replies.push(text),
+        telegram: fakeBot({}, sent).telegram
+    });
+    await commands.login(ctx({ id: 99 }, { id: 99, type: 'private' }));
+    assert.match(replies.pop(), /закрытом тесте/);
+    assert.equal(sent.length, 0);
+
+    await commands.login(ctx({ id: 42, username: 'me' }, { id: -1, type: 'supergroup', title: 'Кино <b>' }));
+    assert.equal(sent[0].chatId, '42');
+    assert.match(sent[0].text, /http:\/\/box\/login\//);
+    assert.match(sent[0].text, /Кино &lt;b&gt;/);
+    assert.match(replies.pop(), /личные сообщения/);
+});
+
+test('/start L<code>: the bot asks first, and only "Да, это я" lets the page in', async () => {
+    const { commands, actions } = botHandlers();
+    const { code, secret } = auth.startCode();
+    const replies = [];
+    let passedOn = false;
+    const message = (text, from = { id: 7 }) => ({
+        from,
+        chat: { id: from.id, type: 'private' },
+        message: { text },
+        reply: async (body, extra) => replies.push({ body, extra })
+    });
+    await commands.start(message('/start'), () => (passedOn = true));
+    assert.equal(passedOn, true, 'the usual /start goes on to src/bot/commands.js');
+
+    await commands.start(message(`/start L${code}`, { id: 99 }), () => {});
+    assert.match(replies.pop().body, /закрытом тесте/);
+    await commands.start(message(`/start L${code}`), () => {});
+    const ask = replies.pop();
+    assert.match(ask.body, /Войти в панель/);
+    // The same four digits as the sign-in page shows: a link sent by someone else shows other digits
+    assert.match(ask.body, new RegExp(`Проверочный код: <b>${auth.checkWord(code)}</b>`));
+    const buttons = ask.extra.reply_markup.inline_keyboard.flat().map((b) => b.callback_data);
+    assert.deepEqual(buttons, [`login_ok_${code}`, `login_no_${code}`]);
+    assert.deepEqual(await auth.pollCode(code, secret), { state: 'waiting' }, 'nothing yet');
+
+    const [re, press] = actions[0];
+    const edits = [];
+    await press({
+        match: re.exec(`login_ok_${code}`),
+        from: { id: 7, username: 'u7' },
+        answerCbQuery: async () => {},
+        editMessageText: async (text) => edits.push(text)
+    });
+    assert.match(edits[0], /Готово/);
+    assert.equal((await auth.pollCode(code, secret)).state, 'in');
+});

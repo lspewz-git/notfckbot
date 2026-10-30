@@ -396,7 +396,7 @@ test('each tab: two columns that end on one line', async ({ page }) => {
 
     await openSettingsTab(page, 'bot');
     const [left3, right3] = await columns('bot');
-    expect(left3.titles).toEqual(['Update check', 'Year recap by date']);
+    expect(left3.titles).toEqual(['Update check', 'Chat change log', 'Year recap by date']);
     expect(right3.titles).toEqual(['Database', 'Bot']);
     expect(left3.bottom).toBe(right3.bottom);
 });

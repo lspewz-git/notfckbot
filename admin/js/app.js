@@ -37,6 +37,8 @@ import {
 import { triggerCheck, openBroadcastModal, sendBroadcast } from './maintenance.js';
 import { openAbout, loadAbout } from './about.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
+import { accountActions, setupAccount } from './account.js';
+import { startSession, watchSession, sessionActions } from './session.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -158,6 +160,8 @@ const CLICK_ACTIONS = {
     ...alertsActions,
     ...recapCardActions,
     ...recapScheduleActions,
+    ...accountActions,
+    ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'sends-recent': () => openRecentSends(),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
@@ -253,7 +257,14 @@ function setupControls() {
 }
 
 // --- Boot ---
-function init() {
+
+/** Once signed in: an admin's panel opens on the dashboard, a user's on their subscriptions. */
+function afterSignIn(role) {
+    if (role === 'admin') switchSection(activeSection);
+    else switchSection('my-subs');
+}
+
+async function init() {
     // First: the selects inside are what setupFilters, setupHistory and enhanceSelects work on
     fillPagers();
     setupControls();
@@ -267,6 +278,8 @@ function init() {
     setupRecapSchedule();
     setupChatSettingsForm();
     setupProxyForm();
+    setupAccount();
+    watchSession();
     enhanceSelects();
     updateAutoRefreshSwitch();
     startTimer();
@@ -288,7 +301,10 @@ function init() {
         }
     });
 
-    fetchData(); // Initial load runs even though auto-refresh starts paused
+    // Who is signed in first: the sign-in screen, an admin's panel or a user's own chats. The initial
+    // load runs even though auto-refresh starts paused
+    const role = await startSession();
+    if (role) afterSignIn(role);
 }
 
 init();

@@ -45,3 +45,48 @@
     background: var(--danger-soft);
     color: var(--danger);
 }
+
+/* --- A chat's change log (changes.js): the panel's dialog and a group admin's settings page --- */
+
+.changes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.changes-list {
+    list-style: none;
+}
+
+.changes-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    overflow-wrap: anywhere;
+}
+
+.changes-row + .changes-row {
+    border-top: 1px solid var(--border-row);
+}
+
+.changes-meta,
+.changes-kept,
+.changes-empty {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.changes-body[aria-busy='true'] {
+    opacity: 0.6;
+}
+
+.changes .pager {
+    padding-top: 0;
+}
+
+.mine-h {
+    margin-top: var(--space-4);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
