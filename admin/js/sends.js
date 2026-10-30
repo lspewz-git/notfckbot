@@ -40,8 +40,20 @@ function row(dot, time, title, meta) {
     return `<li class="sends-row"><time>${time}</time><span class="alert-dot ${dot}" aria-hidden="true"></span><span class="sends-what"><span class="sends-title">${title}</span><span class="sends-meta">${meta}</span></span></li>`;
 }
 
-/** Rows of the real rows' size until the answer (panel.md: nothing jumps). */
-const SKELETON = `<ul class="sends-list" aria-hidden="true">${'<li class="sends-row"><time><span class="skeleton"></span></time><span class="alert-dot"></span><span class="sends-what"><span class="sends-title"><span class="skeleton"></span></span><span class="sends-meta"><span class="skeleton"></span></span></span></li>'.repeat(2)}</ul>`;
+const EMPTY = '<p class="alerts-empty">Everything went out.</p>';
+const SKELETON_ROW =
+    '<li class="sends-row"><time><span class="skeleton"></span></time><span class="alert-dot"></span><span class="sends-what"><span class="sends-title"><span class="skeleton"></span></span><span class="sends-meta"><span class="skeleton"></span><span class="skeleton"></span></span></span></li>';
+
+/**
+ * Until the answer, what it will most likely be, from the chart's counts (panel.md: nothing
+ * jumps): "Everything went out." for a day without failures, else the heading and a row of the
+ * real rows' size per failure, up to three.
+ */
+function placeholder(counts) {
+    if (!counts.failed) return EMPTY;
+    const rows = SKELETON_ROW.repeat(Math.min(counts.failed, 3));
+    return `<h4 class="sends-group">Not delivered</h4><ul class="sends-list" aria-hidden="true">${rows}</ul>`;
+}
 
 function subtitle(counts, queued = 0) {
     const parts = [`Sent ${counts.sent}`, `Not delivered ${counts.failed}`];
@@ -93,7 +105,7 @@ function render(res, counts) {
             .join('');
         html += '</ul>';
     }
-    $('sends-body').innerHTML = html || '<p class="alerts-empty">Everything went out.</p>';
+    $('sends-body').innerHTML = html || EMPTY;
 }
 
 /**
@@ -106,8 +118,10 @@ export async function openSends(day, counts, { latest = false } = {}) {
     asked = day;
     $('sends-title').textContent = dayLabel(day);
     $('sends-sub').textContent = subtitle(counts);
-    $('sends-body').innerHTML = SKELETON;
+    $('sends-body').innerHTML = placeholder(counts);
     openModal('sends-modal');
+    // A past day without failures has nothing more to tell; today may still have its queue
+    if (!counts.failed && !latest) return;
     try {
         const res = await api(`/stats/sends?day=${encodeURIComponent(day)}${latest ? '&latest=1' : ''}`);
         if (asked === day) render(res, counts);

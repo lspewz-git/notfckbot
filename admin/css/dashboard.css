@@ -934,3 +934,8 @@
 .sends-meta .skeleton {
     width: 14rem;
 }
+
+/* The reason's second line, shorter: most wrap part way */
+.sends-meta .skeleton + .skeleton {
+    width: 8rem;
+}

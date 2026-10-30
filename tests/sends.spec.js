@@ -164,8 +164,36 @@ test('a day counted before the details were kept says so instead of an empty lis
     await expect(page.locator('#sends-body')).toContainText('1 more without details: details are kept since 1 Oct');
 });
 
-test('a day where everything went out says so', async ({ page }) => {
-    await mockPanel(page);
+test('a day where everything went out says so at once: nothing to load, nothing to jump', async ({ page }) => {
+    const panel = await mockPanel(page);
     await clickDay(page, 6);
     await expect(page.locator('#sends-body')).toHaveText('Everything went out.');
+    expect(panel.sendsAsked).toBeUndefined();
+});
+
+test('a day with a failure keeps its height from opening to the answer', async ({ page }) => {
+    let release;
+    const gate = new Promise((resolve) => {
+        release = resolve;
+    });
+    await mockPanel(page, {
+        sends: async (day) => {
+            await gate;
+            return SENDS(day);
+        }
+    });
+    await clickDay(page, 9);
+    const content = page.locator('#sends-modal .modal-content');
+    // The stand-in: the heading and a row for the one failure
+    await expect(page.locator('#sends-body .sends-group')).toHaveText('Not delivered');
+    await expect(page.locator('#sends-body .sends-row')).toHaveCount(1);
+    // The layout's height: the box on screen still grows with the dialog's opening animation
+    const height = () => content.evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
+    const before = await height();
+    release();
+    await expect(page.locator('#sends-body .skeleton')).toHaveCount(0);
+    await expect(page.locator('#sends-body .sends-title')).toContainText('Голодные игры');
+    const after = await height();
+    // Within a line: a reason may wrap one line more or less than its stand-in
+    expect(Math.abs(after - before)).toBeLessThanOrEqual(20);
 });
