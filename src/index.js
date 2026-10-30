@@ -41,6 +41,7 @@ async function start() {
                 await require('./stats-log')
                     .flushStats()
                     .catch(() => {});
+                await require('./send-failures').flushFailures();
                 await require('./chat-events')
                     .flushEvents()
                     .catch(() => {});

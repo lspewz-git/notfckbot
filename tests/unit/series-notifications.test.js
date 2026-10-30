@@ -9,6 +9,9 @@ const { fakeBot, fakeSeries, ep, tmdbSeries, kindOf } = require('./fakes');
 
 // A chat's settings (quiet hours) come from the database: none here, so none set
 mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
+// A send that fails for good is kept for the dashboard (src/send-failures.js): not here
+mock.method(require('../../src/db').SendFailure, 'create', async () => {});
+mock.method(require('../../src/db').SendFailure, 'destroy', async () => 0);
 
 const kinds = (bot) => bot.sent.map((m) => `${m.chatId}:${kindOf(m.text)}`);
 

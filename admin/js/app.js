@@ -3,7 +3,7 @@
 import { $, $field, all, closest, debounce } from './dom.js';
 import { runCheckNow, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
-import { setSubsChart } from './dashboard-charts.js';
+import { setSubsChart, openRecentSends } from './dashboard-charts.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
 import { fillPagers } from './pager.js';
 import { filterLogs } from './logs.js';
@@ -159,6 +159,7 @@ const CLICK_ACTIONS = {
     ...recapCardActions,
     ...recapScheduleActions,
     'chart-subs': (el) => setSubsChart(el.dataset.by),
+    'sends-recent': () => openRecentSends(),
     'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
     proxy: () => openProxyModal(),
     about: () => loadAbout(),

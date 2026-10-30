@@ -7,7 +7,7 @@ const { test, describe, mock, beforeEach, before, after } = require('node:test')
 const assert = require('node:assert/strict');
 const express = require('express');
 
-const { DailyStat, Subscription, Chat, Series, Watchlist } = require('../../src/db');
+const { DailyStat, Subscription, Chat, Series, Watchlist, SendFailure, PendingMessage } = require('../../src/db');
 const stats = require('../../src/stats-log');
 
 describe('counting by day', () => {
@@ -93,6 +93,69 @@ describe('the API', () => {
         assert.equal(res.countingSince, today);
     });
 
+    test("a day's details: what didn't go out with its chat's name; the queue only with today", async () => {
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date());
+        const asked = [];
+        mock.method(SendFailure, 'findAll', async ({ where }) => {
+            asked.push(where.day);
+            return [
+                {
+                    chatId: -100,
+                    about: 'Голодные игры',
+                    status: 'gave_up',
+                    error: 'No answer from Telegram in 30 s',
+                    count: 1,
+                    tries: 8,
+                    since: new Date('2026-10-29T03:01:00Z'),
+                    createdAt: new Date('2026-10-30T06:00:00Z')
+                }
+            ];
+        });
+        mock.method(SendFailure, 'min', async () => '2026-10-30');
+        mock.method(PendingMessage, 'findAll', async () => [
+            { chatId: -100, about: 'Темная материя', error: 'x', attempts: 1, createdAt: new Date() }
+        ]);
+        mock.method(Chat, 'findAll', async () => [{ id: -100, username: 'miners_otdihayt' }]);
+
+        const past = await get('/api/stats/sends?day=2026-10-20');
+        assert.deepEqual(asked, ['2026-10-20']);
+        assert.equal(past.failed[0].chat, 'miners_otdihayt');
+        assert.equal(past.failed[0].chatId, '-100');
+        assert.deepEqual([past.failed[0].status, past.failed[0].tries], ['gave_up', 8]);
+        assert.equal(past.keptSince, '2026-10-30');
+        // A past day: the queue is today's news
+        assert.deepEqual(past.queued, []);
+
+        const now = await get(`/api/stats/sends?day=${today}`);
+        assert.deepEqual(
+            now.queued.map((q) => [q.about, q.tries, q.chat]),
+            [['Темная материя', 1, 'miners_otdihayt']]
+        );
+        assert.ok(now.queued[0].maxTries > 1);
+
+        // The panel loaded before midnight asks for its last day: the queue still shows
+        const latest = await get('/api/stats/sends?day=2026-10-20&latest=1');
+        assert.equal(latest.queued.length, 1);
+
+        // A chat the table doesn't know: no name, its id stays
+        mock.method(Chat, 'findAll', async () => []);
+        const unnamed = await get('/api/stats/sends?day=2026-10-20');
+        assert.deepEqual([unnamed.failed[0].chat, unnamed.failed[0].chatId], [null, '-100']);
+
+        mock.method(SendFailure, 'findAll', async () => {
+            throw new Error('database down');
+        });
+        const res = await fetch(`${base}/api/stats/sends?day=2026-10-20`);
+        assert.equal(res.status, 500);
+        mock.restoreAll();
+    });
+
+    test("a day's details: a day that isn't one is refused", async () => {
+        const res = await fetch(`${base}/api/stats/sends?day=30.10.2026`);
+        assert.equal(res.status, 400);
+        assert.deepEqual(await res.json(), { error: 'Bad day' });
+    });
+
     test('the cards: last 7 days against the 7 before, from the day counts', async () => {
         const fmt = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(d);
         const day = (n) => fmt(new Date(Date.now() - n * 86400000));
@@ -124,9 +187,13 @@ describe('the API', () => {
 
 describe('what counts as not delivered', () => {
     const { notify, flushPending } = require('../../src/cron/outbox');
-    const { PendingMessage } = require('../../src/db');
+    // Kept for the day's details (src/send-failures.js)
+    let kept;
 
     beforeEach(async () => {
+        kept = [];
+        mock.method(SendFailure, 'create', async (fields) => kept.push(fields));
+        mock.method(SendFailure, 'destroy', async () => 0);
         mock.method(DailyStat, 'findOrCreate', async () => {});
         mock.method(DailyStat, 'increment', async () => {});
         await stats.flushStats();
@@ -150,6 +217,10 @@ describe('what counts as not delivered', () => {
             'x'
         );
         assert.equal(failedToday(), 1);
+        assert.deepEqual(
+            kept.map((k) => [k.chatId, k.status]),
+            [[1, 'gone']]
+        );
 
         // Telegram down: queued, so it may still go out
         mock.timers.enable({ apis: ['setTimeout'] });
@@ -186,5 +257,23 @@ describe('what counts as not delivered', () => {
             telegram: { sendMessage: async () => Promise.reject(telegramError(400, 'Bad Request: chat not found')) }
         });
         assert.equal(failedToday(), 2);
+        // Each kept with why: the old one given up on, the other lost to a chat that's gone
+        assert.deepEqual(
+            kept.map((k) => k.status),
+            ['too_old', 'gone']
+        );
+    });
+
+    test("a row that can't be kept doesn't stop the count or the sending", async () => {
+        mock.method(SendFailure, 'create', async () => {
+            throw new Error('database down');
+        });
+        const result = await notify(
+            { telegram: { sendMessage: async () => Promise.reject(telegramError(403, 'Forbidden: bot was blocked')) } },
+            4,
+            'z'
+        );
+        assert.equal(result.status, 'gone');
+        assert.equal(failedToday(), 1);
     });
 });

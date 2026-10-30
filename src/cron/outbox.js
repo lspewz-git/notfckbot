@@ -6,6 +6,7 @@ const { PendingMessage, HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
 const stats = require('../stats-log');
+const { recordFailure } = require('../send-failures');
 const events = require('../chat-events');
 const { isLeft } = require('../bot-status');
 const { tally, noteFailure } = require('./status');
@@ -21,6 +22,12 @@ const MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 // to the queue: no waiting through three tries per message for a Telegram that isn't there, and
 // no newer message slipping out ahead of an older queued one. Each check starts afresh.
 let unreachable = false;
+// Sends that failed this check while Telegram itself answered: that message's trouble (a poster
+// it can't fetch), so the next one still goes. The MAX_LONE-th such failure says the sends
+// themselves are stuck (a proxy that lets getMe through), and each would cost its 90 s of tries:
+// the rest go to the queue
+let lone = 0;
+const MAX_LONE = 2;
 // Each chat's settings, read once per check: a chat with ten new episodes is one query
 let chats = new Map();
 
@@ -33,13 +40,39 @@ async function chatSettings(chatId) {
     return chats.get(String(chatId));
 }
 const QUEUED = { status: 'failed', error: 'Telegram was unreachable earlier in this check' };
+// How long Telegram may take to say it is there, after a send failed
+const PROBE_MS = 5000;
+
+/**
+ * Whether Telegram itself answers: a send that failed while it does was that message's trouble
+ * (a poster it can't fetch), not Telegram's, so the rest of the check still goes out. On 29.10 one
+ * queued message timing out marked every check of the day unreachable.
+ */
+async function telegramAnswers(bot) {
+    try {
+        await bot.telegram.callApi('getMe', {}, { signal: AbortSignal.timeout(PROBE_MS) });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** After a send failed: true when the rest of the check should wait for the next one. */
+async function stopSending(bot, result) {
+    // A long flood wait is Telegram's word to stop for everyone
+    if (result.retryAfter || lone + 1 >= MAX_LONE || !(await telegramAnswers(bot))) return true;
+    lone += 1;
+    return false;
+}
+
+const clip = (text, n) => (text ? String(text).slice(0, n) : null);
 
 /**
  * Sends one notification; a temporary failure is queued for the next check. In the chat's quiet
  * hours it is held instead, for the list that goes out when they end (src/cron/held.js).
  * Returns deliver()'s outcome, held, or left for a chat the bot has lost (not tried).
  * @param {{ photo?: string | null, about?: string, line?: string, label?: string, event?: object | null }} [options]
- *   about: the title, for the log; line and label: its line and button in that list; event: what it
+ *   about: the title, for the log and the dashboard's list of what didn't go out; line and label: its line and button in that list; event: what it
  *   was, for the chat's statistics (src/chat-events.js: detail, tmdb_id, title, season, episode)
  */
 async function notify(bot, chatId, text, { photo = null, about = '', line = '', label = '', event = null } = {}) {
@@ -68,7 +101,9 @@ async function send(bot, chatId, text, { photo, about, line, label }) {
         }
     }
     const result = unreachable ? QUEUED : await deliver(bot, chatId, text, { photo });
-    if (result.status === 'failed') unreachable = true;
+    if (result !== QUEUED && result.status === 'failed') unreachable = await stopSending(bot, result);
+    // Where it went: a group that became a supergroup on the way has its new id
+    const to = result.chatId || chatId;
     if (result.status === 'sent') {
         tally('sent');
         stats.count('sent');
@@ -82,15 +117,22 @@ async function send(bot, chatId, text, { photo, about, line, label }) {
     const what = about ? ` about "${about}"` : '';
     // The day counts take a failure once it is final: a queued message may still go out
     if (result.status !== 'failed') {
-        stats.count('failed');
+        recordFailure({ chatId: to, about, status: result.status, error: result.error });
         log.error(`[Cron] Chat ${chatId} not notified${what} (${result.status}): ${result.error}`);
         return result;
     }
     try {
-        await PendingMessage.create({ chatId, text, photo });
+        // Cut to the columns' size: a longer value would fail the insert and lose the message
+        await PendingMessage.create({
+            chatId: to,
+            text,
+            photo,
+            about: clip(about, 255),
+            error: clip(result.error, 500)
+        });
         log.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}. Will retry on the next check`);
     } catch (err) {
-        stats.count('failed');
+        recordFailure({ chatId: to, about, status: 'not_queued', error: `${result.error}; ${err.message}` });
         log.error(`[Cron] Chat ${chatId} not notified${what}: ${result.error}; queueing failed: ${err.message}`);
     }
     return result;
@@ -99,6 +141,7 @@ async function send(bot, chatId, text, { photo, about, line, label }) {
 /** Starts a check: sends what earlier checks couldn't, oldest first, before the check's own news. */
 async function flushPending(bot, now = new Date()) {
     unreachable = false;
+    lone = 0;
     chats = new Map();
     const pending = await PendingMessage.findAll({ order: [['id', 'ASC']] });
     if (!pending.length) return;
@@ -106,8 +149,20 @@ async function flushPending(bot, now = new Date()) {
     for (const message of pending) {
         const age = now.getTime() - new Date(message.createdAt).getTime();
         if (message.attempts >= MAX_ATTEMPTS || age > MAX_AGE_MS) {
+            // Out of tries, or stale news (it waited out quiet hours or outages untried)
+            const status = message.attempts >= MAX_ATTEMPTS ? 'gave_up' : 'too_old';
             log.error(`[Cron] Gave up on a message to chat ${message.chatId} after ${message.attempts} retries`);
-            stats.count('failed');
+            recordFailure(
+                {
+                    chatId: message.chatId,
+                    about: message.about,
+                    status,
+                    error: message.error,
+                    tries: message.attempts,
+                    since: message.createdAt
+                },
+                now
+            );
             await message.destroy();
             continue;
         }
@@ -116,15 +171,29 @@ async function flushPending(bot, now = new Date()) {
         const chat = await chatSettings(message.chatId);
         // Lost to a chat that blocked the bot meanwhile, as a new one would be
         if (isLeft(chat)) {
+            recordFailure(
+                {
+                    chatId: message.chatId,
+                    about: message.about,
+                    status: 'gone',
+                    error: 'The chat blocked or removed the bot while it waited',
+                    tries: message.attempts,
+                    since: message.createdAt
+                },
+                now
+            );
             await message.destroy();
             continue;
         }
         // A retry is still a notification: not in the chat's quiet hours; a later check sends it
         if (isQuietNow(chat, now)) continue;
-        const result = await deliver(bot, message.chatId, message.text, { photo: message.photo });
+        // A retry after a failed one goes as text: the poster may be why it failed (each poster try
+        // that gets no answer costs 30 s)
+        const photo = message.attempts ? null : message.photo;
+        const result = await deliver(bot, message.chatId, message.text, { photo });
         if (result.status === 'failed') {
-            unreachable = true;
-            await message.update({ attempts: message.attempts + 1 });
+            unreachable = await stopSending(bot, result);
+            await message.update({ attempts: message.attempts + 1, error: clip(result.error, 500) });
             continue;
         }
         if (result.status === 'sent') {
@@ -132,7 +201,17 @@ async function flushPending(bot, now = new Date()) {
             stats.count('sent');
             sent += 1;
         } else {
-            stats.count('failed');
+            recordFailure(
+                {
+                    chatId: result.chatId || message.chatId,
+                    about: message.about,
+                    status: result.status,
+                    error: result.error,
+                    tries: message.attempts,
+                    since: message.createdAt
+                },
+                now
+            );
             log.error(`[Cron] Queued message to chat ${message.chatId} dropped (${result.status}): ${result.error}`);
         }
         await message.destroy();

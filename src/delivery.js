@@ -5,6 +5,7 @@
  * broadcasts and messages.
  */
 const { log } = require('./log');
+const { redactToken } = require('./redact');
 
 // Telegram's flood limit asks to wait this many seconds at most; more would hold up the check
 const MAX_FLOOD_WAIT_S = 60;
@@ -47,7 +48,7 @@ async function sendOnce(bot, chatId, text, photo, extra) {
         } catch (err) {
             // Only a poster problem falls back to text; a blocked chat or a timeout stays an error
             if (classify(err).kind !== 'rejected') throw err;
-            log.error(`[Delivery] Poster refused for chat ${chatId} (${err.message}); sending text`);
+            log.error(`[Delivery] Poster refused for chat ${chatId} (${redactToken(err.message)}); sending text`);
         }
     }
     return bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML', ...extra });
@@ -77,7 +78,18 @@ function withTimeout(promise, ms) {
  *   the network didn't answer after a few tries, so a later attempt may still work
  */
 async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sleep } = {}) {
-    return followingMove(chatId, (id) => withRetries(() => sendOnce(bot, id, text, photo, extra), wait));
+    // A poster Telegram can't fetch in time leaves no answer, not an error to fall back on. One
+    // silent try may be a slow Telegram; after two the last goes as text. (On 29.10 one episode's
+    // poster timed out 27 tries in a row.)
+    let poster = photo;
+    let silent = 0;
+    const dropPoster = () => {
+        silent += 1;
+        if (silent >= 2) poster = null;
+    };
+    return followingMove(chatId, (id) =>
+        withRetries(() => sendOnce(bot, id, text, poster, extra), wait, TRY_TIMEOUT_MS, { onNoAnswer: dropPoster })
+    );
 }
 
 /**
@@ -87,13 +99,19 @@ async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sle
 async function followingMove(chatId, send) {
     const result = await send(chatId);
     if (result.status !== 'moved') return noted(chatId, result);
+    let moved = true;
     try {
         await require('./chat-migration').migrateChat(chatId, result.to);
     } catch (err) {
+        moved = false;
         log.error(`[Delivery] Moving group ${chatId} to supergroup ${result.to} failed: ${err.message}`);
     }
     const again = await send(result.to);
-    return again.status === 'moved' ? { status: 'gone', error: again.error } : noted(result.to, again);
+    // chatId: the id the chat's data is under now, for what the caller keeps about it (the queue,
+    // the failures). A move that failed leaves it under the old id, which then tries it again
+    const kept = String(moved ? result.to : chatId);
+    if (again.status === 'moved') return { status: 'gone', error: again.error, chatId: kept };
+    return { ...noted(result.to, again), chatId: kept };
 }
 
 /** A chat that blocked the bot or took it out is marked so (src/bot-status.js): later sends skip it. */
@@ -126,22 +144,27 @@ async function deliverAlbum(bot, chatId, images, caption, { wait = sleep, timeou
     );
 }
 
-/** One send, tried again after a short failure or a flood wait; the outcome as deliver() gives it. */
-async function withRetries(send, wait, timeout = TRY_TIMEOUT_MS, { retryNoAnswer = true } = {}) {
+/**
+ * One send, tried again after a short failure or a flood wait; the outcome as deliver() gives it.
+ * onNoAnswer: called when a try got no answer, before the next.
+ */
+async function withRetries(send, wait, timeout = TRY_TIMEOUT_MS, { retryNoAnswer = true, onNoAnswer = () => {} } = {}) {
     for (let attempt = 1; ; attempt += 1) {
         try {
             await withTimeout(send(), timeout);
             return { status: 'sent' };
         } catch (err) {
-            if (err.noAnswer && !retryNoAnswer) return { status: 'failed', error: err.message, uncertain: true };
+            if (err.noAnswer && !retryNoAnswer)
+                return { status: 'failed', error: redactToken(err.message), uncertain: true };
+            if (err.noAnswer) onNoAnswer();
             const { kind, retryAfter, to } = classify(err);
-            if (kind === 'moved') return { status: 'moved', to, error: err.message };
-            if (kind === 'gone' || kind === 'rejected') return { status: kind, error: err.message };
+            if (kind === 'moved') return { status: 'moved', to, error: redactToken(err.message) };
+            if (kind === 'gone' || kind === 'rejected') return { status: kind, error: redactToken(err.message) };
             // A long flood wait: the caller is told how long, to hold off rather than try the next chat
             if (kind === 'flood' && retryAfter > MAX_FLOOD_WAIT_S) {
-                return { status: 'failed', error: err.message, retryAfter };
+                return { status: 'failed', error: redactToken(err.message), retryAfter };
             }
-            if (attempt >= TRIES) return { status: 'failed', error: err.message };
+            if (attempt >= TRIES) return { status: 'failed', error: redactToken(err.message) };
             await wait(kind === 'flood' ? retryAfter * 1000 : attempt * 2000);
         }
     }

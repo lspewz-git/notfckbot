@@ -1,6 +1,6 @@
 /** Dashboard figures: counters, most popular series, the update check, upcoming releases. */
 const { Op } = require('sequelize');
-const { Chat, Series, Subscription, Watchlist, DailyStat } = require('../../db');
+const { Chat, Series, Subscription, Watchlist, DailyStat, SendFailure, PendingMessage } = require('../../db');
 const { todayIn, addDays, weekStart, addMonths } = require('../../calendar');
 const { DEFAULT_ZONE } = require('../../quiet');
 const { unwritten } = require('../../stats-log');
@@ -8,6 +8,8 @@ const { getCronStatus } = require('../../cron');
 const { getVersion } = require('../version');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('../../constants');
 const { LEFT } = require('../../bot-status');
+const { MAX_ATTEMPTS } = require('../../cron/outbox');
+const { z, valid } = require('../validate');
 
 const router = require('express').Router();
 
@@ -114,6 +116,65 @@ router.get('/api/stats/charts', async (req, res) => {
         // Since when there are day counts at all: the chart says so instead of showing zeros as fact
         const first = await DailyStat.min('day');
         res.json({ weeks, months, days, countingSince: first || today });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+const SENDS_QUERY = z.object({
+    day: z.string({ error: 'Bad day' }).regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Bad day' }),
+    // The chart's last day: it shows the queue even when the panel was loaded before midnight
+    latest: z.enum(['1']).optional()
+});
+
+/**
+ * A day of the notifications chart, clicked: what didn't reach its chat and why (SendFailure),
+ * and with today, what waits in the queue for the next check (PendingMessage).
+ */
+router.get('/api/stats/sends', async (req, res) => {
+    const query = valid(SENDS_QUERY, req.query, res);
+    if (!query) return;
+    try {
+        // The queue is now, not that day's: it goes with today
+        const now = query.day === todayIn(DEFAULT_ZONE) || query.latest === '1';
+        const [failures, queue, first] = await Promise.all([
+            SendFailure.findAll({ where: { day: query.day }, order: [['createdAt', 'ASC']] }),
+            now
+                ? PendingMessage.findAll({
+                      attributes: ['chatId', 'about', 'error', 'attempts', 'createdAt'],
+                      order: [['id', 'ASC']]
+                  })
+                : [],
+            // The oldest kept: a day before it has counts but no rows
+            SendFailure.min('day')
+        ]);
+        const ids = [...new Set([...failures, ...queue].map((r) => String(r.chatId)))];
+        const chats = ids.length ? await Chat.findAll({ where: { id: ids }, attributes: ['id', 'username'] }) : [];
+        const names = new Map(chats.map((c) => [String(c.id), c.username || null]));
+        const chat = (id) => ({ chatId: String(id), chat: names.get(String(id)) || null });
+        res.json({
+            day: query.day,
+            keptSince: first || null,
+            failed: failures.map((f) => ({
+                ...chat(f.chatId),
+                about: f.about,
+                status: f.status,
+                error: f.error,
+                count: f.count,
+                tries: f.tries,
+                since: f.since,
+                at: f.createdAt
+            })),
+            queued: queue.map((m) => ({
+                ...chat(m.chatId),
+                about: m.about,
+                error: m.error,
+                tries: m.attempts,
+                maxTries: MAX_ATTEMPTS,
+                since: m.createdAt
+            })),
+            nextCheckAt: getCronStatus().nextRunAt
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

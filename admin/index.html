@@ -45,6 +45,7 @@
         <link rel="modulepreload" href="js/render.js" />
         <link rel="modulepreload" href="js/select.js" />
         <link rel="modulepreload" href="js/services.js" />
+        <link rel="modulepreload" href="js/sends.js" />
         <link rel="modulepreload" href="js/settings.js" />
         <link rel="modulepreload" href="js/store.js" />
         <link rel="modulepreload" href="js/table-defs.js" />
@@ -358,7 +359,8 @@
                                 ></span>
                                 <span id="sent-delta" class="stat-delta">&nbsp;</span>
                             </div>
-                            <div class="stat-card" data-static>
+                            <!-- Opens the latest of these days with a failure (admin/js/sends.js), as its bar does -->
+                            <div class="stat-card" data-action="sends-recent" role="button" tabindex="0">
                                 <span class="stat-label">Not delivered, 7 days</span>
                                 <span id="failed-count" class="stat-value"
                                     ><span class="skeleton" aria-hidden="true"></span
@@ -447,7 +449,11 @@
                                         ><span class="skeleton" style="height: 55%"></span
                                         ><span class="skeleton" style="height: 40%"></span>
                                     </div>
-                                    <canvas id="chart-sent" role="img" aria-label="Notifications sent per day"></canvas>
+                                    <canvas
+                                        id="chart-sent"
+                                        role="img"
+                                        aria-label="Notifications sent per day; a day's bar opens what didn't go out"
+                                    ></canvas>
                                 </div>
                             </section>
                         </div>
@@ -2400,6 +2406,21 @@
                     <button id="send-broadcast" class="btn btn-primary btn-grow">Send Broadcast</button>
                     <button data-close-return="broadcast-modal" class="btn btn-ghost">Cancel</button>
                 </div>
+            </div>
+        </dialog>
+
+        <!-- A day of the notifications chart (admin/js/sends.js): what didn't go out, what waits -->
+        <dialog id="sends-modal" class="modal" aria-labelledby="sends-title">
+            <div class="modal-content modal-medium">
+                <h3 id="sends-title">Today</h3>
+                <p class="modal-sub" id="sends-sub"></p>
+                <div id="sends-body" aria-live="polite"></div>
+                <button data-close="sends-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
         </dialog>
 

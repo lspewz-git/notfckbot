@@ -229,7 +229,8 @@ function charts() {
             count: i % 4
         })),
         days: Array.from({ length: 30 }, (_, i) => ({ day: day(i), sent: (i * 3) % 7, failed: i === 9 ? 1 : 0 })),
-        countingSince: day(20)
+        // The bot counted from 20 Sep: the days before have no details to open
+        countingSince: day(5)
     };
 }
 
@@ -462,7 +463,16 @@ async function mockPanel(page, options = {}) {
 
     const api = {
         '/api/stats': () => ({ ...stats(panel.subs), ...options.stats }),
-        '/api/stats/charts': () => charts(),
+        // options.charts(data): the charts' data changed for a test
+        '/api/stats/charts': () => (options.charts ? options.charts(charts()) : charts()),
+        // A day of the notifications chart: options.sends(day) answers, else nothing went wrong
+        '/api/stats/sends': (req) => {
+            const day = new URL(req.url()).searchParams.get('day');
+            panel.sendsAsked = [...(panel.sendsAsked || []), day];
+            return options.sends
+                ? options.sends(day)
+                : { day, keptSince: null, failed: [], queued: [], nextCheckAt: null };
+        },
         '/api/health': () => ({ ...panel.health, kinopoiskQuota: { used: 3, limit: 500 } }),
         '/api/health/telegram': () => ({ telegram: panel.health.telegram }),
         '/api/health/tmdb': () => ({ tmdb: panel.health.tmdb }),

@@ -8,6 +8,7 @@
 
 import { $, all } from './dom.js';
 import { isUnchanged } from './render.js';
+import { openSends } from './sends.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayLabel = (day) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]}`;
@@ -50,14 +51,14 @@ function options(stacked) {
     };
 }
 
-/** Draws a chart the first time, then only swaps its data. */
-function draw(id, chartData, stacked) {
+/** Draws a chart the first time, then only swaps its data. extra: more Chart.js options. */
+function draw(id, chartData, stacked, extra = {}) {
     if (charts[id]) {
         charts[id].data = chartData;
         charts[id].update('none');
         return;
     }
-    charts[id] = new (ChartJs())($(id), { type: 'bar', data: chartData, options: options(stacked) });
+    charts[id] = new (ChartJs())($(id), { type: 'bar', data: chartData, options: { ...options(stacked), ...extra } });
     $(id).parentElement.querySelector('.chart-skeleton')?.remove();
 }
 
@@ -82,6 +83,34 @@ function renderSubs() {
     $('chart-subs').setAttribute('aria-label', `New subscriptions per ${subsBy === 'months' ? 'month' : 'week'}`);
 }
 
+/**
+ * The day under the pointer: anywhere in its column, not only on a bar (a 0 has none). Days
+ * before the counting began have nothing to tell.
+ */
+function dayAt(evt, chart) {
+    const [hit] = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+    const day = hit && data.days[hit.index];
+    return day && day.day >= data.countingSince ? day : null;
+}
+
+/**
+ * The "Not delivered, 7 days" card: the latest of those days with a failure, or today with its
+ * queue when there was none. Before the charts arrive, nothing to open.
+ */
+export function openRecentSends() {
+    if (!data || !data.days.length) return;
+    const last = data.days[data.days.length - 1];
+    const day =
+        data.days
+            .slice(-7)
+            .reverse()
+            .find((d) => d.failed > 0) || last;
+    openSends(day.day, day, { latest: day === last });
+}
+
+/** The tooltip says a day opens: a pointer's cursor alone says nothing on a phone. */
+const hint = () => (window.matchMedia('(pointer: coarse)').matches ? 'Tap for details' : 'Click for details');
+
 function renderSent() {
     draw(
         'chart-sent',
@@ -104,7 +133,28 @@ function renderSent() {
                 }
             ]
         },
-        true
+        true,
+        {
+            onClick: (evt, _elements, chart) => {
+                const day = dayAt(evt, chart);
+                if (day) openSends(day.day, day, { latest: day === data.days[data.days.length - 1] });
+            },
+            onHover: (evt, _elements, chart) => {
+                chart.canvas.style.cursor = dayAt(evt, chart) ? 'pointer' : '';
+            },
+            plugins: {
+                ...options(true).plugins,
+                tooltip: {
+                    ...options(true).plugins.tooltip,
+                    footerColor: token('--text-dim'),
+                    // Only where a click opens something: not the days before the counting began
+                    callbacks: {
+                        footer: (items) =>
+                            items.length && data.days[items[0].dataIndex].day >= data.countingSince ? hint() : ''
+                    }
+                }
+            }
+        }
     );
     // The bot counts from the day this was deployed: earlier days are not zeros but unknown
     const since = data.countingSince;

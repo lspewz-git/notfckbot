@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { Chat, HeldNotification } = require('../../src/db');
+const { Chat, HeldNotification, SendFailure } = require('../../src/db');
 const { ZONES, isQuietNow, quietLabel, hourIn } = require('../../src/quiet');
 const { notify, flushPending } = require('../../src/cron/outbox');
 const { releaseHeld, heldView } = require('../../src/cron/held');
@@ -218,6 +218,30 @@ describe('the list after quiet hours', () => {
         assert.equal(sent.length, 1);
         assert.match(sent[0].text, /Сериал 1[\s\S]*Сериал 2/);
         assert.deepEqual(updates[0].ids, [1, 2]);
+    });
+
+    test('a list the chat no longer takes: one row for the day, standing for all it held', async (t) => {
+        t.mock.method(HeldNotification, 'findAll', async () => [row(1), row(2)]);
+        t.mock.method(HeldNotification, 'update', async () => {});
+        t.mock.method(HeldNotification, 'destroy', async () => 0);
+        t.mock.method(Chat, 'findByPk', async () => chat());
+        const kept = [];
+        t.mock.method(SendFailure, 'create', async (fields) => kept.push(fields));
+        t.mock.method(SendFailure, 'destroy', async () => 0);
+        const bot = {
+            telegram: {
+                sendMessage: async () => {
+                    throw Object.assign(new Error('403: Forbidden: bot was blocked by the user'), {
+                        response: { error_code: 403 }
+                    });
+                }
+            }
+        };
+        await releaseHeld(bot, at('06:00'));
+        assert.deepEqual(
+            kept.map((k) => [k.chatId, k.status, k.count, k.about]),
+            [['10', 'gone', 2, '2 notifications held overnight']]
+        );
     });
 });
 

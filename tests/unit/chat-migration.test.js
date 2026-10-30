@@ -18,7 +18,8 @@ const MODELS = [
     'HeldNotification',
     'ChatEvent',
     'RecapSend',
-    'AlertRecipient'
+    'AlertRecipient',
+    'SendFailure'
 ];
 let chats;
 let tables;
@@ -79,6 +80,8 @@ beforeEach(() => {
     tables.RecapSend.push({ chatId: '-100', year: 2026, status: 'queued' });
     // The owners' group gets the alerts (src/alerts/)
     tables.AlertRecipient.push({ chatId: '-100', preset: 'all' });
+    // A notification that didn't reach it: the dashboard's list names the group by its new id
+    tables.SendFailure.push({ chatId: '-100', status: 'gave_up' });
 });
 
 describe('moving a group to its supergroup', () => {
@@ -175,5 +178,23 @@ describe('noticing the move', () => {
         assert.equal(result.status, 'sent');
         assert.deepEqual(tried, ['-100', '-1001']);
         assert.ok(chats.has('-1001'));
+        // What the caller keeps about it (the queue, the failures) goes under the new id
+        assert.equal(result.chatId, '-1001');
+    });
+
+    test("a move that fails: what's kept about the send stays under the old id, where the data is", async (t) => {
+        t.mock.method(sequelize, 'transaction', async () => {
+            throw new Error('database down');
+        });
+        const bot = {
+            telegram: {
+                sendMessage: async (chatId) => {
+                    if (String(chatId) === '-100') throw upgraded();
+                }
+            }
+        };
+        const result = await deliver(bot, '-100', 'Новая серия', { wait: async () => {} });
+        assert.equal(result.status, 'sent');
+        assert.equal(result.chatId, '-100');
     });
 });

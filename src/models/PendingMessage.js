@@ -20,6 +20,15 @@ const PendingMessage = sequelize.define('PendingMessage', {
         type: DataTypes.STRING(500),
         allowNull: true
     },
+    // What it is about (a title) and why it last failed: the dashboard lists the queue
+    about: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+    },
+    error: {
+        type: DataTypes.STRING(500),
+        allowNull: true
+    },
     // Update checks that have tried to send it again
     attempts: {
         type: DataTypes.INTEGER,

@@ -11,6 +11,7 @@ const RecapSend = require('./models/RecapSend');
 const RecapLook = require('./models/RecapLook');
 const AlertRecipient = require('./models/AlertRecipient');
 const AlertLog = require('./models/AlertLog');
+const SendFailure = require('./models/SendFailure');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -40,5 +41,6 @@ module.exports = {
     RecapSend,
     RecapLook,
     AlertRecipient,
-    AlertLog
+    AlertLog,
+    SendFailure
 };

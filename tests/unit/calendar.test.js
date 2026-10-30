@@ -6,7 +6,7 @@ const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const tmdb = require('../../src/api/tmdb');
-const { Subscription, Watchlist, Chat } = require('../../src/db');
+const { Subscription, Watchlist, Chat, SendFailure } = require('../../src/db');
 
 // --- TMDB: one series, seasons 1 and 2; season 2 airs weekly across October 2026 ---
 const SEASONS = {
@@ -279,5 +279,27 @@ describe('digests', () => {
             { id: 1, digest_week_sent: '2026-10-19' },
             { id: 3, digest_month_sent: '2026-10' }
         ]);
+    });
+
+    test('a digest the chat no longer takes is listed for the day as such', async (t) => {
+        const c = { ...chat({ id: 1, digest_week: true, digest_week_sent: '2026-10-12' }), async update() {} };
+        t.mock.method(Chat, 'findAll', async () => [c]);
+        t.mock.method(Subscription, 'findAll', async () => [{ Series: SERIES }]);
+        t.mock.method(Watchlist, 'findAll', async () => FILMS);
+        const kept = [];
+        t.mock.method(SendFailure, 'create', async (fields) => kept.push(fields));
+        t.mock.method(SendFailure, 'destroy', async () => 0);
+        const bot = {
+            telegram: {
+                sendMessage: async () => {
+                    throw Object.assign(new Error('403: Forbidden: bot was kicked'), { response: { error_code: 403 } });
+                }
+            }
+        };
+        await sendDigests(bot, MONDAY);
+        assert.deepEqual(
+            kept.map((k) => [k.chatId, k.about, k.status]),
+            [[1, 'Weekly digest', 'gone']]
+        );
     });
 });

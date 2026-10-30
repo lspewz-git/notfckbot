@@ -51,6 +51,7 @@ function restartSoon(why) {
     // The day counts and chat events kept in memory go to the database first
     setTimeout(async () => {
         await flushStats().catch(() => {});
+        await require('../send-failures').flushFailures();
         await flushEvents().catch(() => {});
         process.exit(0);
     }, 800);

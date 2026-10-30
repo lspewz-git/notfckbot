@@ -7,6 +7,7 @@
  */
 const { setTimeout: sleep } = require('node:timers/promises');
 const { log } = require('./log');
+const { redactToken: redact } = require('./redact');
 
 const PAUSE_MS = 30 * 1000;
 // One try's deadline: Telegraf's own is 500 s, so a silent proxy would hold a try that long
@@ -25,9 +26,6 @@ const isTelegramReady = () => ready;
 
 /** Telegram's answer to a token it doesn't know (revoked, mistyped, empty): no network fixes it. */
 const tokenRejected = (err) => [401, 404].includes(err && err.response && err.response.error_code);
-
-/** The bot token out of a message: Telegraf hides it in network errors, not in every other one. */
-const redact = (text) => String(text).replace(/bot\d+:[\w-]+/g, 'bot<token>');
 
 /** Why a try failed, in words: an abort is our own deadline, not Telegram's answer. */
 function reasonOf(err, tryMs) {
