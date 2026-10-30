@@ -134,10 +134,15 @@ describe('recording', () => {
     });
 
     test('who did it: @username, else the name', () => {
-        assert.deepEqual(events.actor({ from: { id: 1, username: 'ann' } }), { userId: 1, userName: '@ann' });
+        assert.deepEqual(events.actor({ from: { id: 1, username: 'ann' } }), {
+            userId: 1,
+            userName: '@ann',
+            source: 'bot'
+        });
         assert.deepEqual(events.actor({ from: { id: 2, first_name: 'Bob', last_name: 'K' } }), {
             userId: 2,
-            userName: 'Bob K'
+            userName: 'Bob K',
+            source: 'bot'
         });
         assert.deepEqual(events.actor({}), {});
     });
@@ -215,6 +220,8 @@ describe('the statistics', () => {
             // Bob renamed himself: still one member, under the newest name
             { kind: 'subscribed', title: 'Drama', userId: 11, userName: '@bobby', createdAt: NOW },
             { kind: 'film_added', title: 'Film', userId: 11, userName: '@bobby', createdAt: NOW },
+            // An admin's change from the panel names the admin: not one of the members
+            { kind: 'film_added', title: 'Panel film', userId: 99, userName: 'Admin', source: 'panel', createdAt: NOW },
             { kind: 'mode', title: 'Drama', userId: 10, userName: '@ann', createdAt: NOW },
             // Added from the panel: nobody's
             { kind: 'subscribed', title: 'Comedy', createdAt: NOW }

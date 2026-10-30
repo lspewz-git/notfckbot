@@ -8,16 +8,18 @@ const { log } = require('./log');
 
 // The database down for hours shouldn't eat the memory: past this the oldest go
 const MAX_PENDING = 5000;
-const FIELDS = ['kind', 'detail', 'outcome', 'tmdb_id', 'title', 'season', 'episode', 'userId', 'userName'];
+const FIELDS = ['kind', 'detail', 'outcome', 'tmdb_id', 'title', 'season', 'episode', 'userId', 'userName', 'source'];
 
 let pending = [];
+// The write under way, if any: the change log waits for it, or a batch would be in neither place
+let writing = null;
 
 /**
  * Notes an event for a chat.
  * @param {string | number} chatId
  * @param {{ kind: string, detail?: string | null, outcome?: string | null, tmdb_id?: string | null,
  *   title?: string | null, season?: number | null, episode?: number | null,
- *   userId?: string | number | null, userName?: string | null }} event
+ *   userId?: string | number | null, userName?: string | null, source?: string | null }} event
  */
 function record(chatId, event, now = new Date()) {
     if (chatId === null || chatId === undefined || !event || !event.kind) return;
@@ -34,7 +36,7 @@ function actor(ctx) {
     const from = ctx && ctx.from;
     if (!from) return {};
     const name = from.username ? `@${from.username}` : [from.first_name, from.last_name].filter(Boolean).join(' ');
-    return { userId: from.id, userName: name || null };
+    return { userId: from.id, userName: name || null, source: 'bot' };
 }
 
 /** The events not yet written, for tests. */
@@ -48,16 +50,28 @@ async function flushEvents() {
     const batch = pending;
     pending = [];
     try {
-        await ChatEvent.bulkCreate(batch);
+        writing = ChatEvent.bulkCreate(batch);
+        await writing;
     } catch (err) {
         log.error(`[Events] Writing ${batch.length} chat event(s) failed: ${err.message}`);
         pending = batch.concat(pending).slice(-MAX_PENDING);
+    } finally {
+        writing = null;
     }
 }
+
+/** Settles once a write under way has finished, so the unwritten and the written don't overlap. */
+const settled = () =>
+    writing
+        ? writing.then(
+              () => {},
+              () => {}
+          )
+        : Promise.resolve();
 
 /** A group became a supergroup (src/chat-migration.js): its events not written yet go under the new id. */
 function moveChat(fromId, toId) {
     for (const row of pending) if (String(row.chatId) === String(fromId)) row.chatId = toId;
 }
 
-module.exports = { record, actor, flushEvents, unwritten, moveChat };
+module.exports = { record, actor, flushEvents, unwritten, settled, moveChat };

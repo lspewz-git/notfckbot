@@ -16,6 +16,7 @@ const { SERVICES, describeError } = require('./services');
 const { invalidateHealth } = require('./health');
 const { restartBlock, restartSoon } = require('../restart');
 const { readSchedule } = require('../../recap/schedule');
+const { KEEP_CHOICES, keepDays } = require('../../chat-changes');
 
 const router = require('express').Router();
 const { log } = require('../../log');
@@ -55,6 +56,8 @@ function currentSettings(bot) {
             name: process.env.DB_NAME || '',
             user: process.env.DB_USER || ''
         },
+        // How long a chat's change log is kept (src/chat-changes.js)
+        changes: { days: keepDays(), choices: KEEP_CHOICES },
         // The year recap sent by date: shown here, set in Year recap → Schedule (routes/recap-schedule.js)
         recap: readSchedule(),
         restart: { pending: pendingRestart(bot), blocked: restartBlock() },
@@ -68,7 +71,7 @@ router.get('/api/settings', (req, res) => {
 });
 
 /**
- * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, proxyUrl?, intervalHours? }; what is
+ * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, proxyUrl?, intervalHours?, changesKeepDays? }; what is
  * left out stays as it is. On a problem nothing is written, and `fields` says which field it is.
  */
 router.post('/api/settings', async (req, res) => {
@@ -83,6 +86,12 @@ router.post('/api/settings', async (req, res) => {
         else if (hours !== parseIntervalHours(process.env.UPDATE_INTERVAL_HOURS, { quiet: true })) {
             changes.UPDATE_INTERVAL_HOURS = String(hours);
         }
+    }
+
+    if (body.changesKeepDays !== undefined) {
+        const days = Number(body.changesKeepDays);
+        if (!KEEP_CHOICES.includes(days)) fields.changes = `Pick one of ${KEEP_CHOICES.join(', ')} days`;
+        else if (days !== keepDays()) changes.CHANGES_KEEP_DAYS = String(days);
     }
 
     if (body.proxyUrl !== undefined) {

@@ -7,6 +7,9 @@ const { mainMenu } = require('./keyboards');
 const { ownerOf } = require('./access');
 const { ZONES, PRESETS, zoneOf, hasQuietHours, quietLabel, pad } = require('../quiet');
 const { sentMarkOnEnable } = require('../cron/digests');
+const { settingsOf } = require('../chat-ops');
+const { recordSettings } = require('../chat-changes');
+const events = require('../chat-events');
 
 const BUTTONS_LABEL = {
     owner: 'только тот, кто их вызвал',
@@ -125,9 +128,17 @@ const showView = (ctx, view) =>
         if (!/not modified/.test(err.message)) throw err;
     });
 
+/** Applies a change from the buttons and notes it in the chat's change log (src/chat-changes.js). */
+async function change(ctx, values) {
+    const chat = ctx.state.chatData;
+    const before = settingsOf(chat);
+    await chat.update(values);
+    recordSettings(ctx.chat.id, before, settingsOf(chat), events.actor(ctx));
+}
+
 /** Turns the bottom menu on or off; says so with a message, as only a message can carry a keyboard. */
 async function setMenu(ctx, on) {
-    await ctx.state.chatData.update({ menu_enabled: on });
+    await change(ctx, { menu_enabled: on });
     if (on) await ctx.reply('Нижнее меню включено.', mainMenu(ctx));
     else await ctx.reply('Нижнее меню выключено. Команды: /search, /subs, /settings, /help', Markup.removeKeyboard());
 }
@@ -147,7 +158,7 @@ function register(bot) {
         if (!(await canChange(ctx))) return ctx.answerCbQuery(NOT_ADMIN, { show_alert: true });
         const [what, value] = ctx.match[1].split('_');
         if (what === 'buttons') {
-            await ctx.state.chatData.update({ buttons_mode: value });
+            await change(ctx, { buttons_mode: value });
             await ctx.answerCbQuery(value === 'all' ? 'Теперь кнопки нажимают все' : 'Теперь только тот, кто вызвал');
         } else {
             await ctx.answerCbQuery();
@@ -177,9 +188,7 @@ function register(bot) {
         const end = Number(ctx.match[3]);
         // Only the offered choices: callback data can be made up
         if (!off && !PRESETS.some(([s, e]) => s === start && e === end)) return ctx.answerCbQuery();
-        await ctx.state.chatData.update(
-            off ? { quiet_start: null, quiet_end: null } : { quiet_start: start, quiet_end: end }
-        );
+        await change(ctx, off ? { quiet_start: null, quiet_end: null } : { quiet_start: start, quiet_end: end });
         await ctx.answerCbQuery(off ? 'Тихие часы выключены' : `Тихие часы: ${pad(start)}–${pad(end)}`);
         await showView(ctx, quietView(ctx.state.chatData));
     });
@@ -187,7 +196,7 @@ function register(bot) {
         if (!(await canChange(ctx))) return ctx.answerCbQuery(NOT_ADMIN, { show_alert: true });
         const zone = ZONES[Number(ctx.match[1])];
         if (!zone) return ctx.answerCbQuery();
-        await ctx.state.chatData.update({ timezone: zone.id });
+        await change(ctx, { timezone: zone.id });
         await ctx.answerCbQuery(`Часовой пояс: ${zone.city}`);
         await showView(ctx, quietView(ctx.state.chatData));
     });
@@ -198,7 +207,7 @@ function register(bot) {
         const [, which, state] = ctx.match;
         const on = state === 'on';
         const settings = ctx.state.chatData;
-        await settings.update({
+        await change(ctx, {
             [`digest_${which}`]: on,
             ...(on ? { [`digest_${which}_sent`]: sentMarkOnEnable(which === 'week' ? 'w' : 'm', settings) } : {})
         });

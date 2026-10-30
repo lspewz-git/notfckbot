@@ -41,15 +41,15 @@ function add(counts, key, n = 1) {
 }
 
 /**
- * Who in the chat did what, from the events that name a member (the bot's buttons; the panel's
- * changes and the notifications name nobody): who added the most series and films, who used the
- * bot the most. A member is one Telegram id, under the latest name seen, so a new @username
+ * Who in the chat did what, from the events that name a member (the bot's buttons and the account
+ * pages; the notifications name nobody, and the panel's changes name the admin, not a member): who
+ * added the most series and films, who used the bot the most. A member is one Telegram id, under the latest name seen, so a new @username
  * doesn't split them in two.
  */
 function membersOf(chatEvents) {
     const people = new Map();
     for (const e of chatEvents) {
-        if (!e.userId) continue;
+        if (!e.userId || e.source === 'panel') continue;
         const id = String(e.userId);
         const person = people.get(id) || { name: id, series: 0, films: 0, used: 0 };
         if (e.userName) person.name = e.userName;
@@ -302,7 +302,7 @@ async function loadChatStats(chatId, period, now = new Date()) {
         Subscription.findAll({ where: { chatId }, include: [{ model: Series }] }),
         Watchlist.findAll({ where: { chatId } }),
         ChatEvent.findAll({ where: { chatId, createdAt: window }, order: [['id', 'ASC']] }),
-        ChatEvent.min('createdAt', { where: { chatId } }),
+        ChatEvent.min('createdAt', { where: { chatId, kind: { [Op.ne]: 'settings' } } }),
         // The bot's own comings and goings, whatever the period
         ChatEvent.findAll({ where: { chatId, kind: BOT_KINDS }, order: [['id', 'DESC']], limit: BOT_HISTORY })
     ]);
