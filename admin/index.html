@@ -666,17 +666,40 @@
                         <header>
                             <div class="header-info">
                                 <h1>Settings</h1>
-                                <p>The server's .env, field by field. Nothing is written until you save.</p>
+                                <p>The server's .env, card by card. Each card saves its own fields.</p>
                             </div>
                         </header>
-                        <div class="settings-bar" id="settings-bar" role="status">
-                            <span id="settings-bar-text" class="settings-bar-text">No changes</span>
-                            <button class="btn btn-ghost" data-action="settings-discard">Discard</button>
-                            <button class="btn btn-primary" id="settings-save" data-action="settings-save">Save</button>
+                        <!-- Read out for the Connections tab while it has unsaved changes (settings.js) -->
+                        <span id="settings-unsaved-note" hidden>Unsaved changes</span>
+                        <div class="tab-filters settings-tabs" role="group" aria-label="Settings">
+                            <button
+                                class="btn btn-ghost active"
+                                data-action="settings-tab"
+                                data-tab="connections"
+                                aria-pressed="true"
+                            >
+                                Connections
+                            </button>
+                            <button
+                                class="btn btn-ghost"
+                                data-action="settings-tab"
+                                data-tab="bot"
+                                aria-pressed="false"
+                            >
+                                Bot
+                            </button>
+                            <button
+                                class="btn btn-ghost"
+                                data-action="settings-tab"
+                                data-tab="alerts"
+                                aria-pressed="false"
+                            >
+                                Alerts
+                            </button>
                         </div>
-                        <div class="settings-grid">
+                        <div class="settings-grid" id="settings-pane-connections">
                             <div class="settings-col">
-                                <div class="glass-card settings-card">
+                                <div class="glass-card settings-card" data-card="services">
                                     <h2 class="settings-title">Services</h2>
                                     <p class="settings-desc">
                                         A new token is checked with its service before it's saved.
@@ -699,12 +722,24 @@
                                                     placeholder="Paste the new value"
                                                     hidden
                                                 />
+                                                <!-- The pencil opens the field, the cross closes it: aria-expanded picks one -->
                                                 <button
-                                                    class="btn btn-ghost"
+                                                    class="btn btn-ghost btn-icon-square settings-replace"
                                                     data-action="settings-replace"
                                                     data-service="telegram"
+                                                    aria-label="Replace"
+                                                    aria-expanded="false"
+                                                    aria-controls="settings-token-telegram"
+                                                    title="Replace"
                                                 >
-                                                    Replace
+                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                                        <path d="m15 5 4 4" />
+                                                    </svg>
+                                                    <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M18 6 6 18" />
+                                                        <path d="m6 6 12 12" />
+                                                    </svg>
                                                 </button>
                                             </div>
                                             <p class="field-error" id="settings-error-telegram" hidden></p>
@@ -726,12 +761,24 @@
                                                     placeholder="Paste the new value"
                                                     hidden
                                                 />
+                                                <!-- The pencil opens the field, the cross closes it: aria-expanded picks one -->
                                                 <button
-                                                    class="btn btn-ghost"
+                                                    class="btn btn-ghost btn-icon-square settings-replace"
                                                     data-action="settings-replace"
                                                     data-service="tmdb"
+                                                    aria-label="Replace"
+                                                    aria-expanded="false"
+                                                    aria-controls="settings-token-tmdb"
+                                                    title="Replace"
                                                 >
-                                                    Replace
+                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                                        <path d="m15 5 4 4" />
+                                                    </svg>
+                                                    <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M18 6 6 18" />
+                                                        <path d="m6 6 12 12" />
+                                                    </svg>
                                                 </button>
                                             </div>
                                             <p class="field-error" id="settings-error-tmdb" hidden></p>
@@ -755,20 +802,50 @@
                                                     placeholder="Paste the new value"
                                                     hidden
                                                 />
+                                                <!-- The pencil opens the field, the cross closes it: aria-expanded picks one -->
                                                 <button
-                                                    class="btn btn-ghost"
+                                                    class="btn btn-ghost btn-icon-square settings-replace"
                                                     data-action="settings-replace"
                                                     data-service="kinopoisk"
+                                                    aria-label="Replace"
+                                                    aria-expanded="false"
+                                                    aria-controls="settings-token-kinopoisk"
+                                                    title="Replace"
                                                 >
-                                                    Replace
+                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                                        <path d="m15 5 4 4" />
+                                                    </svg>
+                                                    <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M18 6 6 18" />
+                                                        <path d="m6 6 12 12" />
+                                                    </svg>
                                                 </button>
                                             </div>
                                             <p class="field-error" id="settings-error-kinopoisk" hidden></p>
                                         </div>
                                     </div>
+                                    <div class="settings-foot" id="settings-foot-services" hidden>
+                                        <span class="settings-foot-text"></span>
+                                        <button
+                                            class="btn btn-ghost"
+                                            data-action="settings-discard"
+                                            data-card="services"
+                                        >
+                                            Discard
+                                        </button>
+                                        <button
+                                            class="btn btn-primary"
+                                            data-action="settings-save"
+                                            data-card="services"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
                                 </div>
-
-                                <div class="glass-card settings-card">
+                            </div>
+                            <div class="settings-col">
+                                <div class="glass-card settings-card" data-card="proxy">
                                     <h2 class="settings-title">Proxy</h2>
                                     <p class="settings-desc">For TMDB and Telegram. Applies at once, no restart.</p>
                                     <div class="settings-row">
@@ -856,8 +933,20 @@
                                             <dd data-check="internet">—</dd>
                                         </dl>
                                     </div>
+                                    <div class="settings-foot" id="settings-foot-proxy" hidden>
+                                        <span class="settings-foot-text"></span>
+                                        <button class="btn btn-ghost" data-action="settings-discard" data-card="proxy">
+                                            Discard
+                                        </button>
+                                        <button class="btn btn-primary" data-action="settings-save" data-card="proxy">
+                                            Save
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="settings-grid" id="settings-pane-bot" hidden>
                             <div class="settings-col">
                                 <div class="glass-card settings-card">
                                     <h2 class="settings-title">Update check</h2>
@@ -872,7 +961,7 @@
                                                 class="select-field settings-interval"
                                                 data-setting="interval"
                                             ></select>
-                                            <p class="field-hint">Applies after a restart</p>
+                                            <p class="field-hint">Saved when picked; applies after a restart</p>
                                             <p class="field-error" id="settings-error-interval" hidden></p>
                                         </div>
                                     </div>
@@ -897,7 +986,8 @@
                                         </button>
                                     </div>
                                 </div>
-
+                            </div>
+                            <div class="settings-col">
                                 <div class="glass-card settings-card">
                                     <h2 class="settings-title">
                                         Database <span class="settings-optional">read only</span>
@@ -934,8 +1024,8 @@
                             </div>
                         </div>
 
-                        <!-- Alerts (admin/js/alerts.js): saved at once, not through the bar above -->
-                        <div class="settings-grid alerts-grid">
+                        <!-- Alerts (admin/js/alerts.js): saved at once, no Save button -->
+                        <div class="settings-grid alerts-grid" id="settings-pane-alerts" hidden>
                             <div class="glass-card settings-card">
                                 <h2 class="settings-title">
                                     Alerts <span class="settings-optional">from the bot</span>

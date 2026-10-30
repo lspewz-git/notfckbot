@@ -95,6 +95,7 @@ test('a confirmation lands on its safe choice on a computer, on its box on a tou
     } else {
         await page.locator('.nav-item[data-section="settings"]').click();
     }
+    await page.locator('[data-action="settings-tab"][data-tab="bot"]').click();
     await page.locator('[data-action="settings-restart"]').click();
     await expect(page.locator('#confirm-modal')).toBeVisible();
     if (isNarrow(page)) {

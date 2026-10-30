@@ -91,6 +91,7 @@ test('Settings: the recap by date only says what is set, and opens Year recap â†
         recapSchedule: { on: true, day: `${YEAR}-12-28`, hour: 12, firstAt: `${YEAR + 5}-12-28T00:00:00Z` }
     });
     await openSection(page, 'settings');
+    await page.locator('[data-action="settings-tab"][data-tab="bot"]').click();
     await expect(page.locator('.settings-title', { hasText: 'Year recap' })).not.toContainText('in dev');
     await expect(page.locator('#settings-recap')).toHaveText(`On Â· 28 Dec ${YEAR}, 12:00 chat's time`);
     await page.locator('#settings-section [data-tab="schedule"]').click();

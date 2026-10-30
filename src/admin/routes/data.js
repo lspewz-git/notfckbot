@@ -4,13 +4,19 @@ const { isFinishedStatus } = require('../../constants');
 
 const router = require('express').Router();
 const { log } = require('../../log');
+const { isTelegramReady } = require('../../telegram-ready');
 
-// Chats whose name Telegram refused to give us (bot kicked, chat deleted...).
-// Remembered so the polling admin panel doesn't retry them on every refresh.
+// A name's wait: the table doesn't hang on a Telegram that doesn't answer
+const NAME_TIMEOUT_MS = 5000;
+
+// Chats whose name Telegram refused to give us (bot kicked, chat deleted...): a 400 or 403, not a
+// network failure, a 429 or a 5xx. Remembered so the polling admin panel doesn't retry them on
+// every refresh.
 const unresolvableChatNames = new Set();
 
 async function backfillChatNames(chats, bot) {
-    if (!bot) return;
+    // Before Telegram's first answer every name would wait out its timeout: the table comes first
+    if (!bot || !isTelegramReady()) return;
 
     const pending = chats.filter(
         (c) => !c.username && c.type !== 'private' && !unresolvableChatNames.has(String(c.id))
@@ -20,7 +26,11 @@ async function backfillChatNames(chats, bot) {
     await Promise.all(
         pending.map(async (chat) => {
             try {
-                const info = await bot.telegram.getChat(chat.id);
+                const info = await bot.telegram.callApi(
+                    'getChat',
+                    { chat_id: chat.id },
+                    { signal: AbortSignal.timeout(NAME_TIMEOUT_MS) }
+                );
                 const name = info.title || (info.username ? `@${info.username}` : null);
                 if (name) {
                     await chat.update({ username: name });
@@ -28,7 +38,9 @@ async function backfillChatNames(chats, bot) {
                     unresolvableChatNames.add(String(chat.id));
                 }
             } catch (err) {
-                unresolvableChatNames.add(String(chat.id));
+                if (err.response && [400, 403].includes(err.response.error_code)) {
+                    unresolvableChatNames.add(String(chat.id));
+                }
                 log.error(`[Admin] Could not resolve name for chat ${chat.id}: ${err.message}`);
             }
         })

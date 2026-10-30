@@ -331,13 +331,16 @@ async function startupAlert(version, how, { pause = MINUTE_MS } = {}) {
 
 /**
  * Starts the minute's look and the log's daily sweep, and tells how the last run ended.
- * @param {{ version?: string | null, ended?: { reason: string } | null }} [options] ended:
- *   lastShutdown(), read at the very start, before anything that can fail
+ * @param {{ version?: string | null, ended?: { reason: string } | null, ready?: Promise<any> }} [options]
+ *   ended: lastShutdown(), read at the very start, before anything that can fail; ready: Telegram's
+ *   first answer. The start alert waits for it: an outage can outlast its few tries
  */
-function startAlerts(bot, { version = null, ended = null } = {}) {
+function startAlerts(bot, { version = null, ended = null, ready = Promise.resolve() } = {}) {
     alerts.useBot(bot);
     noteStop(ended);
-    startupAlert(version, ended).catch((err) => log.error(`[Alerts] Start alert failed: ${err.message}`));
+    ready
+        .then(() => startupAlert(version, ended))
+        .catch((err) => log.error(`[Alerts] Start alert failed: ${err.message}`));
     let busy = false;
     setInterval(async () => {
         // A slow look (Telegram's retries) mustn't overlap the next

@@ -48,4 +48,9 @@ async function openSection(page, section) {
     }
 }
 
-module.exports = { isNarrow, isPhone, watchConsole, openSection };
+/** Settings → one of its tabs (connections, bot, alerts). */
+async function openSettingsTab(page, tab) {
+    await page.locator(`[data-action="settings-tab"][data-tab="${tab}"]`).click();
+}
+
+module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab };

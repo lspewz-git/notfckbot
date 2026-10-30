@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { watchConsole, openSection } = require('./helpers');
+const { watchConsole, openSection, openSettingsTab } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /** Settings → Alerts: one row per recipient, a dialog for what each gets, the rules and the log. */
@@ -11,6 +11,7 @@ async function openAlerts(page, options = {}) {
     const panel = await mockPanel(page, options);
     await openSection(page, 'settings');
     await expect(page.locator('#settings-section')).toHaveClass(/active/);
+    await openSettingsTab(page, 'alerts');
     await expect(page.locator('#alerts-people')).not.toHaveAttribute('aria-busy', 'true');
     // The rest of Settings loaded too: nothing moves under a dropdown later (a scroll closes it)
     await expect(page.locator('#settings-masked-telegram')).toHaveText('8123*****xYz4');
@@ -87,7 +88,7 @@ test('Add recipient: picked from the chats the bot knows, starts with critical o
     await expect(row(page, 'bob').locator('.alert-sum')).toHaveText(/Critical only/);
 });
 
-test('a rule saves at once and leaves the Settings bar alone', async ({ page }) => {
+test("a rule saves at once and leaves the cards' Save alone", async ({ page }) => {
     const panel = await openAlerts(page);
     const trigger = page.locator('.custom-select:has(#alerts-down-minutes) .custom-select-trigger');
     // Scrolled to first, as a person would: the scroll event of a click's own scrolling closes the list
@@ -97,7 +98,7 @@ test('a rule saves at once and leaves the Settings bar alone', async ({ page }) 
     await page.locator('.custom-select-panel .custom-select-option', { hasText: '30 minutes' }).click();
     await expect.poll(() => panel.alerts.saves.length).toBe(1);
     expect(panel.alerts.saves[0].rules).toEqual({ downMinutes: 30, sendShare: 'half', repeatHours: 6, fixed: true });
-    await expect(page.locator('#settings-bar-text')).toHaveText('No changes');
+    await expect(page.locator('.settings-foot:not([hidden])')).toHaveCount(0);
 
     await page.locator('#alerts-fixed').click();
     await expect(page.locator('#alerts-fixed')).toHaveAttribute('aria-checked', 'false');
@@ -142,6 +143,7 @@ test('an older last alert: its date as written, not lower-cased', async ({ page 
 test('no recipients yet: says how to start, no test button', async ({ page }) => {
     await mockPanel(page, { alerts: { recipients: [] } });
     await openSection(page, 'settings');
+    await openSettingsTab(page, 'alerts');
     await expect(page.locator('#alerts-people')).toContainText('No one gets alerts yet');
     await expect(page.locator('#alerts-test-all')).toBeHidden();
 });
@@ -164,6 +166,7 @@ test('rows and the dialog fit a phone: nothing wider than the screen', async ({ 
 test('the first answer failed: a dead end, no test button, the rules stay locked', async ({ page }) => {
     await mockPanel(page, { failing: ['/api/alerts'] });
     await openSection(page, 'settings');
+    await openSettingsTab(page, 'alerts');
     await expect(page.locator('#alerts-people')).toContainText('Failed to load');
     await expect(page.locator('#alerts-log')).toContainText('Failed to load');
     await expect(page.locator('#alerts-test-all')).toBeHidden();

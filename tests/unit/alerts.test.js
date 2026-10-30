@@ -460,6 +460,27 @@ describe('how the last run ended', () => {
         await watch.startupAlert('abc1234', { reason: 'crash' }, { pause: 0 });
         assert.equal(tries, 1);
     });
+
+    test("the start alert waits for Telegram's first answer: an outage outlasts its tries", async () => {
+        mock.method(alerts, 'sweepLog', async () => 0);
+        mock.method(alerts, 'sentLately', async () => false);
+        const sent = [];
+        mock.method(alerts, 'once', async (key) => {
+            sent.push(key);
+            return { sent: 1, failed: 0, wanted: 1, unreachable: 0 };
+        });
+        let answer;
+        const ready = new Promise((resolve) => {
+            answer = resolve;
+        });
+        watch.startAlerts({}, { version: 'abc1234', ended: { reason: 'crash' }, ready });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.deepEqual(sent, []);
+        answer();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.deepEqual(sent, ['restart_crash']);
+    });
 });
 
 describe('rules in .env', () => {
@@ -490,7 +511,7 @@ describe("the minute's look", () => {
     test('no recipients: no requests to the services at all', async () => {
         mock.method(AlertRecipient, 'count', async () => 0);
         const asked = [];
-        const spy = { telegram: { getMe: async () => asked.push('getMe') } };
+        const spy = { telegram: { callApi: async (method) => asked.push(method) } };
         await watch.look(spy, at('2026-10-29T10:00:00Z'));
         assert.deepEqual(asked, []);
     });

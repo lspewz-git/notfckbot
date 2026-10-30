@@ -1,4 +1,4 @@
-/* Settings: the server's .env as fields, a bar for unsaved changes, restart */
+/* Settings: the server's .env as fields in three tabs, each card with its own Save, restart */
 
 /* Two columns of cards on a wide screen, one on a narrow one */
 .settings-grid {
@@ -114,34 +114,47 @@
     display: none;
 }
 
-/* Unsaved changes: stays in view while the page scrolls */
-.settings-bar {
-    position: sticky;
-    top: var(--space-3);
-    z-index: 5;
+/* A card's unsaved changes: under its fields, only while there are some */
+.settings-foot {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-bottom: var(--space-3);
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-2);
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-row);
 }
 
-.settings-bar-text {
+.settings-foot[hidden],
+.settings-grid[hidden] {
+    display: none;
+}
+
+/* A token's button: the pencil while the field is closed, the cross while it's open */
+.settings-replace[aria-expanded='true'] .icon-open,
+.settings-replace[aria-expanded='false'] .icon-close {
+    display: none;
+}
+
+/* The interval while its pick is being saved; a new pick still goes, sent after this one */
+.custom-select:has(#settings-interval[aria-busy='true']) {
+    opacity: 0.6;
+}
+
+.settings-foot-text {
     flex: 1;
     min-width: 0;
-    color: var(--text-dim);
+    color: var(--warning);
     font-size: var(--text-sm);
 }
 
-.settings-bar[data-dirty='true'] {
-    border-color: var(--warning);
-}
-
-.settings-bar[data-dirty='true'] .settings-bar-text {
-    color: var(--text);
+/* A tab with unsaved changes in it: a dot after its name, the size of the status dots */
+.settings-tabs .btn[data-dirty='true']::before {
+    content: '';
+    order: 1;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--warning);
 }
 
 /* What the bot runs with now: a line of its own above the button */
@@ -176,11 +189,6 @@
 
     .settings-label {
         padding-top: 0;
-    }
-
-    /* Above the bottom tab bar */
-    .settings-bar {
-        top: var(--space-2);
     }
 }
 
@@ -228,7 +236,6 @@
 
 /* Settings → Alerts (admin/js/alerts.js): recipients one row each, the rules, the week's log */
 .alerts-grid {
-    margin-top: var(--space-3);
     align-items: start;
 }
 

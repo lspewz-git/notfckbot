@@ -26,15 +26,12 @@ const reasonOf = (err) => (err.response && err.response.status ? `HTTP ${err.res
 const HEALTH_CHECKS = {
     telegram: async (bot) => {
         try {
-            // Telegraf has no request timeout of its own: without this a hung connection
-            // would keep the badge spinning, and every poll would reuse the stuck check
-            await Promise.race([
-                bot.telegram.getMe(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), HEALTH_TIMEOUT_MS))
-            ]);
+            // Telegraf's own timeout is 500 s: without this a hung connection would keep the badge
+            // spinning. Aborted, not raced: a raced request stays open, one more each poll
+            await bot.telegram.callApi('getMe', {}, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
             return { telegram: true };
         } catch (err) {
-            return { telegram: false, reason: reasonOf(err) };
+            return { telegram: false, reason: err.name === 'AbortError' ? 'timeout' : reasonOf(err) };
         }
     },
     tmdb: async () => {
