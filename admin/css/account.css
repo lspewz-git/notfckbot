@@ -1,26 +1,41 @@
 /* The sign-in screen, the roles, and the user's own chats ("My subscriptions", "Calendar", "Chat
    settings", admin/js/account.js). Tokens from base.css only. */
 
-/* --- Roles: a user sees only their own sections; an admin sees everything --- */
+/* --- Views: an admin switches between the admin panel and "My account" (body.view-mine, set by
+   the open section); a user has only "My account" and no switch --- */
 
-.tab-mine {
+.tab-mine,
+.tab-admin,
+body:not(.view-mine) .rail-nav .nav-mine,
+body.view-mine .rail-nav .nav-item:not(.nav-mine),
+body.view-mine .rail-nav .rail-divider,
+body.view-mine #actions-btn,
+body.view-mine #about-btn,
+body.view-mine .tabbar .tab-item:not(.tab-mine),
+body.role-user .view-switch,
+body.view-mine .view-admin-label,
+body:not(.view-mine) .view-mine-label {
     display: none;
 }
 
-body.role-user .rail-nav .nav-item:not(.nav-mine),
-body.role-user .rail-nav .rail-divider,
-body.role-user #actions-btn,
-body.role-user #about-btn,
-body.role-user .tabbar .tab-item:not(.tab-mine) {
-    display: none;
-}
-
-body.role-user .tabbar .tab-mine {
+body.view-mine .tabbar .tab-mine,
+body.view-mine:not(.role-user) .tabbar .tab-admin {
     display: flex;
 }
 
-body.role-user .tabbar {
+body.view-mine .tabbar {
     grid-template-columns: repeat(3, 1fr);
+}
+
+/* The way back to the admin panel on an admin's phone */
+body.view-mine:not(.role-user) .tabbar {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+/* The switch stands out from the sections under it */
+.view-switch {
+    margin-bottom: var(--space-3);
+    border: 1px solid var(--border-strong);
 }
 
 /* --- Sign-in --- */

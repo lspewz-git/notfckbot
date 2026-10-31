@@ -41,13 +41,30 @@ import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from '
 import { accountActions, setupAccount } from './account.js';
 import { startSession, watchSession, sessionActions } from './session.js';
 import { setupPullRefresh } from './pull-refresh.js';
-import { pickActions } from './pick-sheet.js';
+import { pickActions, pickFrom } from './pick-sheet.js';
 
 const REFRESH_SECONDS = 10;
 
 // --- Navigation ---
 
 let activeSection = 'dashboard';
+
+// An admin has two views: the admin panel and "My account" (their own chats, what a user sees).
+// The open section sets the view; each view reopens on the section it was left on
+const viewOf = (id) => (id.startsWith('my-') ? 'mine' : 'admin');
+const lastSection = { admin: 'dashboard', mine: 'my-subs' };
+
+function openViewPicker() {
+    pickFrom({
+        title: 'Switch to',
+        options: [
+            { value: 'admin', label: 'Admin panel', hint: 'The bot, chats, logs and settings' },
+            { value: 'mine', label: 'My account', hint: 'Your subscriptions, calendar and chat settings' }
+        ],
+        value: viewOf(activeSection),
+        onPick: (view) => switchSection(lastSection[view])
+    });
+}
 
 function switchSection(id) {
     // Leaving Settings with changes not saved: ask, rather than lose them silently
@@ -65,6 +82,8 @@ function switchSection(id) {
         return;
     }
     activeSection = id;
+    lastSection[viewOf(id)] = id;
+    document.body.classList.toggle('view-mine', viewOf(id) === 'mine');
     setSection(id);
     // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
     // not pushed: Back still leaves the panel instead of stepping through its tabs
@@ -144,6 +163,8 @@ function startTimer() {
 // reachable from the global scope and no value ends up inside executable code.
 const CLICK_ACTIONS = {
     'chat-actions': (el) => openChatActions(el.dataset.id),
+    'view-pick': openViewPicker,
+    'view-admin': () => switchSection(lastSection.admin),
     series: (el) => openSeriesDetails(el.dataset.id),
     film: (el) => openFilmDetails(el.dataset.id),
     mode: (el) => openModeModal(el.dataset.key),

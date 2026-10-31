@@ -108,7 +108,8 @@
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;
     --control-h-sm: 2rem; /* buttons inside table rows */
-    --rail-width: 56px;
+    --rail-width: 80px;
+    --page-max-width: 1320px; /* rail and content, centered on wide screens */
 
     /* Older names still used by a few rules */
     --glass-bg: var(--surface-1);

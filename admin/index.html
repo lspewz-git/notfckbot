@@ -122,7 +122,7 @@
             </div>
         </div>
         <div class="app-container">
-            <!-- Icon rail: labels show on hover and keyboard focus; phones use the tab bar instead -->
+            <!-- Icon rail: a short label under each icon; phones use the tab bar instead -->
             <aside class="sidebar">
                 <div class="rail-logo" title="NotFckBot · Admin panel">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -130,6 +130,20 @@
                         <path d="m6.2 5.3 3.1 3.9M12.4 3.4l3.1 4M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
                     </svg>
                 </div>
+                <!-- An admin's two views: the admin panel and their own account -->
+                <button
+                    class="nav-item view-switch"
+                    data-action="view-pick"
+                    aria-label="Switch view"
+                    aria-haspopup="dialog"
+                >
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />
+                    </svg>
+                    <span class="nav-label" aria-hidden="true"
+                        ><span class="view-admin-label">Admin</span><span class="view-mine-label">Me</span></span
+                    >
+                </button>
                 <nav class="rail-nav" aria-label="Sections">
                     <button class="nav-item active" aria-current="page" data-section="dashboard" aria-label="Dashboard">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -138,7 +152,7 @@
                             <rect x="14" y="12" width="7" height="9" rx="1.5" />
                             <rect x="3" y="16" width="7" height="5" rx="1.5" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Dashboard</span>
+                        <span class="nav-label" aria-hidden="true">Dashboard</span>
                     </button>
                     <span class="rail-divider" aria-hidden="true"></span>
                     <button class="nav-item" data-section="chats" aria-label="Users / Chats">
@@ -147,35 +161,35 @@
                             <circle cx="9" cy="7" r="4" />
                             <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Users / Chats</span>
+                        <span class="nav-label" aria-hidden="true">Chats</span>
                     </button>
                     <button class="nav-item" data-section="subs" aria-label="Serials">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="2" y="7" width="20" height="15" rx="2" />
                             <polyline points="17 2 12 7 7 2" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Serials</span>
+                        <span class="nav-label" aria-hidden="true">Serials</span>
                     </button>
                     <button class="nav-item" data-section="watchlist" aria-label="Movies">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="3" y="3" width="18" height="18" rx="2" />
                             <path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Movies</span>
+                        <span class="nav-label" aria-hidden="true">Movies</span>
                     </button>
                     <button class="nav-item" data-section="history" aria-label="History">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="3" y="4" width="18" height="18" rx="2" />
                             <path d="M16 2v4M8 2v4M3 10h18" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">History</span>
+                        <span class="nav-label" aria-hidden="true">History</span>
                     </button>
                     <button class="nav-item" data-section="recap" aria-label="Year recap">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="5" y="3" width="14" height="18" rx="2" />
                             <path d="M9 8h6M9 12h6M9 16h3" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Year recap</span>
+                        <span class="nav-label" aria-hidden="true">Recap</span>
                     </button>
                     <span class="rail-divider" aria-hidden="true"></span>
                     <button class="nav-item" data-section="logs" aria-label="Activity Logs">
@@ -183,7 +197,7 @@
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Activity Logs</span>
+                        <span class="nav-label" aria-hidden="true">Logs</span>
                     </button>
                     <button class="nav-item" data-section="settings" aria-label="Settings">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -192,27 +206,27 @@
                                 d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
                             />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Settings</span>
+                        <span class="nav-label" aria-hidden="true">Settings</span>
                     </button>
                     <span class="rail-divider nav-mine" aria-hidden="true"></span>
                     <button class="nav-item nav-mine" data-section="my-subs" aria-label="My subscriptions">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">My subscriptions</span>
+                        <span class="nav-label" aria-hidden="true">Following</span>
                     </button>
                     <button class="nav-item nav-mine" data-section="my-calendar" aria-label="Calendar">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="3" y="4" width="18" height="18" rx="2" />
                             <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Calendar</span>
+                        <span class="nav-label" aria-hidden="true">Calendar</span>
                     </button>
                     <button class="nav-item nav-mine" data-section="my-settings" aria-label="Chat settings">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Chat settings</span>
+                        <span class="nav-label" aria-hidden="true">Settings</span>
                     </button>
                 </nav>
                 <div class="rail-bottom">
@@ -220,20 +234,20 @@
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Actions</span>
+                        <span class="nav-label" aria-hidden="true">Actions</span>
                     </button>
                     <button class="nav-item" id="about-btn" aria-label="About">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="3" y="3" width="18" height="18" rx="5" />
                             <path d="M12 8h.01M12 11.5v5" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">About</span>
+                        <span class="nav-label" aria-hidden="true">About</span>
                     </button>
-                    <button class="nav-item nav-mine" data-action="logout" aria-label="Sign out">
+                    <button class="nav-item" data-action="logout" aria-label="Sign out">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
                         </svg>
-                        <span class="nav-tip" aria-hidden="true">Sign out</span>
+                        <span class="nav-label" aria-hidden="true">Sign out</span>
                     </button>
                 </div>
             </aside>
@@ -1715,7 +1729,7 @@
             <button
                 class="tab-item"
                 data-open="more-modal"
-                data-tab-sections="logs history recap settings my-subs my-calendar my-settings"
+                data-tab-sections="logs history recap settings"
                 aria-haspopup="dialog"
             >
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1739,6 +1753,12 @@
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg
                 ><span>Settings</span>
+            </button>
+            <button class="tab-item tab-admin" data-action="view-admin">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>Admin</span>
             </button>
         </nav>
 

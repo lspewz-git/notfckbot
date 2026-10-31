@@ -7,9 +7,28 @@ const { mockPanel } = require('./mock-panel');
 // refresh that met it logs its error
 watchConsole({ ignore: /status of 401|Sign in: \/login in the bot/ });
 
-/** One of the user's sections: the rail on a wide screen, the tab bar (a user) or More (an admin) */
+/** The visible rail or tab-bar items, by section (or action, for the way back to the admin panel) */
+const visibleNav = (page, selector) =>
+    page
+        .locator(selector)
+        .evaluateAll((items) =>
+            items
+                .filter((el) => el.getBoundingClientRect().width > 0)
+                .map((el) => el.dataset.section || el.dataset.action)
+        );
+
+/**
+ * One of the user's sections: the rail on a wide screen (an admin first switches to "My account"),
+ * the tab bar (a user) or More (an admin)
+ */
 async function openMine(page, section, { admin = false } = {}) {
-    if (!isNarrow(page)) return page.locator(`.nav-item[data-section="${section}"]`).click();
+    if (!isNarrow(page)) {
+        if (admin) {
+            await page.locator('.view-switch').click();
+            await page.locator('#pick-list .pick-row', { hasText: 'My account' }).click();
+        }
+        return page.locator(`.nav-item[data-section="${section}"]`).click();
+    }
     if (!admin) return page.locator(`.tab-item[data-section="${section}"]`).click();
     // An admin's phone: one "My account" row in More, then the switch at the top of the section
     await page.locator('.tab-item[data-open="more-modal"]').click();
@@ -75,12 +94,7 @@ test('a user sees only their own sections, and the panel asks for nothing else',
     const panel = await mockPanel(page, { role: 'user' });
     await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
     const nav = isNarrow(page) ? '.tabbar .tab-item' : '.rail-nav .nav-item';
-    const visible = await page
-        .locator(nav)
-        .evaluateAll((items) =>
-            items.filter((el) => el.getBoundingClientRect().width > 0).map((el) => el.dataset.section)
-        );
-    expect(visible).toEqual(['my-subs', 'my-calendar', 'my-settings']);
+    expect(await visibleNav(page, nav)).toEqual(['my-subs', 'my-calendar', 'my-settings']);
     await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
     // No admin request was made for a user (they would all be refused)
     expect(panel.account.sent.every((r) => r.path.startsWith('/api/account/'))).toBe(true);
@@ -92,6 +106,39 @@ test('an admin has the whole panel and their own chats too', async ({ page }) =>
     await openMine(page, 'my-calendar', { admin: true });
     await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
     await expect(page.locator('.mine-cal-row')).toHaveCount(2);
+});
+
+test("an admin's two views: the admin panel and My account, each with only its own sections", async ({ page }) => {
+    await mockPanel(page);
+    const nav = isNarrow(page) ? '.tabbar .tab-item' : '.rail-nav .nav-item';
+    await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
+    expect(await visibleNav(page, nav)).not.toContain('my-subs');
+
+    await openMine(page, 'my-calendar', { admin: true });
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
+    const mine = isNarrow(page)
+        ? ['my-subs', 'my-calendar', 'my-settings', 'view-admin']
+        : ['my-subs', 'my-calendar', 'my-settings'];
+    expect(await visibleNav(page, isNarrow(page) ? nav : '.rail-nav .nav-item')).toEqual(mine);
+
+    // Back to the admin panel, on the section it was left on; the switch marks the current view
+    if (isNarrow(page)) await page.locator('.tab-admin').click();
+    else {
+        await expect(page.locator('.view-switch')).toContainText('Me');
+        await page.locator('.view-switch').click();
+        await expect(page.locator('#pick-list .pick-row.selected')).toContainText('My account');
+        await page.locator('#pick-list .pick-row', { hasText: 'Admin panel' }).click();
+        await expect(page.locator('.view-switch')).toContainText('Admin');
+    }
+    await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
+    expect(await visibleNav(page, nav)).not.toContain('my-calendar');
+});
+
+test('a user has no view switch', async ({ page }) => {
+    await mockPanel(page, { role: 'user' });
+    await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
+    await expect(page.locator('.view-switch')).toBeHidden();
+    await expect(page.locator('.tab-admin')).toBeHidden();
 });
 
 test("on an admin's phone the switch between the three sections is as wide as the tabs under it", async ({

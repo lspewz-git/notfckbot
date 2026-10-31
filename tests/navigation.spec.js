@@ -120,3 +120,23 @@ test('no pull to refresh while a dialog is open or the page is scrolled down', a
     await pullDown(page, 200);
     await expectNoRefresh(page, asked);
 });
+
+test('on a wide screen the rail and content sit centered, every rail label fits', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop layout');
+    await page.setViewportSize({ width: 1920, height: 900 });
+    await mockPanel(page);
+    await expect(page.locator('#popular-list [data-action="series"]').first()).toBeVisible();
+
+    const box = await page.locator('.app-container').boundingBox();
+    expect(box.width).toBe(1320);
+    const viewport = await page.evaluate(() => document.body.clientWidth); // less the scrollbar
+    expect(Math.abs(box.x - (viewport - box.width) / 2)).toBeLessThanOrEqual(1);
+
+    // Labels are whole, not cut with an ellipsis, and the last rail item is on screen
+    const cut = await page.$$eval('.sidebar .nav-label', (els) =>
+        els.filter((e) => e.offsetParent && e.scrollWidth > e.clientWidth).map((e) => e.textContent),
+    );
+    expect(cut).toEqual([]);
+    const last = await page.locator('.rail-bottom .nav-item:visible').last().boundingBox();
+    expect(last.y + last.height).toBeLessThanOrEqual(900);
+});
