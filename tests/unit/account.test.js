@@ -531,6 +531,20 @@ async function sentCount(sent, n) {
     return sent.length;
 }
 
+test('the API: signing out on other devices keeps this one', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const user = await signIn(call, 8);
+    const other = await signIn(call, 8);
+    const stranger = await signIn(call, 7);
+    assert.equal((await call('POST', '/api/account/sessions/end-others')).status, 401);
+    const ended = await call('POST', '/api/account/sessions/end-others', { cookie: user });
+    assert.deepEqual([ended.status, ended.body], [200, { ended: 1 }]);
+    assert.equal((await call('GET', '/api/account/me', { cookie: other })).status, 401);
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).status, 200, 'this device stays in');
+    assert.equal((await call('GET', '/api/account/me', { cookie: stranger })).status, 200, "someone else's stays in");
+});
+
 test('the API: set, use and remove a password; wrong tries stop at the limit', async (t) => {
     const sent = [];
     const { server, call } = await serve(fakeBot({}, sent));

@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { watchConsole, openSection, isNarrow, pickChat } = require('./helpers');
+const { watchConsole, openSection, isNarrow, pickChat, openProfilePage } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -69,9 +69,7 @@ test('the change log is for panel admins only: account settings never show it, e
         await page
             .locator(isNarrow(page) ? '.tab-item[data-section="my-subs"]' : '.nav-item[data-section="my-subs"]')
             .click();
-        await page
-            .locator(isNarrow(page) ? '.tab-item[data-section="my-settings"]' : '.nav-item[data-section="my-settings"]')
-            .click();
+        await openProfilePage(page, 'my-settings');
         await pickChat(page, 'my-settings', 'Киноклуб');
     };
     await open();

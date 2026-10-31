@@ -9,8 +9,18 @@ import { openModal, closeModal } from './ui.js';
 
 const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>';
 
-/** The first letter of a name, for its round avatar (an emoji counts as one) */
-export const initial = (name) => (Array.from(String(name || '').trim())[0] || '?').toUpperCase();
+/**
+ * The first letter of a name, for its round avatar (an emoji counts as one). A Telegram username's
+ * leading at sign is skipped: every avatar would show it otherwise
+ */
+export function initial(name) {
+    const letters = Array.from(
+        String(name || '')
+            .trim()
+            .replace(/^@+/, '')
+    );
+    return (letters[0] || '?').toUpperCase();
+}
 
 /** A letter avatar; `accent` marks the user's own chat */
 export const avatar = (name, accent = false) =>

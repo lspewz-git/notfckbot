@@ -4,7 +4,7 @@
  * password. It is set after signing in with Telegram, so it always belongs to a Telegram account.
  */
 import { api } from './api.js';
-import { $, $field, escapeHtml, setText } from './dom.js';
+import { $, $field, setText } from './dom.js';
 import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
 
 const MIN_LENGTH = 8;
@@ -87,10 +87,10 @@ function renderSignIn() {
     const holder = $('my-signin');
     // The system account has no account page: its password is in Settings → Bot
     if (!holder || !me || me.system) return;
-    const who = me.name ? `${me.name} · ${me.id}` : me.id;
+    // Who it is is shown in the Account group above (profile.js)
     holder.innerHTML =
         '<section class="mine-group"><h3 class="mine-group-title">Sign-in</h3><ul class="glass-card mine-sets">' +
-        `<li class="mine-set"><span class="mine-set-text">Telegram</span><span class="mine-set-value">${escapeHtml(who)}</span></li>` +
+        '<li class="mine-set"><span class="mine-set-text">Telegram</span><span class="mine-set-value">Connected</span></li>' +
         '<li><button type="button" class="mine-set mine-set-pick" data-action="password-open" aria-haspopup="dialog">' +
         '<span class="mine-set-text">Password</span>' +
         `<span class="mine-set-value">${me.hasPassword ? 'Set' : 'Not set'}${CHEVRON_RIGHT}</span></button></li>` +

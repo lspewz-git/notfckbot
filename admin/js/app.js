@@ -43,6 +43,7 @@ import { startSession, watchSession, sessionActions } from './session.js';
 import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions, pickFrom } from './pick-sheet.js';
+import { profileActions } from './profile.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -192,6 +193,7 @@ const CLICK_ACTIONS = {
     ...accountActions,
     ...passwordActions,
     ...pickActions,
+    ...profileActions,
     ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'sends-recent': () => openRecentSends(),

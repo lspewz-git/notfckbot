@@ -1,11 +1,12 @@
 // Signing in to the panel and the user's own chats in it, on the API mock (tests/mock-account.js)
 const { test, expect } = require('@playwright/test');
-const { watchConsole, isNarrow, pickChat } = require('./helpers');
+const { watchConsole, isNarrow, pickChat, openProfilePage } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 // A 401 is the answer the panel expects before sign-in (and to a wrong password, a 429 to too many
-// tries): the browser logs it as a failed load, and the refresh that met it logs its error
-watchConsole({ ignore: /status of 4(01|29)|Sign in: \/login in the bot/ });
+// tries, a 503 to the chats while Telegram is down): the browser logs it as a failed load,
+// and the refresh that met it logs its error
+watchConsole({ ignore: /status of (4(01|29)|503)|Sign in: \/login in the bot/ });
 
 /** The visible rail or tab-bar items, by section (or action, for the way back to the admin panel) */
 const visibleNav = (page, selector) =>
@@ -19,9 +20,13 @@ const visibleNav = (page, selector) =>
 
 /**
  * One of the user's sections: the rail on a wide screen (an admin first switches to "My account"),
- * the tab bar (a user) or More (an admin)
+ * the tab bar (a user) or More (an admin). Chat / Account settings: from the profile menu
  */
 async function openMine(page, section, { admin = false } = {}) {
+    if (section === 'my-settings' || section === 'my-account') {
+        await openMine(page, 'my-subs', { admin });
+        return openProfilePage(page, section);
+    }
     if (!isNarrow(page)) {
         if (admin) {
             await page.locator('.view-switch').click();
@@ -95,7 +100,7 @@ test('a user sees only their own sections, and the panel asks for nothing else',
     const panel = await mockPanel(page, { role: 'user' });
     await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
     const nav = isNarrow(page) ? '.tabbar .tab-item' : '.rail-nav .nav-item';
-    expect(await visibleNav(page, nav)).toEqual(['my-subs', 'my-calendar', 'my-settings']);
+    expect(await visibleNav(page, nav)).toEqual(['my-subs', 'my-calendar']);
     await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
     // No admin request was made for a user (they would all be refused)
     expect(panel.account.sent.every((r) => r.path.startsWith('/api/account/'))).toBe(true);
@@ -118,8 +123,8 @@ test("an admin's two views: the admin panel and My account, each with only its o
     await openMine(page, 'my-calendar', { admin: true });
     await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
     const mine = isNarrow(page)
-        ? ['my-subs', 'my-calendar', 'my-settings', 'view-admin']
-        : ['my-subs', 'my-calendar', 'my-settings'];
+        ? ['my-subs', 'my-calendar', 'view-admin']
+        : ['my-subs', 'my-calendar'];
     expect(await visibleNav(page, isNarrow(page) ? nav : '.rail-nav .nav-item')).toEqual(mine);
 
     // Back to the admin panel, on the section it was left on; the switch marks the current view
@@ -321,7 +326,7 @@ test('signing out, or a session that ends, brings back the sign-in screen', asyn
     await expect(page.locator('#login-error')).toContainText('Your session has ended');
 });
 
-test('on a phone a user has three tabs, big enough to tap, and nothing scrolls sideways', async ({
+test('on a phone a user has two tabs, big enough to tap, and nothing scrolls sideways', async ({
     page,
     isMobile
 }) => {
@@ -338,21 +343,82 @@ test('on a phone a user has three tabs, big enough to tap, and nothing scrolls s
             overflow: document.documentElement.scrollWidth - window.innerWidth
         };
     });
-    expect(layout.tabs).toBe(3);
+    expect(layout.tabs).toBe(2);
     expect(layout.tabHeight).toBeGreaterThanOrEqual(44);
     expect(layout.overflow).toBeLessThanOrEqual(0);
 });
 
-test('signing out works on a phone too: from More for an admin, from the settings page for a user', async ({
-    page,
-    isMobile
+test('the profile menu: chats, both settings pages and Sign out; nothing else signs out in My account', async ({
+    page
 }) => {
-    test.skip(!isMobile, 'phone layout');
     const panel = await mockPanel(page, { role: 'user' });
-    await openMine(page, 'my-settings');
-    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    // No Sign out in the rail, the tab bar or on a page: only in the menu
+    await expect(page.locator('[data-action="logout"]:visible')).toHaveCount(0);
+    const chip = page.locator('#my-calendar-section .mine-chat-chip');
+    await openMine(page, 'my-calendar');
+    await chip.click();
+    const menu = page.locator('#profile-modal');
+    await expect(menu.locator('.profile-head')).toContainText('@me');
+    await expect(menu.locator('.profile-head')).toContainText('User · ID 42');
+    await expect(menu.locator('.profile-links .action-title')).toHaveText([
+        'Chat settings',
+        'Account settings',
+        'Sign out'
+    ]);
+    const box = await menu.locator('.modal-content').boundingBox();
+    const chipBox = await chip.boundingBox();
+    if (isNarrow(page)) {
+        // A sheet on the bottom edge
+        await expect
+            .poll(async () => {
+                const b = await menu.locator('.modal-content').boundingBox();
+                return Math.round(b.y + b.height);
+            })
+            .toBe(page.viewportSize().height);
+    } else {
+        // Drops from the chip, right edges lined up
+        expect(box.y).toBeGreaterThan(chipBox.y + chipBox.height);
+        expect(Math.abs(box.x + box.width - (chipBox.x + chipBox.width))).toBeLessThan(2);
+    }
+
+    // Chat settings, and Back to the section the menu was opened from
+    await menu.locator('[data-section="my-settings"]').click();
+    await expect(page.locator('#my-settings-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-settings-body .mine-group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
+    await page.locator('#my-settings-section .mine-back').click();
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
+
+    await chip.click();
+    await menu.getByRole('button', { name: 'Sign out' }).click();
     await expect(page.locator('#login-gate')).toBeVisible();
     expect(panel.account.sent.some((r) => r.path === '/api/logout')).toBe(true);
+});
+
+test('the chip opens the menu even when the chats could not load', async ({ page }) => {
+    await mockPanel(page, { role: 'user', chatsDown: true });
+    const chip = page.locator('#my-subs-section .mine-chat-chip');
+    await expect(chip).toContainText('@me');
+    await chip.click();
+    await expect(page.locator('#profile-modal .pick-row')).toHaveCount(0);
+    await expect(page.locator('#profile-modal .profile-links .action-title')).toHaveText([
+        'Account settings',
+        'Sign out'
+    ]);
+});
+
+test('Account settings: who is signed in, the role, and signing out on other devices', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-account');
+    await expect(page.locator('#my-account-info')).toContainText('@me');
+    await expect(page.locator('#my-account-info')).toContainText('Telegram · ID 42');
+    await expect(page.locator('#my-account-info')).toContainText('User');
+    await expect(page.locator('#my-signin')).toContainText('Connected');
+    await page.locator('[data-action="profile-end-others"]').click();
+    await page.locator('#modal-confirm-btn').click();
+    await expect(page.locator('.toast').last()).toHaveText('Signed out on 2 other devices');
+    expect(panel.account.sent.some((r) => r.path === '/api/account/sessions/end-others')).toBe(true);
+    await page.locator('#my-account-section .mine-back').click();
+    await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
 });
 
 test('the chat chip opens the list of chats; the one picked shows on every page', async ({ page, isMobile }) => {
@@ -370,13 +436,13 @@ test('the chat chip opens the list of chats; the one picked shows on every page'
         expect(hits).toEqual([true, true]);
     }
     await chip.click();
-    const rows = page.locator('#pick-modal .pick-row');
+    const rows = page.locator('#profile-modal .pick-row');
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText('Private chat');
-    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(rows.nth(0)).toHaveAttribute('aria-pressed', 'true');
     await expect(rows.nth(1)).toContainText('Group · view only');
     await rows.nth(1).click();
-    await expect(page.locator('#pick-modal')).toBeHidden();
+    await expect(page.locator('#profile-modal')).toBeHidden();
     await expect(chip).toContainText('Киноклуб');
     await openMine(page, 'my-calendar');
     await expect(page.locator('#my-calendar-section .mine-chat-chip')).toContainText('Киноклуб');
@@ -450,9 +516,9 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
 
 test('the account page sets, changes and removes the password', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    await openMine(page, 'my-settings');
+    await openMine(page, 'my-account');
     const group = page.locator('#my-signin');
-    await expect(group).toContainText('@me · 42');
+    await expect(group).toContainText('Connected');
     const row = group.locator('[data-action="password-open"]');
     await expect(row).toContainText('Not set');
 

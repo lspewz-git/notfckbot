@@ -47,6 +47,7 @@
         <link rel="modulepreload" href="js/pull-refresh.js" />
         <link rel="modulepreload" href="js/password.js" />
         <link rel="modulepreload" href="js/pick-sheet.js" />
+        <link rel="modulepreload" href="js/profile.js" />
         <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/recap-cards.js" />
         <link rel="modulepreload" href="js/recap-schedule.js" />
@@ -223,12 +224,6 @@
                         </svg>
                         <span class="nav-label" aria-hidden="true">Calendar</span>
                     </button>
-                    <button class="nav-item nav-mine" data-section="my-settings" aria-label="Chat settings">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Settings</span>
-                    </button>
                 </nav>
                 <div class="rail-bottom">
                     <button class="nav-item" id="actions-btn" aria-label="Actions">
@@ -244,7 +239,8 @@
                         </svg>
                         <span class="nav-label" aria-hidden="true">About</span>
                     </button>
-                    <button class="nav-item" data-action="logout" aria-label="Sign out">
+                    <!-- In "My account" signing out is in the profile menu (profile.js) -->
+                    <button class="nav-item nav-logout" data-action="logout" aria-label="Sign out">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
                         </svg>
@@ -1299,8 +1295,7 @@
                                 aria-current="page"
                             >
                                 Subscriptions</button
-                            ><button type="button" class="btn btn-ghost" data-section="my-calendar">Calendar</button
-                            ><button type="button" class="btn btn-ghost" data-section="my-settings">Settings</button>
+                            ><button type="button" class="btn btn-ghost" data-section="my-calendar">Calendar</button>
                         </div>
                         <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
                     </section>
@@ -1321,38 +1316,54 @@
                                 data-section="my-calendar"
                                 aria-current="page"
                             >
-                                Calendar</button
-                            ><button type="button" class="btn btn-ghost" data-section="my-settings">Settings</button>
+                                Calendar
+                            </button>
                         </div>
                         <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
-                    <section id="my-settings-section" class="section mine-section">
+                    <!-- Opened from the profile menu (profile.js); Back returns to the section it came from -->
+                    <section id="my-settings-section" class="section mine-section mine-page">
                         <header>
-                            <div class="header-info">
+                            <div class="header-info mine-page-title">
+                                <button
+                                    type="button"
+                                    class="btn btn-ghost btn-icon-square mine-back"
+                                    data-section="my-subs"
+                                    aria-label="Back"
+                                >
+                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                                    </svg>
+                                </button>
                                 <h1>Chat settings</h1>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
-                        <div class="tab-filters mine-switch" role="group" aria-label="My account">
-                            <button type="button" class="btn btn-ghost" data-section="my-subs">Subscriptions</button
-                            ><button type="button" class="btn btn-ghost" data-section="my-calendar">Calendar</button
-                            ><button
-                                type="button"
-                                class="btn btn-ghost active"
-                                data-section="my-settings"
-                                aria-current="page"
-                            >
-                                Settings
-                            </button>
-                        </div>
                         <div id="my-settings-body" class="mine-body" aria-live="polite"></div>
-                        <!-- Whose account this is, and its password (password.js): not tied to the chat -->
+                    </section>
+
+                    <!-- The person's own settings, not a chat's: who they are, sign-in, devices -->
+                    <section id="my-account-section" class="section mine-section mine-page">
+                        <header>
+                            <div class="header-info mine-page-title">
+                                <button
+                                    type="button"
+                                    class="btn btn-ghost btn-icon-square mine-back"
+                                    data-section="my-subs"
+                                    aria-label="Back"
+                                >
+                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                                    </svg>
+                                </button>
+                                <h1>Account settings</h1>
+                            </div>
+                        </header>
+                        <div id="my-account-info" class="mine-body"></div>
+                        <!-- The password (password.js) -->
                         <div id="my-signin" class="mine-body"></div>
-                        <!-- Phones have no rail: signing out lives here (and in More for an admin) -->
-                        <button type="button" class="btn btn-outline btn-block mine-logout" data-action="logout">
-                            Sign out
-                        </button>
+                        <div id="my-devices" class="mine-body"></div>
                     </section>
 
                     <section id="history-section" class="section">
@@ -1768,11 +1779,6 @@
                     <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></svg
                 ><span>Calendar</span>
             </button>
-            <button class="tab-item tab-mine" data-section="my-settings">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg
-                ><span>Settings</span>
-            </button>
             <button class="tab-item tab-admin" data-action="view-admin">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -1848,6 +1854,12 @@
                 <h3 id="pick-title"></h3>
                 <div id="pick-list" class="action-list" role="listbox" aria-labelledby="pick-title"></div>
             </div>
+        </dialog>
+
+        <!-- The profile menu under the chat chip (profile.js): the chat, both settings, sign out.
+             A sheet on phones, a menu under the chip elsewhere -->
+        <dialog id="profile-modal" class="modal modal-sheet profile-modal" aria-label="Profile">
+            <div class="modal-content modal-narrow" id="profile-body"></div>
         </dialog>
 
         <!-- "More" sheet behind the tab bar: what doesn't fit in five tabs -->

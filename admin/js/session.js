@@ -7,8 +7,9 @@
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
-import { setChats, chatsFailed } from './account.js';
+import { setChats, chatsFailed, setOwnerName } from './account.js';
 import { signInForm, submitSignIn, setMe } from './password.js';
+import { setProfile } from './profile.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
@@ -96,6 +97,8 @@ export async function startSession(preferredChat = null) {
     }
     started = true;
     setMe(me.user);
+    setProfile(me.user);
+    setOwnerName(me.user.name || me.user.id);
     document.body.classList.toggle('role-user', me.user.role !== 'admin');
     // The system account is nobody in Telegram: no "My account"
     document.body.classList.toggle('system-account', Boolean(me.user.system));

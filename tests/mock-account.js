@@ -97,6 +97,8 @@ function accountState(options) {
     return {
         signedIn: !options.signedOut,
         hasPassword: Boolean(options.hasPassword),
+        // /api/account/chats fails (Telegram down)
+        chatsDown: Boolean(options.chatsDown),
         // Signed in as the system account (not a Telegram user)
         system: Boolean(options.system),
         role: options.role || 'admin',
@@ -259,7 +261,9 @@ function accountAnswer(state, req, url) {
         state.hasPassword = method === 'PUT';
         return { hasPassword: state.hasPassword };
     }
-    if (p === '/api/account/chats') return state.chats;
+    if (p === '/api/account/sessions/end-others') return { ended: 2 };
+    if (p === '/api/account/chats')
+        return state.chatsDown ? { status: 503, body: { error: "Telegram isn't answering" } } : state.chats;
 
     const m = /^\/api\/account\/chats\/(-?\d+)(\/.*)$/.exec(p);
     if (!m) return { status: 404, body: { error: 'Not mocked' } };

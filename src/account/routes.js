@@ -198,6 +198,16 @@ router.delete('/api/account/password', async (req, res) => {
     }
 });
 
+// "Sign out on other devices" on the account page: this session stays
+router.post('/api/account/sessions/end-others', async (req, res) => {
+    try {
+        const ended = await auth.endOtherSessions(req.user.userId, req.user.id);
+        res.json({ ended });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
 // The chats the user can open: asks Telegram about the groups, a few seconds at most
 router.get('/api/account/chats', async (req, res) => {
     try {

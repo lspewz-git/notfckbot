@@ -56,8 +56,15 @@ async function openSettingsTab(page, tab) {
 /** An account page's chat: its chip at the top, then the chat in the list it opens. */
 async function pickChat(page, section, title) {
     await page.locator(`#${section}-section .mine-chat-chip`).click();
-    await page.locator('#pick-modal .pick-row', { hasText: title }).click();
-    await expect(page.locator('#pick-modal')).toBeHidden();
+    await page.locator('#profile-modal .pick-row', { hasText: title }).click();
+    await expect(page.locator('#profile-modal')).toBeHidden();
 }
 
-module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab, pickChat };
+/** Chat settings or Account settings: from the profile menu behind the chat chip */
+async function openProfilePage(page, section, from = 'my-subs') {
+    await page.locator(`#${from}-section .mine-chat-chip`).click();
+    await page.locator(`#profile-modal [data-section="${section}"]`).click();
+    await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
+}
+
+module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab, pickChat, openProfilePage };

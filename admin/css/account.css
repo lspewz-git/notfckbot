@@ -11,6 +11,7 @@ body.view-mine .rail-nav .nav-item:not(.nav-mine),
 body.view-mine .rail-nav .rail-divider,
 body.view-mine #actions-btn,
 body.view-mine #about-btn,
+body.view-mine .nav-logout,
 body.view-mine .tabbar .tab-item:not(.tab-mine),
 body.role-user .view-switch,
 body.system-account .view-switch,
@@ -26,12 +27,12 @@ body.view-mine:not(.role-user) .tabbar .tab-admin {
 }
 
 body.view-mine .tabbar {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
 }
 
 /* The way back to the admin panel on an admin's phone */
 body.view-mine:not(.role-user) .tabbar {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
 }
 
 /* The switch stands out from the sections under it */
@@ -634,14 +635,94 @@ button.mine-row:hover .mine-row-title {
     font-variant-numeric: tabular-nums;
 }
 
-#my-signin {
+/* --- Chat settings and Account settings: pages the profile menu opens (profile.js) --- */
+
+/* One column: the header's chip ends where the rows do, not across the screen */
+.mine-page {
+    max-width: 40rem;
+}
+
+.mine-page-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+/* A plain arrow, not a framed button: it sits inside the column, before the title */
+.mine-back {
+    border-color: transparent;
+}
+
+/* The account page's groups come from three holders: the same gap as between chat settings' groups */
+#my-account-section .mine-body + .mine-body {
     margin-top: var(--space-4);
 }
 
-#my-signin:empty {
+.mine-back .icon {
+    width: 20px;
+    height: 20px;
+}
+
+#my-signin:empty,
+#my-devices:empty {
     display: none;
 }
 
-.mine-logout {
-    margin-top: var(--space-6);
+.profile-who {
+    justify-content: flex-start;
+    gap: var(--space-3);
+}
+
+.profile-end-others .mine-set-text {
+    color: var(--danger);
+}
+
+/* --- The profile menu --- */
+
+.profile-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-1) var(--space-3) var(--space-3);
+    border-bottom: 1px solid var(--border-row);
+}
+
+.profile-head .pick-avatar {
+    width: 40px;
+    height: 40px;
+}
+
+.profile-label {
+    padding: var(--space-3) var(--space-3) var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.profile-links {
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-row);
+}
+
+/* Wider than a phone: a menu dropping from the chip (profile.js sets where), no dimmed page */
+@media (min-width: 641px) {
+    .modal.profile-modal {
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding: var(--menu-top, var(--space-8)) var(--menu-right, var(--space-4)) var(--space-4);
+        background: transparent;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    .profile-modal .modal-content {
+        width: 20rem;
+        max-height: calc(100vh - var(--menu-top, var(--space-8)) - var(--space-4));
+        overflow-y: auto;
+        padding: var(--space-3) var(--space-2);
+    }
 }

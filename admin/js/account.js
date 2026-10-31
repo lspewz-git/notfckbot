@@ -84,24 +84,36 @@ const CHEVRON_DOWN =
 const CHEVRON_RIGHT =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>';
 
-const chatHint = (c) =>
+export const chatHint = (c) =>
     c.type === 'private' ? 'Private chat' : c.settings ? "Group · you're an admin" : 'Group · view only';
 
-/** The chat at the top of each section: a small chip that opens the list (just a label with one chat) */
+/** The signed-in person's name: the chip shows it until the chats are there (session.js) */
+let ownerName = '';
+
+export function setOwnerName(name) {
+    ownerName = name || '';
+    showChatChips();
+}
+
+/** The chats and the open one, for the profile menu (profile.js) */
+export const chatList = () => ({ chats: state.chats || [], chatId: state.chatId });
+
+/**
+ * The chat at the top of each section: a small chip that opens the profile menu (profile.js) with
+ * the chats, the settings and Sign out. Without a chat yet (loading, failed) it shows the person,
+ * so signing out is always in reach
+ */
 function showChatChips() {
-    const chats = state.chats || [];
-    const chat = chats.find((c) => c.id === state.chatId);
-    const html = !chat
-        ? ''
-        : chats.length < 2
-          ? `<span class="mine-chat-chip">${avatar(chat.title, chat.type === 'private')}<span class="mine-chat-chip-name">${escapeHtml(chat.title)}</span></span>`
-          : `<button type="button" class="mine-chat-chip" data-action="mine-chat-pick" aria-haspopup="dialog" aria-label="Chat: ${escapeHtml(chat.title)}">` +
-            `${avatar(chat.title, chat.type === 'private')}<span class="mine-chat-chip-name">${escapeHtml(chat.title)}</span>${CHEVRON_DOWN}</button>`;
+    const chat = (state.chats || []).find((c) => c.id === state.chatId);
+    const name = chat ? chat.title : ownerName || 'Account';
+    const html =
+        `<button type="button" class="mine-chat-chip" data-action="profile-open" aria-haspopup="dialog" aria-label="${chat ? `Profile and chat: ${escapeHtml(name)}` : 'Profile'}">` +
+        `${avatar(name, !chat || chat.type === 'private')}<span class="mine-chat-chip-name">${escapeHtml(name)}</span>${CHEVRON_DOWN}</button>`;
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
 }
 
 /** Another chat picked: every section shows it, and the open one loads it */
-async function selectChat(id) {
+export async function selectChat(id) {
     if (id === state.chatId) return;
     state.chatId = id;
     state.list = null;
@@ -705,20 +717,6 @@ export const accountActions = {
     'mine-cal-item': (el) => {
         const item = state.cal && state.cal.items && state.cal.items[Number(el.dataset.index)];
         if (item) openCard(releaseCard(item, state.cal.today));
-    },
-    'mine-chat-pick': () => {
-        if (!state.chats) return;
-        pickFrom({
-            title: 'Chat',
-            value: state.chatId,
-            options: state.chats.map((c) => ({
-                value: c.id,
-                label: c.title,
-                hint: chatHint(c),
-                avatar: avatar(c.title, c.type === 'private')
-            })),
-            onPick: selectChat
-        });
     },
     'mine-pick': (el) => {
         const name = el.dataset.name;
