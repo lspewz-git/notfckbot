@@ -204,6 +204,7 @@ module.exports = {
     COOKIE,
     LINK_TTL_MS,
     SESSION_TTL_MS,
+    idsIn,
     roleOf,
     isAllowed,
     firstAdmin,

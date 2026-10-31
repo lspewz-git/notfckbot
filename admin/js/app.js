@@ -13,6 +13,7 @@ import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './r
 import { recapCardActions, setupRecapCards, openRecapSection } from './recap-cards.js';
 import { recapScheduleActions, setupRecapSchedule } from './recap-schedule.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
+import { accessActions, setupAccess } from './access.js';
 import { alertsActions, setupAlerts } from './alerts.js';
 import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
@@ -162,6 +163,7 @@ const CLICK_ACTIONS = {
     'recap-send-all': () => confirmSendAll(),
     'recap-send-stop': () => stopRecapSend(),
     ...settingsActions,
+    ...accessActions,
     ...alertsActions,
     ...recapCardActions,
     ...recapScheduleActions,
@@ -289,6 +291,7 @@ async function init() {
     // Before enhanceSelects(), like setupFilters: the styled dropdowns start on the remembered size
     setupHistory();
     setupSettings();
+    setupAccess();
     setupAlerts();
     setupRecapCards();
     setupRecapSchedule();

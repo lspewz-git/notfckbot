@@ -10,6 +10,7 @@ import { chatsById } from './store.js';
 import { openTestNotifyModal } from './test-notify.js';
 import { openChatStats } from './chat-stats.js';
 import { showChanges } from './changes.js';
+import { ROLE_LABELS } from './access.js';
 
 // --- The per-row menu ---
 // One button per row opens this instead of crowding the Actions column
@@ -61,6 +62,13 @@ export function openChatActions(chatId) {
         openModal('changes-modal');
         showChanges($('changes-root'), { path: `/chat/${encodeURIComponent(chat.id)}/changes` }).catch(() => {});
     };
+
+    // Only a person can sign in: private chats
+    const accessBtn = $('action-access');
+    accessBtn.hidden = chat.type !== 'private';
+    setText('action-access-desc', ROLE_LABELS[chat.panelRole] || 'No access');
+    // The row's access-open (access.js) marks the person, then its data-section loads the list
+    accessBtn.dataset.id = String(chat.id);
 
     const blockBtn = $('action-block');
     blockBtn.querySelector('.action-title').textContent = isBlocked ? 'Unblock' : 'Block';

@@ -50,6 +50,7 @@ app.use(require('./routes/config'));
 app.use(require('./routes/services'));
 app.use(require('./routes/history'));
 app.use(require('./routes/settings'));
+app.use(require('./routes/access'));
 app.use(require('./routes/alerts'));
 
 // Malformed JSON and the like: a short answer, never Express's page with the stack

@@ -72,7 +72,7 @@ test('chat rows expose one action menu that opens and closes', async ({ page }) 
     await expect(modal).toBeVisible();
     await expect(page.locator('#chat-actions-title')).not.toBeEmpty();
 
-    await modal.locator('[data-close="chat-actions-modal"]').click();
+    await modal.locator('.modal-x').click();
     await expect(modal).toBeHidden();
 });
 

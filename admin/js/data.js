@@ -16,6 +16,7 @@ import { setLogs, renderLogs } from './logs.js';
 import { loadHistory } from './history.js';
 import { updateCharts, chartsFailed } from './dashboard-charts.js';
 import { loadSettings } from './settings.js';
+import { loadAccess } from './access.js';
 import { loadAlerts } from './alerts.js';
 import { loadMine } from './account.js';
 
@@ -75,7 +76,7 @@ export async function fetchData() {
     if (currentSection === 'history') jobs.push(loadHistory());
     // The user's own chats (account.js)
     if (currentSection.startsWith('my-')) jobs.push(loadMine(currentSection));
-    if (currentSection === 'settings') jobs.push(loadSettings(), loadAlerts());
+    if (currentSection === 'settings') jobs.push(loadSettings(), loadAlerts(), loadAccess());
     if (currentSection === 'logs') {
         jobs.push(
             api('/logs').then((logs) => {

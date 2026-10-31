@@ -15,6 +15,7 @@ import {
     lastSeenText
 } from './format.js';
 import { subKey } from './store.js';
+import { roleBadge } from './access.js';
 
 // The API decides (series ended or canceled on TMDB); the panel keeps no status list of its own
 const isArchivedSub = (sub) => Boolean(sub.archived);
@@ -87,12 +88,12 @@ export const TABLES = {
             return `
                 <tr class="row-compact">
                     <td data-label="Chat ID"><code>${item.id}</code></td>
-                    <td data-label="User / Group">${chatDisplayName(item)}</td>
+                    <td data-label="User / Group">${chatDisplayName(item)}${roleBadge(item.panelRole)}</td>
                     <td data-label="Type"><span class="chat-type">${item.type}</span></td>
                     <td data-label="Status"><div class="status-cell">${badge}${noteLine}</div></td>
                     <td data-label="Last active"><span class="last-active">${seen}</span></td>
                     ${compactCell({
-                        title: chatDisplayName(item),
+                        title: `${chatDisplayName(item)}${roleBadge(item.panelRole)}`,
                         badge,
                         meta: [item.type, String(item.id), activeLine(item.last_seen_at)],
                         more: note ? [note] : []

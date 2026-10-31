@@ -25,6 +25,7 @@
              keeps this list complete) -->
         <link rel="modulepreload" href="js/app.js" />
         <link rel="modulepreload" href="js/about.js" />
+        <link rel="modulepreload" href="js/access.js" />
         <link rel="modulepreload" href="js/account.js" />
         <link rel="modulepreload" href="js/session.js" />
         <link rel="modulepreload" href="js/alerts.js" />
@@ -1000,6 +1001,35 @@
 
                         <div class="settings-grid" id="settings-pane-bot" hidden>
                             <div class="settings-col">
+                                <div class="glass-card settings-card" id="access-card">
+                                    <h2 class="settings-title">Panel access</h2>
+                                    <p class="settings-desc">
+                                        Admin: the whole panel. User: their own subscriptions, calendar and chat
+                                        settings. Applies at once, no restart.
+                                    </p>
+                                    <ul class="access-list" id="access-list" aria-label="People with access"></ul>
+                                    <div class="access-add">
+                                        <select
+                                            id="access-add-user"
+                                            class="select-field"
+                                            aria-label="Person to add"
+                                        ></select>
+                                        <select id="access-add-role" class="select-field" aria-label="Role">
+                                            <option value="user">User</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline btn-compact"
+                                            id="access-add"
+                                            data-action="access-add"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    <p class="field-hint">Only people who have written to the bot.</p>
+                                </div>
+
                                 <div class="glass-card settings-card">
                                     <h2 class="settings-title">Update check</h2>
                                     <p class="settings-desc">
@@ -2041,6 +2071,27 @@
                         <span class="action-text">
                             <span class="action-title">Changes</span>
                             <span class="action-desc">Who changed the list and settings</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6" /></svg
+                        ></span>
+                    </button>
+                    <button
+                        id="action-access"
+                        class="action-row"
+                        data-action="access-open"
+                        data-section="settings"
+                        data-close="chat-actions-modal"
+                    >
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <rect x="3" y="11" width="18" height="11" rx="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Panel access</span>
+                            <span class="action-desc" id="action-access-desc">No access</span>
                         </span>
                         <span class="action-chevron"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">

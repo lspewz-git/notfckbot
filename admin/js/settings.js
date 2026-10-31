@@ -426,7 +426,7 @@ export function discardSettings(card = null) {
 }
 
 /** Shows one tab's cards and keeps the choice for the next visit. */
-function pickTab(name) {
+export function pickTab(name) {
     if (!TABS.includes(name)) return;
     tab = name;
     try {

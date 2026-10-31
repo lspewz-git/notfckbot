@@ -83,6 +83,11 @@
         border-color 0.15s;
 }
 
+/* A row that doesn't apply to this chat (Panel access for a group) */
+.action-row[hidden] {
+    display: none;
+}
+
 .action-row:hover {
     background: var(--surface-2);
     border-color: var(--border);

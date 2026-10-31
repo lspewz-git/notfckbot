@@ -360,6 +360,10 @@ async function mockPanel(page, options = {}) {
     const panel = {
         // Signing in and the user's own chats (tests/mock-account.js): an admin unless told
         account: accountState(options),
+        access: options.access || {
+            people: [{ id: '101', name: 'alice', role: 'admin', you: true }],
+            candidates: [{ id: '102', name: 'bob' }]
+        },
         subs: buildSubs(),
         sub,
         series,
@@ -540,6 +544,25 @@ async function mockPanel(page, options = {}) {
                 saved.push(name);
             }
             return { saved, settings: panel.settings };
+        },
+        // Settings → Bot → Panel access: alice is the admin signed in, bob may be added. POST records
+        // the body (panel.accessSaves) and answers options.accessSave(body) or the list with it applied
+        '/api/access': (req) => {
+            if (req.method() === 'GET') return panel.access;
+            const body = req.postDataJSON();
+            panel.accessSaves = [...(panel.accessSaves || []), body];
+            if (options.accessSave) return options.accessSave(body);
+            const { people, candidates } = panel.access;
+            const known = [...people, ...candidates].find((p) => p.id === body.userId);
+            const rest = people.filter((p) => p.id !== body.userId);
+            panel.access =
+                body.role === 'none'
+                    ? { people: rest, candidates: [...candidates, { id: known.id, name: known.name }] }
+                    : {
+                          people: [...rest, { id: known.id, name: known.name, role: body.role, you: false }],
+                          candidates: candidates.filter((c) => c.id !== body.userId)
+                      };
+            return panel.access;
         },
         // The year recap's sending: who gets it and how it goes; the sends asked for, for tests
         '/api/recap': () => panel.recap,

@@ -5,6 +5,7 @@ const { isFinishedStatus } = require('../../constants');
 const router = require('express').Router();
 const { log } = require('../../log');
 const { isTelegramReady } = require('../../telegram-ready');
+const { roleOf } = require('../../account/auth');
 
 // A name's wait: the table doesn't hang on a Telegram that doesn't answer
 const NAME_TIMEOUT_MS = 5000;
@@ -68,6 +69,8 @@ router.get('/api/data/:type', async (req, res) => {
                 order: [['createdAt', 'DESC']]
             });
             await backfillChatNames(data, req.app.get('bot'));
+            // Who may sign in to the panel: a badge on the row (routes/access.js sets it)
+            data = data.map((c) => ({ ...c.toJSON(), panelRole: c.type === 'private' ? roleOf(c.id) : null }));
         }
         res.json(data);
     } catch (err) {
