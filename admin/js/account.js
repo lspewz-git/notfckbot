@@ -18,20 +18,6 @@ export const MODES = {
 };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTH_NAMES = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December'
-];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** "2026-11-04" → "Nov 4" (with the year when it isn't this one, or asked) */
@@ -320,6 +306,9 @@ function newSeriesCard(r) {
     );
 }
 
+/** The episode's title, or "Episode 8" while TMDB has none (in the panel's language) */
+const episodeName = (item) => item.name || `Episode ${item.episode}`;
+
 const kinopoiskLink = (url) => (url ? linkButtons([{ kind: 'info', label: 'Kinopoisk', url }]) : '');
 
 /** An episode or a film from the calendar */
@@ -328,7 +317,7 @@ function releaseCard(item, today) {
     const lines =
         item.kind === 'tv'
             ? [
-                  [`S${item.season}E${item.episode}`, item.name].filter(Boolean).join(' · '),
+                  `S${item.season}E${item.episode} · ${episodeName(item)}`,
                   MARKS[item.mark] ? MARKS[item.mark][0].toUpperCase() + MARKS[item.mark].slice(1) : '',
                   when
               ]
@@ -352,44 +341,45 @@ const calWhatOf = (kind) => (kind === 'movie' ? 'films' : 'series');
 function calRow(item, index, today) {
     const sub =
         item.kind === 'tv'
-            ? [`S${item.season}E${item.episode}`, item.name, MARKS[item.mark]].filter(Boolean).join(' · ')
+            ? [`S${item.season}E${item.episode}`, episodeName(item), MARKS[item.mark]].filter(Boolean).join(' · ')
             : 'Digital release';
     const n = daysUntil(item.date, today);
     return (
-        `<li><button type="button" class="mine-row mine-cal-row${n < 0 ? ' past' : ''}" data-action="mine-cal-item" data-index="${index}">` +
+        `<li><button type="button" class="mine-row mine-cal-row" data-action="mine-cal-item" data-index="${index}">` +
         `<span class="mine-cal-date"><b>${item.date.slice(8, 10)}</b>${weekday(item.date)}</span>${poster(item.poster)}` +
         `<span class="mine-row-text"><span class="mine-row-title">${escapeHtml(item.title)}</span><span class="mine-dim mine-cal-sub">${escapeHtml(sub)}</span></span>` +
         `<span class="mine-cal-when${n === 0 ? ' today' : ''}">${whenText(item.date, today)}</span></button></li>`
     );
 }
 
+/** "2027-07" → "July 2027"; the year only when it isn't today's */
+const monthTitle = (key, today) =>
+    new Date(`${key}-01T00:00:00Z`).toLocaleString('en', {
+        month: 'long',
+        timeZone: 'UTC',
+        ...(key.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' })
+    });
+
+/** Yesterday and what is still to come, in one card by date, a month's name before its first row */
 function daysBody(data) {
     const shown = data.items
         .map((item, index) => ({ item, index }))
-        .filter(({ item }) => calWhatOf(item.kind) === state.calWhat);
+        .filter(({ item }) => calWhatOf(item.kind) === state.calWhat && daysUntil(item.date, data.today) >= -1);
     if (!shown.length)
         return state.calWhat === 'films'
-            ? empty('No films out', 'No films on the list come out from last month to the end of the next two.')
-            : empty(
-                  'No episodes out',
-                  'No subscribed series have episodes from last month to the end of the next two.'
-              );
-    // One card per month, as the months go
-    const months = new Map();
-    for (const one of shown) {
-        const key = one.item.date.slice(0, 7);
-        months.set(key, [...(months.get(key) || []), one]);
-    }
-    const thisYear = data.today.slice(0, 4);
-    return [...months.entries()]
-        .map(([key, rows]) => {
-            const title = `${MONTH_NAMES[Number(key.slice(5, 7)) - 1]}${key.slice(0, 4) === thisYear ? '' : ` ${key.slice(0, 4)}`}`;
-            return `<section class="glass-card mine-cal-month"><h3>${title}</h3><ul class="mine-rows">${rows.map(({ item, index }) => calRow(item, index, data.today)).join('')}</ul></section>`;
-        })
-        .join('');
+            ? empty('No films coming', 'No films on the list have a release date yet.')
+            : empty('No episodes coming', 'No subscribed series have dated episodes yet.');
+    let month = '';
+    const rows = shown.map(({ item, index }) => {
+        const key = item.date.slice(0, 7);
+        const head = key === month ? '' : `<li class="mine-cal-month">${monthTitle(key, data.today)}</li>`;
+        month = key;
+        return head + calRow(item, index, data.today);
+    });
+    return `<ul class="glass-card mine-rows">${rows.join('')}</ul>`;
 }
 
-/** One list, month by month: from last month to the end of the month after next */
+/** One list from yesterday on */
 function calendarView(data) {
     const body = !data ? loading() : daysBody(data);
     const note =

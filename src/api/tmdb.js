@@ -159,18 +159,26 @@ function nextEpisodeFields(data) {
     };
 }
 
-const fetchDetails = async (id, media_type) => {
+/**
+ * @param {number[]} [seasons] series only: seasons to bring in the same request (TMDB appends up
+ *   to 20 parts); they go to the season cache, not into the details
+ */
+const fetchDetails = async (id, media_type, seasons = []) => {
     try {
         const response = await apiClient.get(`/${media_type}/${id}`, {
             params: {
                 language: 'ru-RU',
                 // external_ids carries the IMDb ID, used to look up the Kinopoisk ID;
                 // release_dates (films only) carries the digital release
-                append_to_response:
-                    media_type === 'movie' ? 'credits,external_ids,release_dates' : 'credits,external_ids'
+                append_to_response: [
+                    'credits',
+                    'external_ids',
+                    ...(media_type === 'movie' ? ['release_dates'] : seasons.map((s) => `season/${s}`))
+                ].join(',')
             }
         });
         const data = response.data;
+        if (media_type === 'tv') keepSeasons(id, 'ru-RU', data);
 
         // Extract director if it's a movie
         if (media_type === 'movie' && data.credits && data.credits.crew) {
@@ -204,9 +212,9 @@ const DETAILS_CACHE_MAX = 500;
 const detailsCache = lruCache({
     max: DETAILS_CACHE_MAX,
     ttl: DETAILS_TTL_MS,
-    fetchMethod: (key) => {
+    fetchMethod: (key, _stale, { context }) => {
         const [mediaType, id] = key.split(':');
-        return fetchDetails(id, mediaType);
+        return fetchDetails(id, mediaType, context);
     }
 }); // "tv:1399" -> details
 
@@ -215,19 +223,19 @@ const cacheKey = (id, media_type) => `${media_type}:${id}`;
 /**
  * Always asks TMDB (the update check needs current data) and refreshes the cache.
  * Concurrent calls for the same title share one request.
+ * @param {{ seasons?: number[] }} [options] series: seasons to refresh in the same request
  */
-const getDetails = (id, media_type) => detailsCache.fetch(cacheKey(id, media_type), { forceRefresh: true });
+const getDetails = (id, media_type, { seasons = [] } = {}) =>
+    detailsCache.fetch(cacheKey(id, media_type), { forceRefresh: true, context: seasons });
 
 /** The cached details when fresh enough, otherwise a fetch. For display only. */
 const getDetailsCached = (id, media_type) => fetchFresh(detailsCache, cacheKey(id, media_type));
 
 // Returns season details including episodes
-const getSeasonDetails = async (tv_id, season_number) => {
+const getSeasonDetails = async (tv_id, season_number, language = 'ru-RU') => {
     try {
         const response = await apiClient.get(`/tv/${tv_id}/season/${season_number}`, {
-            params: {
-                language: 'ru-RU'
-            }
+            params: { language }
         });
         return response.data;
     } catch (error) {
@@ -242,15 +250,54 @@ const seasonCache = lruCache({
     max: DETAILS_CACHE_MAX,
     ttl: DETAILS_TTL_MS,
     fetchMethod: (key) => {
-        const [tvId, seasonNumber] = key.split(':');
-        return getSeasonDetails(tvId, seasonNumber);
+        const [tvId, seasonNumber, language] = key.split(':');
+        return getSeasonDetails(tvId, seasonNumber, language).then(slimSeason);
     }
-}); // "1399:2" -> season
+}); // "1399:2:ru-RU" -> season
+
+const seasonKey = (tvId, seasonNumber, language) => `${tvId}:${seasonNumber}:${language}`;
+
+/** A season without each episode's crew and guest stars: nothing reads them, they are most of the size. */
+const slimSeason = (season) => ({
+    ...season,
+    episodes: (season.episodes || []).map(({ crew, guest_stars, ...episode }) => episode)
+});
+
+/** Moves the "season/N" parts of a series response into the season cache. */
+function keepSeasons(tvId, language, data) {
+    for (const part of Object.keys(data)) {
+        const number = part.startsWith('season/') ? Number(part.slice(7)) : NaN;
+        if (!Number.isInteger(number)) continue;
+        if (data[part]) seasonCache.set(seasonKey(tvId, number, language), slimSeason(data[part]));
+        delete data[part];
+    }
+}
 
 /** A season's episodes, from memory when fresh enough; concurrent calls share one request. */
-const getSeasonDetailsCached = (tvId, seasonNumber) => fetchFresh(seasonCache, `${tvId}:${seasonNumber}`);
+const getSeasonDetailsCached = (tvId, seasonNumber, language = 'ru-RU') =>
+    fetchFresh(seasonCache, seasonKey(tvId, seasonNumber, language));
+
+/** Whether the season is in memory and not yet expired. */
+const hasSeason = (tvId, seasonNumber, language = 'ru-RU') =>
+    seasonCache.getRemainingTTL(seasonKey(tvId, seasonNumber, language)) > 0;
+
+/** Several seasons of a series in one request, into the season cache. */
+async function refreshSeasons(tvId, seasons, language = 'ru-RU') {
+    if (!seasons.length) return;
+    try {
+        const response = await apiClient.get(`/tv/${tvId}`, {
+            params: { language, append_to_response: seasons.map((s) => `season/${s}`).join(',') }
+        });
+        keepSeasons(tvId, language, response.data);
+    } catch (error) {
+        log.error(`TMDB API Error (refreshSeasons ${tvId} ${seasons.join(',')} ${language}): ${error.message}`);
+        throw error;
+    }
+}
 
 module.exports = {
+    hasSeason,
+    refreshSeasons,
     getSeasonDetailsCached,
     searchMulti,
     digitalReleaseDate,

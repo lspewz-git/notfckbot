@@ -91,7 +91,7 @@ test('an admin has the whole panel and their own chats too', async ({ page }) =>
     await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
     await openMine(page, 'my-calendar', { admin: true });
     await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
-    await expect(page.locator('.mine-cal-row')).toHaveCount(3);
+    await expect(page.locator('.mine-cal-row')).toHaveCount(2);
 });
 
 test("on an admin's phone the switch between the three sections is as wide as the tabs under it", async ({
@@ -190,38 +190,42 @@ test('search: a series asks for the mode, a film is added at once, what is on th
     });
 });
 
-test('calendar: one list by month, series and films in their tabs, with posters; no period switch', async ({
+test('calendar: one list of what is to come, series and films in their tabs, with posters; no period switch', async ({
     page
 }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
     const rows = body.locator('.mine-cal-row');
-    await expect(rows).toHaveCount(3);
-    await expect(body.locator('.mine-cal-month h3')).toHaveText(['October', 'November', 'January 2027']);
-    await expect(rows.first()).toHaveClass(/past/);
-    await expect(rows.nth(1)).toContainText('Одни из нас');
-    await expect(rows.nth(1)).toContainText('S2E5 · Feel Her Love · season finale');
-    await expect(rows.nth(1).locator('.mine-cal-when')).toHaveText('Today');
-    await expect(rows.nth(1).locator('img.mine-poster')).toHaveAttribute('src', '/api/poster/w185/p1.jpg');
+    // The episode already out is left out; the rest share one card, a month's name before its first row
+    await expect(rows).toHaveCount(2);
+    await expect(body.locator('ul.mine-rows')).toHaveCount(1);
+    await expect(body.locator('.mine-cal-month')).toHaveText(['November', 'January 2027']);
+    await expect(body.locator('.mine-cal-date')).toHaveText(['04Wed', '15Fri']);
+    await expect(rows.first()).toContainText('Одни из нас');
+    await expect(rows.first()).toContainText('S2E5 · Feel Her Love · season finale');
+    await expect(rows.first().locator('.mine-cal-when')).toHaveText('Today');
+    // No title from TMDB yet: a stand-in
+    await expect(rows.nth(1)).toContainText('S4E1 · Episode 1 · season premiere');
+    await expect(rows.first().locator('img.mine-poster')).toHaveAttribute('src', '/api/poster/w185/p1.jpg');
     // Only the Series / Films tabs: no week, month or year, no paging
     await expect(body.locator('.tab-filters')).toHaveCount(1);
     await expect(body.getByRole('button', { name: /^(Week|Month|Year|Earlier|Later)$/ })).toHaveCount(0);
     expect(panel.account.sent.some((r) => r.path.includes('/calendar?'))).toBe(false);
-    // Films have their own tab
+    // Films have their own tab; yesterday's release is still shown
     await body.getByRole('button', { name: 'Films' }).click();
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('Дюна: Часть третья');
-    await expect(rows.first().locator('.mine-cal-when')).toHaveText('In 2 days');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText('Мегалополис');
+    await expect(rows.first().locator('.mine-cal-when')).toHaveText('Yesterday');
+    await expect(rows.nth(1)).toContainText('Дюна: Часть третья');
+    await expect(rows.nth(1).locator('.mine-cal-when')).toHaveText('In 2 days');
 });
 
-test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself', async ({
-    page
-}) => {
+test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
     const card = page.locator('#mine-card-modal');
-    await page.locator('#my-calendar-body .mine-cal-row').nth(1).click();
+    await page.locator('#my-calendar-body .mine-cal-row').first().click();
     await expect(card).toBeVisible();
     await expect(card.locator('h3')).toHaveText('Одни из нас');
     await expect(card).toContainText('S2E5 · Feel Her Love');

@@ -294,19 +294,24 @@ button.mine-row:hover .mine-row-title {
 
 /* --- Calendar --- */
 
-/* A month of the list: date, poster, title and episode, how soon */
-.mine-cal-month h3 {
-    font-size: var(--text-lg);
+/* A month's name before its first row: a label in the list, no line above, not a card of its own */
+.mine-rows li.mine-cal-month {
+    padding: var(--space-3) 0 var(--space-1);
+    border-top: 0;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
     font-weight: 600;
-    margin-bottom: var(--space-1);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
+.mine-rows li.mine-cal-month + li {
+    border-top: 0;
+}
+
+/* A row of the list: date, poster, title and episode, how soon */
 .mine-cal-row {
     gap: var(--space-3);
-}
-
-.mine-cal-row.past {
-    opacity: 0.6;
 }
 
 .mine-cal-date {

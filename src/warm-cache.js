@@ -8,22 +8,24 @@
  * moment is no problem: concurrent requests for a title share one fetch (see tmdb.js).
  */
 const { Series, Watchlist } = require('./db');
-const { getDetailsCached, getSeasonDetailsCached } = require('./api/tmdb');
+const { getDetailsCached } = require('./api/tmdb');
+const { warmSeasons } = require('./calendar');
 const { findKinopoiskId } = require('./api/kinopoisk');
 const { log } = require('./log');
 
-/** Every title the panel can show a card for: the tracked series and the films on any list. */
+/** Every title the panel can show a card for: the tracked series (rows) and the films on any list. */
 async function trackedTitles() {
     const [series, films] = await Promise.all([
-        Series.findAll({ attributes: ['tmdb_id'] }),
+        Series.findAll(),
         Watchlist.findAll({ attributes: ['tmdb_id'], group: ['tmdb_id'] })
     ]);
-    return [...new Set([...series, ...films].map((row) => row.tmdb_id))];
+    const rows = new Map(series.map((row) => [row.tmdb_id, row]));
+    return { ids: [...new Set([...series, ...films].map((row) => row.tmdb_id))], rows };
 }
 
 async function warmDetailsCache() {
     const started = Date.now();
-    const ids = await trackedTitles();
+    const { ids, rows } = await trackedTitles();
     let failed = 0;
     for (const tmdbId of ids) {
         const [mediaType, numericId] = String(tmdbId).split('_');
@@ -33,14 +35,10 @@ async function warmDetailsCache() {
             // Films keep no Kinopoisk ID in the database (series do): find it now, so the
             // History page links straight to their pages from the first view
             if (mediaType === 'movie') await findKinopoiskId(tmdbId, details.imdb_id);
-            // The bot's 📅 week and month read episode dates from the current season (and the
-            // next, once announced): the first view after a start shouldn't wait for TMDB
-            if (mediaType === 'tv') {
-                const last = details.last_episode_to_air && details.last_episode_to_air.season_number;
-                const next = details.next_episode_to_air && details.next_episode_to_air.season_number;
-                for (const season of new Set([last, next].filter(Boolean))) {
-                    await getSeasonDetailsCached(numericId, season).catch(() => {});
-                }
+            // The calendars (the panel's list, the bot's 📅 week and month) read episode dates
+            // from the seasons: the first view after a start shouldn't wait for TMDB
+            if (mediaType === 'tv' && rows.has(tmdbId)) {
+                await warmSeasons(rows.get(tmdbId), details).catch(() => {});
             }
         } catch {
             // Already logged by tmdb.js; that card will just ask TMDB when opened

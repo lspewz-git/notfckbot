@@ -16,19 +16,30 @@ const SEASONS = {
     ],
     '1:2': [
         ['2026-10-05', 1, 'Начало'],
-        ['2026-10-12', 2, ''],
+        ['2026-10-12', 2, 'Эпизод 2'],
         ['2026-10-14', 3, ''],
-        ['2026-10-19', 4, ''],
+        ['2026-10-19', 4, 'Эпизод 4'],
         ['2026-11-02', 5, 'Финал']
+    ]
+};
+// English titles, for the episodes TMDB has no Russian one for
+const SEASONS_EN = {
+    '1:2': [
+        ['2026-10-05', 1, 'The Beginning'],
+        ['2026-10-12', 2, 'Payback'],
+        ['2026-10-14', 3, 'Episode 3'],
+        ['2026-10-19', 4, 'Homecoming'],
+        ['2026-11-02', 5, 'Finale']
     ]
 };
 let seasonAsks = [];
 let tmdbDown = false;
-mock.method(tmdb, 'getSeasonDetailsCached', async (id, season) => {
-    seasonAsks.push(`${id}:${season}`);
+mock.method(tmdb, 'getSeasonDetailsCached', async (id, season, language = 'ru-RU') => {
+    seasonAsks.push(language === 'ru-RU' ? `${id}:${season}` : `${id}:${season}:${language}`);
     if (tmdbDown) throw new Error('TMDB down');
+    const table = language === 'ru-RU' ? SEASONS : SEASONS_EN;
     return {
-        episodes: (SEASONS[`${id}:${season}`] || []).map(([air_date, episode_number, name]) => ({
+        episodes: (table[`${id}:${season}`] || []).map(([air_date, episode_number, name]) => ({
             air_date,
             episode_number,
             name
@@ -84,10 +95,11 @@ describe('dates', () => {
         assert.deepEqual(pick(calendar.period('m', -10, 'Europe/Moscow', NOW)), ['2025-12-01', '2025-12-31']);
     });
 
-    test("the panel's one list runs from last month to the end of the month after next, across years", () => {
-        assert.deepEqual(pick(calendar.listPeriod('Europe/Moscow', NOW)), ['2026-09-01', '2026-12-31']);
-        const december = new Date('2026-12-10T12:00:00Z');
-        assert.deepEqual(pick(calendar.listPeriod('Europe/Moscow', december)), ['2026-11-01', '2027-02-28']);
+    test("the panel's one list runs from yesterday with no end; a far-off end asks no extra seasons", () => {
+        assert.deepEqual(pick(calendar.listPeriod('Europe/Moscow', NOW)), ['2026-10-13', '9999-12-31']);
+        const series = { release_seasons: '2020:1;2026:2', last_season: 2, next_episode_season: null };
+        const details = { seasons: [{ season_number: 3, air_date: '2028-07-08' }] };
+        assert.deepEqual(calendar.seasonsToAsk(series, details, '2026-10-14', '9999-12-31'), [3, 2]);
     });
 
     test("today is the chat's: late on Sunday in Moscow is Monday in Vladivostok", () => {
@@ -127,6 +139,18 @@ describe('the week', () => {
         assert.match(first.text, /S2E1, премьера сезона/);
         const last = await calendarView(chat(), 'w', 3, { now: NOW });
         assert.match(last.text, /S2E5, финал сезона/);
+    });
+
+    test('episode titles: Russian, else English instead of TMDB\'s "Эпизод 2", else none', async () => {
+        const { items } = await calendar.periodItems(10, '2026-10-05', '2026-11-02');
+        const names = items.filter((i) => i.kind === 'tv').map((i) => i.name);
+        assert.deepEqual(names, ['Начало', 'Payback', '', 'Homecoming', 'Финал']);
+        assert.ok(seasonAsks.includes('1:2:en-US'));
+    });
+
+    test('every episode titled in Russian: English is not asked', async () => {
+        await calendar.periodItems(10, '2026-11-01', '2026-11-03');
+        assert.ok(!seasonAsks.some((ask) => ask.endsWith('en-US')));
     });
 
     test('a week far back asks TMDB for the seasons of that year, not the latest', async () => {

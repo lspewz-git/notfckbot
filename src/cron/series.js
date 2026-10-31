@@ -8,6 +8,7 @@ const { notify } = require('./outbox');
 const { ensureReleaseSeasons } = require('./release-seasons');
 const { ensureAiredEpisodes, seasonsToRescan } = require('./aired-episodes');
 const { log } = require('../log');
+const { warmSeasons, seasonsAlong } = require('../calendar');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
 // Returning <-> In Production changes are not interesting to users and stay silent.
@@ -134,7 +135,8 @@ const checkSeriesUpdates = async (bot, allSeries) => {
         tally('series');
         try {
             const [mediaType, filmId] = item.tmdb_id.split('_');
-            const data = await getDetails(filmId, mediaType);
+            // The current and next season come in the same request, for the calendar
+            const data = await getDetails(filmId, mediaType, { seasons: seasonsAlong(item) });
             if (!data) continue;
 
             // Store the status first so a failure in the episode step below can't hold up the
@@ -176,6 +178,11 @@ const checkSeriesUpdates = async (bot, allSeries) => {
                 log.error(`[Stats] Aired episodes for ${item.tmdb_id} failed: ${err.message}`)
             );
             if (item.aired_episodes !== null && item.aired_episodes !== undefined) await airedDone;
+
+            // The calendar's seasons stay in memory: most came with the details above
+            await warmSeasons(item, data).catch((err) =>
+                log.error(`[Calendar] Seasons for ${item.tmdb_id} failed: ${err.message}`)
+            );
         } catch (err) {
             tally('errors');
             log.error(`[Cron] Error checking series ${item.tmdb_id} ("${item.title}"): ${err.message}`);

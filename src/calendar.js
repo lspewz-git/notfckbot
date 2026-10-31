@@ -5,10 +5,10 @@
  * (cached); which seasons to ask for, from the years each series had episodes in.
  */
 const { Subscription, Series, Watchlist } = require('./db');
-const { getDetailsCached, getSeasonDetailsCached } = require('./api/tmdb');
+const { getDetailsCached, getSeasonDetailsCached, hasSeason, refreshSeasons } = require('./api/tmdb');
 const { parseSeasons } = require('./cron/release-seasons');
 const { zoneOf } = require('./quiet');
-const { escapeHtml } = require('./constants');
+const { escapeHtml, isFinishedStatus } = require('./constants');
 
 // --- Dates as "YYYY-MM-DD" strings: TMDB's air dates are days, not moments ---
 
@@ -112,10 +112,13 @@ function period(kind, offset, zoneId, now = new Date()) {
     return { kind, offset, from, to: addDays(from, 6), today };
 }
 
-/** The panel's one-list calendar: from the first of last month to the end of the month after next. */
+// No end: whatever TMDB already knows the date of (a season a year or two ahead at most)
+const NO_END = '9999-12-31';
+
+/** The panel's one-list calendar: from yesterday (what just came out) on, with no end. */
 function listPeriod(zoneId, now = new Date()) {
     const today = todayIn(zoneId, now);
-    return { from: addMonths(today, -1), to: monthEnd(addMonths(today, 2)), today };
+    return { from: addDays(today, -1), to: NO_END, today };
 }
 
 // --- What comes out in a period ---
@@ -136,7 +139,10 @@ async function inBatches(items, fn) {
 function seasonsToAsk(series, details, from, to) {
     const seasons = new Set();
     const byYear = parseSeasons(series.release_seasons);
-    for (let y = year(from); y <= year(to); y += 1) for (const s of byYear.get(y) || []) seasons.add(s);
+    // Ended or canceled, nothing announced and the last season out before that year: nothing to ask
+    const lastYear = Math.max(0, ...byYear.keys());
+    if (isFinishedStatus(series.status) && !series.next_episode_season && lastYear && lastYear < year(from)) return [];
+    for (const [y, list] of byYear) if (y >= year(from) && y <= year(to)) for (const s of list) seasons.add(s);
     if (series.last_season) seasons.add(series.last_season);
     if (series.next_episode_season) seasons.add(series.next_episode_season);
     // Announced seasons starting by the period's end (the release years know only the past)
@@ -153,6 +159,54 @@ function seasonsToAsk(series, details, from, to) {
 
 const NOTES = { premiere: 'премьера сезона', finale: 'финал сезона', '': '' };
 
+// TMDB's stand-in for an episode without a title in that language: "Эпизод 8", "Episode 8"
+const PLACEHOLDER_NAME = /^(эпизод|серия|episode)\s*\d+$/i;
+const realName = (name) => (name && !PLACEHOLDER_NAME.test(name.trim()) ? name : '');
+
+/**
+ * Episode titles by number: Russian, else English for the episodes TMDB has no Russian title for,
+ * else none. English is asked only when needed; without an answer those stay untitled.
+ */
+async function episodeNames(numericId, season, episodes) {
+    const names = new Map(episodes.map((ep) => [ep.episode_number, realName(ep.name)]));
+    if (![...names.values()].some((name) => !name)) return names;
+    const english = await getSeasonDetailsCached(numericId, season, 'en-US').catch(() => null);
+    for (const ep of (english && english.episodes) || []) {
+        if (!names.get(ep.episode_number)) names.set(ep.episode_number, realName(ep.name));
+    }
+    return names;
+}
+
+/**
+ * The seasons the panel's calendar shows (a day of slack for the time zones), in memory before
+ * anyone opens it. Run by the update check and after a start, with the details at hand: the
+ * missing Russian seasons in one request, the English titles for "Эпизод N" in one more.
+ */
+async function warmSeasons(series, details, now = new Date()) {
+    const numericId = String(series.tmdb_id).replace('tv_', '');
+    const from = addDays(todayIn('UTC', now), -2);
+    const seasons = seasonsToAsk(series, details, from, NO_END);
+    await refreshSeasons(
+        numericId,
+        seasons.filter((s) => !hasSeason(numericId, s))
+    );
+    const untitled = [];
+    for (const season of seasons) {
+        const data = await getSeasonDetailsCached(numericId, season).catch(() => null);
+        const coming = ((data && data.episodes) || []).filter((ep) => ep.air_date && ep.air_date >= from);
+        if (coming.some((ep) => !realName(ep.name))) untitled.push(season);
+    }
+    // English titles change rarely: asked again once the kept ones expire, not on every check
+    await refreshSeasons(
+        numericId,
+        untitled.filter((s) => !hasSeason(numericId, s, 'en-US')),
+        'en-US'
+    );
+}
+
+/** The seasons to bring along with a series' details: the last aired and the next. */
+const seasonsAlong = (series) => [...new Set([series.last_season, series.next_episode_season].filter(Boolean))];
+
 /**
  * One series' episodes in the period: [{ date, tmdbId, title, season, episode, note, mark, name, overview,
  * poster, kinopoiskId }]; `note` is the bot's Russian word for `mark` ('premiere' | 'finale' | '').
@@ -164,8 +218,12 @@ async function seriesEpisodes(series, from, to) {
     const items = [];
     for (const season of seasonsToAsk(series, details, from, to)) {
         const data = await getSeasonDetailsCached(numericId, season);
-        for (const ep of (data && data.episodes) || []) {
-            if (!ep.air_date || ep.air_date < from || ep.air_date > to) continue;
+        const inPeriod = ((data && data.episodes) || []).filter(
+            (ep) => ep.air_date && ep.air_date >= from && ep.air_date <= to
+        );
+        if (!inPeriod.length) continue;
+        const names = await episodeNames(numericId, season, inPeriod);
+        for (const ep of inPeriod) {
             const total = counts.get(season);
             const mark = ep.episode_number === 1 ? 'premiere' : total && ep.episode_number === total ? 'finale' : '';
             items.push({
@@ -177,7 +235,7 @@ async function seriesEpisodes(series, from, to) {
                 episode: ep.episode_number,
                 note: NOTES[mark],
                 mark,
-                name: ep.name || '',
+                name: names.get(ep.episode_number) || '',
                 overview: ep.overview || '',
                 poster: series.poster_url || null,
                 kinopoiskId: series.kinopoisk_id || null
@@ -337,6 +395,8 @@ module.exports = {
     periodItems,
     calendarText,
     seasonsToAsk,
+    warmSeasons,
+    seasonsAlong,
     plural,
     rangeText,
     MONTHS_TITLE

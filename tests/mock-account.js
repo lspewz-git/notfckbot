@@ -130,9 +130,9 @@ const SEARCH = [
     { tmdbId: 'movie_8', kind: 'movie', title: 'Дюна', year: '2021', poster: null, released: true, added: false }
 ];
 
-// From last month to the end of the month after next
+// From yesterday on; the episode out a week ago is one the page must still leave out
 const CALENDAR = {
-    from: '2026-10-01',
+    from: '2026-11-03',
     to: '2027-01-31',
     today: '2026-11-04',
     failed: 0,
@@ -162,6 +162,14 @@ const CALENDAR = {
             overview: 'Ellie and Dina head out.',
             poster: '/p1.jpg',
             kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/'
+        },
+        {
+            date: '2026-11-03',
+            kind: 'movie',
+            tmdbId: 'movie_6',
+            title: 'Мегалополис',
+            poster: null,
+            kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=y'
         },
         {
             date: '2026-11-06',

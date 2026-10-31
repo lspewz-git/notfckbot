@@ -264,7 +264,7 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
     }
 });
 
-// Calendar: one list from last month to the end of the month after next
+// Calendar: one list from yesterday on
 router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => {
     try {
         const chat = await Chat.findByPk(req.chatId);
