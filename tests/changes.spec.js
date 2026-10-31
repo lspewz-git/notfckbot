@@ -59,10 +59,12 @@ test('a chat with no changes says so, without a pager', async ({ page }) => {
     await expect(page.locator('#changes-root .changes-pager')).toBeHidden();
 });
 
-test("a group's admin sees its log under the settings, in English like the panel; a member doesn't", async ({
+test('the change log is for panel admins only: account settings never show it, even to a group admin', async ({
     page
 }) => {
     const panel = await mockPanel(page, { role: 'user' });
+    const asked = [];
+    page.on('request', (r) => r.url().includes('/changes') && asked.push(r.url()));
     const open = async () => {
         await page
             .locator(isNarrow(page) ? '.tab-item[data-section="my-subs"]' : '.nav-item[data-section="my-subs"]')
@@ -78,12 +80,9 @@ test("a group's admin sees its log under the settings, in English like the panel
 
     panel.account.chats[1].settings = true;
     await open();
-    const log = page.locator('#mine-changes');
-    await expect(log.locator('.changes-row')).toHaveCount(10);
-    await expect(log.locator('.pager-info')).toHaveText('1–10 of 23');
-    await expect(log.locator('.changes-line').nth(0)).toHaveText('Subscribed: The Bear');
-    await expect(log.locator('.changes-meta').nth(1)).toContainText('Анна · account');
-    await expect(log.locator('.changes-kept')).toHaveText('Kept for 30 days');
+    await expect(page.locator('#my-settings-body .mine-sets').first()).toBeVisible();
+    await expect(page.locator('#my-settings-body .changes')).toHaveCount(0);
+    expect(asked).toEqual([]);
 });
 
 test('Settings → Bot: how long the log is kept, saved when picked', async ({ page }) => {

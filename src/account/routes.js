@@ -7,7 +7,6 @@ const router = require('express').Router();
 const { Chat, Series, Subscription, Watchlist } = require('../db');
 const tmdb = require('../api/tmdb');
 const ops = require('../chat-ops');
-const { changesQuery, changesOf } = require('../chat-changes');
 const { listPeriod, periodItems } = require('../calendar');
 const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
@@ -303,18 +302,6 @@ router.get('/api/account/chats/:chatId/settings', openChat, async (req, res) => 
             zones: ZONES.map(({ id, en, offset }) => ({ id, city: en, offset })),
             presets: PRESETS
         });
-    } catch (err) {
-        fail(res, err);
-    }
-});
-
-// The change log: for those who may change the settings (a group's admins, the owner of a private chat)
-router.get('/api/account/chats/:chatId/changes', openChat, async (req, res) => {
-    if (!req.access.settings) return res.status(403).json({ error: "Only the group's admins see its log" });
-    const query = valid(changesQuery, req.query, res);
-    if (!query) return;
-    try {
-        res.json(await changesOf(req.chatId, query));
     } catch (err) {
         fail(res, err);
     }

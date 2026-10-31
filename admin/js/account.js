@@ -7,7 +7,6 @@ import { api } from './api.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal } from './ui.js';
 import { avatar, pickFrom } from './pick-sheet.js';
-import { showChanges } from './changes.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
 
@@ -491,11 +490,7 @@ function settingsView(data) {
             'Bot',
             (data.group ? pickRow('buttons_mode', 'Buttons pressed by') : '') +
                 toggleRow('menu_enabled', 'Bottom menu in the chat', '', s.menu_enabled !== false)
-        ) +
-        // The change log: only for those who may change the settings
-        (data.canChange
-            ? '<h3 class="mine-h">Change log</h3><div class="glass-card changes" id="mine-changes"></div>'
-            : '')
+        )
     );
 }
 
@@ -547,8 +542,6 @@ export async function loadMine(section) {
             const data = await api(chatPath('/settings'));
             if (stale()) return;
             body.innerHTML = settingsView(data);
-            const log = $('mine-changes');
-            if (log) showChanges(log, { path: chatPath('/changes') }).catch(() => {});
         }
     } catch (err) {
         if (!stale()) body.innerHTML = failed(err.message);

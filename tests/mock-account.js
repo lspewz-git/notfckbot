@@ -271,11 +271,6 @@ function accountAnswer(state, req, url) {
             ]
         };
     }
-    if (rest === '/changes') {
-        if (!chat.settings) return { status: 403, body: { error: "Only the group's admins see its log" } };
-        state.changesAsked = [...(state.changesAsked || []), url.search.slice(1)];
-        return changesPage(url);
-    }
     if (rest === '/settings' && method === 'PATCH') {
         if (!chat.settings) return { status: 403, body: { error: "Only the group's admins change its settings" } };
         Object.assign(state.settings, body);

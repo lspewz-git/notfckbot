@@ -311,6 +311,8 @@ test("the API: a chat the user isn't in is closed; a member can't change a group
     await call('PATCH', '/api/account/chats/-1/settings', { cookie: admin, body: { timezone: 'Asia/Omsk' } });
     await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(sent.length, 2);
+    // The change log is the panel admins' only, even for a group's admin
+    assert.equal((await call('GET', '/api/account/chats/-1/changes', { cookie: admin })).status, 404);
 });
 
 test('the API: a film is removed only from the chat in the path', async (t) => {
