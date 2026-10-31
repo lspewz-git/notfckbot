@@ -173,7 +173,11 @@ export const clearReturnTo = () => {
  * @param {string} id
  */
 export function closeModalReturning(id) {
+    // A preview on top of an open search returns to that search. Keep its own
+    // return callback intact for when the search itself is dismissed.
+    const hasParent = openStack.length > 1 && topmostModal()?.id === id;
     closeModal(id);
+    if (hasParent) return;
     const back = returnTo;
     returnTo = null;
     if (back) back();

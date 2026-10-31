@@ -10,11 +10,8 @@ import { avatar, pickFrom } from './pick-sheet.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
 
-export const MODES = {
-    episode: { short: 'Every episode', long: 'Every episode' },
-    first_and_full: { short: 'Ep. 1 + season', long: 'Episode 1 and the whole season' },
-    season: { short: 'Season', long: 'When the whole season is out' }
-};
+import { MODES, modesField, searchResults, searchCard } from './content-search.js';
+export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -232,24 +229,11 @@ function searchView() {
 }
 
 function resultsView() {
-    if (!state.results.length) return empty('Nothing found', 'Try another spelling or the original title.');
-    return `<ul class="glass-card mine-rows">${state.results
-        .map((r) => {
-            const note = [
-                r.kind === 'tv' ? 'Series' : 'Film',
-                r.year,
-                r.kind === 'movie' && r.released ? 'already out' : ''
-            ]
-                .filter(Boolean)
-                .join(' · ');
-            const action = r.added
-                ? '<span class="mine-chip">Added</span>'
-                : r.kind === 'tv'
-                  ? `<button type="button" class="btn btn-outline btn-compact" data-action="mine-pick-series" data-id="${escapeHtml(r.tmdbId)}">Subscribe</button>`
-                  : `<button type="button" class="btn btn-outline btn-compact" data-action="mine-add-film" data-id="${escapeHtml(r.tmdbId)}">${r.released ? 'Add' : 'Wait for it'}</button>`;
-            return `<li><div class="mine-row">${poster(r.poster)}<span class="mine-row-text"><span class="mine-row-title">${escapeHtml(r.title)}</span><span class="mine-dim">${escapeHtml(note)}</span></span>${action}</div></li>`;
-        })
-        .join('')}</ul>`;
+    return searchResults(state.results, {
+        open: 'mine-search-card',
+        series: 'mine-pick-series',
+        film: 'mine-add-film'
+    });
 }
 
 // --- The card ---
@@ -275,14 +259,6 @@ const cardHead = (picture, title, lines) =>
         .filter(Boolean)
         .map((l) => `<p class="mine-dim">${escapeHtml(l)}</p>`)
         .join('')}</div></div>`;
-
-const modesField = (name, current, id) =>
-    `<fieldset class="mine-modes"><legend class="field-label">Notify me</legend>${Object.entries(MODES)
-        .map(
-            ([key, m]) =>
-                `<label class="mine-radio"><input type="radio" name="${name}" value="${key}"${id ? ` data-mine="mode" data-id="${escapeHtml(id)}"` : ''}${current === key ? ' checked' : ''} /> ${m.long}</label>`
-        )
-        .join('')}</fieldset>`;
 
 const CLOSE_X =
     '<button type="button" data-close="mine-card-modal" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>';
@@ -323,12 +299,11 @@ function filmCard(f, { confirm = false } = {}) {
 }
 
 function newSeriesCard(r) {
-    return (
-        cardHead(poster(r.poster, 'mine-poster mine-poster-big'), r.title, ['Series', r.year]) +
-        modesField('mine-new-mode', 'episode', null) +
-        `<div class="modal-actions"><button type="button" class="btn btn-primary btn-grow" data-action="mine-subscribe" data-id="${escapeHtml(r.tmdbId)}">Subscribe</button>` +
-        '<button type="button" class="btn btn-ghost" data-close="mine-card-modal">Cancel</button></div>'
-    );
+    return searchCard(r, {
+        modeName: 'mine-new-mode',
+        submit: r.kind === 'tv' ? 'mine-subscribe' : 'mine-add-film',
+        modal: 'mine-card-modal'
+    });
 }
 
 /** The episode's title, or "Episode 8" while TMDB has none (in the panel's language) */
@@ -354,10 +329,17 @@ function releaseCard(item, today) {
     );
 }
 
-function openCard(html) {
+function openCard(html, tmdbId = null) {
+    cardVersion += 1;
+    searchCardId = tmdbId;
     $('mine-card-body').innerHTML = html + CLOSE_X;
     openModal('mine-card-modal');
 }
+
+let cardVersion = 0;
+let searchCardId = null;
+let searchRequest = 0;
+const pendingAdds = new Set();
 
 // --- Calendar ---
 
@@ -668,11 +650,20 @@ export const accountActions = {
         state.results = [];
         reload();
     },
+    'mine-search-card': (el) => {
+        const r = state.results.find((x) => x.tmdbId === el.dataset.id);
+        if (r) openCard(newSeriesCard(r), r.tmdbId);
+    },
     'mine-pick-series': (el) => {
         const r = state.results.find((x) => x.tmdbId === el.dataset.id);
-        if (r) openCard(newSeriesCard(r));
+        if (r) openCard(newSeriesCard(r), r.tmdbId);
     },
     'mine-subscribe': async (el) => {
+        const chatNow = state.chatId;
+        const cardNow = cardVersion;
+        const key = `${chatNow}:${el.dataset.id}`;
+        if (pendingAdds.has(key)) return;
+        pendingAdds.add(key);
         const picked = /** @type {HTMLInputElement | null} */ (
             document.querySelector('input[name="mine-new-mode"]:checked')
         );
@@ -683,16 +674,24 @@ export const accountActions = {
                 method: 'POST',
                 body: { tmdbId: el.dataset.id, mode: picked ? picked.value : 'episode' }
             });
-            closeModal('mine-card-modal');
             toast('Subscribed', 'success');
+            if (state.chatId !== chatNow) return;
+            if (cardVersion === cardNow || searchCardId === el.dataset.id) closeModal('mine-card-modal');
             markAdded(el.dataset.id);
             state.list = null;
         } catch (err) {
             button.disabled = false;
             toast(err.message, 'error');
+        } finally {
+            pendingAdds.delete(key);
         }
     },
     'mine-add-film': async (el) => {
+        const chatNow = state.chatId;
+        const cardNow = cardVersion;
+        const key = `${chatNow}:${el.dataset.id}`;
+        if (pendingAdds.has(key)) return;
+        pendingAdds.add(key);
         const button = /** @type {HTMLButtonElement} */ (el);
         button.disabled = true;
         try {
@@ -703,11 +702,15 @@ export const accountActions = {
                     : 'The bot writes when the film is out',
                 'success'
             );
+            if (state.chatId !== chatNow) return;
+            if (cardVersion === cardNow || searchCardId === el.dataset.id) closeModal('mine-card-modal');
             markAdded(el.dataset.id);
             state.list = null;
         } catch (err) {
             button.disabled = false;
             toast(err.message, 'error');
+        } finally {
+            pendingAdds.delete(key);
         }
     },
     'mine-cal-what': (el) => {
@@ -767,16 +770,18 @@ export function setupAccount() {
         const query = String(new FormData(form).get('q') || '').trim();
         if (!query) return;
         state.query = query;
+        const request = ++searchRequest;
         const chatNow = state.chatId;
         const results = $('mine-results');
         results.innerHTML = loading();
         try {
             const found = await api(chatPath(`/search?q=${encodeURIComponent(query)}`));
-            if (state.query !== query || state.chatId !== chatNow) return;
+            if (request !== searchRequest || state.query !== query || state.chatId !== chatNow || !searchOpen) return;
             state.results = found;
             if ($('mine-results')) $('mine-results').innerHTML = resultsView();
         } catch (err) {
-            results.innerHTML = failed(err.message);
+            if (request === searchRequest && state.chatId === chatNow && searchOpen)
+                results.innerHTML = failed(err.message);
         }
     });
 }

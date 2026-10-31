@@ -1,241 +1,221 @@
 const { test, expect } = require('@playwright/test');
 const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
+watchConsole({ ignore: /status of 409/ });
 
-/**
- * Adding a series or film to a chat from the panel, on the canned API: the results list
- * scrolls only downwards, and the add button shows it is working until the server answers.
- */
-
-watchConsole();
-
-/** Chats → alice's actions → Add, then a search that finds six long-titled results. */
 async function searchForAlice(page) {
     await openSection(page, 'chats');
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await page.locator('#action-add').click();
     await page.locator('#content-search-input').fill('long title');
-    await expect(page.locator('#content-search-results [data-action="select-content"]')).toHaveCount(6);
+    await expect(page.locator('#content-search-results li')).toHaveCount(6);
 }
+const result = (page, index) => page.locator('#content-search-results .search-result-open').nth(index);
+const card = (page) => page.locator('#content-card-modal');
 
-test('search results scroll down only, never sideways', async ({ page }) => {
+test('regression: clicking a search title opens its card', async ({ page }) => {
     await mockPanel(page);
-    await searchForAlice(page);
-    const box = page.locator('#content-search-results');
-    const { scrollWidth, clientWidth } = await box.evaluate((el) => ({
-        scrollWidth: el.scrollWidth,
-        clientWidth: el.clientWidth
-    }));
-    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await openSection(page, 'chats');
+    await page.locator('[data-action="chat-actions"][data-id="101"]').click();
+    await page.locator('#action-add').click();
+    await page.locator('#content-search-input').fill('long title');
+    await page
+        .locator('#content-search-results .result-title, #content-search-results .search-result-open')
+        .first()
+        .click();
+    await expect(card(page)).toBeVisible();
 });
 
-test('the add button shows it is working, and a second click does not add twice', async ({ page }) => {
+test('a search title opens a card; cancelling preserves the query and results', async ({ page }) => {
+    await mockPanel(page);
+    await searchForAlice(page);
+    await result(page, 0).click();
+    await expect(card(page)).toBeVisible();
+    await expect(card(page).locator('#content-card-title')).toContainText('film title');
+    await expect(card(page).locator('.mine-overview')).toHaveText('A search description.');
+    await expect(card(page).locator('.mine-modes')).toHaveCount(0);
+    await card(page).getByRole('button', { name: 'Cancel' }).click();
+    await expect(card(page)).toBeHidden();
+    await expect(page.locator('#content-search-input')).toHaveValue('long title');
+    await expect(page.locator('#content-search-results li')).toHaveCount(6);
+});
+
+test('Escape from a preview returns to search, then back to the chat menu', async ({ page }) => {
+    await mockPanel(page);
+    await searchForAlice(page);
+    await result(page, 0).click();
+    await page.keyboard.press('Escape');
+    await expect(card(page)).toBeHidden();
+    await expect(page.locator('#chat-actions-modal')).toBeHidden();
+    await expect(page.locator('#add-content-modal')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#add-content-modal')).toBeHidden();
+    await expect(page.locator('#chat-actions-modal')).toBeVisible();
+});
+
+test('rows fit the dialog and the keyboard opens the series mode card', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await searchForAlice(page);
+    expect(await page.locator('#content-search-results').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await result(page, 2).focus();
+    await page.keyboard.press('Enter');
+    await expect(card(page).locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
+    await card(page).getByLabel('Episode 1 and the whole season').check();
+    await card(page).getByRole('button', { name: 'Subscribe', exact: true }).click();
+    await expect(card(page)).toBeHidden();
+    await expect(page.locator('#content-search-results li').nth(2).locator('.mine-chip')).toHaveText('Added');
+    expect(panel.lastAdd).toEqual({
+        path: '/api/subscription',
+        body: { chatId: '101', tmdbId: 903, notify_type: 'first_and_full' }
+    });
+    await result(page, 2).click();
+    await expect(card(page).getByRole('button', { name: 'Added', exact: true })).toBeDisabled();
+});
+
+test('a film adds directly from results and leaves the search open', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await searchForAlice(page);
+    await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.locator('#content-search-results li').first().locator('.mine-chip')).toHaveText('Added');
+    await expect(card(page)).toBeHidden();
+    await expect(page.locator('#add-content-modal')).toBeVisible();
+    expect(panel.lastAdd).toMatchObject({ path: '/api/watchlist', body: { chatId: '101', tmdbId: 901 } });
+});
+
+test('a pending add cannot submit twice and an error keeps the card retryable', async ({ page }) => {
+    let release;
+    const addHold = new Promise((r) => (release = r));
+    const panel = await mockPanel(page, { addHold, addError: 'Try again' });
+    await searchForAlice(page);
+    await result(page, 0).click();
+    const button = card(page).locator('#confirm-add-content');
+    await button.click();
+    await expect(button).toHaveText('Adding…');
+    await expect(button).toBeDisabled();
+    await button.click({ force: true });
+    release();
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveText('Add');
+    await expect(card(page)).toBeVisible();
+    expect(panel.added).toBe(1);
+});
+
+test('a card opened during a quick film add closes when that add succeeds', async ({ page }) => {
     let release;
     const addHold = new Promise((r) => (release = r));
     const panel = await mockPanel(page, { addHold });
     await searchForAlice(page);
-
-    // The first result is a film
-    await page.locator('#content-search-results [data-index="0"]').click();
-    const add = page.locator('#confirm-add-content');
-    await expect(add).toHaveText('Add to Watchlist');
-
-    await add.click();
-    await expect(add).toBeDisabled();
-    await expect(add).toHaveAttribute('aria-busy', 'true');
-    await expect(add).toHaveText('Adding…');
-    await add.click({ force: true });
-
+    await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
+    await result(page, 0).click();
+    await expect(card(page)).toBeVisible();
     release();
-    await expect(page.locator('.toast')).toContainText('Фильм добавлен в список ожидания');
-    await expect(page.locator('#add-content-modal')).toBeHidden();
+    await expect(card(page)).toBeHidden();
+    await expect(page.locator('#content-search-results li').first().locator('.mine-chip')).toHaveText('Added');
     expect(panel.added).toBe(1);
 });
 
-test('picking another result during an add leaves the button labelled for the new pick', async ({ page }) => {
-    let release;
-    const addHold = new Promise((r) => (release = r));
-    await mockPanel(page, { addHold, addError: 'Film already in watchlist for this chat' });
+test('existing subscriptions and waiting films are marked before any add', async ({ page }) => {
+    await mockPanel(page);
+    await page.route('**/api/data/subs', (route) => route.fulfill({ json: [{ chatId: 101, seriesId: 'tv_903' }] }));
+    await page.route('**/api/data/films', (route) =>
+        route.fulfill({
+            json: [
+                { chatId: 101, tmdb_id: 'movie_901', notified: false },
+                { chatId: 101, tmdb_id: 'movie_902', notified: true }
+            ]
+        })
+    );
     await searchForAlice(page);
-
-    await page.locator('#content-search-results [data-index="0"]').click(); // a film
-    const add = page.locator('#confirm-add-content');
-    await add.click();
-    await expect(add).toHaveText('Adding…');
-    await page.locator('#content-search-results [data-index="2"]').click(); // a series
-    await expect(add).toHaveText('Adding…');
-
-    release();
-    await expect(page.locator('.toast')).toContainText('Film already in watchlist');
-    await expect(add).toHaveText('Add Subscription');
-    await expect(add).toBeEnabled();
-    // The browser reports the refused add itself; that one is expected here
-    page.__errors = page.__errors.filter((e) => !/status of 409/.test(e));
+    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(2);
+    await expect(
+        page.locator('#content-search-results li').nth(1).getByRole('button', { name: 'Add', exact: true })
+    ).toBeVisible();
 });
 
-test('an add that ends after the dialog was reopened for another chat leaves that dialog open', async ({ page }) => {
+test('an old add cannot close a new card for another chat', async ({ page }) => {
     let release;
     const addHold = new Promise((r) => (release = r));
     await mockPanel(page, { addHold });
     await searchForAlice(page);
-    await page.locator('#content-search-results [data-index="0"]').click();
-    await page.locator('#confirm-add-content').click();
-
-    // Cancel goes back to alice's menu; close it and open bob's dialog instead
+    await result(page, 0).click();
+    await card(page).locator('#confirm-add-content').click();
+    await card(page).locator('.modal-x').click();
     await page.locator('[data-close-return="add-content-modal"]').click();
     await page.keyboard.press('Escape');
     await page.locator('[data-action="chat-actions"][data-id="102"]').click();
     await page.locator('#action-add').click();
-    await expect(page.locator('#add-content-target')).toHaveText('bob');
-
+    await page.locator('#content-search-input').fill('long title');
+    await expect(page.locator('#content-search-results li')).toHaveCount(6);
+    await result(page, 2).click();
     release();
-    await expect(page.locator('.toast')).toContainText('Фильм добавлен в список ожидания');
-    await expect(page.locator('#add-content-modal')).toBeVisible();
-    await expect(page.locator('#add-content-target')).toHaveText('bob');
+    await expect(page.locator('.toast', { hasText: 'The bot writes' })).toBeVisible();
+    await expect(card(page)).toBeVisible();
+    await expect(card(page).locator('#content-card-title')).toContainText('series title');
+    await card(page).locator('.modal-x').click();
+    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(0);
 });
 
-test('Serials adds a series for a chat picked in the dialog, searching series only', async ({ page }) => {
+test('Serials filters results and requires the chat to be chosen explicitly', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSection(page, 'subs');
     await page.locator('#subs-section [data-action="add-content"]').click();
-
-    const dialog = page.locator('#add-content-modal');
-    await expect(dialog.locator('#add-content-modal-title')).toHaveText('Add serial');
-    await expect(dialog.locator('#content-chat-field')).toBeVisible();
-    await expect(dialog.locator('#content-search-input')).toHaveAttribute('placeholder', 'Search serials...');
-
-    // The styled dropdown: open it and pick bob
-    await dialog.locator('#content-chat-field .custom-select-trigger').click();
+    await page.locator('#content-search-input').fill('long title');
+    await expect(page.locator('#content-search-results li')).toHaveCount(2);
+    await result(page, 0).click();
+    await card(page).locator('#confirm-add-content').click();
+    await expect(card(page)).toBeHidden();
+    const trigger = page.locator('#content-chat-field .custom-select-trigger');
+    await expect(trigger).toBeFocused();
+    expect(panel.lastAdd).toBeUndefined();
+    await trigger.click();
     await page.locator('.custom-select-option', { hasText: 'bob' }).click();
-    await expect(dialog.locator('#content-chat-field .custom-select-trigger')).toHaveText('bob (private)');
-
-    await dialog.locator('#content-search-input').fill('long title');
-    const results = dialog.locator('#content-search-results [data-action="select-content"]');
-    // Six results come back, two of them series; the films are left out
-    await expect(results).toHaveCount(2);
-    await expect(results.filter({ hasText: 'Movie' })).toHaveCount(0);
-
-    await results.first().click();
-    await dialog.locator('#confirm-add-content').click();
-    await expect(page.locator('.toast')).toContainText('Подписка добавлена');
-    expect(panel.lastAdd.path).toBe('/api/subscription');
+    await result(page, 0).click();
+    await card(page).locator('#confirm-add-content').click();
+    await expect(card(page)).toBeHidden();
     expect(panel.lastAdd.body).toMatchObject({ chatId: '102', tmdbId: 903 });
 });
 
-test('Movies adds a film, searching films only, once a chat is chosen', async ({ page }) => {
+test('Movies filters films and Added belongs only to the selected chat', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSection(page, 'watchlist');
     await page.locator('#watchlist-section [data-action="add-content"]').click();
-
-    const dialog = page.locator('#add-content-modal');
-    await expect(dialog.locator('#add-content-modal-title')).toHaveText('Add movie');
-    await dialog.locator('#content-search-input').fill('long title');
-    const results = dialog.locator('#content-search-results [data-action="select-content"]');
-    await expect(results).toHaveCount(4);
-    await expect(results.filter({ hasText: 'Series' })).toHaveCount(0);
-
-    await results.first().click();
-
-    // No chat is preselected: adding asks for one and sends nothing
-    const trigger = dialog.locator('#content-chat-field .custom-select-trigger');
-    await expect(trigger).toHaveText('Choose a chat…');
-    await dialog.locator('#confirm-add-content').click();
-    await expect(page.locator('.toast')).toContainText('Choose a chat first');
-    await expect(trigger).toBeFocused();
-    expect(panel.lastAdd).toBeUndefined();
-
+    const trigger = page.locator('#content-chat-field .custom-select-trigger');
     await trigger.click();
     await page.locator('.custom-select-option', { hasText: 'alice' }).click();
-    await dialog.locator('#confirm-add-content').click();
-    // The "Choose a chat first" toast may still be up
-    await expect(page.locator('.toast', { hasText: 'Фильм добавлен в список ожидания' })).toBeVisible();
-    expect(panel.lastAdd).toMatchObject({ path: '/api/watchlist', body: { chatId: '101', tmdbId: 901 } });
+    await page.locator('#content-search-input').fill('long title');
+    await expect(page.locator('#content-search-results li')).toHaveCount(4);
+    await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(1);
+    await trigger.click();
+    await page.locator('.custom-select-option', { hasText: 'bob' }).click();
+    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(0);
+    expect(panel.lastAdd.body.chatId).toBe('101');
 });
 
-test("a chat's own Add has no chat picker and searches both kinds", async ({ page }) => {
-    await mockPanel(page);
-    // Opened from Serials first, so a leftover picker or filter would show here
-    await openSection(page, 'subs');
-    await page.locator('#subs-section [data-action="add-content"]').click();
-    await page.locator('[data-close-return="add-content-modal"]').click();
-
-    await searchForAlice(page);
-    await expect(page.locator('#add-content-modal-title')).toHaveText('Add for alice');
-    await expect(page.locator('#content-chat-field')).toBeHidden();
-});
-
-test('a search answer that arrives after the dialog was reopened does not fill it', async ({ page }) => {
-    await mockPanel(page);
-    // Hold the first search until the dialog has been closed and reopened from Movies
-    let release;
-    const held = new Promise((r) => (release = r));
-    let first = true;
-    await page.route('**/api/tmdb/search*', async (route) => {
-        if (first) {
-            first = false;
+for (const reopen of [false, true])
+    test(`late search cannot fill ${reopen ? 'a reopened dialog' : 'a cleared query'}`, async ({ page }) => {
+        await mockPanel(page);
+        let release;
+        const held = new Promise((r) => (release = r));
+        await page.route('**/api/tmdb/search*', async (route) => {
             await held;
+            await route.fallback();
+        });
+        await openSection(page, 'subs');
+        await page.locator('#subs-section [data-action="add-content"]').click();
+        const requested = page.waitForRequest('**/api/tmdb/search*');
+        await page.locator('#content-search-input').fill('long title');
+        await requested;
+        if (reopen) {
+            await page.locator('[data-close-return="add-content-modal"]').click();
+            await openSection(page, 'watchlist');
+            await page.locator('#watchlist-section [data-action="add-content"]').click();
+        } else {
+            await page.locator('#content-search-input').fill('');
+            await page.waitForTimeout(600);
         }
-        await route.fallback();
+        const response = page.waitForResponse('**/api/tmdb/search*');
+        release();
+        await response;
+        await expect(page.locator('#content-search-results')).toBeEmpty();
     });
-
-    await openSection(page, 'subs');
-    await page.locator('#subs-section [data-action="add-content"]').click();
-    await page.locator('#content-search-input').fill('long title');
-    await page.waitForTimeout(700); // past the search's debounce, so the held request is out
-    await page.locator('[data-close-return="add-content-modal"]').click();
-
-    await openSection(page, 'watchlist');
-    await page.locator('#watchlist-section [data-action="add-content"]').click();
-    release();
-    await page.waitForTimeout(500);
-    await expect(page.locator('#content-search-results [data-action="select-content"]')).toHaveCount(0);
-});
-
-test('after picking a result the Add button is in view without scrolling, and × closes the dialog', async ({
-    page
-}) => {
-    await mockPanel(page);
-    await openSection(page, 'watchlist');
-    await page.locator('#watchlist-section [data-action="add-content"]').click();
-    await page.locator('#content-search-input').fill('long title');
-    await page.locator('#content-search-results [data-index="0"]').click();
-
-    // Six results would push it below the fold on a phone if the dialog scrolled as a whole
-    await expect(page.locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
-    await expect(page.locator('#add-content-modal button', { hasText: 'Cancel' })).toHaveCount(0);
-
-    await page.locator('#add-content-modal .modal-x').click();
-    await expect(page.locator('#add-content-modal')).toBeHidden();
-});
-
-test('on a phone held sideways the dialog scrolls, so the Add button can still be reached', async ({
-    page,
-    isMobile
-}) => {
-    // The size is set here, so the desktop project would only repeat the phone's run
-    test.skip(!isMobile, 'run once, on the touch device');
-    await page.setViewportSize({ width: 812, height: 375 });
-    await mockPanel(page);
-    await openSection(page, 'subs');
-    await page.locator('#subs-section [data-action="add-content"]').click();
-    await page.locator('#content-search-input').fill('long title');
-    // A series: its notification mode makes the picked block taller
-    await page.locator('#content-search-results [data-index="0"]').click();
-
-    const dialog = page.locator('#add-content-modal .modal-content');
-    // Taller than the screen, so it has to scroll: scrollIntoView would work even on a clipped
-    // box, so check what a user can do instead
-    const { overflowY, overflows } = await dialog.evaluate((el) => ({
-        overflowY: getComputedStyle(el).overflowY,
-        overflows: el.scrollHeight > el.clientHeight
-    }));
-    expect(overflows).toBe(true);
-    expect(overflowY).toBe('auto');
-    if (test.info().project.name === 'desktop') {
-        // A wheel over the dialog brings the button up (mobile WebKit has no wheel)
-        const box = await dialog.boundingBox();
-        await page.mouse.move(box.x + box.width / 2, box.y + 40);
-        await page.mouse.wheel(0, 600);
-        await expect(page.locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
-    }
-});

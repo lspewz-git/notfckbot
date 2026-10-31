@@ -753,7 +753,8 @@ async function mockPanel(page, options = {}) {
                 name: `A very long series title that would not fit on one line of the dialog ${n}`,
                 release_date: '2026-01-01',
                 first_air_date: '2025-01-01',
-                poster_path: null
+                poster_path: null,
+                overview: 'A search description.'
             })),
         // What the add dialog sent last, for tests to check: { path, body }
         '/api/subscription': (req) => {

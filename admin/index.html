@@ -32,6 +32,7 @@
         <link rel="modulepreload" href="js/api.js" />
         <link rel="modulepreload" href="js/changes.js" />
         <link rel="modulepreload" href="js/chat-stats.js" />
+        <link rel="modulepreload" href="js/content-search.js" />
         <link rel="modulepreload" href="js/chats.js" />
         <link rel="modulepreload" href="js/dashboard-charts.js" />
         <link rel="modulepreload" href="js/dashboard.js" />
@@ -2253,27 +2254,6 @@
                     <input type="text" id="content-search-input" placeholder="Search series or movies..." />
                 </div>
                 <div id="content-search-results" class="search-results"></div>
-                <div
-                    id="content-selected"
-                    style="
-                        display: none;
-                        margin-top: 1rem;
-                        padding: 1rem;
-                        background: rgba(255, 255, 255, 0.05);
-                        border-radius: 1rem;
-                    "
-                >
-                    <h4 id="selected-content-title"></h4>
-                    <div class="field-block" id="notify-field">
-                        <label class="field-label" for="sub-notify-type">Notification mode</label>
-                        <select id="sub-notify-type" class="select-field">
-                            <option value="episode">New Episodes</option>
-                            <option value="season">Whole Seasons</option>
-                            <option value="first_and_full">1x1 + Whole Seasons</option>
-                        </select>
-                    </div>
-                    <button id="confirm-add-content" class="btn btn-primary btn-block">Add</button>
-                </div>
                 <!-- A corner ×, not a Cancel button under everything: on a phone that one sat below the
                      fold, past the results and the Add button -->
                 <button data-close-return="add-content-modal" class="modal-x" aria-label="Close">
@@ -2282,6 +2262,13 @@
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                 </button>
+            </div>
+        </dialog>
+
+        <dialog id="content-card-modal" class="modal" aria-labelledby="content-card-title">
+            <div class="modal-content">
+                <div id="content-card-body"></div>
+                <button type="button" class="modal-x" data-close="content-card-modal" aria-label="Close">×</button>
             </div>
         </dialog>
 

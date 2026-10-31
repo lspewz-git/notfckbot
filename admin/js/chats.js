@@ -11,6 +11,7 @@ import { openTestNotifyModal } from './test-notify.js';
 import { openChatStats } from './chat-stats.js';
 import { showChanges } from './changes.js';
 import { showAccessIn } from './access.js';
+import { searchItem, searchResults as resultsView, searchCard } from './content-search.js';
 
 // --- The per-row menu ---
 // One button per row opens this instead of crowding the Actions column
@@ -202,6 +203,8 @@ function openChatSettings(chat, label) {
 // --- Adding a series or a film ---
 // One search covering both; the branch happens on submit.
 let searchResults = [];
+let existingContent = [];
+let membership = null;
 let targetChatId = null;
 let selected = null;
 // Counts openings of the dialog, so an add that finishes after it was closed and opened
@@ -216,7 +219,7 @@ let contentKind = null;
 
 const SEARCH_PLACEHOLDER = { tv: 'Search serials...', movie: 'Search movies...' };
 
-const addLabel = () => (selected && selected.mediaType === 'tv' ? 'Add Subscription' : 'Add to Watchlist');
+const addLabel = (item) => (item.kind === 'tv' ? 'Subscribe' : item.released ? 'Add' : 'Wait for it');
 
 /** The dialog's state for a fresh opening; `kind` and `heading` set what it searches and says. */
 function resetAddContent(kind, heading, target) {
@@ -224,6 +227,8 @@ function resetAddContent(kind, heading, target) {
     contentKind = kind;
     selected = null;
     searchResults = [];
+    existingContent = [];
+    membership = null;
 
     setText('add-content-heading', heading);
     setText('add-content-target', target);
@@ -232,12 +237,12 @@ function resetAddContent(kind, heading, target) {
     input.value = '';
     input.placeholder = SEARCH_PLACEHOLDER[kind] || 'Search series or movies...';
     $('content-search-results').innerHTML = '';
-    $('content-selected').style.display = 'none';
+    closeModal('content-card-modal');
 }
 
 function openAddContentModal(chatId, label) {
     resetAddContent(null, 'Add for', label || chatId);
-    targetChatId = chatId;
+    targetChatId = String(chatId);
 
     openModal('add-content-modal');
     focusField($field('content-search-input'));
@@ -269,6 +274,7 @@ export async function openAddContentFor(kind) {
     select.innerHTML = `<option value="">${chats.length ? 'Choose a chat…' : 'No chats yet'}</option>${options.join('')}`;
     // Keeps the styled dropdown's label in step with the new options
     setSelectValue('content-chat-select', '');
+    select.onchange = renderContentResults;
 
     openModal('add-content-modal');
     focusField($field('content-search-input'));
@@ -279,103 +285,124 @@ export async function openAddContentFor(kind) {
 let searchRequest = 0;
 
 export async function searchContent(query) {
-    if (query.length < 2) return;
     const request = ++searchRequest;
     const session = dialogSession;
+    if (query.length < 2) {
+        searchResults = [];
+        $('content-search-results').innerHTML = '';
+        return;
+    }
+    $('content-search-results').innerHTML = '<p class="empty-note">Searching…</p>';
     try {
-        const res = await api(`/tmdb/search?q=${encodeURIComponent(query)}`);
+        // The membership list belongs to this opening, not to each search keystroke.
+        membership ||= Promise.all([api('/data/subs'), api('/data/films')]).then(([subs, films]) => [
+            ...subs.map((s) => ({
+                chatId: String(s.chatId),
+                tmdbId: String(s.seriesId).startsWith('tv_') ? String(s.seriesId) : `tv_${s.seriesId}`
+            })),
+            ...films.filter((f) => !f.notified).map((f) => ({ chatId: String(f.chatId), tmdbId: String(f.tmdb_id) }))
+        ]);
+        const [res, known] = await Promise.all([api(`/tmdb/search?q=${encodeURIComponent(query)}`), membership]);
         if (request !== searchRequest || session !== dialogSession) return;
-        searchResults = res.filter((r) =>
-            contentKind ? r.media_type === contentKind : r.media_type === 'tv' || r.media_type === 'movie'
-        );
+        existingContent = known;
+        searchResults = res
+            .filter((r) =>
+                contentKind ? r.media_type === contentKind : r.media_type === 'tv' || r.media_type === 'movie'
+            )
+            .map(searchItem);
         renderContentResults();
     } catch (err) {
-        if (request === searchRequest && session === dialogSession) toast('Search failed: ' + err.message, 'error');
+        if (request === searchRequest && session === dialogSession) {
+            membership = null;
+            $('content-search-results').innerHTML = '<p class="empty-note">Search failed. Try again.</p>';
+            toast('Search failed: ' + err.message, 'error');
+        }
     }
 }
 
 function renderContentResults() {
-    const box = $('content-search-results');
-    if (!searchResults.length) {
-        box.innerHTML = '<p class="empty-note">Nothing found.</p>';
+    if ($field('content-search-input').value.trim().length < 2) {
+        $('content-search-results').innerHTML = '';
         return;
     }
-
-    box.innerHTML = searchResults
-        .map((item, idx) => {
-            const isTv = item.media_type === 'tv';
-            const title = isTv ? item.name : item.title;
-            const year = (isTv ? item.first_air_date : item.release_date)?.split('-')[0] || 'N/A';
-            const poster = item.poster_path
-                ? // Through our server, like the cards: image.tmdb.org isn't reachable from every network
-                  `<img class="result-poster" src="/api/poster/w92${escapeHtml(item.poster_path)}" alt="">`
-                : '<div class="poster-stub">?</div>';
-            return `
-            <div class="popular-item" data-action="select-content" data-index="${idx}">
-                ${poster}
-                <span class="result-title">${escapeHtml(title)} (${year})</span>
-                <span class="badge ${isTv ? 'ok' : ''}">${isTv ? '📺 Series' : '🎬 Movie'}</span>
-            </div>
-        `;
-        })
-        .join('');
+    const chatId = contentKind ? $field('content-chat-select').value : targetChatId;
+    searchResults.forEach((r) => {
+        r.added = existingContent.some((c) => c.chatId === String(chatId) && c.tmdbId === r.tmdbId);
+    });
+    $('content-search-results').innerHTML = resultsView(searchResults, {
+        open: 'select-content',
+        series: 'select-content',
+        film: 'add-content-film'
+    });
 }
 
-export function selectContent(idx) {
+export function selectContent(idx, quickAdd = false) {
     const item = searchResults[idx];
     if (!item) return;
-
-    const isTv = item.media_type === 'tv';
-    selected = { id: item.id, mediaType: item.media_type, title: isTv ? item.name : item.title };
-
-    setText('selected-content-title', selected.title);
-    // Notification mode only makes sense for series
-    $('notify-field').style.display = isTv ? 'block' : 'none';
-    // Mid-add the button keeps saying "Adding…"; it gets this label when the add ends
-    if (!adding) $('confirm-add-content').innerText = addLabel();
-    $('content-selected').style.display = 'block';
+    // Snapshot the chat with the card: it cannot silently change underneath an add.
+    const chatId = contentKind ? $field('content-chat-select').value : targetChatId;
+    selected = { ...item, chatId };
+    if (quickAdd) {
+        submitAddContent();
+        return;
+    }
+    $('content-card-body').innerHTML = searchCard(item, {
+        modeName: 'content-new-mode',
+        submit: 'submit-content',
+        modal: 'content-card-modal',
+        buttonId: 'confirm-add-content',
+        titleId: 'content-card-title'
+    });
+    openModal('content-card-modal');
 }
 
 export async function submitAddContent() {
-    // From Serials or Movies the chat is whichever is picked in the dialog
-    const chatId = contentKind ? $field('content-chat-select').value : targetChatId;
-    if (!selected) return;
-    if (!chatId) {
+    if (!selected || selected.added || adding) return;
+    const item = selected;
+    if (!item.chatId) {
+        closeModal('content-card-modal');
         toast('Choose a chat first', 'error');
         /** @type {HTMLElement} */ ($('content-chat-field').querySelector('.custom-select-trigger')).focus();
         return;
     }
-    // The server asks TMDB for the title first, which can take a few seconds through the
-    // proxy: show that it's working, and don't let a second click add it twice
-    const btn = /** @type {HTMLButtonElement} */ ($('confirm-add-content'));
-    if (adding) return;
     const session = dialogSession;
-
-    const isTv = selected.mediaType === 'tv';
-    const body = { chatId, tmdbId: selected.id };
-    if (isTv) body.notify_type = $field('sub-notify-type').value;
-
+    const button = /** @type {HTMLButtonElement | null} */ ($('confirm-add-content'));
+    const picked = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="content-new-mode"]:checked')
+    );
+    const isTv = item.kind === 'tv';
+    const body = { chatId: item.chatId, tmdbId: Number(item.tmdbId.split('_')[1]) };
+    if (isTv) body.notify_type = picked?.value || 'episode';
     adding = true;
-    btn.disabled = true;
-    btn.setAttribute('aria-busy', 'true');
-    btn.textContent = 'Adding…';
+    if (button) {
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = 'Adding…';
+    }
     let ok;
     try {
         ok = await mutate(isTv ? '/subscription' : '/watchlist', { method: 'POST', body }, (res) => {
-            // The server updates the mode of a subscription the chat already has
-            if (isTv) return res.created === false ? 'Подписка уже была, режим обновлён' : 'Подписка добавлена';
-            return res.isReleased ? 'Фильм добавлен, но он уже вышел' : 'Фильм добавлен в список ожидания';
+            if (isTv) return res.created === false ? 'Subscription already exists; mode updated' : 'Subscribed';
+            return res.isReleased
+                ? 'The film is already out: added to the released ones'
+                : 'The bot writes when the film is out';
         });
     } finally {
         adding = false;
-        btn.disabled = false;
-        btn.removeAttribute('aria-busy');
-        // For whatever is selected now: another result may have been picked meanwhile
-        btn.textContent = addLabel();
+        if (button) {
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            button.textContent = addLabel(item);
+        }
     }
-
     if (ok && session === dialogSession) {
-        clearReturnTo();
-        closeModal('add-content-modal');
+        existingContent.push({ chatId: String(item.chatId), tmdbId: item.tmdbId });
+        const result = searchResults.find((r) => r.tmdbId === item.tmdbId);
+        if (result) result.added = true;
+        if (selected?.tmdbId === item.tmdbId && selected?.chatId === item.chatId) {
+            selected.added = true;
+            closeModal('content-card-modal');
+        }
+        renderContentResults();
     }
 }

@@ -373,6 +373,7 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
                     title: r.title || r.name || r.original_title || r.original_name || 'Untitled',
                     year: date.slice(0, 4) || null,
                     poster: r.poster_path || null,
+                    overview: r.overview || '',
                     released:
                         r.media_type === 'movie' && Boolean(date) && date <= new Date().toISOString().slice(0, 10),
                     added: have.has(id)

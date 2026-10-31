@@ -176,6 +176,8 @@ const CLICK_ACTIONS = {
     sort: (el) => setTableSort(el.dataset.table, el.dataset.sort),
     page: (el) => setTablePage(el.dataset.table, Number(el.dataset.step)),
     'select-content': (el) => selectContent(Number(el.dataset.index)),
+    'add-content-film': (el) => selectContent(Number(el.dataset.index), true),
+    'submit-content': () => submitAddContent(),
     'add-content': (el) => openAddContentFor(el.dataset.kind === 'tv' ? 'tv' : 'movie'),
     'history-year': (el) => setHistoryYear(Number(el.dataset.year)),
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step)),
@@ -282,7 +284,7 @@ function setupControls() {
         openTestNotifyModal();
     };
     $('send-broadcast').onclick = sendBroadcast;
-    $('confirm-add-content').onclick = submitAddContent;
+
     setupServiceDialog();
     setupTestNotifyDialog();
 

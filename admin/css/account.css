@@ -259,7 +259,8 @@ button.mine-chat-chip:hover {
     border-top: 1px solid var(--border-row);
 }
 
-.mine-row {
+.mine-row,
+.search-result-open {
     display: flex;
     align-items: center;
     gap: var(--space-4);
@@ -273,14 +274,27 @@ button.mine-chat-chip:hover {
     text-align: left;
 }
 
-button.mine-row {
+button.mine-row,
+button.search-result-open {
     cursor: pointer;
 }
 
-button.mine-row:hover .mine-row-title {
+button.mine-row:hover .mine-row-title,
+button.search-result-open:hover .mine-row-title {
     text-decoration: underline;
     text-decoration-color: var(--border-strong);
     text-underline-offset: 4px;
+}
+
+/* The poster and title open a preview; the add action remains a separate button. */
+.search-result-open {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+}
+
+#content-card-body .modal-actions {
+    margin-top: var(--space-4);
 }
 
 .mine-row-text {

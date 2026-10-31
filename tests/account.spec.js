@@ -243,6 +243,25 @@ test('search: a series asks for the mode, a film is added at once, what is on th
     });
 });
 
+test('search titles open the shared series and film cards without adding anything', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await page.getByRole('button', { name: '+ Add' }).click();
+    await page.locator('#mine-q').fill('дюна');
+    await page.locator('#mine-q').press('Enter');
+    const rows = page.locator('#mine-results .search-result-open');
+    await rows.first().click();
+    await expect(page.locator('#mine-card-title')).toHaveText('Дюна: Пророчество');
+    await expect(page.locator('#mine-card-modal .mine-modes')).toBeVisible();
+    await page.locator('#mine-card-modal').getByRole('button', { name: 'Cancel' }).click();
+    await rows.nth(2).click();
+    await expect(page.locator('#mine-card-title')).toHaveText('Дюна');
+    await expect(page.locator('#mine-card-modal .mine-modes')).toHaveCount(0);
+    expect(panel.account.sent.filter((r) => r.method === 'POST')).toHaveLength(0);
+    await page.locator('#mine-card-modal').getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.locator('#mine-card-modal')).toBeHidden();
+    await expect(page.locator('#mine-results .mine-row').nth(2).locator('.mine-chip')).toHaveText('Added');
+});
+
 test('calendar: one list of what is to come, series and films in their tabs, with posters; no period switch', async ({
     page
 }) => {
