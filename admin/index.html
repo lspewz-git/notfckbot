@@ -45,6 +45,7 @@
         <link rel="modulepreload" href="js/proxy-url.js" />
         <link rel="modulepreload" href="js/proxy.js" />
         <link rel="modulepreload" href="js/pull-refresh.js" />
+        <link rel="modulepreload" href="js/password.js" />
         <link rel="modulepreload" href="js/pick-sheet.js" />
         <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/recap-cards.js" />
@@ -1330,6 +1331,8 @@
                             </button>
                         </div>
                         <div id="my-settings-body" class="mine-body" aria-live="polite"></div>
+                        <!-- Whose account this is, and its password (password.js): not tied to the chat -->
+                        <div id="my-signin" class="mine-body"></div>
                         <!-- Phones have no rail: signing out lives here (and in More for an admin) -->
                         <button type="button" class="btn btn-outline btn-block mine-logout" data-action="logout">
                             Sign out
@@ -1769,6 +1772,63 @@
         </dialog>
 
         <!-- Choosing one of a few (pick-sheet.js): the account pages' chat and settings -->
+        <dialog id="password-modal" class="modal" aria-labelledby="password-title">
+            <form id="password-form" class="modal-content modal-medium password-form" novalidate>
+                <h3 id="password-title">Set a password</h3>
+                <p class="modal-sub">For signing in when Telegram isn't answering, with your username or ID.</p>
+                <label class="field-label" for="password-new">New password</label>
+                <div class="token-row">
+                    <input
+                        id="password-new"
+                        class="input-field"
+                        type="password"
+                        autocomplete="new-password"
+                        maxlength="128"
+                    />
+                    <button
+                        type="button"
+                        class="btn btn-outline btn-icon-square"
+                        data-action="password-show"
+                        data-for="password-new"
+                        aria-label="Show password"
+                        aria-pressed="false"
+                    >
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    </button>
+                </div>
+                <label class="field-label" for="password-again">Repeat it</label>
+                <input
+                    id="password-again"
+                    class="input-field"
+                    type="password"
+                    autocomplete="new-password"
+                    maxlength="128"
+                />
+                <p class="field-hint">
+                    At least 8 characters. A change signs you out on your other devices; the bot tells you about it.
+                </p>
+                <p class="login-error" id="password-error" role="alert" hidden></p>
+                <button type="submit" class="btn btn-primary btn-block">Save</button>
+                <button
+                    type="button"
+                    class="btn btn-danger-quiet btn-block"
+                    id="password-remove"
+                    data-action="password-remove"
+                    hidden
+                >
+                    Remove password
+                </button>
+                <button type="button" data-close="password-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </form>
+        </dialog>
         <dialog id="pick-modal" class="modal modal-sheet" aria-labelledby="pick-title">
             <div class="modal-content modal-narrow">
                 <h3 id="pick-title"></h3>

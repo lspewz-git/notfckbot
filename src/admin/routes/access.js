@@ -5,7 +5,8 @@
  * own role: that is how the last admin stays one.
  */
 const { Chat, AccountSession } = require('../../db');
-const { idsIn, roleOf } = require('../../account/auth');
+const { idsIn, roleOf, endOtherSessions } = require('../../account/auth');
+const { withPasswords, removePassword, notifyPassword } = require('../../account/password');
 const { writeEnv } = require('../env');
 const { z, valid, idOf } = require('../validate');
 const { log } = require('../../log');
@@ -20,10 +21,13 @@ const personOf = (id, chat) => ({ id, role: roleOf(id), name: chat ? chat.userna
 /** Everyone with a role, and the private chats that could get one. */
 async function currentAccess(selfId) {
     const ids = [...new Set([...idsIn('ADMIN_USERS'), ...idsIn('ACCOUNT_USERS')])];
-    const chats = await Chat.findAll({ where: { type: 'private' }, attributes: ['id', 'username'], raw: true });
+    const [chats, passwords] = await Promise.all([
+        Chat.findAll({ where: { type: 'private' }, attributes: ['id', 'username'], raw: true }),
+        withPasswords()
+    ]);
     const byId = new Map(chats.map((c) => [String(c.id), c]));
     const people = ids
-        .map((id) => ({ ...personOf(id, byId.get(id)), you: id === String(selfId) }))
+        .map((id) => ({ ...personOf(id, byId.get(id)), you: id === String(selfId), password: passwords.has(id) }))
         // Admins first, then by name
         .sort((a, b) =>
             a.role === b.role
@@ -87,12 +91,33 @@ router.post('/api/access', async (req, res) => {
             Object.assign(process.env, changes);
             log.info(`[Access] User ${req.user.userId} set ${userId} to ${role}`);
         }
-        // Taken off: their sessions go too, so adding them back later doesn't revive an old one
-        if (role === 'none') await AccountSession.destroy({ where: { userId } });
+        // Taken off: their sessions and password go too, so adding them back later doesn't revive them
+        if (role === 'none') await Promise.all([AccountSession.destroy({ where: { userId } }), removePassword(userId)]);
         res.json(await currentAccess(req.user.userId));
     } catch (err) {
         log.error(`[Access] Saving failed: ${err.message}`);
         res.status(500).json({ error: `Couldn't save: ${err.message}` });
+    }
+});
+
+/**
+ * Someone's password removed, as when it may have leaked: their sessions end too (an admin's own,
+ * but the one making the request), and the bot tells them.
+ */
+router.delete('/api/access/:userId/password', async (req, res) => {
+    const params = valid(z.object({ userId: ACCESS.shape.userId }), req.params, res);
+    if (!params) return;
+    try {
+        const self = params.userId === String(req.user.userId);
+        if (await removePassword(params.userId)) {
+            await endOtherSessions(params.userId, self ? req.user.id : null);
+            if (!self) notifyPassword(req.app.get('bot'), params.userId, 'removed-by-admin');
+            log.info(`[Access] User ${req.user.userId} removed the password of ${params.userId}`);
+        }
+        res.json(await currentAccess(req.user.userId));
+    } catch (err) {
+        log.error(`[Access] Removing a password failed: ${err.message}`);
+        res.status(500).json({ error: `Couldn't remove the password: ${err.message}` });
     }
 });
 

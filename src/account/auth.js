@@ -1,6 +1,6 @@
 /**
- * Signing in to the panel. Telegram already knows who writes to the bot, so there are no
- * passwords; every way in ends in the same session, an httpOnly cookie:
+ * Signing in to the panel. Telegram already knows who writes to the bot, so every account is a
+ * Telegram one; every way in ends in the same session, an httpOnly cookie:
  *
  * - "Войти через Telegram" on the sign-in page: the page gets a one-time code and opens the bot with
  *   it (t.me/<bot>?start=L<code>). The bot asks the user to confirm, and only then the page that
@@ -9,6 +9,7 @@
  * - /login in the bot: a one-time link. The page behind it asks for a press before it spends the
  *   token (a POST): link previews and prefetchers only GET, so they can't use it up.
  * - login-link.js on the server makes such a link when Telegram itself is out of reach.
+ * - A password the user set on their account page (src/account/password.js).
  *
  * Who may sign in: ADMIN_USERS (the whole panel) and ACCOUNT_USERS (their own chats only), Telegram
  * ids separated by commas in .env. Both lists are read on every request: taking an id off signs that
@@ -95,6 +96,10 @@ async function sessionOf(req, now = Date.now()) {
 }
 
 const endSession = (session) => AccountSession.destroy({ where: { id: session.id } });
+
+/** Signs the user out everywhere but the session `keepId` (null: everywhere). */
+const endOtherSessions = (userId, keepId = null) =>
+    AccountSession.destroy({ where: keepId ? { userId, id: { [Op.ne]: keepId } } : { userId } });
 
 /** Over HTTPS (directly, or behind a proxy that says so) the cookie is Secure too. */
 const isHttps = (req) => req.secure || req.headers['x-forwarded-proto'] === 'https';
@@ -213,6 +218,7 @@ module.exports = {
     cookieToken,
     sessionOf,
     endSession,
+    endOtherSessions,
     setCookie,
     clearCookie,
     createLink,

@@ -12,7 +12,9 @@ const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
 const { deliver } = require('../delivery');
 const { z, valid, idOf, chatId, text } = require('../admin/validate');
+const { rateLimit, MemoryStore } = require('express-rate-limit');
 const auth = require('./auth');
+const password = require('./password');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
 
@@ -72,6 +74,74 @@ router.post('/api/login/telegram/poll', async (req, res) => {
     }
 });
 
+// A password (src/account/password.js): wrong tries are limited per address and per login, so
+// guessing takes years and spreading it over many addresses still stops at one account's limit
+const LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const limitStores = [];
+const limitBy = (limit, keyGenerator) => {
+    const store = new MemoryStore();
+    limitStores.push(store);
+    return rateLimit({
+        windowMs: LIMIT_WINDOW_MS,
+        limit,
+        store,
+        skipSuccessfulRequests: true,
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        message: { error: 'Too many attempts. Try again in 15 minutes.' },
+        ...(keyGenerator ? { keyGenerator } : {})
+    });
+};
+/** The account a login names: its id and its @username share one count. */
+const loginLimitKey = (req) => `login:${req.loginUserId || password.loginKey(req.body && req.body.login)}`;
+// The address first: the lookup behind the account's limit asks the database
+const passwordLimits = [
+    limitBy(5),
+    async (req, res, next) => {
+        try {
+            req.loginUserId = await password.userIdFor(req.body && req.body.login);
+            next();
+        } catch (err) {
+            fail(res, err);
+        }
+    },
+    limitBy(10, loginLimitKey)
+];
+/** For the tests: every limit starts again. */
+const resetLimits = () => limitStores.forEach((store) => store.resetAll());
+
+const PASSWORD = z
+    .string({ error: 'Enter a password' })
+    .min(password.MIN_LENGTH, { error: `At least ${password.MIN_LENGTH} characters` })
+    .max(password.MAX_LENGTH, { error: `At most ${password.MAX_LENGTH} characters` });
+
+router.post('/api/login/password', passwordLimits, async (req, res) => {
+    const body = valid(
+        z.object({
+            login: z
+                .string({ error: 'Enter your Telegram username or id' })
+                .trim()
+                .min(1, { error: 'Enter your Telegram username or id' })
+                .max(64),
+            password: z
+                .string({ error: 'Enter a password' })
+                .min(1, { error: 'Enter a password' })
+                .max(password.MAX_LENGTH)
+        }),
+        req.body,
+        res
+    );
+    if (!body) return;
+    try {
+        const session = await password.signInWithPassword(body.login, body.password);
+        if (!session) return res.status(401).json({ error: 'Wrong username or password.' });
+        auth.setCookie(req, res, session.token);
+        res.json({ success: true });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
 router.post('/api/logout', async (req, res) => {
     try {
         await auth.endSession(req.user);
@@ -83,8 +153,43 @@ router.post('/api/logout', async (req, res) => {
 });
 
 // Who is signed in and as what: no Telegram in it, so the panel opens at once even when Telegram is down
-router.get('/api/account/me', (req, res) => {
-    res.json({ user: { id: req.user.userId, name: req.user.userName, role: req.user.role } });
+router.get('/api/account/me', async (req, res) => {
+    try {
+        const hasPassword = await password.hasPassword(req.user.userId);
+        res.json({ user: { id: req.user.userId, name: req.user.userName, role: req.user.role, hasPassword } });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+// The user's own password: set or changed (the session proves who they are), or removed. A change
+// or removal signs them out on their other devices, and the bot tells them either way
+router.put('/api/account/password', async (req, res) => {
+    const body = valid(z.object({ password: PASSWORD }), req.body, res);
+    if (!body) return;
+    const { userId } = req.user;
+    try {
+        const had = await password.hasPassword(userId);
+        await password.setPassword(userId, body.password);
+        if (had) await auth.endOtherSessions(userId, req.user.id);
+        password.notifyPassword(req.app.get('bot'), userId, had ? 'changed' : 'set');
+        res.json({ hasPassword: true });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+router.delete('/api/account/password', async (req, res) => {
+    const { userId } = req.user;
+    try {
+        if (await password.removePassword(userId)) {
+            await auth.endOtherSessions(userId, req.user.id);
+            password.notifyPassword(req.app.get('bot'), userId, 'removed');
+        }
+        res.json({ hasPassword: false });
+    } catch (err) {
+        fail(res, err);
+    }
 });
 
 // The chats the user can open: asks Telegram about the groups, a few seconds at most
@@ -328,4 +433,4 @@ router.patch('/api/account/chats/:chatId/settings', openChat, async (req, res) =
     }
 });
 
-module.exports = { router };
+module.exports = { router, resetLimits, loginLimitKey };

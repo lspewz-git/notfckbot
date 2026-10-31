@@ -1,12 +1,14 @@
 /**
  * Who is using the panel (src/account/auth.js). Without a session the sign-in screen covers it:
  * "Sign in with Telegram" (the bot asks to confirm, this page waits for the answer), or the link
- * from /login in the bot (/login/<token>, spent only by the press of "Sign in"). With one, an admin
+ * from /login in the bot (/login/<token>, spent only by the press of "Sign in"), or a password the user
+ * set on their account page (password.js). With one, an admin
  * gets the whole panel and a user (body.role-user) only their own chats.
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
 import { setChats, chatsFailed } from './account.js';
+import { signInForm, submitSignIn, setMe } from './password.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
@@ -51,7 +53,8 @@ function signInScreen(error = '') {
         '<p class="login-text">Sign in with Telegram: the bot asks whether it is you.</p>' +
             '<a id="login-tg" class="btn btn-primary btn-block" target="_blank" rel="noopener noreferrer" aria-disabled="true" data-action="login-telegram">Sign in with Telegram</a>' +
             '<p class="login-hint">Or send <b>/login</b> to the bot: it sends a sign-in link.</p>' +
-            `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>`
+            `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
+            signInForm()
     );
     prepareCode();
 }
@@ -93,6 +96,7 @@ export async function startSession(preferredChat = null) {
         return null;
     }
     started = true;
+    setMe(me.user);
     document.body.classList.toggle('role-user', me.user.role !== 'admin');
     document.body.classList.remove('signed-out');
     $('login-gate').hidden = true;
@@ -125,6 +129,13 @@ export function sessionActions(onSignedIn) {
         const role = await startSession(chatId);
         if (role) onSignedIn(role);
     };
+    $('login-gate').addEventListener('submit', async (event) => {
+        const form = /** @type {HTMLFormElement} */ (event.target);
+        if (form.dataset.login !== 'password') return;
+        event.preventDefault();
+        stopPolling();
+        if (await submitSignIn(form)) await signedIn();
+    });
     return {
         'login-telegram': () => {
             // The link itself opens the bot; here the page starts waiting for the answer

@@ -15,6 +15,10 @@ export const ROLE_LABELS = { admin: 'Admin', user: 'User' };
 const trash =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>';
 
+// A key with a slash: the person's password removed
+const keyOff =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3 21 2" /><path d="m16 7 3 3" /><path d="M3 3l18 18" /></svg>';
+
 /** @type {{ people: any[], candidates: any[] } | null} */
 let access = null;
 // A chat's menu asked for this person: shown once the list is in
@@ -42,10 +46,14 @@ function personRow(p) {
     const label = escapeHtml(chatLabel(asChat(p)));
     const controls = p.you
         ? `<span class="access-you">${ROLE_LABELS[p.role]}</span>`
-        : `${roleSelect(p)}<button type="button" class="btn btn-row btn-row-danger" data-action="access-remove" data-id="${escapeHtml(p.id)}" aria-label="Remove access for ${label}">${trash}</button>`;
+        : roleSelect(p) +
+          (p.password
+              ? `<button type="button" class="btn btn-row" data-action="access-password-remove" data-id="${escapeHtml(p.id)}" aria-label="Remove the password of ${label}" title="Remove password">${keyOff}</button>`
+              : '') +
+          `<button type="button" class="btn btn-row btn-row-danger" data-action="access-remove" data-id="${escapeHtml(p.id)}" aria-label="Remove access for ${label}">${trash}</button>`;
     return `
         <li class="access-row" data-id="${escapeHtml(p.id)}">
-            <span class="access-who">${chatDisplayName(asChat(p))}<span class="access-id">${escapeHtml(p.id)}${p.you ? ' · you' : ''}</span></span>
+            <span class="access-who">${chatDisplayName(asChat(p))}<span class="access-id">${escapeHtml(p.id)}${p.you ? ' · you' : ''}${p.password ? ' · password' : ''}</span></span>
             <span class="access-controls">${controls}</span>
         </li>`;
 }
@@ -143,10 +151,29 @@ function remove(id) {
     });
 }
 
+function removePassword(id) {
+    const name = nameOf(id);
+    showConfirm({
+        title: 'Remove the password?',
+        text: `${name} will sign in with Telegram only, and can set a new password on their account page.`,
+        confirmLabel: 'Remove',
+        onConfirm: async () => {
+            try {
+                access = await api(`/access/${encodeURIComponent(id)}/password`, { method: 'DELETE' });
+                toast(`${name} has no password now.`, 'success');
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+            render();
+        }
+    });
+}
+
 export const accessActions = {
     'access-add': () => add(),
     'access-open': (el) => openFor(el.dataset.id),
-    'access-remove': (el) => remove(el.dataset.id)
+    'access-remove': (el) => remove(el.dataset.id),
+    'access-password-remove': (el) => removePassword(el.dataset.id)
 };
 
 export function setupAccess() {

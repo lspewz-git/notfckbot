@@ -1,7 +1,8 @@
 /**
  * Panel access from Settings (src/admin/routes/access.js): roles go to ADMIN_USERS / ACCOUNT_USERS
  * in .env and into process.env at once; nobody changes their own role; a new person must have
- * written to the bot; taking access away ends their sessions. The database is stubbed, .env a
+ * written to the bot; taking access away ends their sessions and removes their password; an admin
+ * removes someone's password. The database is stubbed, .env a
  * temporary file. Run: npm run test:unit
  */
 const { test, describe, mock, before, after, beforeEach } = require('node:test');
@@ -16,7 +17,7 @@ const KEYS = ['ADMIN_USERS', 'ACCOUNT_USERS', 'ENV_FILE'];
 const savedEnv = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 process.env.ENV_FILE = path.join(DIR, '.env');
 
-const { Chat, AccountSession } = require('../../src/db');
+const { Chat, AccountSession, AccountPassword } = require('../../src/db');
 
 const CHATS = [
     { id: 1, username: '@me' },
@@ -24,10 +25,14 @@ const CHATS = [
     { id: 9, username: null }
 ];
 const destroyed = [];
+const passwords = new Set();
+const notices = [];
 const stubs = [
     mock.method(Chat, 'findAll', async () => CHATS),
     mock.method(Chat, 'findOne', async ({ where }) => CHATS.find((c) => String(c.id) === where.id) || null),
-    mock.method(AccountSession, 'destroy', async ({ where }) => destroyed.push(where.userId))
+    mock.method(AccountSession, 'destroy', async ({ where }) => destroyed.push(where.userId)),
+    mock.method(AccountPassword, 'findAll', async () => [...passwords].map((userId) => ({ userId }))),
+    mock.method(AccountPassword, 'destroy', async ({ where }) => Number(passwords.delete(String(where.userId))))
 ];
 
 after(() => {
@@ -50,6 +55,7 @@ describe('POST /api/access', () => {
             req.user = { userId: '1', role: 'admin' };
             next();
         });
+        app.set('bot', { telegram: { sendMessage: async (chatId, text) => notices.push({ chatId, text }) } });
         app.use(require('../../src/admin/routes/access'));
         await new Promise((resolve) => {
             server = app.listen(0, resolve);
@@ -63,10 +69,11 @@ describe('POST /api/access', () => {
         process.env.ADMIN_USERS = '1';
         process.env.ACCOUNT_USERS = '';
         destroyed.length = 0;
+        passwords.clear();
     });
 
-    const call = async (method, body) => {
-        const res = await fetch(`${base}/api/access`, {
+    const call = async (method, body, path = '/api/access') => {
+        const res = await fetch(`${base}${path}`, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: body && JSON.stringify(body)
@@ -77,10 +84,11 @@ describe('POST /api/access', () => {
 
     test('the list: people with a role, you marked; the private chats without one to add', async () => {
         process.env.ACCOUNT_USERS = '7';
+        passwords.add('7');
         const { body } = await call('GET');
         assert.deepEqual(body.people, [
-            { id: '1', role: 'admin', name: '@me', you: true },
-            { id: '7', role: 'user', name: '@kirill', you: false }
+            { id: '1', role: 'admin', name: '@me', you: true, password: false },
+            { id: '7', role: 'user', name: '@kirill', you: false, password: true }
         ]);
         assert.deepEqual(body.candidates, [{ id: '9', name: null }]);
     });
@@ -99,10 +107,12 @@ describe('POST /api/access', () => {
         assert.match(envFile(), /^BOT_TOKEN=x$/m, 'other keys stay');
         assert.deepEqual(destroyed, [], 'a role change keeps the sessions');
 
+        passwords.add('7');
         res = await call('POST', { userId: '7', role: 'none' });
         assert.equal(res.status, 200);
         assert.equal(process.env.ADMIN_USERS, '1');
         assert.deepEqual(destroyed, ['7'], 'taken off: signed out');
+        assert.equal(passwords.has('7'), false, 'taken off: the password goes too');
         assert.deepEqual(
             res.body.people.map((p) => p.id),
             ['1']
@@ -126,5 +136,20 @@ describe('POST /api/access', () => {
         process.env.ADMIN_USERS = '1';
         assert.equal(envFile(), before, 'nothing written');
         assert.equal(process.env.ADMIN_USERS, '1');
+    });
+
+    test("an admin removes someone's password: their sessions end, the bot tells them, the role stays", async () => {
+        process.env.ACCOUNT_USERS = '7';
+        passwords.add('7');
+        const res = await call('DELETE', undefined, '/api/access/7/password');
+        assert.equal(res.status, 200);
+        assert.equal(passwords.has('7'), false);
+        assert.equal(res.body.people.find((p) => p.id === '7').password, false);
+        assert.equal(res.body.people.find((p) => p.id === '7').role, 'user');
+        assert.deepEqual(destroyed, ['7']);
+        for (let i = 0; i < 100 && !notices.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.equal(String(notices[0].chatId), '7');
+        assert.match(notices[0].text, /Администратор панели удалил ваш пароль/);
+        assert.equal((await call('DELETE', undefined, '/api/access/abc/password')).status, 400);
     });
 });

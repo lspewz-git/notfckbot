@@ -7,8 +7,10 @@
 const { test, mock, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { AccountSession, LoginLink, Chat, Watchlist, Subscription } = require('../../src/db');
+const { Op } = require('sequelize');
+const { AccountSession, LoginLink, AccountPassword, Chat, Watchlist, Subscription } = require('../../src/db');
 const auth = require('../../src/account/auth');
+const password = require('../../src/account/password');
 const members = require('../../src/account/members');
 const { guard } = require('../../src/account/guard');
 const { panelOnly } = require('../../src/admin/panel-only');
@@ -17,6 +19,7 @@ const ENV = ['ADMIN_USERS', 'ACCOUNT_USERS', 'PANEL_URL'];
 let savedEnv;
 let sessions;
 let links;
+let passwords;
 
 beforeEach(() => {
     savedEnv = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
@@ -25,13 +28,26 @@ beforeEach(() => {
     process.env.PANEL_URL = 'http://box/';
     sessions = new Map();
     links = new Map();
+    passwords = new Map();
+    mock.method(AccountPassword, 'findByPk', async (id) =>
+        passwords.has(String(id)) ? passwords.get(String(id)) : null
+    );
+    mock.method(AccountPassword, 'upsert', async (row) => passwords.set(String(row.userId), row));
+    mock.method(AccountPassword, 'destroy', async ({ where }) => Number(passwords.delete(String(where.userId))));
     const table = (rows) => ({
         create: async (row) => {
             rows.set(row.id, row);
             return row;
         },
         findByPk: async (id) => rows.get(id) || null,
-        destroy: async ({ where }) => (typeof where.id === 'string' && rows.delete(where.id) ? 1 : 0)
+        destroy: async ({ where }) => {
+            if (typeof where.id === 'string') return rows.delete(where.id) ? 1 : 0;
+            // A user's sessions, but the one kept (where.id[Op.ne])
+            const keep = where.id && where.id[Op.ne];
+            const gone = [...rows.values()].filter((r) => String(r.userId) === String(where.userId) && r.id !== keep);
+            gone.forEach((r) => rows.delete(r.id));
+            return gone.length;
+        }
     });
     for (const [model, rows] of [
         [AccountSession, sessions],
@@ -225,7 +241,7 @@ test('the API: a session for everything but signing in; the panel itself for adm
     const user = await signIn(call, 7);
     assert.equal((await call('GET', '/api/stats', { cookie: user })).status, 403);
     const me = await call('GET', '/api/account/me', { cookie: user });
-    assert.deepEqual(me.body.user, { id: '7', name: '@u7', role: 'user' });
+    assert.deepEqual(me.body.user, { id: '7', name: '@u7', role: 'user', hasPassword: false });
     assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, []);
 
     const admin = await signIn(call, 42);
@@ -400,4 +416,106 @@ test('/start L<code>: the bot asks first, and only "Да, это я" lets the pa
     });
     assert.match(edits[0], /Готово/);
     assert.equal((await auth.pollCode(code, secret)).state, 'in');
+});
+
+// --- Passwords ---
+
+test('a password: only a salted scrypt hash is stored; the same password hashes differently', async () => {
+    const one = await password.hashPassword('correct horse');
+    const two = await password.hashPassword('correct horse');
+    assert.match(one, /^scrypt\$16384\$8\$1\$[A-Za-z0-9_-]{22}\$[A-Za-z0-9_-]{43}$/);
+    assert.notEqual(one, two);
+    assert.equal(one.includes('correct horse'), false);
+    assert.equal(await password.matches('correct horse', one), true);
+    assert.equal(await password.matches('correct hors', one), false);
+    assert.equal(await password.matches('x', 'garbage'), false);
+});
+
+test('signing in with a password: by id or @username, only for people still on the lists', async (t) => {
+    t.mock.method(Chat, 'findAll', async ({ where }) => (where.username === '@kirill' ? [{ id: 7 }] : []));
+    t.mock.method(Chat, 'findByPk', async () => ({ username: '@Kirill' }));
+    await password.setPassword('7', 'secret-pass');
+    for (const login of ['7', '@kirill', 'Kirill', ' @KIRILL ']) {
+        const session = await password.signInWithPassword(login, 'secret-pass');
+        assert.ok(session, login);
+        const signed = await auth.sessionOf({ headers: { cookie: `nfb_session=${session.token}` } });
+        assert.deepEqual([signed.userId, signed.role, signed.userName], ['7', 'user', '@Kirill']);
+    }
+    assert.equal(await password.signInWithPassword('7', 'wrong-pass'), null);
+    assert.equal(await password.signInWithPassword('@nobody', 'secret-pass'), null);
+    assert.equal(await password.signInWithPassword('8', 'secret-pass'), null, 'no password set');
+    assert.equal(await password.signInWithPassword('first name', 'secret-pass'), null, 'only @usernames');
+    process.env.ACCOUNT_USERS = '8';
+    assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'taken off the list');
+    process.env.ACCOUNT_USERS = '7';
+    assert.equal(await password.removePassword('7'), true);
+    assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'removed');
+});
+
+/** Waits for the bot's messages sent without being waited for (a second at most). */
+async function sentCount(sent, n) {
+    for (let i = 0; i < 100 && sent.length < n; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    return sent.length;
+}
+
+test('the API: set, use and remove a password; wrong tries stop at the limit', async (t) => {
+    const sent = [];
+    const { server, call } = await serve(fakeBot({}, sent));
+    t.after(() => server.close());
+    require('../../src/account/routes').resetLimits();
+    t.mock.method(Chat, 'findByPk', async () => null);
+    t.mock.method(Chat, 'findAll', async () => []);
+    const user = await signIn(call, 7);
+    const short = await call('PUT', '/api/account/password', { cookie: user, body: { password: 'short' } });
+    assert.deepEqual([short.status, short.body.error], [400, 'At least 8 characters']);
+    assert.equal((await call('PUT', '/api/account/password', { body: { password: 'long-enough' } })).status, 401);
+    const other = await signIn(call, 7);
+    const set = await call('PUT', '/api/account/password', { cookie: user, body: { password: 'long-enough' } });
+    assert.deepEqual(set.body, { hasPassword: true });
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).body.user.hasPassword, true);
+    assert.equal(await sentCount(sent, 1), 1);
+    assert.equal(sent[0].chatId, '7');
+    assert.match(sent[0].text, /задан пароль/);
+    assert.equal(
+        (await call('GET', '/api/account/me', { cookie: other })).status,
+        200,
+        'a first password signs out nobody'
+    );
+
+    // A change: the bot says so, and the other device is signed out
+    await call('PUT', '/api/account/password', { cookie: user, body: { password: 'long-enough' } });
+    assert.equal(await sentCount(sent, 2), 2);
+    assert.match(sent[1].text, /изменён/);
+    assert.equal((await call('GET', '/api/account/me', { cookie: other })).status, 401);
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).status, 200, 'this device stays in');
+
+    const login = (pass, who = '7') => call('POST', '/api/login/password', { body: { login: who, password: pass } });
+    const ok = await login('long-enough');
+    assert.equal(ok.status, 200);
+    assert.match(ok.headers.get('set-cookie'), /nfb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly/);
+    ok.cookie = /nfb_session=([^;]+)/.exec(ok.headers.get('set-cookie'))[1];
+    assert.equal((await login('')).status, 400);
+    for (let i = 0; i < 4; i += 1) {
+        const wrong = await login('wrong-one');
+        assert.deepEqual([wrong.status, wrong.body.error], [401, 'Wrong username or password.']);
+    }
+    const blocked = await login('long-enough');
+    assert.deepEqual([blocked.status, blocked.body.error], [429, 'Too many attempts. Try again in 15 minutes.']);
+
+    require('../../src/account/routes').resetLimits();
+    const before = sent.length;
+    assert.equal((await call('DELETE', '/api/account/password', { cookie: user })).status, 200);
+    assert.equal(await sentCount(sent, before + 1), before + 1);
+    assert.match(sent.at(-1).text, /удалён/);
+    assert.equal((await call('GET', '/api/account/me', { cookie: ok.cookie })).status, 401, 'signed out elsewhere');
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).status, 200);
+    assert.equal((await login('long-enough')).status, 401, 'removed');
+});
+
+test('the per-account limit: an id and its @username count as one account', async (t) => {
+    t.mock.method(Chat, 'findAll', async ({ where }) => (where.username === '@kirill' ? [{ id: 7 }] : []));
+    const { loginLimitKey } = require('../../src/account/routes');
+    const keyFor = async (login) => loginLimitKey({ body: { login }, loginUserId: await password.userIdFor(login) });
+    assert.equal(await keyFor('@Kirill'), await keyFor('7'));
+    assert.notEqual(await keyFor('@nobody'), await keyFor('7'));
 });

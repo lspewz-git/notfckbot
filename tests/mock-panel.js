@@ -767,6 +767,18 @@ async function mockPanel(page, options = {}) {
 
     // Cards: /api/series/:id, /api/movie/:id and their Kinopoisk line
     const cards = [
+        // Panel access: someone's password removed (panel.passwordRemoved has the ids)
+        [
+            /^\/api\/access\/(\d+)\/password$/,
+            ([, id]) => {
+                panel.passwordRemoved = [...(panel.passwordRemoved || []), id];
+                panel.access = {
+                    ...panel.access,
+                    people: panel.access.people.map((p) => (p.id === id ? { ...p, password: false } : p))
+                };
+                return panel.access;
+            }
+        ],
         [
             /^\/api\/series\/(.+)$/,
             ([, raw]) => {

@@ -14,6 +14,7 @@ const AlertLog = require('./models/AlertLog');
 const SendFailure = require('./models/SendFailure');
 const AccountSession = require('./models/AccountSession');
 const LoginLink = require('./models/LoginLink');
+const AccountPassword = require('./models/AccountPassword');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -46,5 +47,6 @@ module.exports = {
     AlertLog,
     SendFailure,
     AccountSession,
-    LoginLink
+    LoginLink,
+    AccountPassword
 };

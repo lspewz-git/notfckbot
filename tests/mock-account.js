@@ -2,7 +2,8 @@
  * The sign-in and the user's own chats on the panel's fake API (tests/mock-panel.js takes these in).
  * mockPanel(page, { role: 'user' }) signs in as a user, { signedOut: true } shows the sign-in screen;
  * the default is an admin, so the panel's other tests run as before. What the page sent is in
- * panel.account.sent.
+ * panel.account.sent. A password sign-in takes "@me" or "42" with "good-password" ({ hasPassword }
+ * says whether one is set to begin with); "too-many" is answered as the rate limit.
  */
 
 const series = () => [
@@ -62,7 +63,7 @@ const films = () => [
     }
 ];
 
-/** @param {{ role?: 'admin' | 'user', signedOut?: boolean, groupAdmin?: boolean }} options */
+/** @param {{ role?: 'admin' | 'user', signedOut?: boolean, groupAdmin?: boolean, hasPassword?: boolean }} options */
 // A chat's change log (src/chat-changes.js): 23 rows, the newest first, one of each kind among them
 const CHANGE_KINDS = [
     ['subscribed', 'episode', 'The Bear', '@igor', 'bot'],
@@ -95,6 +96,7 @@ function changesPage(url, rows = CHANGES) {
 function accountState(options) {
     return {
         signedIn: !options.signedOut,
+        hasPassword: Boolean(options.hasPassword),
         role: options.role || 'admin',
         sent: /** @type {{ method: string, path: string, body: any }[]} */ ([]),
         polls: 0,
@@ -210,6 +212,15 @@ function accountAnswer(state, req, url) {
         }
         return { status: 401, body: { error: 'This link has expired. Send /login to the bot again.' } };
     }
+    if (p === '/api/login/password') {
+        if (body.password === 'too-many')
+            return { status: 429, body: { error: 'Too many attempts. Try again in 15 minutes.' } };
+        if (['@me', '42'].includes(body.login) && body.password === 'good-password') {
+            state.signedIn = true;
+            return { success: true };
+        }
+        return { status: 401, body: { error: 'Wrong username or password.' } };
+    }
     if (p === '/api/login/telegram') {
         return {
             code: 'c'.repeat(32),
@@ -230,7 +241,14 @@ function accountAnswer(state, req, url) {
         state.signedIn = false;
         return { success: true };
     }
-    if (p === '/api/account/me') return { user: { id: '42', name: '@me', role: state.role } };
+    if (p === '/api/account/me')
+        return { user: { id: '42', name: '@me', role: state.role, hasPassword: state.hasPassword } };
+    if (p === '/api/account/password') {
+        if (method === 'PUT' && body.password.length < 8)
+            return { status: 400, body: { error: 'At least 8 characters' } };
+        state.hasPassword = method === 'PUT';
+        return { hasPassword: state.hasPassword };
+    }
     if (p === '/api/account/chats') return state.chats;
 
     const m = /^\/api\/account\/chats\/(-?\d+)(\/.*)$/.exec(p);

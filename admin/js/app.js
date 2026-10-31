@@ -40,6 +40,7 @@ import { openAbout, loadAbout } from './about.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 import { accountActions, setupAccount } from './account.js';
 import { startSession, watchSession, sessionActions } from './session.js';
+import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions, pickFrom } from './pick-sheet.js';
 
@@ -189,6 +190,7 @@ const CLICK_ACTIONS = {
     ...recapCardActions,
     ...recapScheduleActions,
     ...accountActions,
+    ...passwordActions,
     ...pickActions,
     ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
@@ -319,6 +321,7 @@ async function init() {
     setupChatSettingsForm();
     setupProxyForm();
     setupAccount();
+    setupPassword();
     watchSession();
     enhanceSelects();
     updateAutoRefreshSwitch();

@@ -96,6 +96,50 @@ body.signed-out .tabbar {
     pointer-events: none;
 }
 
+/* "or with a password": a rule on both sides of the words */
+.login-or {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.login-or::before,
+.login-or::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--divider);
+}
+
+.login-password,
+.password-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.login-password .field-label,
+.password-form .field-label {
+    margin: var(--space-1) 0 0;
+}
+
+.login-password .btn,
+.password-form .btn-block {
+    margin-top: var(--space-2);
+}
+
+.password-form .field-hint {
+    margin: 0;
+}
+
+/* .btn sets display, which would otherwise beat the hidden attribute */
+.login-password [hidden],
+.password-form [hidden] {
+    display: none;
+}
+
 /* --- The user's sections --- */
 
 .mine-section header {
@@ -586,6 +630,14 @@ button.mine-row:hover .mine-row-title {
     text-align: center;
     font-size: var(--text-lg);
     font-variant-numeric: tabular-nums;
+}
+
+#my-signin {
+    margin-top: var(--space-4);
+}
+
+#my-signin:empty {
+    display: none;
 }
 
 .mine-logout {

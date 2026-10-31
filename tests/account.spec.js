@@ -3,9 +3,9 @@ const { test, expect } = require('@playwright/test');
 const { watchConsole, isNarrow, pickChat } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
-// A 401 is the answer the panel expects before sign-in: the browser logs it as a failed load, and the
-// refresh that met it logs its error
-watchConsole({ ignore: /status of 401|Sign in: \/login in the bot/ });
+// A 401 is the answer the panel expects before sign-in (and to a wrong password, a 429 to too many
+// tries): the browser logs it as a failed load, and the refresh that met it logs its error
+watchConsole({ ignore: /status of 4(01|29)|Sign in: \/login in the bot/ });
 
 /** The visible rail or tab-bar items, by section (or action, for the way back to the admin panel) */
 const visibleNav = (page, selector) =>
@@ -413,4 +413,71 @@ test('settings are rows; a row opens its choices and saves the one picked', asyn
     expect(panel.account.sent.filter((r) => r.method === 'PATCH')[1].body).toEqual({
         timezone: 'Asia/Yekaterinburg'
     });
+});
+
+// --- Passwords ---
+
+test('a password signs in from the sign-in screen; a wrong one or too many tries say so', async ({ page }) => {
+    const panel = await mockPanel(page, { signedOut: true });
+    await expect(page.locator('.login-or')).toHaveText('or with a password');
+    const submit = page.locator('.login-password [type="submit"]');
+    await submit.click();
+    await expect(page.locator('#login-pass-error')).toHaveText('Enter your Telegram username or ID.');
+    expect(panel.account.sent.filter((r) => r.path === '/api/login/password')).toHaveLength(0);
+
+    await page.locator('#login-name').fill('@me');
+    await page.locator('#login-pass').fill('wrong-one');
+    await submit.click();
+    await expect(page.locator('#login-pass-error')).toHaveText('Wrong username or password.');
+    await expect(page.locator('#login-pass')).toHaveValue('');
+
+    await page.locator('#login-pass').fill('too-many');
+    await page.locator('#login-pass').press('Enter');
+    await expect(page.locator('#login-pass-error')).toHaveText('Too many attempts. Try again in 15 minutes.');
+
+    // The eye shows what is typed
+    await page.locator('#login-pass').fill('good-password');
+    await page.locator('.login-password [data-action="password-show"]').click();
+    await expect(page.locator('#login-pass')).toHaveAttribute('type', 'text');
+    await submit.click();
+    await expect(page.locator('#login-gate')).toBeHidden();
+    expect(panel.account.sent.filter((r) => r.path === '/api/login/password').at(-1).body).toEqual({
+        login: '@me',
+        password: 'good-password'
+    });
+});
+
+test('the account page sets, changes and removes the password', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-settings');
+    const group = page.locator('#my-signin');
+    await expect(group).toContainText('@me · 42');
+    const row = group.locator('[data-action="password-open"]');
+    await expect(row).toContainText('Not set');
+
+    await row.click();
+    await expect(page.locator('#password-title')).toHaveText('Set a password');
+    await expect(page.locator('#password-remove')).toBeHidden();
+    await page.locator('#password-new').fill('short');
+    await page.locator('#password-form [type="submit"]').click();
+    await expect(page.locator('#password-error')).toHaveText('At least 8 characters.');
+    await page.locator('#password-new').fill('long-enough');
+    await page.locator('#password-again').fill('long-enougg');
+    await page.locator('#password-again').press('Enter');
+    await expect(page.locator('#password-error')).toHaveText("The passwords don't match.");
+    await page.locator('#password-again').fill('long-enough');
+    await page.locator('#password-form [type="submit"]').click();
+    await expect(page.locator('#password-modal')).toBeHidden();
+    await expect(page.locator('.toast').last()).toHaveText('Password set');
+    await expect(row).toContainText('Set');
+    expect(panel.account.sent.find((r) => r.method === 'PUT').body).toEqual({ password: 'long-enough' });
+
+    await row.click();
+    await expect(page.locator('#password-title')).toHaveText('Change password');
+    await expect(page.locator('#password-new')).toHaveValue('');
+    await page.locator('#password-remove').click();
+    await page.locator('#modal-confirm-btn').click();
+    await expect(page.locator('.toast').last()).toHaveText('Password removed');
+    await expect(row).toContainText('Not set');
+    expect(panel.account.sent.some((r) => r.method === 'DELETE' && r.path === '/api/account/password')).toBe(true);
 });

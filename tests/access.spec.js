@@ -115,3 +115,26 @@ test('Users / Chats: a role on the row; the menu leads to the person in Settings
     await page.locator('#action-access').click();
     await expect(row(page, '101')).toHaveClass(/access-row-wanted/);
 });
+
+test("someone's password is marked in the list and removed after a confirmation", async ({ page }) => {
+    const panel = await mockPanel(page, {
+        access: {
+            people: [
+                { id: '101', name: 'alice', role: 'admin', you: true, password: true },
+                { id: '103', name: 'carol', role: 'user', you: false, password: true }
+            ],
+            candidates: []
+        }
+    });
+    await openAccess(page);
+    await expect(row(page, '103')).toContainText('103 · password');
+    // Your own password is on your account page
+    await expect(row(page, '101').locator('[data-action="access-password-remove"]')).toHaveCount(0);
+    await row(page, '103').locator('[data-action="access-password-remove"]').click();
+    await expect(page.locator('#confirm-title')).toHaveText('Remove the password?');
+    await page.locator('#modal-confirm-btn').click();
+    await expect(page.locator('.toast-success')).toHaveText('carol has no password now.');
+    expect(panel.passwordRemoved).toEqual(['103']);
+    await expect(row(page, '103')).not.toContainText('password');
+    await expect(row(page, '103').locator('[data-action="access-password-remove"]')).toHaveCount(0);
+});

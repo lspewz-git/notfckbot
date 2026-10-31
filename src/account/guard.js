@@ -6,8 +6,8 @@
 const auth = require('./auth');
 const { log } = require('../log');
 
-// Relative to /api: signing in (link, Telegram code and its poll) and TMDB's public posters
-const OPEN = /^\/(login(\/telegram(\/poll)?)?|poster\/.*)$/;
+// Relative to /api: signing in (link, Telegram code and its poll, password) and TMDB's public posters
+const OPEN = /^\/(login(\/telegram(\/poll)?|\/password)?|poster\/.*)$/;
 const ANY_ROLE = /^\/(account\/|logout$)/;
 
 async function guard(req, res, next) {
