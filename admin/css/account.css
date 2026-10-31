@@ -88,8 +88,60 @@ body.signed-out .tabbar {
     flex-wrap: wrap;
 }
 
-.mine-chat {
-    min-width: 220px;
+/* The chat: a small chip that opens the list of chats (pick-sheet.js) */
+.mine-chat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    position: relative;
+    max-width: 100%;
+    height: 2rem;
+    padding: 0 var(--space-3) 0 var(--space-1);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-sm);
+}
+
+button.mine-chat-chip {
+    cursor: pointer;
+}
+
+/* A finger's 44 px without a taller chip */
+@media (pointer: coarse) {
+    button.mine-chat-chip::after {
+        content: '';
+        position: absolute;
+        /* From inside the 1 px border: 30 + 2 × 7 = 44 */
+        inset: -7px 0;
+        /* Over the positioned block under it */
+        z-index: 1;
+    }
+}
+
+button.mine-chat-chip:hover {
+    background: var(--surface-3);
+}
+
+.mine-chat-chip .pick-avatar {
+    width: 24px;
+    height: 24px;
+    font-size: var(--text-xs);
+}
+
+.mine-chat-chip-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.mine-chat-chip .icon {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    color: var(--text-dim);
 }
 
 /* Between the three sections: for an admin on a phone or tablet, who reaches them from one row in More */
@@ -355,12 +407,42 @@ button.mine-row:hover .mine-row-title {
     line-height: 1.5;
 }
 
-/* --- Settings --- */
+/* --- Settings: grouped rows, a choice opens a list --- */
 
+.mine-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    /* A short label and its value: across a wide screen they would drift apart */
+    max-width: 40rem;
+}
+
+.mine-group + .mine-group {
+    margin-top: var(--space-2);
+}
+
+.mine-group-title {
+    padding: 0 var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mine-group-note {
+    padding: 0 var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+}
+
+/* The card's own padding is the rows' instead: a whole row is the button */
 .mine-sets {
     list-style: none;
-    padding-top: var(--space-1);
-    padding-bottom: var(--space-1);
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
 }
 
 .mine-set {
@@ -368,11 +450,12 @@ button.mine-row:hover .mine-row-title {
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    min-height: 3.5rem;
-    padding: var(--space-3) 0;
+    width: 100%;
+    min-height: 3rem;
+    padding: var(--space-2) var(--space-4);
 }
 
-.mine-set + .mine-set {
+.mine-sets > li + li {
     border-top: 1px solid var(--border-row);
 }
 
@@ -380,10 +463,78 @@ button.mine-row:hover .mine-row-title {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 }
 
-.mine-set .custom-select {
-    min-width: 190px;
+.mine-set-pick {
+    border: none;
+    border-radius: inherit;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mine-set-pick:hover:not(:disabled) {
+    background: var(--fill-hover);
+}
+
+.mine-set-pick:disabled {
+    cursor: default;
+}
+
+.mine-set-value {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.mine-set-value .icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+.mine-set-pick:disabled .mine-set-value .icon {
+    visibility: hidden;
+}
+
+/* --- Choosing one of a few (pick-sheet.js) --- */
+
+.pick-avatar {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.pick-avatar-accent {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.pick-row.selected {
+    background: var(--surface-2);
+}
+
+.pick-check {
+    display: inline-flex;
+    color: var(--accent);
+}
+
+.pick-check .icon {
+    width: 18px;
+    height: 18px;
 }
 
 #mine-card-body .modal-actions {
@@ -397,7 +548,7 @@ button.mine-row:hover .mine-row-title {
 
     .mine-chat {
         min-width: 0;
-        width: 100%;
+        max-width: 100%;
     }
 
     .mine-toolbar .tab-filters {
@@ -410,21 +561,6 @@ button.mine-row:hover .mine-row-title {
 
     .mine-toolbar > .btn {
         width: 100%;
-    }
-
-    .mine-set {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    /* A switch stays on its row's right, like the panel's own settings */
-    .mine-set:has(> .switch) {
-        flex-direction: row;
-        align-items: center;
-    }
-
-    .mine-set .custom-select {
-        min-width: 0;
     }
 }
 

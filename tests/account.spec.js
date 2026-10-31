@@ -1,6 +1,6 @@
 // Signing in to the panel and the user's own chats in it, on the API mock (tests/mock-account.js)
 const { test, expect } = require('@playwright/test');
-const { watchConsole, isNarrow } = require('./helpers');
+const { watchConsole, isNarrow, pickChat } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 // A 401 is the answer the panel expects before sign-in: the browser logs it as a failed load, and the
@@ -61,7 +61,7 @@ test('the link from /login signs in only after a press and opens the chat it cam
     expect(panel.account.sent.find((r) => r.path === '/api/login').body).toEqual({ token: 'good-token' });
     expect(new URL(page.url()).pathname).toBe('/');
     await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
-    await expect(page.locator('#my-subs-section select[data-mine="chat"]')).toHaveValue('-100');
+    await expect(page.locator('#my-subs-section .mine-chat-chip')).toContainText('Киноклуб');
 });
 
 test('a used link says so and offers the other ways in', async ({ page }) => {
@@ -241,20 +241,19 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
 test('the panel opens on the own account, not on the group picked last time', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-settings');
-    const picker = page.locator('#my-settings-section select[data-mine="chat"]');
-    await picker.selectOption('-100');
+    await pickChat(page, 'my-settings', 'Киноклуб');
     await page.reload();
     await openMine(page, 'my-settings');
-    await expect(picker).toHaveValue(panel.account.chats[0].id);
+    await expect(page.locator('#my-settings-section .mine-chat-chip')).toContainText(panel.account.chats[0].title);
 });
 
 test("a group's settings: a member sees them, unchangeable; an admin's change is saved", async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-settings');
-    await page.locator('#my-settings-section select[data-mine="chat"]').selectOption('-100');
+    await pickChat(page, 'my-settings', 'Киноклуб');
     await expect(page.locator('.mine-note')).toContainText("Only the group's admins");
-    await expect(page.locator('#my-settings-body .custom-select-trigger').first()).toBeDisabled();
-    await expect(page.locator('select[name="buttons_mode"]')).toHaveCount(1);
+    await expect(page.locator('#my-settings-body [data-action="mine-pick"]').first()).toBeDisabled();
+    await expect(page.locator('[data-action="mine-pick"][data-name="buttons_mode"]')).toHaveCount(1);
     await expect(page.locator('[data-action="mine-toggle"]').first()).toBeDisabled();
 
     panel.account.chats[1].settings = true;
@@ -306,4 +305,65 @@ test('signing out works on a phone too: from More for an admin, from the setting
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.locator('#login-gate')).toBeVisible();
     expect(panel.account.sent.some((r) => r.path === '/api/logout')).toBe(true);
+});
+
+test('the chat chip opens the list of chats; the one picked shows on every page', async ({ page, isMobile }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    const chip = page.locator('#my-subs-section .mine-chat-chip');
+    await expect(chip).toContainText('My account');
+    if (isMobile) {
+        // A small chip, but a finger's 44 px to hit: 5 px above and below it still lands on it
+        const hits = await chip.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            return [r.top - 5, r.bottom + 5].map((y) => el.contains(document.elementFromPoint(x, y)));
+        });
+        expect(await chip.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(40);
+        expect(hits).toEqual([true, true]);
+    }
+    await chip.click();
+    const rows = page.locator('#pick-modal .pick-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Private chat');
+    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(rows.nth(1)).toContainText('Group · view only');
+    await rows.nth(1).click();
+    await expect(page.locator('#pick-modal')).toBeHidden();
+    await expect(chip).toContainText('Киноклуб');
+    await openMine(page, 'my-calendar');
+    await expect(page.locator('#my-calendar-section .mine-chat-chip')).toContainText('Киноклуб');
+    expect(panel.account.sent.some((r) => r.path.startsWith('/api/account/chats/-100/'))).toBe(true);
+});
+
+test('settings are rows; a row opens its choices and saves the one picked', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-settings');
+    const quiet = page.locator('[data-action="mine-pick"][data-name="quiet"]');
+    await expect(quiet).toContainText('23:00–09:00');
+    await expect(page.locator('#my-settings-body .mine-group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
+    // A private chat has no "who presses the buttons"
+    await expect(page.locator('[data-name="buttons_mode"]')).toHaveCount(0);
+
+    await quiet.click();
+    const sheet = page.locator('#pick-modal');
+    await expect(sheet.locator('h3')).toHaveText('Quiet hours');
+    await expect(sheet.locator('.pick-row')).toHaveText(['Off', '23:00–09:00', '22:00–08:00']);
+    await expect(sheet.locator('.pick-row.selected')).toHaveText('23:00–09:00');
+    await sheet.locator('.pick-row', { hasText: '22:00' }).click();
+    await expect(page.locator('.toast').last()).toHaveText('Saved');
+    expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ quiet_start: 22, quiet_end: 8 });
+    await expect(quiet).toContainText('22:00–08:00');
+
+    // The same choice again saves nothing
+    await quiet.click();
+    await sheet.locator('.pick-row.selected').click();
+    await expect(sheet).toBeHidden();
+    expect(panel.account.sent.filter((r) => r.method === 'PATCH')).toHaveLength(1);
+
+    await page.locator('[data-action="mine-pick"][data-name="timezone"]').click();
+    await sheet.locator('.pick-row', { hasText: 'Yekaterinburg' }).click();
+    await expect.poll(() => panel.account.sent.filter((r) => r.method === 'PATCH').length).toBe(2);
+    expect(panel.account.sent.filter((r) => r.method === 'PATCH')[1].body).toEqual({
+        timezone: 'Asia/Yekaterinburg'
+    });
 });

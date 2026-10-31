@@ -44,6 +44,7 @@
         <link rel="modulepreload" href="js/proxy-url.js" />
         <link rel="modulepreload" href="js/proxy.js" />
         <link rel="modulepreload" href="js/pull-refresh.js" />
+        <link rel="modulepreload" href="js/pick-sheet.js" />
         <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/recap-cards.js" />
         <link rel="modulepreload" href="js/recap-schedule.js" />
@@ -1269,7 +1270,6 @@
                         <header>
                             <div class="header-info">
                                 <h1>Chat settings</h1>
-                                <p>The same as “Settings” in the bot.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
@@ -1716,6 +1716,14 @@
         <!-- A title on the user's own list (account.js) -->
         <dialog id="mine-card-modal" class="modal" aria-labelledby="mine-card-title">
             <div class="modal-content modal-narrow" id="mine-card-body"></div>
+        </dialog>
+
+        <!-- Choosing one of a few (pick-sheet.js): the account pages' chat and settings -->
+        <dialog id="pick-modal" class="modal modal-sheet" aria-labelledby="pick-title">
+            <div class="modal-content modal-narrow">
+                <h3 id="pick-title"></h3>
+                <div id="pick-list" class="action-list" role="listbox" aria-labelledby="pick-title"></div>
+            </div>
         </dialog>
 
         <!-- "More" sheet behind the tab bar: what doesn't fit in five tabs -->

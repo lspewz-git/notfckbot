@@ -53,4 +53,11 @@ async function openSettingsTab(page, tab) {
     await page.locator(`[data-action="settings-tab"][data-tab="${tab}"]`).click();
 }
 
-module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab };
+/** An account page's chat: its chip at the top, then the chat in the list it opens. */
+async function pickChat(page, section, title) {
+    await page.locator(`#${section}-section .mine-chat-chip`).click();
+    await page.locator('#pick-modal .pick-row', { hasText: title }).click();
+    await expect(page.locator('#pick-modal')).toBeHidden();
+}
+
+module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab, pickChat };

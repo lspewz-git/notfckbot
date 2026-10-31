@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { watchConsole, openSection, isNarrow } = require('./helpers');
+const { watchConsole, openSection, isNarrow, pickChat } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -59,14 +59,18 @@ test('a chat with no changes says so, without a pager', async ({ page }) => {
     await expect(page.locator('#changes-root .changes-pager')).toBeHidden();
 });
 
-test("a group's admin sees its log under the settings, in English like the panel; a member doesn't", async ({ page }) => {
+test("a group's admin sees its log under the settings, in English like the panel; a member doesn't", async ({
+    page
+}) => {
     const panel = await mockPanel(page, { role: 'user' });
     const open = async () => {
-        await page.locator(isNarrow(page) ? '.tab-item[data-section="my-subs"]' : '.nav-item[data-section="my-subs"]').click();
+        await page
+            .locator(isNarrow(page) ? '.tab-item[data-section="my-subs"]' : '.nav-item[data-section="my-subs"]')
+            .click();
         await page
             .locator(isNarrow(page) ? '.tab-item[data-section="my-settings"]' : '.nav-item[data-section="my-settings"]')
             .click();
-        await page.locator('#my-settings-section select[data-mine="chat"]').selectOption('-100');
+        await pickChat(page, 'my-settings', 'Киноклуб');
     };
     await open();
     await expect(page.locator('.mine-note')).toContainText("Only the group's admins");

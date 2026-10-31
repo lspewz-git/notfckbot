@@ -6,7 +6,7 @@
 import { api } from './api.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal } from './ui.js';
-import { enhanceIn, closeDropdown, isDropdownOpen } from './select.js';
+import { avatar, pickFrom } from './pick-sheet.js';
 import { showChanges } from './changes.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
@@ -45,7 +45,7 @@ function whenText(day, today) {
 const MARKS = { premiere: 'season premiere', finale: 'season finale' };
 
 const state = {
-    /** @type {{ id: string, title: string, settings: boolean }[] | null} null until /api/account/chats answers */
+    /** @type {{ id: string, type: string, title: string, settings: boolean }[] | null} null until /api/account/chats answers */
     chats: null,
     /** @type {string | null} why the chats couldn't be loaded */
     chatsError: null,
@@ -76,18 +76,47 @@ export function setChats(chats, preferred = null) {
     state.chatsError = null;
     state.list = null;
     state.cal = null;
-    for (const holder of all('[data-chat-picker]')) {
-        holder.innerHTML = chats.length
-            ? `<select class="select-field" aria-label="Chat" data-mine="chat">${chats
-                  .map(
-                      (c) =>
-                          `<option value="${escapeHtml(c.id)}"${c.id === state.chatId ? ' selected' : ''}>${escapeHtml(c.title)}</option>`
-                  )
-                  .join('')}</select>`
-            : '';
-        enhanceIn(holder);
-    }
+    showChatChips();
     reload();
+}
+
+const CHEVRON_DOWN =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>';
+const CHEVRON_RIGHT =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>';
+
+const chatHint = (c) =>
+    c.type === 'private' ? 'Private chat' : c.settings ? "Group · you're an admin" : 'Group · view only';
+
+/** The chat at the top of each section: a small chip that opens the list (just a label with one chat) */
+function showChatChips() {
+    const chats = state.chats || [];
+    const chat = chats.find((c) => c.id === state.chatId);
+    const html = !chat
+        ? ''
+        : chats.length < 2
+          ? `<span class="mine-chat-chip">${avatar(chat.title, chat.type === 'private')}<span class="mine-chat-chip-name">${escapeHtml(chat.title)}</span></span>`
+          : `<button type="button" class="mine-chat-chip" data-action="mine-chat-pick" aria-haspopup="dialog" aria-label="Chat: ${escapeHtml(chat.title)}">` +
+            `${avatar(chat.title, chat.type === 'private')}<span class="mine-chat-chip-name">${escapeHtml(chat.title)}</span>${CHEVRON_DOWN}</button>`;
+    for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
+}
+
+/** Another chat picked: every section shows it, and the open one loads it */
+async function selectChat(id) {
+    if (id === state.chatId) return;
+    state.chatId = id;
+    state.list = null;
+    state.cal = null;
+    searchOpen = false;
+    // The search's "Added" marks belong to the chat it was made for
+    state.query = '';
+    state.results = [];
+    // The other chat's settings rows would save their choices to this one while it loads
+    settings = null;
+    const sets = $('my-settings-body');
+    if (sets && sets.querySelector('.mine-sets')) sets.innerHTML = loading();
+    showChatChips();
+    await reload();
 }
 
 /** The chats didn't load: the sections say so, with a retry. */
@@ -392,66 +421,77 @@ function calendarView(data) {
 
 const pad = (h) => `${String(h).padStart(2, '0')}:00`;
 
-function settingsView(data) {
+/** The settings chosen from a list, with their choices and the current one (from /settings) */
+function settingChoices(data) {
     const s = data.settings;
-    const off = data.canChange ? '' : ' disabled';
-    const quietValue =
-        s.quiet_start === null || s.quiet_start === undefined ? 'off' : `${s.quiet_start}-${s.quiet_end}`;
+    const quiet = s.quiet_start === null || s.quiet_start === undefined ? 'off' : `${s.quiet_start}-${s.quiet_end}`;
     const presets = data.presets.map(([a, b]) => [`${a}-${b}`, `${pad(a)}–${pad(b)}`]);
     // A pair set elsewhere (the panel) that isn't a preset still shows
-    if (quietValue !== 'off' && !presets.some(([v]) => v === quietValue)) {
-        presets.push([quietValue, `${pad(s.quiet_start)}–${pad(s.quiet_end)}`]);
+    if (quiet !== 'off' && !presets.some(([v]) => v === quiet)) {
+        presets.push([quiet, `${pad(s.quiet_start)}–${pad(s.quiet_end)}`]);
     }
-    const select = (name, label, options, value) =>
-        `<select class="select-field" name="${name}" aria-label="${label}" data-mine="setting"${off}>${options
-            .map(
-                ([v, text]) =>
-                    `<option value="${escapeHtml(v)}"${String(v) === String(value) ? ' selected' : ''}>${escapeHtml(text)}</option>`
-            )
-            .join('')}</select>`;
-    const toggle = (name, label, on) =>
-        `<button type="button" class="switch" role="switch" aria-checked="${Boolean(on)}" aria-label="${label}" data-action="mine-toggle" data-name="${name}"${off}><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button>`;
-    const item = (label, hint, control) =>
-        `<li class="mine-set"><span class="mine-set-text"><span>${label}</span>${hint ? `<span class="mine-dim">${hint}</span>` : ''}</span>${control}</li>`;
+    return {
+        quiet: { title: 'Quiet hours', value: quiet, options: [['off', 'Off'], ...presets] },
+        timezone: {
+            title: 'Time zone',
+            value: s.timezone,
+            options: data.zones.map((z) => [z.id, `${z.city} +${z.offset}`])
+        },
+        buttons_mode: {
+            title: "Who presses the bot's buttons",
+            value: s.buttons_mode,
+            options: [
+                ['owner', 'Whoever called them'],
+                ['all', 'Every member']
+            ]
+        }
+    };
+}
+
+/** The last /settings answer: the rows' sheets offer its choices */
+let settings = null;
+
+function settingsView(data) {
+    settings = data;
+    const s = data.settings;
+    const choices = settingChoices(data);
+    const off = data.canChange ? '' : ' disabled';
+    // A row showing the current choice; it opens the list (pick-sheet.js)
+    const pickRow = (name, label) => {
+        const c = choices[name];
+        const current = c.options.find(([v]) => String(v) === String(c.value));
+        return (
+            `<li><button type="button" class="mine-set mine-set-pick" data-action="mine-pick" data-name="${name}" aria-haspopup="dialog"${off}>` +
+            `<span class="mine-set-text">${label}</span>` +
+            `<span class="mine-set-value">${escapeHtml(current ? current[1] : '')}${CHEVRON_RIGHT}</span></button></li>`
+        );
+    };
+    const toggleRow = (name, label, hint, on) =>
+        `<li class="mine-set"><span class="mine-set-text"><span>${label}</span>${hint ? `<span class="mine-dim">${hint}</span>` : ''}</span>` +
+        `<button type="button" class="switch" role="switch" aria-checked="${Boolean(on)}" aria-label="${label}" data-action="mine-toggle" data-name="${name}"${off}><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button></li>`;
+    const group = (title, rows, note = '') =>
+        `<section class="mine-group"><h3 class="mine-group-title">${title}</h3><ul class="glass-card mine-sets">${rows}</ul>` +
+        (note ? `<p class="mine-group-note">${note}</p>` : '') +
+        '</section>';
     return (
         (data.canChange
             ? ''
             : '<p class="mine-note">Only the group\'s admins change its settings. You can look at them.</p>') +
-        '<ul class="glass-card mine-sets">' +
-        item(
-            'Quiet hours',
-            'At night notifications wait and come in the morning as one message',
-            select('quiet', 'Quiet hours', [['off', 'Off'], ...presets], quietValue)
+        group(
+            'Notifications',
+            pickRow('quiet', 'Quiet hours') + pickRow('timezone', 'Time zone'),
+            'In quiet hours notifications wait and come in the morning as one message.'
         ) +
-        item(
-            'Time zone',
-            '',
-            select(
-                'timezone',
-                'Time zone',
-                data.zones.map((z) => [z.id, `${z.city} +${z.offset}`]),
-                s.timezone
-            )
+        group(
+            'Digests',
+            toggleRow('digest_week', 'Weekly', 'Mondays at 10:00', s.digest_week) +
+                toggleRow('digest_month', 'Monthly', 'On the 1st at 10:00', s.digest_month)
         ) +
-        item('Weekly digest', 'Mondays at 10:00', toggle('digest_week', 'Weekly digest', s.digest_week)) +
-        item('Monthly digest', 'On the 1st at 10:00', toggle('digest_month', 'Monthly digest', s.digest_month)) +
-        (data.group
-            ? item(
-                  "The bot's buttons in the chat can be pressed by",
-                  '',
-                  select(
-                      'buttons_mode',
-                      'Who presses the buttons',
-                      [
-                          ['owner', 'Whoever called them'],
-                          ['all', 'Every member']
-                      ],
-                      s.buttons_mode
-                  )
-              )
-            : '') +
-        item("The bot's bottom menu", '', toggle('menu_enabled', "The bot's bottom menu", s.menu_enabled !== false)) +
-        '</ul>' +
+        group(
+            'Bot',
+            (data.group ? pickRow('buttons_mode', 'Buttons pressed by') : '') +
+                toggleRow('menu_enabled', 'Bottom menu in the chat', '', s.menu_enabled !== false)
+        ) +
         // The change log: only for those who may change the settings
         (data.canChange
             ? '<h3 class="mine-h">Change log</h3><div class="glass-card changes" id="mine-changes"></div>'
@@ -506,20 +546,9 @@ export async function loadMine(section) {
             if (!body.querySelector('.mine-sets')) body.innerHTML = loading();
             const data = await api(chatPath('/settings'));
             if (stale()) return;
-            // A list open over the old controls would change a select no longer on the page
-            if (isDropdownOpen() && body.querySelector('.mine-sets')) return;
-            closeDropdown();
             body.innerHTML = settingsView(data);
-            enhanceIn(body);
             const log = $('mine-changes');
             if (log) showChanges(log, { path: chatPath('/changes') }).catch(() => {});
-            // The styled dropdown's trigger follows its select: disabled for a member
-            for (const select of /** @type {HTMLSelectElement[]} */ ([...body.querySelectorAll('select')])) {
-                const trigger = /** @type {HTMLButtonElement} */ (
-                    select.parentElement.querySelector('.custom-select-trigger')
-                );
-                if (trigger) trigger.disabled = select.disabled;
-            }
         }
     } catch (err) {
         if (!stale()) body.innerHTML = failed(err.message);
@@ -684,6 +713,35 @@ export const accountActions = {
         const item = state.cal && state.cal.items && state.cal.items[Number(el.dataset.index)];
         if (item) openCard(releaseCard(item, state.cal.today));
     },
+    'mine-chat-pick': () => {
+        if (!state.chats) return;
+        pickFrom({
+            title: 'Chat',
+            value: state.chatId,
+            options: state.chats.map((c) => ({
+                value: c.id,
+                label: c.title,
+                hint: chatHint(c),
+                avatar: avatar(c.title, c.type === 'private')
+            })),
+            onPick: selectChat
+        });
+    },
+    'mine-pick': (el) => {
+        const name = el.dataset.name;
+        const c = settings && settingChoices(settings)[name];
+        if (!c) return;
+        pickFrom({
+            title: c.title,
+            value: String(c.value),
+            options: c.options.map(([value, label]) => ({ value, label })),
+            onPick: (value) => {
+                if (name !== 'quiet') return changeSettings({ [name]: value });
+                const [start, end] = value === 'off' ? [null, null] : value.split('-').map(Number);
+                return changeSettings({ quiet_start: start, quiet_end: end });
+            }
+        });
+    },
     'mine-toggle': (el) => {
         const on = el.getAttribute('aria-checked') !== 'true';
         el.setAttribute('aria-checked', String(on));
@@ -691,30 +749,12 @@ export const accountActions = {
     }
 };
 
-/** The chat picker, the mode radios, the settings' selects and the search form. */
+/** The mode radios and the search form. */
 export function setupAccount() {
     document.addEventListener('change', async (event) => {
         const el = /** @type {HTMLInputElement | HTMLSelectElement} */ (event.target);
         const kind = el.dataset && el.dataset.mine;
-        if (kind === 'chat') {
-            // The other pickers catching up (below) change nothing more
-            if (el.value === state.chatId) return;
-            state.chatId = el.value;
-            state.list = null;
-            state.cal = null;
-            searchOpen = false;
-            // The search's "Added" marks belong to the chat it was made for
-            state.query = '';
-            state.results = [];
-            // Every section's picker shows the same chat
-            for (const other of /** @type {HTMLSelectElement[]} */ (all('select[data-mine="chat"]'))) {
-                if (other !== el && other.value !== el.value) {
-                    other.value = el.value;
-                    other.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-            await reload();
-        } else if (kind === 'mode') {
+        if (kind === 'mode') {
             const s = findSeries(el.dataset.id);
             if (!s) return;
             try {
@@ -725,13 +765,6 @@ export function setupAccount() {
             } catch (err) {
                 toast(err.message, 'error');
                 openCard(seriesCard(s));
-            }
-        } else if (kind === 'setting') {
-            if (el.name === 'quiet') {
-                const [start, end] = el.value === 'off' ? [null, null] : el.value.split('-').map(Number);
-                await changeSettings({ quiet_start: start, quiet_end: end });
-            } else {
-                await changeSettings({ [el.name]: el.value });
             }
         }
     });

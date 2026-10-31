@@ -40,6 +40,7 @@ import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from '
 import { accountActions, setupAccount } from './account.js';
 import { startSession, watchSession, sessionActions } from './session.js';
 import { setupPullRefresh } from './pull-refresh.js';
+import { pickActions } from './pick-sheet.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -165,6 +166,7 @@ const CLICK_ACTIONS = {
     ...recapCardActions,
     ...recapScheduleActions,
     ...accountActions,
+    ...pickActions,
     ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'sends-recent': () => openRecentSends(),
