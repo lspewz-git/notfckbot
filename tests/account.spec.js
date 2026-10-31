@@ -43,7 +43,8 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     const gate = page.locator('#login-gate');
     await expect(gate).toBeVisible();
     await expect(page.locator('#login-tg')).toHaveAttribute('href', 'https://t.me/notfckbot?start=Lcode');
-    await expect(gate).toContainText('/login');
+    await expect(page.locator('#login-tg')).toHaveText('Continue with Telegram');
+    await expect(page.locator('#login-name')).toHaveAttribute('placeholder', '@username or ID');
     // One code for the one screen, and no "session ended" on a first visit
     await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/);
     expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
@@ -56,7 +57,7 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     expect(hit).toBe(true);
 });
 
-test('"Sign in with Telegram": the page waits for the answer in the bot, then opens the panel', async ({
+test('"Continue with Telegram": the page waits for the answer in the bot, then opens the panel', async ({
     page,
     context
 }) => {
@@ -422,7 +423,7 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
     await expect(page.locator('.login-or')).toHaveText('or with a password');
     const submit = page.locator('.login-password [type="submit"]');
     await submit.click();
-    await expect(page.locator('#login-pass-error')).toHaveText('Enter your Telegram username or ID.');
+    await expect(page.locator('#login-pass-error')).toHaveText('Enter your @username or ID.');
     expect(panel.account.sent.filter((r) => r.path === '/api/login/password')).toHaveLength(0);
 
     await page.locator('#login-name').fill('@me');

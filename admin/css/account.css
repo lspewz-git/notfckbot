@@ -13,6 +13,8 @@ body.view-mine #actions-btn,
 body.view-mine #about-btn,
 body.view-mine .tabbar .tab-item:not(.tab-mine),
 body.role-user .view-switch,
+body.system-account .view-switch,
+body.system-account #more-modal .action-row[data-section='my-subs'],
 body.view-mine .view-admin-label,
 body:not(.view-mine) .view-mine-label {
     display: none;

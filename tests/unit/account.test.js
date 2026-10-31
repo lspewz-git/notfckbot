@@ -8,24 +8,48 @@ const { test, mock, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const { Op } = require('sequelize');
-const { AccountSession, LoginLink, AccountPassword, Chat, Watchlist, Subscription } = require('../../src/db');
+const {
+    AccountSession,
+    LoginLink,
+    AccountPassword,
+    PanelRole,
+    Chat,
+    Watchlist,
+    Subscription
+} = require('../../src/db');
 const auth = require('../../src/account/auth');
+const roles = require('../../src/account/roles');
 const password = require('../../src/account/password');
 const members = require('../../src/account/members');
 const { guard } = require('../../src/account/guard');
 const { panelOnly } = require('../../src/admin/panel-only');
 
-const ENV = ['ADMIN_USERS', 'ACCOUNT_USERS', 'PANEL_URL'];
+const ENV = ['ADMIN_USERS', 'ACCOUNT_USERS', 'PANEL_URL', 'OPEN_SIGNUP', 'SYSTEM_LOGIN', 'SYSTEM_PASSWORD_HASH'];
 let savedEnv;
 let sessions;
 let links;
 let passwords;
+// PanelRole's rows: userId → role
+let panelRoles;
 
 beforeEach(() => {
     savedEnv = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
-    process.env.ADMIN_USERS = '42';
-    process.env.ACCOUNT_USERS = '7, 8';
+    for (const k of ENV) delete process.env[k];
     process.env.PANEL_URL = 'http://box/';
+    panelRoles = new Map([
+        ['42', 'admin'],
+        ['7', 'user'],
+        ['8', 'user']
+    ]);
+    mock.method(PanelRole, 'findByPk', async (id) =>
+        panelRoles.has(String(id)) ? { role: panelRoles.get(String(id)) } : null
+    );
+    mock.method(PanelRole, 'findAll', async ({ where }) =>
+        where.userId[Op.in]
+            .filter((id) => panelRoles.has(String(id)))
+            .map((id) => ({ userId: id, role: panelRoles.get(String(id)) }))
+    );
+    mock.method(PanelRole, 'upsert', async (row) => panelRoles.set(String(row.userId), row.role));
     sessions = new Map();
     links = new Map();
     passwords = new Map();
@@ -69,12 +93,59 @@ afterEach(() => {
 
 const tokenOf = (link) => link.split('/login/')[1];
 
-test('roles: ADMIN_USERS get the panel, ACCOUNT_USERS their chats, nobody else gets in', () => {
-    assert.equal(auth.roleOf(42), 'admin');
-    assert.equal(auth.roleOf('8'), 'user');
-    assert.equal(auth.roleOf(99), null);
-    process.env.ACCOUNT_USERS = '42';
-    assert.equal(auth.roleOf(42), 'admin', 'an admin on both lists is an admin');
+test('roles: from the database; open sign-up lets in whoever started the bot; "none" stays out', async (t) => {
+    t.mock.method(Chat, 'findOne', async ({ where }) => (['99', '5'].includes(where.id) ? { id: where.id } : null));
+    assert.equal(await roles.roleOf(42), 'admin');
+    assert.equal(await roles.roleOf('8'), 'user');
+    assert.equal(await roles.roleOf(99), null, 'sign-up closed');
+    panelRoles.set('5', 'none');
+    process.env.OPEN_SIGNUP = 'true';
+    assert.equal(await roles.roleOf(99), 'user', 'started the bot');
+    assert.equal(await roles.roleOf(100), null, 'never started the bot');
+    assert.equal(await roles.roleOf(5), null, 'taken away by an admin');
+    assert.equal(await roles.roleOf('-100'), null, 'a group is nobody');
+    const list = await roles.rolesOf(['42', '5', '99']);
+    assert.deepEqual([...list.values()], ['admin', 'none', 'user']);
+    process.env.OPEN_SIGNUP = 'false';
+    assert.deepEqual([...(await roles.rolesOf(['99'])).values()], [null]);
+});
+
+test('the system account: id 0, an admin only while it has a password; its login and password sign in', async (t) => {
+    t.mock.method(Chat, 'findAll', async () => []);
+    assert.equal(await roles.roleOf(0), null);
+    process.env.SYSTEM_PASSWORD_HASH = await password.hashPassword('system-pass');
+    assert.equal(await roles.roleOf('0'), 'admin');
+    assert.equal(await password.signInWithPassword('admin', 'wrong-pass'), null);
+    const { token } = await password.signInWithPassword(' Admin ', 'system-pass');
+    const session = await auth.sessionOf({ headers: { cookie: `nfb_session=${token}` } });
+    assert.deepEqual([session.userId, session.role, session.system, session.userName], ['0', 'admin', true, 'admin']);
+    process.env.SYSTEM_LOGIN = 'root';
+    assert.equal(await password.signInWithPassword('admin', 'system-pass'), null, 'renamed');
+    assert.ok(await password.signInWithPassword('root', 'system-pass'));
+    delete process.env.SYSTEM_PASSWORD_HASH;
+    assert.equal(await auth.sessionOf({ headers: { cookie: `nfb_session=${token}` } }), null, 'no password: out');
+});
+
+test('roles from .env move into the database once, while it has none', async (t) => {
+    const created = [];
+    let count = 0;
+    t.mock.method(PanelRole, 'count', async () => count);
+    t.mock.method(PanelRole, 'bulkCreate', async (rows) => created.push(...rows));
+    process.env.ADMIN_USERS = '42, 7';
+    process.env.ACCOUNT_USERS = '7,8,x';
+    assert.equal(await roles.importFromEnv(), 3);
+    assert.deepEqual(created, [
+        { userId: '42', role: 'admin' },
+        { userId: '7', role: 'admin' },
+        { userId: '8', role: 'user' }
+    ]);
+    count = 3;
+    assert.equal(await roles.importFromEnv(), 0, 'not again');
+    delete process.env.ADMIN_USERS;
+    delete process.env.ACCOUNT_USERS;
+    count = 0;
+    assert.equal(await roles.importFromEnv(), 0, 'nothing to move');
+    assert.equal(created.length, 3);
 });
 
 test('a link: only for allowed users with PANEL_URL set; works once; only hashes are stored', async () => {
@@ -102,9 +173,9 @@ test('a link expires after five minutes; a user taken off the list loses link an
     const { token } = await auth.redeemLink(tokenOf(await auth.createLink({ id: 8 }, null, now)), now);
     const req = { headers: { cookie: `nfb_session=${token}` } };
     assert.ok(await auth.sessionOf(req, now));
-    process.env.ACCOUNT_USERS = '7';
+    panelRoles.set('8', 'none');
     assert.equal(await auth.sessionOf(req, now), null);
-    process.env.ACCOUNT_USERS = '7,8';
+    panelRoles.set('8', 'user');
     assert.equal(await auth.sessionOf(req, now + auth.SESSION_TTL_MS + 1), null, 'session expired');
 });
 
@@ -112,9 +183,9 @@ test('"Войти через Telegram": in only after "Да" in the bot, only fo
     const { code, secret } = auth.startCode();
     assert.equal(auth.isWaiting(code), true);
     assert.deepEqual(await auth.pollCode(code, secret), { state: 'waiting' });
-    assert.equal(auth.answerCode(code, { id: 99 }, true), false, 'not allowed in');
-    assert.equal(auth.answerCode(code, { id: 7, name: '@u7' }, true), true);
-    assert.equal(auth.answerCode(code, { id: 8 }, true), false, 'answered already');
+    assert.equal(await auth.answerCode(code, { id: 99 }, true), false, 'not allowed in');
+    assert.equal(await auth.answerCode(code, { id: 7, name: '@u7' }, true), true);
+    assert.equal(await auth.answerCode(code, { id: 8 }, true), false, 'answered already');
     // Someone who only saw the bot link (the code) has no secret
     assert.deepEqual(await auth.pollCode(code, 'x'.repeat(43)), { state: 'gone' });
     const result = await auth.pollCode(code, secret);
@@ -124,7 +195,7 @@ test('"Войти через Telegram": in only after "Да" in the bot, only fo
     assert.deepEqual(await auth.pollCode(code, secret), { state: 'gone' }, 'used up');
 
     const refused = auth.startCode();
-    auth.answerCode(refused.code, { id: 7 }, false);
+    await auth.answerCode(refused.code, { id: 7 }, false);
     assert.deepEqual(await auth.pollCode(refused.code, refused.secret), { state: 'refused' });
 });
 
@@ -241,7 +312,7 @@ test('the API: a session for everything but signing in; the panel itself for adm
     const user = await signIn(call, 7);
     assert.equal((await call('GET', '/api/stats', { cookie: user })).status, 403);
     const me = await call('GET', '/api/account/me', { cookie: user });
-    assert.deepEqual(me.body.user, { id: '7', name: '@u7', role: 'user', hasPassword: false });
+    assert.deepEqual(me.body.user, { id: '7', name: '@u7', role: 'user', hasPassword: false, system: false });
     assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, []);
 
     const admin = await signIn(call, 42);
@@ -259,7 +330,7 @@ test('the API: the Telegram code goes with the bot link; the poll lets in the co
     const poll = () =>
         call('POST', '/api/login/telegram/poll', { body: { code: start.body.code, secret: start.body.secret } });
     assert.equal((await poll()).body.state, 'waiting');
-    auth.answerCode(start.body.code, { id: 42 }, true);
+    await auth.answerCode(start.body.code, { id: 42 }, true);
     const done = await poll();
     assert.equal(done.body.state, 'in');
     assert.match(done.headers.get('set-cookie'), /nfb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly/);
@@ -423,7 +494,9 @@ test('/start L<code>: the bot asks first, and only "Да, это я" lets the pa
 test('a password: only a salted scrypt hash is stored; the same password hashes differently', async () => {
     const one = await password.hashPassword('correct horse');
     const two = await password.hashPassword('correct horse');
-    assert.match(one, /^scrypt\$16384\$8\$1\$[A-Za-z0-9_-]{22}\$[A-Za-z0-9_-]{43}$/);
+    assert.match(one, /^scrypt:16384:8:1:[A-Za-z0-9_-]{22}:[A-Za-z0-9_-]{43}$/);
+    // The first hashes (31.10) had "$" between the parts
+    assert.equal(await password.matches('correct horse', one.replaceAll(':', '$')), true);
     assert.notEqual(one, two);
     assert.equal(one.includes('correct horse'), false);
     assert.equal(await password.matches('correct horse', one), true);
@@ -445,9 +518,9 @@ test('signing in with a password: by id or @username, only for people still on t
     assert.equal(await password.signInWithPassword('@nobody', 'secret-pass'), null);
     assert.equal(await password.signInWithPassword('8', 'secret-pass'), null, 'no password set');
     assert.equal(await password.signInWithPassword('first name', 'secret-pass'), null, 'only @usernames');
-    process.env.ACCOUNT_USERS = '8';
-    assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'taken off the list');
-    process.env.ACCOUNT_USERS = '7';
+    panelRoles.set('7', 'none');
+    assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'access taken away');
+    panelRoles.set('7', 'user');
     assert.equal(await password.removePassword('7'), true);
     assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'removed');
 });
@@ -518,4 +591,25 @@ test('the per-account limit: an id and its @username count as one account', asyn
     const keyFor = async (login) => loginLimitKey({ body: { login }, loginUserId: await password.userIdFor(login) });
     assert.equal(await keyFor('@Kirill'), await keyFor('7'));
     assert.notEqual(await keyFor('@nobody'), await keyFor('7'));
+});
+
+test('the API: the system account has no chats and no own password here, its password is in Settings', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    process.env.SYSTEM_PASSWORD_HASH = await password.hashPassword('system-pass');
+    const token = await auth.startSession({ userId: '0', userName: 'admin' });
+    const me = await call('GET', '/api/account/me', { cookie: token });
+    assert.deepEqual(me.body.user, { id: '0', name: 'admin', role: 'admin', hasPassword: true, system: true });
+    assert.deepEqual((await call('GET', '/api/account/chats', { cookie: token })).body, []);
+    const own = await call('PUT', '/api/account/password', { cookie: token, body: { password: 'long-enough' } });
+    assert.deepEqual([own.status, own.body.error], [400, "The system account's password is in Settings"]);
+    assert.equal((await call('DELETE', '/api/account/password', { cookie: token })).status, 400);
+});
+
+test('the system account: its tries count per address (the login is public), and it opens no chat', async () => {
+    const { loginLimitKey } = require('../../src/account/routes');
+    const key = (ip) => loginLimitKey({ body: { login: 'admin' }, loginUserId: '0', ip });
+    assert.notEqual(key('10.0.0.1'), key('10.0.0.2'));
+    assert.equal(loginLimitKey({ body: { login: '7' }, loginUserId: '7', ip: '10.0.0.1' }), 'login:7');
+    assert.equal(await members.accessTo('0', '0'), null);
 });

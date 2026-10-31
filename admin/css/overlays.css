@@ -88,6 +88,24 @@
     display: none;
 }
 
+/* A row with a choice in it (Users → Actions → Panel access): the dropdown is the control, the
+   row itself doesn't light up */
+.action-row-select:hover {
+    background: transparent;
+    border-color: transparent;
+}
+
+.action-row-select .action-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.action-row-select .custom-select,
+.action-row-select .action-select {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
 .action-row:hover {
     background: var(--surface-2);
     border-color: var(--border);
@@ -897,4 +915,10 @@ html:has(.modal[open]) {
     .recap-actions .btn {
         width: 100%;
     }
+}
+
+/* Your own role in the menu: said in the line under the title, not offered */
+.action-row-you .custom-select,
+.action-row-you .action-select {
+    display: none;
 }

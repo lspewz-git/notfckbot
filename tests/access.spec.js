@@ -2,139 +2,178 @@ const { test, expect } = require('@playwright/test');
 const { watchConsole, openSection, openSettingsTab } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
-/** Settings → Bot → Panel access, and the way there from a chat's menu, on the canned API. */
+/**
+ * Panel access on the canned API: a person's role in Users (the badge, the Admins tab, the role in
+ * the row's menu), and in Settings → Bot the sign-up switch and the system account's password.
+ */
 
 // A refused save is a 4xx the browser reports itself
 watchConsole({ ignore: /status of 4\d\d/ });
-
-async function openAccess(page) {
-    await openSection(page, 'settings');
-    await openSettingsTab(page, 'bot');
-    await expect(page.locator('#access-list .access-row')).not.toHaveCount(0);
-}
 
 async function pick(page, select, text) {
     await page.locator(`.custom-select:has(${select}) .custom-select-trigger`).click();
     await page.locator('.custom-select-panel .custom-select-option', { hasText: text }).first().click();
 }
 
-const row = (page, id) => page.locator(`.access-row[data-id="${id}"]`);
-
-test('you are listed without controls; adding someone saves at once and lists them', async ({ page }) => {
-    const panel = await mockPanel(page);
-    await openAccess(page);
-    await expect(row(page, '101')).toContainText('alice');
-    await expect(row(page, '101')).toContainText('101 · you');
-    // Your own role can't be changed or taken away here
-    await expect(row(page, '101').locator('select, button')).toHaveCount(0);
-
-    await pick(page, '#access-add-role', 'Admin');
-    await page.locator('#access-add').click();
-    await expect(page.locator('.toast-success')).toHaveText('bob can sign in as Admin.');
-    expect(panel.accessSaves).toEqual([{ userId: '102', role: 'admin' }]);
-    await expect(row(page, '102').locator('select.access-role')).toHaveValue('admin');
-    // Nobody left to add
-    await expect(page.locator('#access-add')).toBeDisabled();
+const chat = (id, username, type, panelRole, extra = {}) => ({
+    id,
+    username,
+    type,
+    panelRole,
+    blockedUntil: null,
+    bot_status: 'active',
+    last_seen_at: null,
+    ...extra
 });
 
-test('a role changes when picked; removing asks first and puts the person back to add', async ({ page }) => {
-    const panel = await mockPanel(page, {
-        access: {
-            people: [
-                { id: '101', name: 'alice', role: 'admin', you: true },
-                { id: '102', name: 'bob', role: 'user', you: false }
-            ],
-            candidates: []
-        }
-    });
-    await openAccess(page);
-    await pick(page, '.access-role[data-id="102"]', 'Admin');
-    await expect(page.locator('.toast-success')).toHaveText('bob is Admin now.');
-    expect(panel.accessSaves).toEqual([{ userId: '102', role: 'admin' }]);
+// 42 is the person signed in (tests/mock-account.js)
+const CHATS = [
+    chat(42, '@me', 'private', 'admin'),
+    chat(101, '@alice', 'private', 'admin'),
+    chat(102, '@bob', 'private', 'user', { hasPassword: true }),
+    chat(103, '@spam', 'private', 'none'),
+    chat(104, '@new', 'private', null),
+    chat(-1003, 'Movie Club', 'supergroup', null)
+];
 
-    await row(page, '102').locator('[data-action="access-remove"]').click();
-    await expect(page.locator('#confirm-text')).toContainText("bob won't be able to sign in");
-    await page.locator('#modal-confirm-btn').click();
-    await expect(row(page, '102')).toHaveCount(0);
-    expect(panel.accessSaves.at(-1)).toEqual({ userId: '102', role: 'none' });
-    await expect(page.locator('#access-add-user')).toHaveValue('102');
-});
+const openMenu = (page, id) => page.locator(`[data-action="chat-actions"][data-id="${id}"]`).click();
 
-test('a refused change says why and shows the saved role again', async ({ page }) => {
-    await mockPanel(page, {
-        access: {
-            people: [
-                { id: '101', name: 'alice', role: 'admin', you: true },
-                { id: '102', name: 'bob', role: 'user', you: false }
-            ],
-            candidates: []
-        },
-        accessSave: () => ({ status: 400, body: { error: "This person hasn't written to the bot yet" } })
-    });
-    await openAccess(page);
-    await pick(page, '.access-role[data-id="102"]', 'Admin');
-    await expect(page.locator('.toast-error')).toHaveText("This person hasn't written to the bot yet");
-    await expect(row(page, '102').locator('select.access-role')).toHaveValue('user');
-});
-
-test('Users / Chats: a role on the row; the menu leads to the person in Settings', async ({ page }) => {
-    const chat = (id, username, type, panelRole) => ({
-        id,
-        username,
-        type,
-        panelRole,
-        blockedUntil: null,
-        bot_status: 'active',
-        last_seen_at: null
-    });
-    await mockPanel(page, {
-        chats: [
-            chat(101, 'alice', 'private', 'admin'),
-            chat(102, 'bob', 'private', null),
-            chat(-1003, 'Movie Club', 'supergroup', null)
-        ]
-    });
+test('Users: a role next to the name; the Admins tab lists the admins', async ({ page }) => {
+    await mockPanel(page, { chats: CHATS });
     await openSection(page, 'chats');
-    await expect(page.locator('#chats-body .access-badge:visible', { hasText: 'Admin' })).toHaveCount(1);
+    const badges = page.locator('#chats-body .access-badge:visible');
+    // The phone shows the name in the row's compact card, the desktop in its column: one badge a row
+    await expect(badges).toHaveText(['Admin', 'Admin', 'User', 'No access']);
+    await page.locator('.tab-filters [data-chats-tab="admins"]').click();
+    await expect(page.locator('#chats-body tr:visible')).toHaveCount(2);
+    await expect(page.locator('#chats-body')).toContainText('@alice');
+    await expect(page.locator('#chats-body')).not.toContainText('@bob');
+});
 
-    // A group can't sign in: no access row
-    await page.locator('[data-action="chat-actions"][data-id="-1003"]').click();
+test('on a phone the four Users tabs stay inside the card: the track scrolls, the page does not', async ({
+    page,
+    isMobile
+}) => {
+    test.skip(!isMobile, 'phone layout');
+    await mockPanel(page, { chats: CHATS });
+    await openSection(page, 'chats');
+    await expect(page.locator('#chats-body .access-badge.error:visible')).toHaveText('No access');
+    const box = await page.evaluate(() => {
+        const track = document.querySelector('#chats-section .tab-filters');
+        const card = track.parentElement.getBoundingClientRect();
+        const t = track.getBoundingClientRect();
+        return {
+            inside: t.left >= card.left - 1 && t.right <= card.right + 1,
+            scrolls: track.scrollWidth > track.clientWidth,
+            pageWide: document.documentElement.scrollWidth > innerWidth
+        };
+    });
+    expect(box).toEqual({ inside: true, scrolls: true, pageWide: false });
+    // The last tab is reached by scrolling the track
+    await page.locator('.tab-filters [data-chats-tab="left"]').click();
+    await expect(page.locator('.tab-filters [data-chats-tab="left"]')).toHaveClass(/active/);
+});
+
+test("the row's menu: the role is picked from a dropdown and saved at once; not for groups or yourself", async ({
+    page
+}) => {
+    const panel = await mockPanel(page, { chats: CHATS });
+    await openSection(page, 'chats');
+
+    // A group can't sign in
+    await openMenu(page, -1003);
     await expect(page.locator('#action-access')).toBeHidden();
     await page.locator('[data-close="chat-actions-modal"].modal-x').click();
 
-    await page.locator('[data-action="chat-actions"][data-id="102"]').click();
-    await expect(page.locator('#action-access-desc')).toHaveText('No access');
-    await page.locator('#action-access').click();
-    await expect(page.locator('#settings-pane-bot')).toBeVisible();
-    // bob has no role yet: picked to be added
-    await expect(page.locator('#access-add-user')).toHaveValue('102');
+    // Your own role can't be changed
+    await openMenu(page, 42);
+    await expect(page.locator('#action-access .custom-select')).toBeHidden();
+    await expect(page.locator('#action-access-desc')).toHaveText("Admin · yours, can't be changed here");
+    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
 
-    await openSection(page, 'chats');
-    await page.locator('[data-action="chat-actions"][data-id="101"]').click();
-    await expect(page.locator('#action-access-desc')).toHaveText('Admin');
-    await page.locator('#action-access').click();
-    await expect(row(page, '101')).toHaveClass(/access-row-wanted/);
+    // Without a role (sign-up closed) the dropdown says No access
+    await openMenu(page, 104);
+    await expect(page.locator('#action-access-role')).toHaveValue('none');
+    await pick(page, '#action-access-role', 'User');
+    await expect(page.locator('.toast-success')).toHaveText('@new is User now.');
+    expect(panel.accessSaves).toEqual([{ userId: '104', role: 'user' }]);
+    // The dialog stays open on the new role, and the row's badge follows
+    await expect(page.locator('#chat-actions-modal')).toBeVisible();
+    await expect(page.locator('#action-access-role')).toHaveValue('user');
+    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
+    await expect(
+        page.locator('#chats-body tr:visible', { hasText: '@new' }).locator('.access-badge:visible')
+    ).toHaveText('User');
 });
 
-test("someone's password is marked in the list and removed after a confirmation", async ({ page }) => {
-    const panel = await mockPanel(page, {
-        access: {
-            people: [
-                { id: '101', name: 'alice', role: 'admin', you: true, password: true },
-                { id: '103', name: 'carol', role: 'user', you: false, password: true }
-            ],
-            candidates: []
-        }
+test('a refused role change says why and shows the saved role again', async ({ page }) => {
+    await mockPanel(page, {
+        chats: CHATS,
+        accessSave: () => ({ status: 403, body: { error: 'Only for the panel admins' } })
     });
-    await openAccess(page);
-    await expect(row(page, '103')).toContainText('103 · password');
-    // Your own password is on your account page
-    await expect(row(page, '101').locator('[data-action="access-password-remove"]')).toHaveCount(0);
-    await row(page, '103').locator('[data-action="access-password-remove"]').click();
+    await openSection(page, 'chats');
+    await openMenu(page, 102);
+    await pick(page, '#action-access-role', 'Admin');
+    await expect(page.locator('.toast-error')).toHaveText('Only for the panel admins');
+    await expect(page.locator('#action-access-role')).toHaveValue('user');
+});
+
+test("someone's password: a row in their menu removes it after a confirmation", async ({ page }) => {
+    const panel = await mockPanel(page, { chats: CHATS });
+    await openSection(page, 'chats');
+    await openMenu(page, 101);
+    await expect(page.locator('#action-password-remove')).toBeHidden();
+    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
+
+    await openMenu(page, 102);
+    await page.locator('#action-password-remove').click();
     await expect(page.locator('#confirm-title')).toHaveText('Remove the password?');
     await page.locator('#modal-confirm-btn').click();
-    await expect(page.locator('.toast-success')).toHaveText('carol has no password now.');
-    expect(panel.passwordRemoved).toEqual(['103']);
-    await expect(row(page, '103')).not.toContainText('password');
-    await expect(row(page, '103').locator('[data-action="access-password-remove"]')).toHaveCount(0);
+    await expect(page.locator('.toast-success')).toHaveText('@bob has no password now.');
+    expect(panel.passwordRemoved).toEqual(['102']);
+    await openMenu(page, 102);
+    await expect(page.locator('#action-password-remove')).toBeHidden();
+});
+
+test('Settings: sign-up is switched at once; the system account password is set in a dialog', async ({ page }) => {
+    const panel = await mockPanel(page, {
+        access: { openSignup: false, system: { login: 'admin', passwordSet: false } }
+    });
+    await openSection(page, 'settings');
+    await openSettingsTab(page, 'bot');
+    const signup = page.locator('#access-signup');
+    await expect(signup).toHaveAttribute('aria-checked', 'false');
+    await signup.click();
+    await expect(signup).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.toast-success')).toHaveText('Anyone who starts the bot can sign in now.');
+
+    await expect(page.locator('#access-system-state')).toHaveText("No password: it can't sign in");
+    await page.locator('#access-system-password').click();
+    await expect(page.locator('#password-title')).toHaveText('Password for "admin"');
+    await expect(page.locator('#password-remove')).toBeHidden();
+    await page.locator('#password-new').fill('system-pass');
+    await page.locator('#password-again').fill('system-pass');
+    await page.locator('#password-form [type="submit"]').click();
+    await expect(page.locator('#password-modal')).toBeHidden();
+    await expect(page.locator('.toast-success').last()).toHaveText('System account password saved');
+    expect(panel.systemPasswords).toEqual(['system-pass']);
+    await expect(page.locator('#access-system-state')).toHaveText('Password set');
+    await expect(page.locator('#access-system-password')).toHaveText('Change password');
+});
+
+test('the system account has no "My account": no view switch, no Sign-in group', async ({ page, isMobile }) => {
+    const panel = await mockPanel(page, { system: true });
+    await expect(page.locator('#login-gate')).toBeHidden();
+    if (!isMobile) await expect(page.locator('.view-switch')).toBeHidden();
+    else {
+        await page.locator('.tab-item[data-open="more-modal"]').click();
+        await expect(page.locator('#more-modal .action-row[data-section="my-subs"]')).toBeHidden();
+    }
+    expect(panel.account.sent.some((r) => r.path === '/api/account/chats')).toBe(false);
+});
+
+test('the system account opened on an address naming "My account" lands on the dashboard', async ({ page }) => {
+    await mockPanel(page, { system: true, path: '/#my-subs' });
+    await expect(page.locator('#dashboard-section')).toBeVisible();
+    await expect(page.locator('#my-subs-section')).toBeHidden();
 });

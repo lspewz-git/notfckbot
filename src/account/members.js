@@ -8,6 +8,7 @@
 const { Op } = require('sequelize');
 const { Chat } = require('../db');
 const { OpError } = require('../chat-ops');
+const { isSystem } = require('./roles');
 const { lruCache, fetchFresh } = require('../lru');
 const { log } = require('../log');
 
@@ -88,6 +89,8 @@ const GROUP_TYPES = ['group', 'supergroup'];
  * @returns {Promise<{ edit: boolean, settings: boolean } | null>} null: no access
  */
 async function accessTo(userId, chatId) {
+    // The system account is nobody in Telegram: "its own chat" would be a chat 0
+    if (isSystem(userId)) return null;
     if (String(chatId) === String(userId)) return { edit: true, settings: true };
     if (!isGroupId(chatId)) return null;
     const chat = await Chat.findByPk(chatId, { attributes: ['type'] });

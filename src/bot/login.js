@@ -4,7 +4,8 @@
  *   "Войти в панель?" and the page lets the user in only after "Да, это я".
  * - /login: a one-time link, always in the user's private chat: in a group, the link would let any
  *   member in under their name.
- * Neither is in /help while only the users in ADMIN_USERS and ACCOUNT_USERS may sign in.
+ * Neither is in /help. Who may sign in: src/account/roles.js (with sign-up open, everyone who
+ * started the bot).
  */
 const { Markup } = require('telegraf');
 const auth = require('../account/auth');
@@ -13,7 +14,7 @@ const { log } = require('../log');
 
 const CLOSED = 'Вход в панель пока в закрытом тесте.';
 const MINUTES = auth.LINK_TTL_MS / 60000;
-const GONE = 'Этот вход устарел. Нажмите «Войти через Telegram» на странице ещё раз.';
+const GONE = 'Этот вход устарел. Нажмите «Continue with Telegram» на странице ещё раз.';
 
 const nameOf = (from) =>
     from.username ? `@${from.username}` : [from.first_name, from.last_name].filter(Boolean).join(' ') || null;
@@ -26,11 +27,11 @@ function register(bot) {
         if (!payload.startsWith('L')) return next();
         const code = payload.slice(1);
         if (ctx.chat.type !== 'private') return;
-        if (!auth.isAllowed(ctx.from.id)) return ctx.reply(CLOSED);
+        if (!(await auth.isAllowed(ctx.from.id))) return ctx.reply(CLOSED);
         if (!auth.isWaiting(code)) return ctx.reply(GONE);
         await ctx.reply(
             `🔐 <b>Войти в панель NotFckBot?</b>\n\nПроверочный код: <b>${auth.checkWord(code)}</b>. Нажмите «Да», только если ` +
-                'этот же код сейчас на вашей странице входа. Если вы не нажимали «Войти через Telegram», нажмите «Нет».',
+                'этот же код сейчас на вашей странице входа. Если вы не нажимали «Continue with Telegram», нажмите «Нет».',
             {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
@@ -43,7 +44,7 @@ function register(bot) {
 
     bot.action(/^login_(ok|no)_([A-Za-z0-9_-]{32})$/, async (ctx) => {
         const yes = ctx.match[1] === 'ok';
-        const answered = auth.answerCode(ctx.match[2], userOf(ctx.from), yes);
+        const answered = await auth.answerCode(ctx.match[2], userOf(ctx.from), yes);
         await ctx.answerCbQuery();
         const text = !answered ? GONE : yes ? '✅ Готово: вернитесь на страницу панели.' : 'Вход отменён.';
         await ctx.editMessageText(text).catch(() => {});
@@ -52,7 +53,7 @@ function register(bot) {
 
     bot.command('login', async (ctx) => {
         const from = ctx.from;
-        if (!from || !auth.isAllowed(from.id)) return ctx.reply(CLOSED);
+        if (!from || !(await auth.isAllowed(from.id))) return ctx.reply(CLOSED);
         const group = ctx.chat.type !== 'private';
         let link;
         try {

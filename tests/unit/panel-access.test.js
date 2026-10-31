@@ -1,9 +1,8 @@
 /**
- * Panel access from Settings (src/admin/routes/access.js): roles go to ADMIN_USERS / ACCOUNT_USERS
- * in .env and into process.env at once; nobody changes their own role; a new person must have
- * written to the bot; taking access away ends their sessions and removes their password; an admin
- * removes someone's password. The database is stubbed, .env a
- * temporary file. Run: npm run test:unit
+ * Panel access (src/admin/routes/access.js): a role is saved in the database for a person who wrote
+ * to the bot; nobody changes their own; "No access" ends their sessions and removes their password;
+ * sign-up and the system account's password go to .env and process.env at once; an admin removes
+ * someone's password. The database is stubbed, .env a temporary file. Run: npm run test:unit
  */
 const { test, describe, mock, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,27 +10,33 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const express = require('express');
+const { Op } = require('sequelize');
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-access-'));
-const KEYS = ['ADMIN_USERS', 'ACCOUNT_USERS', 'ENV_FILE'];
+const KEYS = ['OPEN_SIGNUP', 'SYSTEM_LOGIN', 'SYSTEM_PASSWORD_HASH', 'ENV_FILE'];
 const savedEnv = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 process.env.ENV_FILE = path.join(DIR, '.env');
 
-const { Chat, AccountSession, AccountPassword } = require('../../src/db');
+const { Chat, AccountSession, AccountPassword, PanelRole } = require('../../src/db');
+const { matches } = require('../../src/account/password');
 
-const CHATS = [
-    { id: 1, username: '@me' },
-    { id: 7, username: '@kirill' },
-    { id: 9, username: null }
-];
+const CHATS = ['1', '7', '9'];
+// userId → role
+const panelRoles = new Map();
+// What AccountSession.destroy was asked: [userId, the session kept or null]
 const destroyed = [];
 const passwords = new Set();
 const notices = [];
 const stubs = [
-    mock.method(Chat, 'findAll', async () => CHATS),
-    mock.method(Chat, 'findOne', async ({ where }) => CHATS.find((c) => String(c.id) === where.id) || null),
-    mock.method(AccountSession, 'destroy', async ({ where }) => destroyed.push(where.userId)),
-    mock.method(AccountPassword, 'findAll', async () => [...passwords].map((userId) => ({ userId }))),
+    mock.method(Chat, 'findOne', async ({ where }) => (CHATS.includes(where.id) ? { id: where.id } : null)),
+    mock.method(PanelRole, 'findByPk', async (id) =>
+        panelRoles.has(String(id)) ? { role: panelRoles.get(String(id)) } : null
+    ),
+    mock.method(PanelRole, 'findAll', async () => [...panelRoles].map(([userId, role]) => ({ userId, role }))),
+    mock.method(PanelRole, 'upsert', async (row) => panelRoles.set(String(row.userId), row.role)),
+    mock.method(AccountSession, 'destroy', async ({ where }) => {
+        destroyed.push([String(where.userId), where.id ? where.id[Op.ne] : null]);
+    }),
     mock.method(AccountPassword, 'destroy', async ({ where }) => Number(passwords.delete(String(where.userId))))
 ];
 
@@ -44,15 +49,16 @@ after(() => {
     fs.rmSync(DIR, { recursive: true, force: true });
 });
 
-describe('POST /api/access', () => {
+describe('/api/access', () => {
     let server;
     let base;
+    // The signed-in admin, as the guard sets it
+    let user;
     before(async () => {
         const app = express();
         app.use(express.json());
-        // The guard's work: the signed-in admin
         app.use((req, res, next) => {
-            req.user = { userId: '1', role: 'admin' };
+            req.user = user;
             next();
         });
         app.set('bot', { telegram: { sendMessage: async (chatId, text) => notices.push({ chatId, text }) } });
@@ -65,15 +71,18 @@ describe('POST /api/access', () => {
     after(() => server.close());
 
     beforeEach(() => {
-        fs.writeFileSync(process.env.ENV_FILE, 'BOT_TOKEN=x\nADMIN_USERS=1\nACCOUNT_USERS=\n');
-        process.env.ADMIN_USERS = '1';
-        process.env.ACCOUNT_USERS = '';
+        fs.writeFileSync(process.env.ENV_FILE, 'BOT_TOKEN=x\n');
+        for (const k of ['OPEN_SIGNUP', 'SYSTEM_LOGIN', 'SYSTEM_PASSWORD_HASH']) delete process.env[k];
+        panelRoles.clear();
+        panelRoles.set('1', 'admin');
+        user = { id: 'session-1', userId: '1', role: 'admin', system: false };
         destroyed.length = 0;
         passwords.clear();
+        notices.length = 0;
     });
 
-    const call = async (method, body, path = '/api/access') => {
-        const res = await fetch(`${base}${path}`, {
+    const call = async (method, body, route = '/api/access') => {
+        const res = await fetch(`${base}${route}`, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: body && JSON.stringify(body)
@@ -82,71 +91,71 @@ describe('POST /api/access', () => {
     };
     const envFile = () => fs.readFileSync(process.env.ENV_FILE, 'utf8');
 
-    test('the list: people with a role, you marked; the private chats without one to add', async () => {
-        process.env.ACCOUNT_USERS = '7';
-        passwords.add('7');
-        const { body } = await call('GET');
-        assert.deepEqual(body.people, [
-            { id: '1', role: 'admin', name: '@me', you: true, password: false },
-            { id: '7', role: 'user', name: '@kirill', you: false, password: true }
-        ]);
-        assert.deepEqual(body.candidates, [{ id: '9', name: null }]);
-    });
-
-    test('added, promoted, removed: .env and the running process change together', async () => {
-        let res = await call('POST', { userId: '7', role: 'user' });
-        assert.equal(res.status, 200);
-        assert.equal(process.env.ACCOUNT_USERS, '7');
-        assert.match(envFile(), /^ACCOUNT_USERS=7$/m);
-
-        res = await call('POST', { userId: 7, role: 'admin' });
-        assert.equal(res.status, 200);
-        assert.equal(process.env.ADMIN_USERS, '1,7');
-        assert.equal(process.env.ACCOUNT_USERS, '');
-        assert.match(envFile(), /^ADMIN_USERS=1,7$/m);
-        assert.match(envFile(), /^BOT_TOKEN=x$/m, 'other keys stay');
+    test('a role is saved in the database; "No access" signs them out and removes their password', async () => {
+        let res = await call('POST', { userId: '7', role: 'admin' });
+        assert.deepEqual([res.status, res.body], [200, { userId: '7', role: 'admin' }]);
+        assert.equal(panelRoles.get('7'), 'admin');
         assert.deepEqual(destroyed, [], 'a role change keeps the sessions');
 
         passwords.add('7');
-        res = await call('POST', { userId: '7', role: 'none' });
-        assert.equal(res.status, 200);
-        assert.equal(process.env.ADMIN_USERS, '1');
-        assert.deepEqual(destroyed, ['7'], 'taken off: signed out');
-        assert.equal(passwords.has('7'), false, 'taken off: the password goes too');
-        assert.deepEqual(
-            res.body.people.map((p) => p.id),
-            ['1']
-        );
+        res = await call('POST', { userId: 7, role: 'none' });
+        assert.deepEqual(res.body, { userId: '7', role: 'none' });
+        assert.deepEqual(destroyed, [['7', null]], 'signed out everywhere');
+        assert.equal(passwords.has('7'), false);
+        assert.equal(envFile(), 'BOT_TOKEN=x\n', '.env untouched');
     });
 
-    test('refused: your own role, someone who never wrote to the bot, a bad role or id', async () => {
-        const before = envFile();
-        assert.equal((await call('POST', { userId: '1', role: 'none' })).status, 400);
+    test('refused: your own role, someone who never wrote to the bot, a bad role or id, a non-admin', async () => {
         assert.equal((await call('POST', { userId: '1', role: 'user' })).status, 400);
         const stranger = await call('POST', { userId: '555', role: 'admin' });
-        assert.equal(stranger.status, 400);
-        assert.match(stranger.body.error, /written to the bot/);
+        assert.deepEqual([stranger.status, stranger.body.error], [400, "This person hasn't written to the bot yet"]);
         assert.equal((await call('POST', { userId: '7', role: 'owner' })).status, 400);
         assert.equal((await call('POST', { userId: '-100', role: 'user' })).status, 400);
-        // "007" would be a second entry that never matches the 7 Telegram sends
+        // "007" would be a second row that never matches the 7 Telegram sends
         assert.equal((await call('POST', { userId: '007', role: 'user' })).body.error, 'Bad user id');
         // Taken off by another admin meanwhile: the guard let the request in, the handler doesn't
-        process.env.ADMIN_USERS = '7';
+        panelRoles.set('1', 'user');
         assert.equal((await call('POST', { userId: '7', role: 'none' })).status, 403);
-        process.env.ADMIN_USERS = '1';
-        assert.equal(envFile(), before, 'nothing written');
-        assert.equal(process.env.ADMIN_USERS, '1');
+        assert.deepEqual([...panelRoles.keys()], ['1']);
+    });
+
+    test('sign-up: written to .env and applied at once; the settings say how things stand', async () => {
+        assert.deepEqual((await call('GET')).body, {
+            openSignup: false,
+            system: { login: 'admin', passwordSet: false }
+        });
+        const res = await call('PUT', { open: true }, '/api/access/signup');
+        assert.equal(res.body.openSignup, true);
+        assert.equal(process.env.OPEN_SIGNUP, 'true');
+        assert.match(envFile(), /^OPEN_SIGNUP=true$/m);
+        assert.equal((await call('PUT', { open: 'yes' }, '/api/access/signup')).status, 400);
+    });
+
+    test('the system account password: a hash in .env without "$", its other sessions end', async () => {
+        assert.equal((await call('PUT', { password: 'short' }, '/api/access/system-password')).status, 400);
+        const res = await call('PUT', { password: 'system-pass' }, '/api/access/system-password');
+        assert.equal(res.body.system.passwordSet, true);
+        const hash = /^SYSTEM_PASSWORD_HASH=(.+)$/m.exec(envFile())[1];
+        assert.equal(hash.includes('$'), false, 'Compose would read "$" as a variable');
+        assert.equal(await matches('system-pass', hash), true);
+        assert.equal(process.env.SYSTEM_PASSWORD_HASH, hash);
+        assert.deepEqual(destroyed, [['0', null]]);
+
+        // Changed by the system account itself: its own session stays
+        destroyed.length = 0;
+        user = { id: 'session-0', userId: '0', role: 'admin', system: true };
+        await call('PUT', { password: 'system-pass-2' }, '/api/access/system-password');
+        assert.deepEqual(destroyed, [['0', 'session-0']]);
     });
 
     test("an admin removes someone's password: their sessions end, the bot tells them, the role stays", async () => {
-        process.env.ACCOUNT_USERS = '7';
+        panelRoles.set('7', 'user');
         passwords.add('7');
         const res = await call('DELETE', undefined, '/api/access/7/password');
-        assert.equal(res.status, 200);
+        assert.deepEqual([res.status, res.body], [200, { userId: '7', hasPassword: false }]);
         assert.equal(passwords.has('7'), false);
-        assert.equal(res.body.people.find((p) => p.id === '7').password, false);
-        assert.equal(res.body.people.find((p) => p.id === '7').role, 'user');
-        assert.deepEqual(destroyed, ['7']);
+        assert.equal(panelRoles.get('7'), 'user');
+        assert.deepEqual(destroyed, [['7', null]]);
         for (let i = 0; i < 100 && !notices.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
         assert.equal(String(notices[0].chatId), '7');
         assert.match(notices[0].text, /Администратор панели удалил ваш пароль/);

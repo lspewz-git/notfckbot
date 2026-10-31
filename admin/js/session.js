@@ -1,6 +1,6 @@
 /**
  * Who is using the panel (src/account/auth.js). Without a session the sign-in screen covers it:
- * "Sign in with Telegram" (the bot asks to confirm, this page waits for the answer), or the link
+ * "Continue with Telegram" (the bot asks to confirm, this page waits for the answer), or the link
  * from /login in the bot (/login/<token>, spent only by the press of "Sign in"), or a password the user
  * set on their account page (password.js). With one, an admin
  * gets the whole panel and a user (body.role-user) only their own chats.
@@ -14,7 +14,7 @@ const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
 
 let pollTimer = 0;
-// Each "Sign in with Telegram" press: an older attempt's poll still on its way stops when it lands
+// Each "Continue with Telegram" press: an older attempt's poll still on its way stops when it lands
 let attempt = 0;
 // The first check of the session has answered: a 401 before it is that check's own, not an ended session
 let started = false;
@@ -25,7 +25,7 @@ const gate = (html) => {
     document.body.classList.add('signed-out');
 };
 
-// The code for "Sign in with Telegram", asked for when the screen shows: the button is then a plain
+// The code for "Continue with Telegram", asked for when the screen shows: the button is then a plain
 // link to the bot, which a phone opens in Telegram without a pop-up or an empty tab left behind
 let pending = null;
 
@@ -50,9 +50,8 @@ async function prepareCode() {
 
 function signInScreen(error = '') {
     gate(
-        '<p class="login-text">Sign in with Telegram: the bot asks whether it is you.</p>' +
-            '<a id="login-tg" class="btn btn-primary btn-block" target="_blank" rel="noopener noreferrer" aria-disabled="true" data-action="login-telegram">Sign in with Telegram</a>' +
-            '<p class="login-hint">Or send <b>/login</b> to the bot: it sends a sign-in link.</p>' +
+        // A first time in signs up too: the bot is started on the way (with sign-up open)
+        '<a id="login-tg" class="btn btn-primary btn-block" target="_blank" rel="noopener noreferrer" aria-disabled="true" data-action="login-telegram">Continue with Telegram</a>' +
             `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
             signInForm()
     );
@@ -98,8 +97,11 @@ export async function startSession(preferredChat = null) {
     started = true;
     setMe(me.user);
     document.body.classList.toggle('role-user', me.user.role !== 'admin');
+    // The system account is nobody in Telegram: no "My account"
+    document.body.classList.toggle('system-account', Boolean(me.user.system));
     document.body.classList.remove('signed-out');
     $('login-gate').hidden = true;
+    if (me.user.system) return me.user.role;
     // The chats ask Telegram about each group: they come later, the panel doesn't wait for them
     api('/account/chats')
         .then((chats) => setChats(chats, preferredChat))

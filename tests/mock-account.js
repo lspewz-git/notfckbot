@@ -63,7 +63,7 @@ const films = () => [
     }
 ];
 
-/** @param {{ role?: 'admin' | 'user', signedOut?: boolean, groupAdmin?: boolean, hasPassword?: boolean }} options */
+/** @param {{ role?: 'admin' | 'user', signedOut?: boolean, groupAdmin?: boolean, hasPassword?: boolean, system?: boolean }} options */
 // A chat's change log (src/chat-changes.js): 23 rows, the newest first, one of each kind among them
 const CHANGE_KINDS = [
     ['subscribed', 'episode', 'The Bear', '@igor', 'bot'],
@@ -97,6 +97,8 @@ function accountState(options) {
     return {
         signedIn: !options.signedOut,
         hasPassword: Boolean(options.hasPassword),
+        // Signed in as the system account (not a Telegram user)
+        system: Boolean(options.system),
         role: options.role || 'admin',
         sent: /** @type {{ method: string, path: string, body: any }[]} */ ([]),
         polls: 0,
@@ -242,7 +244,15 @@ function accountAnswer(state, req, url) {
         return { success: true };
     }
     if (p === '/api/account/me')
-        return { user: { id: '42', name: '@me', role: state.role, hasPassword: state.hasPassword } };
+        return {
+            user: {
+                id: state.system ? '0' : '42',
+                name: state.system ? 'admin' : '@me',
+                role: state.role,
+                hasPassword: state.hasPassword,
+                system: state.system
+            }
+        };
     if (p === '/api/account/password') {
         if (method === 'PUT' && body.password.length < 8)
             return { status: 400, body: { error: 'At least 8 characters' } };

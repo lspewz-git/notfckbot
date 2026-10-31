@@ -12,9 +12,10 @@ const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
 const { deliver } = require('../delivery');
 const { z, valid, idOf, chatId, text } = require('../admin/validate');
-const { rateLimit, MemoryStore } = require('express-rate-limit');
+const { rateLimit, MemoryStore, ipKeyGenerator } = require('express-rate-limit');
 const auth = require('./auth');
 const password = require('./password');
+const roles = require('./roles');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
 
@@ -92,8 +93,15 @@ const limitBy = (limit, keyGenerator) => {
         ...(keyGenerator ? { keyGenerator } : {})
     });
 };
-/** The account a login names: its id and its @username share one count. */
-const loginLimitKey = (req) => `login:${req.loginUserId || password.loginKey(req.body && req.body.login)}`;
+/**
+ * The account a login names: its id and its @username share one count. The system account's login
+ * is known to all ("admin"): counted per address too, so tries from elsewhere can't lock out the
+ * way back in
+ */
+function loginLimitKey(req) {
+    const account = req.loginUserId || password.loginKey(req.body && req.body.login);
+    return account === roles.SYSTEM_ID ? `login:${account}:${ipKeyGenerator(req.ip)}` : `login:${account}`;
+}
 // The address first: the lookup behind the account's limit asks the database
 const passwordLimits = [
     limitBy(5),
@@ -109,11 +117,6 @@ const passwordLimits = [
 ];
 /** For the tests: every limit starts again. */
 const resetLimits = () => limitStores.forEach((store) => store.resetAll());
-
-const PASSWORD = z
-    .string({ error: 'Enter a password' })
-    .min(password.MIN_LENGTH, { error: `At least ${password.MIN_LENGTH} characters` })
-    .max(password.MAX_LENGTH, { error: `At most ${password.MAX_LENGTH} characters` });
 
 router.post('/api/login/password', passwordLimits, async (req, res) => {
     const body = valid(
@@ -155,8 +158,9 @@ router.post('/api/logout', async (req, res) => {
 // Who is signed in and as what: no Telegram in it, so the panel opens at once even when Telegram is down
 router.get('/api/account/me', async (req, res) => {
     try {
-        const hasPassword = await password.hasPassword(req.user.userId);
-        res.json({ user: { id: req.user.userId, name: req.user.userName, role: req.user.role, hasPassword } });
+        const { userId, userName: name, role, system } = req.user;
+        const hasPassword = system ? true : await password.hasPassword(userId);
+        res.json({ user: { id: userId, name, role, hasPassword, system } });
     } catch (err) {
         fail(res, err);
     }
@@ -165,7 +169,8 @@ router.get('/api/account/me', async (req, res) => {
 // The user's own password: set or changed (the session proves who they are), or removed. A change
 // or removal signs them out on their other devices, and the bot tells them either way
 router.put('/api/account/password', async (req, res) => {
-    const body = valid(z.object({ password: PASSWORD }), req.body, res);
+    if (req.user.system) return res.status(400).json({ error: "The system account's password is in Settings" });
+    const body = valid(z.object({ password: password.PASSWORD }), req.body, res);
     if (!body) return;
     const { userId } = req.user;
     try {
@@ -180,6 +185,7 @@ router.put('/api/account/password', async (req, res) => {
 });
 
 router.delete('/api/account/password', async (req, res) => {
+    if (req.user.system) return res.status(400).json({ error: "The system account's password is in Settings" });
     const { userId } = req.user;
     try {
         if (await password.removePassword(userId)) {
@@ -195,7 +201,8 @@ router.delete('/api/account/password', async (req, res) => {
 // The chats the user can open: asks Telegram about the groups, a few seconds at most
 router.get('/api/account/chats', async (req, res) => {
     try {
-        res.json(await chatsOf(req.user.userId));
+        // The system account is nobody in Telegram: no chats of its own
+        res.json(req.user.system ? [] : await chatsOf(req.user.userId));
     } catch (err) {
         fail(res, err);
     }

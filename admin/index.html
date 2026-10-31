@@ -685,6 +685,9 @@
                                 <button class="btn btn-ghost" data-chats-tab="active" aria-pressed="false">
                                     Active
                                 </button>
+                                <button class="btn btn-ghost" data-chats-tab="admins" aria-pressed="false">
+                                    Admins
+                                </button>
                                 <button class="btn btn-ghost" data-chats-tab="left" aria-pressed="false">
                                     Left the bot
                                 </button>
@@ -1020,29 +1023,42 @@
                                     <h2 class="settings-title">Panel access</h2>
                                     <p class="settings-desc">
                                         Admin: the whole panel. User: their own subscriptions, calendar and chat
-                                        settings. Applies at once, no restart.
+                                        settings. A person's role: Users → Actions → Panel access.
                                     </p>
-                                    <ul class="access-list" id="access-list" aria-label="People with access"></ul>
-                                    <div class="access-add">
-                                        <select
-                                            id="access-add-user"
-                                            class="select-field"
-                                            aria-label="Person to add"
-                                        ></select>
-                                        <select id="access-add-role" class="select-field" aria-label="Role">
-                                            <option value="user">User</option>
-                                            <option value="admin">Admin</option>
-                                        </select>
+                                    <div class="alerts-rule">
+                                        <span id="access-signup-label">
+                                            Open sign-up
+                                            <span class="field-hint">Anyone who starts the bot is a User</span>
+                                        </span>
+                                        <button
+                                            id="access-signup"
+                                            class="switch"
+                                            role="switch"
+                                            aria-checked="false"
+                                            aria-labelledby="access-signup-label"
+                                            data-action="access-signup"
+                                        >
+                                            <span class="switch-track" aria-hidden="true"
+                                                ><span class="switch-knob"></span
+                                            ></span>
+                                        </button>
+                                    </div>
+                                    <div class="alerts-rule">
+                                        <span>
+                                            System account <b id="access-system-login">admin</b>
+                                            <span class="field-hint" id="access-system-state"
+                                                >Not tied to Telegram</span
+                                            >
+                                        </span>
                                         <button
                                             type="button"
                                             class="btn btn-outline btn-compact"
-                                            id="access-add"
-                                            data-action="access-add"
+                                            id="access-system-password"
+                                            data-action="access-system-password"
                                         >
-                                            Add
+                                            Set password
                                         </button>
                                     </div>
-                                    <p class="field-hint">Only people who have written to the bot.</p>
                                 </div>
 
                                 <div class="glass-card settings-card">
@@ -1775,7 +1791,7 @@
         <dialog id="password-modal" class="modal" aria-labelledby="password-title">
             <form id="password-form" class="modal-content modal-medium password-form" novalidate>
                 <h3 id="password-title">Set a password</h3>
-                <p class="modal-sub">For signing in when Telegram isn't answering, with your username or ID.</p>
+                <p class="modal-sub" id="password-sub"></p>
                 <label class="field-label" for="password-new">New password</label>
                 <div class="token-row">
                     <input
@@ -1807,9 +1823,7 @@
                     autocomplete="new-password"
                     maxlength="128"
                 />
-                <p class="field-hint">
-                    At least 8 characters. A change signs you out on your other devices; the bot tells you about it.
-                </p>
+                <p class="field-hint" id="password-hint"></p>
                 <p class="login-error" id="password-error" role="alert" hidden></p>
                 <button type="submit" class="btn btn-primary btn-block">Save</button>
                 <button
@@ -2157,26 +2171,34 @@
                                 <polyline points="9 18 15 12 9 6" /></svg
                         ></span>
                     </button>
-                    <button
-                        id="action-access"
-                        class="action-row"
-                        data-action="access-open"
-                        data-section="settings"
-                        data-close="chat-actions-modal"
-                    >
+                    <div id="action-access" class="action-row action-row-select">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <rect x="3" y="11" width="18" height="11" rx="2" />
                                 <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg
                         ></span>
                         <span class="action-text">
-                            <span class="action-title">Panel access</span>
-                            <span class="action-desc" id="action-access-desc">No access</span>
+                            <label class="action-title" for="action-access-role">Panel access</label>
+                            <span class="action-desc" id="action-access-desc">Saved when picked</span>
                         </span>
-                        <span class="action-chevron"
+                        <select id="action-access-role" class="select-field action-select">
+                            <option value="admin">Admin</option>
+                            <option value="user">User</option>
+                            <option value="none">No access</option>
+                        </select>
+                    </div>
+                    <button id="action-password-remove" class="action-row" data-action="access-password-remove" hidden>
+                        <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <polyline points="9 18 15 12 9 6" /></svg
+                                <circle cx="7.5" cy="15.5" r="4.5" />
+                                <path d="M10.7 12.3 21 2" />
+                                <path d="m16 7 3 3" />
+                                <path d="M3 3l18 18" /></svg
                         ></span>
+                        <span class="action-text">
+                            <span class="action-title">Remove password</span>
+                            <span class="action-desc">Signs them out; Telegram sign-in stays</span>
+                        </span>
                     </button>
                     <button id="action-block" class="action-row">
                         <span class="action-icon"

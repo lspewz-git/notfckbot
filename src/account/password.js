@@ -1,8 +1,9 @@
 /**
  * Signing in with a password: a way in when Telegram isn't answering. A user sets it on their
  * account page after signing in with Telegram, so the password is always tied to a Telegram id and
- * its role (src/account/auth.js); there is no sign-up. They sign in with that id or their
- * @username (the private chat with the bot knows it).
+ * its role (src/account/roles.js). They sign in with that id or their @username (the private chat
+ * with the bot knows it). The system account signs in here too, with its login and the hash in
+ * .env (roles.js).
  *
  * Hashes are Node's scrypt (no dependency), salted per password. Guessing is slowed by the rate
  * limits on the route (src/account/routes.js).
@@ -10,8 +11,10 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { AccountPassword, Chat } = require('../db');
-const { isAllowed, startSession } = require('./auth');
+const { startSession } = require('./auth');
+const roles = require('./roles');
 const { deliver } = require('../delivery');
+const { z } = require('../admin/validate');
 const { log } = require('../log');
 
 const scrypt = promisify(crypto.scrypt);
@@ -22,15 +25,25 @@ const MAX_LENGTH = 128;
 const COST = { N: 16384, r: 8, p: 1 };
 const KEY_LENGTH = 32;
 
-/** @returns {Promise<string>} `scrypt$N$r$p$salt$key`, base64url parts */
+/** A new password, for the routes that set one */
+const PASSWORD = z
+    .string({ error: 'Enter a password' })
+    .min(MIN_LENGTH, { error: `At least ${MIN_LENGTH} characters` })
+    .max(MAX_LENGTH, { error: `At most ${MAX_LENGTH} characters` });
+
+/**
+ * @returns {Promise<string>} `scrypt:N:r:p:salt:key`, base64url parts; no "$", which Docker
+ *   Compose would read as a variable in .env
+ */
 async function hashPassword(password) {
     const salt = crypto.randomBytes(16);
     const key = await scrypt(password, salt, KEY_LENGTH, COST);
-    return ['scrypt', COST.N, COST.r, COST.p, salt.toString('base64url'), key.toString('base64url')].join('$');
+    return ['scrypt', COST.N, COST.r, COST.p, salt.toString('base64url'), key.toString('base64url')].join(':');
 }
 
 async function matches(password, stored) {
-    const [kind, N, r, p, salt, key] = String(stored || '').split('$');
+    // "$" between the parts in the first hashes (31.10)
+    const [kind, N, r, p, salt, key] = String(stored || '').split(/[:$]/);
     if (kind !== 'scrypt' || !salt || !key) return false;
     const expected = Buffer.from(key, 'base64url');
     const actual = await scrypt(password, Buffer.from(salt, 'base64url'), expected.length, {
@@ -53,11 +66,13 @@ const loginKey = (login) =>
         .toLowerCase();
 
 /**
- * The Telegram id behind a login: the id itself, or the @username of a private chat with the bot.
+ * The user id behind a login: the system account's login (id 0), a Telegram id, or the @username
+ * of a private chat with the bot.
  * @returns {Promise<string | null>}
  */
 async function userIdFor(login) {
     const key = loginKey(login);
+    if (key && key === roles.systemLogin().toLowerCase()) return roles.SYSTEM_ID;
     if (/^[1-9]\d{0,19}$/.test(key)) return key;
     if (!/^[a-z0-9_]{4,32}$/.test(key)) return null;
     // Private chats keep "@username" (or a plain name when there is none: never matched here);
@@ -77,15 +92,22 @@ async function userIdFor(login) {
  */
 async function signInWithPassword(login, password, now = Date.now()) {
     const userId = await userIdFor(login);
-    const row = userId && isAllowed(userId) ? await AccountPassword.findByPk(userId) : null;
-    if (!row) {
+    const system = userId !== null && roles.isSystem(userId);
+    let hash = null;
+    if (system) hash = roles.systemHash() || null;
+    else if (userId && (await roles.isAllowed(userId))) {
+        const row = await AccountPassword.findByPk(userId);
+        hash = row ? row.hash : null;
+    }
+    if (!hash) {
         await matches(password, await dummyHash());
         return null;
     }
-    if (!(await matches(password, row.hash))) {
-        log.warn(`[Account] Wrong password for user ${userId}`);
+    if (!(await matches(password, hash))) {
+        log.warn(`[Account] Wrong password for ${system ? 'the system account' : `user ${userId}`}`);
         return null;
     }
+    if (system) return { token: await startSession({ userId, userName: roles.systemLogin() }, now) };
     const chat = await Chat.findByPk(userId, { attributes: ['username'], raw: true });
     return { token: await startSession({ userId, userName: chat ? chat.username : null }, now) };
 }
@@ -116,7 +138,7 @@ const NOTICES = {
  * @param {keyof NOTICES} kind
  */
 function notifyPassword(bot, userId, kind) {
-    if (!bot) return;
+    if (!bot || roles.isSystem(userId)) return;
     deliver(bot, userId, NOTICES[kind]).catch((err) =>
         log.warn(`[Account] Password notice to ${userId} failed: ${err.message}`)
     );
@@ -133,6 +155,7 @@ async function withPasswords() {
 module.exports = {
     MIN_LENGTH,
     MAX_LENGTH,
+    PASSWORD,
     hashPassword,
     matches,
     loginKey,

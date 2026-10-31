@@ -73,6 +73,7 @@ export const TABLES = {
         tabs: {
             all: { label: 'All', matches: () => true, empty: 'No chats yet.' },
             active: { label: 'Active', matches: (item) => !botLeft(item), empty: 'No active chats.' },
+            admins: { label: 'Admins', matches: (item) => item.panelRole === 'admin', empty: 'No admins.' },
             // Blocked the bot, took it out of the group, or gone (src/bot-status.js)
             left: {
                 label: 'Left the bot',

@@ -64,13 +64,22 @@
         flex-wrap: wrap;
     }
 
-    /* Tabs become one full-width segmented control with thumb-sized targets */
+    /* Tabs become one full-width segmented control with thumb-sized targets; more than fit (Users'
+       four with their counts) scroll inside the track instead of running past the card */
     .tab-filters {
         display: flex;
+        overflow-x: auto;
+        scrollbar-width: none;
     }
 
+    .tab-filters::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Equal while they fit, never narrower than their words */
     .tab-filters .btn {
-        flex: 1;
+        flex: 1 1 0;
+        min-width: max-content;
         min-height: 2.75rem;
     }
 

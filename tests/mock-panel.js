@@ -360,10 +360,10 @@ async function mockPanel(page, options = {}) {
     const panel = {
         // Signing in and the user's own chats (tests/mock-account.js): an admin unless told
         account: accountState(options),
-        access: options.access || {
-            people: [{ id: '101', name: 'alice', role: 'admin', you: true }],
-            candidates: [{ id: '102', name: 'bob' }]
-        },
+        // Settings → Bot → Panel access
+        access: options.access || { openSignup: false, system: { login: 'admin', passwordSet: true } },
+        // Users: a role picked in a row's menu changes the chat here (panel.accessSaves has the bodies)
+        chats: structuredClone(options.chats || CHATS),
         subs: buildSubs(),
         sub,
         series,
@@ -506,7 +506,7 @@ async function mockPanel(page, options = {}) {
                 url: 'https://github.com/owner/repo/commit/abc1234def5678abc1234def5678abc1234def56'
             },
         '/api/logs': () => [{ type: 'log', time: '12:00:00', text: 'Started' }],
-        '/api/data/chats': () => options.chats || CHATS,
+        '/api/data/chats': () => panel.chats,
         // Like the real API: the archived flag is derived from Series.status on every response
         '/api/data/subs': () =>
             panel.subs.map((s) => ({ ...s, archived: FINISHED.includes(s.Series && s.Series.status) })),
@@ -545,23 +545,27 @@ async function mockPanel(page, options = {}) {
             }
             return { saved, settings: panel.settings };
         },
-        // Settings → Bot → Panel access: alice is the admin signed in, bob may be added. POST records
-        // the body (panel.accessSaves) and answers options.accessSave(body) or the list with it applied
+        // Panel access: GET the Settings card; POST a person's role (panel.accessSaves records the
+        // bodies), answered by options.accessSave(body) or applied to their chat
         '/api/access': (req) => {
             if (req.method() === 'GET') return panel.access;
             const body = req.postDataJSON();
             panel.accessSaves = [...(panel.accessSaves || []), body];
             if (options.accessSave) return options.accessSave(body);
-            const { people, candidates } = panel.access;
-            const known = [...people, ...candidates].find((p) => p.id === body.userId);
-            const rest = people.filter((p) => p.id !== body.userId);
-            panel.access =
-                body.role === 'none'
-                    ? { people: rest, candidates: [...candidates, { id: known.id, name: known.name }] }
-                    : {
-                          people: [...rest, { id: known.id, name: known.name, role: body.role, you: false }],
-                          candidates: candidates.filter((c) => c.id !== body.userId)
-                      };
+            const chat = panel.chats.find((c) => String(c.id) === body.userId);
+            if (chat) {
+                chat.panelRole = body.role;
+                if (body.role === 'none') chat.hasPassword = false;
+            }
+            return { userId: body.userId, role: body.role };
+        },
+        '/api/access/signup': (req) => {
+            panel.access = { ...panel.access, openSignup: req.postDataJSON().open };
+            return panel.access;
+        },
+        '/api/access/system-password': (req) => {
+            panel.systemPasswords = [...(panel.systemPasswords || []), req.postDataJSON().password];
+            panel.access = { ...panel.access, system: { ...panel.access.system, passwordSet: true } };
             return panel.access;
         },
         // The year recap's sending: who gets it and how it goes; the sends asked for, for tests
@@ -772,11 +776,9 @@ async function mockPanel(page, options = {}) {
             /^\/api\/access\/(\d+)\/password$/,
             ([, id]) => {
                 panel.passwordRemoved = [...(panel.passwordRemoved || []), id];
-                panel.access = {
-                    ...panel.access,
-                    people: panel.access.people.map((p) => (p.id === id ? { ...p, password: false } : p))
-                };
-                return panel.access;
+                const chat = panel.chats.find((c) => String(c.id) === id);
+                if (chat) chat.hasPassword = false;
+                return { userId: id, hasPassword: false };
             }
         ],
         [

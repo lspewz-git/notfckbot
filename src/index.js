@@ -51,6 +51,10 @@ async function start() {
 
         // Initialize Database
         await initDb();
+        // Panel roles from .env, once, into the database (src/account/roles.js)
+        await require('./account/roles')
+            .importFromEnv()
+            .catch((err) => log.error(`[Account] Moving roles from .env failed: ${err.message}`));
 
         // The panel needs no Telegram: it starts first, so a Telegram out of reach (the network, a
         // block, a revoked token) leaves it up to see why and to set a proxy or a new token

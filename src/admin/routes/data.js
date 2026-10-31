@@ -5,7 +5,8 @@ const { isFinishedStatus } = require('../../constants');
 const router = require('express').Router();
 const { log } = require('../../log');
 const { isTelegramReady } = require('../../telegram-ready');
-const { roleOf } = require('../../account/auth');
+const { rolesOf } = require('../../account/roles');
+const { withPasswords } = require('../../account/password');
 
 // A name's wait: the table doesn't hang on a Telegram that doesn't answer
 const NAME_TIMEOUT_MS = 5000;
@@ -69,8 +70,15 @@ router.get('/api/data/:type', async (req, res) => {
                 order: [['createdAt', 'DESC']]
             });
             await backfillChatNames(data, req.app.get('bot'));
-            // Who may sign in to the panel: a badge on the row (routes/access.js sets it)
-            data = data.map((c) => ({ ...c.toJSON(), panelRole: c.type === 'private' ? roleOf(c.id) : null }));
+            // Who may sign in to the panel: a badge on the row and the role in its menu (routes/access.js
+            // sets it), and whether they have a password the menu can remove
+            const people = data.filter((c) => c.type === 'private').map((c) => String(c.id));
+            const [roles, passwords] = await Promise.all([rolesOf(people), withPasswords()]);
+            data = data.map((c) =>
+                c.type === 'private'
+                    ? { ...c.toJSON(), panelRole: roles.get(String(c.id)), hasPassword: passwords.has(String(c.id)) }
+                    : { ...c.toJSON(), panelRole: null }
+            );
         }
         res.json(data);
     } catch (err) {

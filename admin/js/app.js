@@ -294,7 +294,9 @@ function setupControls() {
 function sectionFromHash(role) {
     const id = location.hash.slice(1);
     if (!/^[a-z-]+$/.test(id) || !document.getElementById(`${id}-section`)) return null;
-    return role === 'admin' || id.startsWith('my-') ? id : null;
+    // The system account has no "My account" and no switch back from it
+    if (id.startsWith('my-')) return document.body.classList.contains('system-account') ? null : id;
+    return role === 'admin' ? id : null;
 }
 
 /**

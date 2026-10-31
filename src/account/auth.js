@@ -11,14 +11,14 @@
  * - login-link.js on the server makes such a link when Telegram itself is out of reach.
  * - A password the user set on their account page (src/account/password.js).
  *
- * Who may sign in: ADMIN_USERS (the whole panel) and ACCOUNT_USERS (their own chats only), Telegram
- * ids separated by commas in .env. Both lists are read on every request: taking an id off signs that
- * user out everywhere. Only hashes of tokens are stored.
+ * Who may sign in and as what: src/account/roles.js, read on every request, so a role taken away
+ * signs that person out everywhere. Only hashes of tokens are stored.
  */
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { AccountSession, LoginLink } = require('../db');
 const { lruCache } = require('../lru');
+const { roleOf, isAllowed, isSystem } = require('./roles');
 const { log } = require('../log');
 
 const LINK_TTL_MS = 5 * 60 * 1000;
@@ -29,29 +29,6 @@ const CODE = /^[A-Za-z0-9_-]{32}$/;
 
 const hash = (token) => crypto.createHash('sha256').update(token).digest('hex');
 const newToken = () => crypto.randomBytes(32).toString('base64url');
-
-/** @returns {Set<string>} the Telegram ids in an .env list */
-function idsIn(name) {
-    return new Set(
-        String(process.env[name] || '')
-            .split(',')
-            .map((id) => id.trim())
-            .filter((id) => /^\d{1,20}$/.test(id))
-    );
-}
-
-/** @returns {'admin' | 'user' | null} */
-function roleOf(userId) {
-    const id = String(userId);
-    if (idsIn('ADMIN_USERS').has(id)) return 'admin';
-    if (idsIn('ACCOUNT_USERS').has(id)) return 'user';
-    return null;
-}
-
-const isAllowed = (userId) => roleOf(userId) !== null;
-
-/** The first admin, for login-link.js run without an id. */
-const firstAdmin = () => [...idsIn('ADMIN_USERS')][0] || null;
 
 /** Where the panel is, for the link: PANEL_URL in .env, like http://192.168.2.112 */
 const panelUrl = () => String(process.env.PANEL_URL || '').replace(/\/+$/, '');
@@ -84,15 +61,18 @@ function cookieToken(header) {
     return null;
 }
 
-/** @returns {Promise<{ id: string, userId: string, userName: string | null, role: 'admin' | 'user' } | null>} */
+/**
+ * @returns {Promise<{ id: string, userId: string, userName: string | null, role: 'admin' | 'user',
+ *   system: boolean } | null>} system: the system account, not a Telegram user
+ */
 async function sessionOf(req, now = Date.now()) {
     const token = cookieToken(req.headers.cookie);
     if (!TOKEN.test(String(token || ''))) return null;
     const row = await AccountSession.findByPk(hash(token));
     if (!row || new Date(row.expiresAt).getTime() <= now) return null;
-    const role = roleOf(row.userId);
+    const role = await roleOf(row.userId);
     if (!role) return null;
-    return { id: row.id, userId: String(row.userId), userName: row.userName, role };
+    return { id: row.id, userId: String(row.userId), userName: row.userName, role, system: isSystem(row.userId) };
 }
 
 const endSession = (session) => AccountSession.destroy({ where: { id: session.id } });
@@ -122,7 +102,7 @@ function clearCookie(res) {
  * @param {number | string | null} chatId the chat /login was sent from, opened first
  */
 async function createLink(user, chatId = null, now = Date.now()) {
-    if (!isAllowed(user.id) || !panelUrl()) return null;
+    if (!panelUrl() || !(await isAllowed(user.id))) return null;
     const token = newToken();
     await LoginLink.create({
         id: hash(token),
@@ -146,7 +126,7 @@ async function redeemLink(token, now = Date.now()) {
     if (!link) return null;
     // Whoever removes the row spends it: two presses at once can't both get in
     if (!(await LoginLink.destroy({ where: { id } }))) return null;
-    if (new Date(link.expiresAt).getTime() <= now || !isAllowed(link.userId)) return null;
+    if (new Date(link.expiresAt).getTime() <= now || !(await isAllowed(link.userId))) return null;
     const session = await startSession({ userId: link.userId, userName: link.userName }, now);
     return { token: session, chatId: link.chatId === null ? null : String(link.chatId) };
 }
@@ -178,10 +158,10 @@ const isWaiting = (code) => {
 
 /**
  * The user's answer in the bot.
- * @returns {boolean} false: the code is gone (expired, used, answered) or the user isn't allowed
+ * @returns {Promise<boolean>} false: the code is gone (expired, used, answered) or the user isn't allowed
  */
-function answerCode(code, user, yes) {
-    if (!isWaiting(code) || !isAllowed(user.id)) return false;
+async function answerCode(code, user, yes) {
+    if (!isWaiting(code) || !(await isAllowed(user.id)) || !isWaiting(code)) return false;
     const entry = codes.get(code);
     if (yes) entry.user = { userId: user.id, userName: user.name || null };
     else entry.refused = true;
@@ -201,7 +181,7 @@ async function pollCode(code, secret, now = Date.now()) {
     }
     if (!entry.user) return { state: 'waiting' };
     codes.delete(code);
-    if (!isAllowed(entry.user.userId)) return { state: 'gone' };
+    if (!(await isAllowed(entry.user.userId))) return { state: 'gone' };
     return { state: 'in', token: await startSession(entry.user, now) };
 }
 
@@ -209,10 +189,8 @@ module.exports = {
     COOKIE,
     LINK_TTL_MS,
     SESSION_TTL_MS,
-    idsIn,
     roleOf,
     isAllowed,
-    firstAdmin,
     panelUrl,
     startSession,
     cookieToken,
