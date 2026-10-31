@@ -238,6 +238,16 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
     await expect(card.getByRole('button', { name: /series card/i })).toHaveCount(0);
 });
 
+test('the panel opens on the own account, not on the group picked last time', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-settings');
+    const picker = page.locator('#my-settings-section select[data-mine="chat"]');
+    await picker.selectOption('-100');
+    await page.reload();
+    await openMine(page, 'my-settings');
+    await expect(picker).toHaveValue(panel.account.chats[0].id);
+});
+
 test("a group's settings: a member sees them, unchangeable; an admin's change is saved", async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-settings');

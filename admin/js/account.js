@@ -65,32 +65,17 @@ const state = {
 
 const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${rest}`;
 
-function remember() {
-    try {
-        localStorage.setItem('account.chat', state.chatId);
-    } catch {
-        // Private mode: the first chat it is
-    }
-}
-
-function recalled() {
-    try {
-        return localStorage.getItem('account.chat');
-    } catch {
-        return null;
-    }
-}
-
-/** The chats from /api/account/me; `preferred` (a sign-in link's chat) or the remembered one first. */
+/**
+ * The chats from /api/account/chats. Opens on the user's own account (first in the list), not on
+ * the chat picked last time; only a sign-in link made in a group (`preferred`) opens that group.
+ */
 export function setChats(chats, preferred = null) {
     state.chats = chats;
     const ids = chats.map((c) => c.id);
-    const wanted = [preferred, recalled()].find((id) => id && ids.includes(String(id)));
-    state.chatId = wanted ? String(wanted) : ids[0] || null;
+    state.chatId = preferred && ids.includes(String(preferred)) ? String(preferred) : ids[0] || null;
     state.chatsError = null;
     state.list = null;
     state.cal = null;
-    remember();
     for (const holder of all('[data-chat-picker]')) {
         holder.innerHTML = chats.length
             ? `<select class="select-field" aria-label="Chat" data-mine="chat">${chats
@@ -721,7 +706,6 @@ export function setupAccount() {
             // The search's "Added" marks belong to the chat it was made for
             state.query = '';
             state.results = [];
-            remember();
             // Every section's picker shows the same chat
             for (const other of /** @type {HTMLSelectElement[]} */ (all('select[data-mine="chat"]'))) {
                 if (other !== el && other.value !== el.value) {
