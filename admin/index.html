@@ -43,6 +43,7 @@
         <link rel="modulepreload" href="js/pager.js" />
         <link rel="modulepreload" href="js/proxy-url.js" />
         <link rel="modulepreload" href="js/proxy.js" />
+        <link rel="modulepreload" href="js/pull-refresh.js" />
         <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/recap-cards.js" />
         <link rel="modulepreload" href="js/recap-schedule.js" />
@@ -1638,6 +1639,17 @@
                     </section>
                 </div>
             </main>
+        </div>
+
+        <!-- Pull to refresh (pull-refresh.js): a ring in the gap the pull opens above the page -->
+        <div id="pull-refresh" class="pull-refresh" aria-hidden="true">
+            <span class="pull-refresh-ring">
+                <svg viewBox="0 0 24 24">
+                    <circle class="pull-refresh-track" cx="12" cy="12" r="9" />
+                    <circle class="pull-refresh-arc" cx="12" cy="12" r="9" transform="rotate(-90 12 12)" />
+                    <path class="pull-refresh-check" d="M7.5 12.5l3 3 6-6.5" />
+                </svg>
+            </span>
         </div>
 
         <!-- Phones and tablets: app-style tab bar instead of the sidebar -->

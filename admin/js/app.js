@@ -39,6 +39,7 @@ import { openAbout, loadAbout } from './about.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 import { accountActions, setupAccount } from './account.js';
 import { startSession, watchSession, sessionActions } from './session.js';
+import { setupPullRefresh } from './pull-refresh.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -63,6 +64,9 @@ function switchSection(id) {
     }
     activeSection = id;
     setSection(id);
+    // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
+    // not pushed: Back still leaves the panel instead of stepping through its tabs
+    window.history.replaceState(null, '', `#${id}`);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
     // Each section opens at its top: the page keeps one scroll position for all of them, and the
     // last section's would leave the new one scrolled down (or at the bottom, if it is shorter)
@@ -237,6 +241,7 @@ function setupControls() {
     $('service-alert-action').onclick = openFailingService;
 
     $('refresh-btn').onclick = refreshNow;
+    setupPullRefresh(refreshNow);
 
     $('actions-btn').onclick = () => openModal('actions-modal');
     $('about-btn').onclick = openAbout;
@@ -258,10 +263,19 @@ function setupControls() {
 
 // --- Boot ---
 
-/** Once signed in: an admin's panel opens on the dashboard, a user's on their subscriptions. */
+/** The section named in the address, if this role may open it; null otherwise. */
+function sectionFromHash(role) {
+    const id = location.hash.slice(1);
+    if (!/^[a-z-]+$/.test(id) || !document.getElementById(`${id}-section`)) return null;
+    return role === 'admin' || id.startsWith('my-') ? id : null;
+}
+
+/**
+ * Once signed in: the section in the address (a reload keeps the tab), else an admin's panel opens
+ * on the dashboard and a user's on their subscriptions.
+ */
 function afterSignIn(role) {
-    if (role === 'admin') switchSection(activeSection);
-    else switchSection('my-subs');
+    switchSection(sectionFromHash(role) || (role === 'admin' ? activeSection : 'my-subs'));
 }
 
 async function init() {

@@ -232,3 +232,148 @@ h3 {
     border-radius: 999px;
     background: var(--surface-3);
 }
+
+/* --- Pull to refresh (pull-refresh.js) --- */
+/* The browser's own pull reloads the whole page and lands on the dashboard; ours refreshes the
+   data and keeps the tab. This also stops the rubber-band bounce at the page edges. */
+html {
+    overscroll-behavior-y: none;
+    /* Set by pull-refresh.js: how far the page is pulled, and the ring's fill (0–1) */
+    --pull: 0px;
+    --pull-progress: 0;
+    --pull-ease: cubic-bezier(0.3, 0, 0.2, 1);
+    --pull-spring: cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+/* The page follows the pull; moved only while pulled (a transform would otherwise re-anchor
+   whatever is fixed or sticky inside it) */
+html.pull-moving .main-inner {
+    transform: translateY(var(--pull));
+    transition: transform 0.35s var(--pull-ease);
+}
+
+/* With the finger: no lag */
+html.pull-dragging .main-inner,
+html.pull-dragging .pull-refresh {
+    transition: none;
+}
+
+/* Into the wait: a small spring */
+html.pull-holding .main-inner,
+html.pull-holding .pull-refresh {
+    transition:
+        transform 0.45s var(--pull-spring),
+        opacity 0.2s ease;
+}
+
+/* The indicator: in the middle of the gap the pull opens above the page */
+.pull-refresh {
+    --ring: 36px;
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + var(--space-2));
+    left: 50%;
+    z-index: 600;
+    width: var(--ring);
+    height: var(--ring);
+    margin-left: calc(var(--ring) / -2);
+    transform: translateY(calc(var(--pull) / 2 - 50%));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        transform 0.35s var(--pull-ease),
+        opacity 0.25s ease;
+}
+
+.pull-refresh.pulling,
+.pull-refresh.ready,
+.pull-refresh.refreshing,
+.pull-refresh.done {
+    opacity: 1;
+}
+
+/* Grows with the pull and pops a little once a release would refresh */
+.pull-refresh-ring {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    transform: scale(calc(0.5 + 0.5 * var(--pull-progress)));
+    transition: transform 0.3s var(--pull-spring);
+}
+
+.pull-refresh.ready .pull-refresh-ring {
+    transform: scale(1.12);
+}
+
+.pull-refresh.refreshing .pull-refresh-ring,
+.pull-refresh.done .pull-refresh-ring {
+    transform: scale(1);
+}
+
+.pull-refresh svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transform: rotate(calc(var(--pull-progress) * 270deg));
+}
+
+.pull-refresh-track {
+    stroke: var(--fill-strong);
+}
+
+/* The ring fills as the page is pulled (a circle of r 9 is 56.55 long) */
+.pull-refresh-arc {
+    stroke: var(--accent);
+    stroke-dasharray: 56.55px;
+    stroke-dashoffset: calc(56.55px * (1 - 0.85 * var(--pull-progress)));
+}
+
+.pull-refresh-check {
+    stroke: var(--success);
+    opacity: 0;
+}
+
+/* Waiting: part of the ring spins */
+.pull-refresh.refreshing svg {
+    animation: spin 0.8s linear infinite;
+}
+
+.pull-refresh.refreshing .pull-refresh-arc {
+    stroke-dashoffset: calc(56.55px * 0.7);
+    transition: stroke-dashoffset 0.3s ease;
+}
+
+/* Done: a check for a moment */
+.pull-refresh.done svg {
+    transform: none;
+}
+
+.pull-refresh.done .pull-refresh-arc,
+.pull-refresh.done .pull-refresh-track {
+    opacity: 0;
+}
+
+.pull-refresh.done .pull-refresh-check {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.pull-moving .main-inner,
+    html.pull-holding .main-inner,
+    html.pull-holding .pull-refresh,
+    .pull-refresh,
+    .pull-refresh-ring {
+        transition-timing-function: ease;
+    }
+
+    .pull-refresh.ready .pull-refresh-ring {
+        transform: scale(1);
+    }
+}

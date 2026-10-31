@@ -120,7 +120,8 @@ function stopPolling() {
 /** @param {(role: string) => void} onSignedIn what the panel does once in (app.js) */
 export function sessionActions(onSignedIn) {
     const signedIn = async (chatId = null) => {
-        window.history.replaceState(null, '', '/');
+        // The section in the address stays: signing in again lands on the tab that was open
+        window.history.replaceState(null, '', `/${location.hash}`);
         const role = await startSession(chatId);
         if (role) onSignedIn(role);
     };
