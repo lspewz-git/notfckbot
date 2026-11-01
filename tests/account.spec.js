@@ -112,6 +112,26 @@ test('Telegram sign-in shows its logo', async ({ page }) => {
     await expect(page.locator('#login-tg svg')).toBeVisible();
 });
 
+test('sign-in branding and confirmation fit without mixed-language instructions', async ({ page, context }) => {
+    const panel = await mockPanel(page, { signedOut: true });
+    panel.account.confirmationState = 'waiting';
+    const logo = await page.locator('.login-logo').boundingBox();
+    const title = await page.locator('.login-card h1').boundingBox();
+    expect(title.x).toBeGreaterThan(logo.x + logo.width);
+    expect(Math.abs(title.y + title.height / 2 - logo.y - logo.height / 2)).toBeLessThan(2);
+    const popup = context.waitForEvent('page');
+    await page.locator('#login-tg[href]').click();
+    await (await popup).close();
+    await expect(page.locator('#login-body .login-text')).toHaveText(
+        'Check that the bot shows the same code, then confirm the sign-in.'
+    );
+    const back = page.locator('.login-back');
+    await expect(back).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    expect(await back.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await back.click();
+    await expect(page.locator('#login-tg')).toBeVisible();
+});
+
 test('confirmation stays usable when the browser clock is ahead of the server', async ({ page }) => {
     await page.addInitScript(() => { const now = Date.now.bind(Date); Date.now = () => now() + 360000; });
     const panel = await mockPanel(page, { signedOut: true });

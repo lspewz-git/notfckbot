@@ -98,7 +98,7 @@ const waitingScreen = (start, qr = false) =>
     gate(
         backButton +
             `<h2>${qr ? 'Scan to sign in' : 'Confirm in Telegram'}</h2>` +
-            `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the Telegram bot.' : 'Check that the bot shows the same code, then tap “Да, это я”.'}</p>` +
+            `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the Telegram bot.' : 'Check that the bot shows the same code, then confirm the sign-in.'}</p>` +
             (qr
                 ? `<img class="login-qr" src="${escapeHtml(start.qr)}" alt="Scan to open the Telegram bot" width="232" height="232" />`
                 : '') +

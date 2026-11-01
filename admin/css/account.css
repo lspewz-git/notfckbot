@@ -74,6 +74,17 @@ body.signed-out .tabbar {
     font-size: var(--text-2xl);
 }
 
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.login-brand .login-logo {
+    flex-shrink: 0;
+    margin-bottom: 0;
+}
+
 .login-text {
     color: var(--text-secondary);
 }
@@ -132,6 +143,7 @@ body.signed-out .tabbar {
 .login-back {
     align-self: flex-start;
     padding-inline: 0;
+    border-color: transparent;
 }
 .login-card h2 {
     font-size: var(--text-xl);
