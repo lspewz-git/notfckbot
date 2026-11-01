@@ -219,6 +219,8 @@ router.post('/api/account/activity', async (req, res) => {
 router.post('/api/logout', async (req, res) => {
     try {
         await auth.endSession(req.user);
+        // A deliberate, authenticated logout must allow an immediate fresh sign-in.
+        confirmationCooldown.delete(req.user.userId);
         auth.clearCookie(res);
         res.json({ success: true });
     } catch (err) {

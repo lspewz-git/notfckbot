@@ -226,6 +226,20 @@ body.signed-out .tabbar {
     color: var(--text);
 }
 
+.password-eye-slash {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    opacity: 1;
+    transition:
+        stroke-dashoffset 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.password-toggle[aria-pressed='true'] .password-eye-slash {
+    stroke-dashoffset: 1;
+    opacity: 0;
+}
+
 .login-password > .btn,
 .password-form .btn-block {
     margin-top: var(--space-2);

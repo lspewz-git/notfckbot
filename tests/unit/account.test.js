@@ -775,6 +775,39 @@ test('the API: set, use and remove a password; wrong tries stop at the limit', a
     assert.equal((await login('long-enough')).status, 401, 'removed');
 });
 
+test('password sign-in can repeat immediately after logout without bypassing pending confirmation limits', async (t) => {
+    const sent = [];
+    const { server, call } = await serve(fakeBot({}, sent));
+    t.after(() => server.close());
+    const { resetLimits } = require('../../src/account/routes');
+    resetLimits();
+    t.after(resetLimits);
+    t.mock.method(Chat, 'findByPk', async () => null);
+    await password.setPassword('7', 'long-enough');
+    await password.setPassword('8', 'long-enough');
+    const login = (userId) => call('POST', '/api/login/password', { body: { login: userId, password: 'long-enough' } });
+    const first = await login('7');
+    assert.equal(first.status, 200);
+    assert.equal((await login('7')).status, 429, 'pending requests stay limited');
+    assert.equal((await call('POST', '/api/logout')).status, 401, 'signed-out callers cannot reset the limit');
+    assert.equal((await login('7')).status, 429);
+    assert.equal((await login('8')).status, 200);
+    await auth.answerCode(first.body.code, { id: 7 }, true);
+    const approved = await call('POST', '/api/login/telegram/poll', {
+        body: { code: first.body.code, secret: first.body.secret }
+    });
+    const cookie = /nfb_session=([^;]+)/.exec(approved.headers.get('set-cookie'))[1];
+    assert.equal((await call('POST', '/api/logout', { cookie })).status, 200);
+    assert.equal((await call('GET', '/api/account/me', { cookie })).status, 401);
+    const again = await login('7');
+    assert.equal(again.status, 200, 'a completed sign-in and logout do not impose a one-minute lockout');
+    assert.equal(again.body.confirmation, true, 'the next login still needs Telegram approval');
+    assert.equal(again.headers.get('set-cookie'), null);
+    assert.notEqual(again.body.code, first.body.code);
+    assert.equal((await login('8')).status, 429, 'another account keeps its own cooldown');
+    assert.equal(sent.length, 3);
+});
+
 test('the per-account limit: an id and its @username count as one account', async (t) => {
     t.mock.method(Chat, 'findAll', async ({ where }) => (where.username === '@kirill' ? [{ id: 7 }] : []));
     const { loginLimitKey } = require('../../src/account/routes');

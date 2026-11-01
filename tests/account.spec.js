@@ -603,13 +603,17 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
 
     // The eye shows what is typed
     await page.locator('#login-pass').fill('good-password');
+    const eyeSvg = await eye.locator('svg').elementHandle();
     await page.locator('.login-password [data-action="password-show"]').click();
     await expect(page.locator('#login-pass')).toHaveAttribute('type', 'text');
-    await expect(eye.locator('path')).toHaveCount(0);
+    expect(await eyeSvg.evaluate((svg) => svg.isConnected)).toBe(true);
+    await expect(eye.locator('.password-eye-slash')).toHaveCSS('opacity', '0');
     await expect(eye).toHaveAttribute('aria-label', 'Hide password');
     await eye.click();
     await expect(page.locator('#login-pass')).toHaveAttribute('type', 'password');
     await expect(eye.locator('path')).toHaveAttribute('d', 'm3 3 18 18');
+    expect(await eyeSvg.evaluate((svg) => svg.isConnected)).toBe(true);
+    await expect(eye.locator('.password-eye-slash')).toHaveCSS('opacity', '1');
     await expect(eye).toHaveAttribute('aria-label', 'Show password');
     await submit.click();
     await expect(page.locator('#login-wait')).toBeVisible();

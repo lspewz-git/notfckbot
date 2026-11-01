@@ -9,9 +9,9 @@ import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
 
 const MIN_LENGTH = 8;
 
-const EYE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /></svg>';
-const EYE_HIDDEN =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path d="m3 3 18 18" /></svg>';
+// Keep the eye mounted: replacing its external <use> can flicker while Safari resolves the sprite.
+const PASSWORD_EYE =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path class="password-eye-slash" pathLength="1" d="m3 3 18 18" /></svg>';
 const CHEVRON_RIGHT =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
 
@@ -24,7 +24,7 @@ export const signedInUser = () => me;
 /** A password field with a borderless show/hide button inside its right edge. */
 const passwordField = (id, autocomplete, label) =>
     `<div class="password-input"><input id="${id}" class="input-field" type="password" autocomplete="${autocomplete}" maxlength="128" aria-label="${label}" />` +
-    `<button type="button" class="password-toggle" data-action="password-show" data-for="${id}" aria-label="Show password" aria-pressed="false">${EYE_HIDDEN}</button></div>`;
+    `<button type="button" class="password-toggle" data-action="password-show" data-for="${id}" aria-label="Show password" aria-pressed="false">${PASSWORD_EYE}</button></div>`;
 
 /** The form under "Continue with Telegram" (session.js draws the screen); the system account signs in here too. */
 export const signInForm = () =>
@@ -197,7 +197,6 @@ export const passwordActions = {
         field.type = show ? 'text' : 'password';
         el.setAttribute('aria-pressed', String(show));
         el.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        if (el.classList.contains('password-toggle')) el.innerHTML = show ? EYE : EYE_HIDDEN;
     }
 };
 
