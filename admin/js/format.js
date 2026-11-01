@@ -25,13 +25,12 @@ function avatarInitial(chat) {
     return /\p{L}/u.test(first) ? first.toUpperCase() : '#';
 }
 
-const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const svg = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
 // Groups and channels carry a small mark in the avatar's corner; private chats don't
 const CHAT_KIND_MARK = {
-    group: svg(
-        '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />'
-    ),
-    channel: svg('<path d="m3 11 18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />')
+    group: svg('users'),
+    channel: svg('megaphone')
 };
 
 export function chatDisplayName(chat) {

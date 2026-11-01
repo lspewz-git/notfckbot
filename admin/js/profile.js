@@ -11,12 +11,13 @@ import { avatar } from './pick-sheet.js';
 import { chatRows } from './chat-picker.js';
 import { chatList, chatHint, selectChat } from './account.js';
 
-const icon = (path) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>`;
+const icon = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
 
-const CHEVRON = icon('m9 18 6-6-6-6');
-const SLIDERS = icon('M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6');
-const PERSON = icon('M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z');
-const SIGN_OUT = icon('M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9');
+const CHEVRON = icon('chevron-right');
+const SLIDERS = icon('sliders-horizontal');
+const PERSON = icon('user-round');
+const SIGN_OUT = icon('log-out');
 
 /** The pages the menu opens: Back on them returns to the section the menu was opened from */
 const PAGES = ['my-settings', 'my-account'];

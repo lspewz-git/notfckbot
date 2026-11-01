@@ -21,13 +21,12 @@ import { roleBadge } from './access.js';
 const isArchivedSub = (sub) => Boolean(sub.archived);
 
 // Small line icons for row buttons (Lucide shapes)
-const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const svg = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
 const ICON = {
-    more: svg('<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />'),
-    mode: svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />'),
-    trash: svg(
-        '<path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />'
-    )
+    more: svg('ellipsis'),
+    mode: svg('bell'),
+    trash: svg('trash-2')
 };
 
 /**

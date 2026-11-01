@@ -72,7 +72,9 @@ function enhanceSelect(select) {
             row.setAttribute('aria-selected', String(isSelected));
             row.innerHTML =
                 `<span>${escapeHtml(opt.text)}</span>` +
-                (isSelected ? '<span class="custom-select-check">✓</span>' : '');
+                (isSelected
+                    ? '<span class="custom-select-check"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg></span>'
+                    : '');
             row.onclick = () => {
                 select.value = opt.value;
                 select.dispatchEvent(new Event('change', { bubbles: true }));

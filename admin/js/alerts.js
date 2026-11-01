@@ -1,3 +1,6 @@
+const CHECK_ICON =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg>';
+
 /**
  * Settings → Alerts (src/admin/routes/alerts.js): who gets the bot's alerts, one row each; a row
  * opens what that recipient gets (a preset, or events by group); the shared rules and the last
@@ -292,7 +295,7 @@ async function searchCandidates(q) {
                         <span class="alert-ava" aria-hidden="true">${escapeHtml(initials(c))}</span>
                         <span class="alert-who"><span class="alert-name"><span class="alert-name-text">${escapeHtml(c.name || c.chatId)}</span></span>
                         <span class="alert-meta">${escapeHtml(kind + seen)}</span></span>
-                        <span class="alert-tick" aria-hidden="true">${selected ? '✓' : ''}</span>
+                        <span class="alert-tick" aria-hidden="true">${selected ? CHECK_ICON : ''}</span>
                     </button>`;
                   })
                   .join('')
@@ -318,7 +321,7 @@ function pick(chatId) {
         const on = b.dataset.id === chatId;
         b.classList.toggle('is-picked', on);
         b.setAttribute('aria-pressed', String(on));
-        b.querySelector('.alert-tick').textContent = on ? '✓' : '';
+        b.querySelector('.alert-tick').innerHTML = on ? CHECK_ICON : '';
     });
     $('alert-add-confirm').removeAttribute('disabled');
 }

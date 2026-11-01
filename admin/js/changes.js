@@ -121,10 +121,10 @@ function frame(root, view, words) {
             <span class="pager-info"></span>
             <div class="pager-nav">
                 <button type="button" class="btn btn-ghost btn-icon" data-changes-step="-1" aria-label="${words.prev}">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-left" /></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-icon" data-changes-step="1" aria-label="${words.next}">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>
                 </button>
             </div>
         </div>

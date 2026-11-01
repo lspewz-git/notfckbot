@@ -5,9 +5,6 @@ import { api } from './api.js';
 import { toast } from './ui.js';
 import { isUnchanged } from './render.js';
 
-const ARROW_UP = 'M3 17l6-6 4 4 8-8M15 7h6v6';
-const ARROW_DOWN = 'M3 7l6 6 4-4 8 8M15 17h6v-6';
-
 /**
  * A card's change: an arrow and the number, then what it compares with. Green when the change
  * is good news, amber (the logo's colour) when it isn't, grey when nothing changed.
@@ -30,7 +27,7 @@ function setDelta(id, change, text, flat, goodWhen = 'up') {
         el.textContent = flat;
         return;
     }
-    el.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${n > 0 ? ARROW_UP : ARROW_DOWN}" /></svg>`;
+    el.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${n > 0 ? 'trending-up' : 'trending-down'}" /></svg>`;
     const strong = document.createElement('b');
     strong.textContent = `${n > 0 ? '+' : '−'}${Math.abs(n)}`;
     el.append(strong, ` ${text}`);
@@ -147,12 +144,11 @@ export function updateHealth(h) {
 
 // --- Coming up ---
 const DAY = 24 * 60 * 60 * 1000;
-const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const svg = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
 const KIND_ICON = {
-    tv: svg('<rect x="2" y="7" width="20" height="15" rx="2" /><polyline points="17 2 12 7 7 2" />'),
-    movie: svg(
-        '<rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4" />'
-    )
+    tv: svg('tv'),
+    movie: svg('film')
 };
 
 /** "2026-10-16" as local midnight (not UTC), so day differences follow the viewer's calendar. */

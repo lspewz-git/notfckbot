@@ -16,11 +16,11 @@ const POLL_FOR_MS = 5 * 60 * 1000;
 const TG_ICON =
     '<svg class="icon login-telegram-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.7 3.3 18.4 21c-.2 1-1 1.2-1.8.7l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.3L5.8 14.2.9 12.7c-1-.3-1-1 .2-1.5L20.3 3c.9-.3 1.6.2 1.4.3Z" /></svg>';
 const QR_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h3v3h-6zM21 12v3M12 3v3M12 12h3M12 18v3" /></svg>';
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#qr-code" /></svg>';
 const KEY_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="5" /><path d="m12 12 9 9m-4-4 3-3m-6 0 3-3" /></svg>';
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#key-round" /></svg>';
 const backButton =
-    '<button type="button" class="btn btn-ghost login-back" data-action="login-cancel">← All sign-in methods</button>';
+    '<button type="button" class="btn btn-ghost login-back" data-action="login-cancel"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-left" /></svg>All sign-in methods</button>';
 
 let pollTimer = 0;
 // Each "Continue with Telegram" press: an older attempt's poll still on its way stops when it lands

@@ -9,10 +9,9 @@ import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
 
 const MIN_LENGTH = 8;
 
-const EYE =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>';
+const EYE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /></svg>';
 const CHEVRON_RIGHT =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>';
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
 
 /** @type {{ id: string, name: string | null, hasPassword: boolean, system: boolean } | null} */
 let me = null;

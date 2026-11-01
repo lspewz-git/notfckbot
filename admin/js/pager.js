@@ -16,8 +16,8 @@ function storedPageSize(type) {
 }
 
 const ARROWS = [
-    [-1, 'Previous page', 'm15 18-6-6 6-6'],
-    [1, 'Next page', 'm9 18 6-6-6-6']
+    [-1, 'Previous page', 'chevron-left'],
+    [1, 'Next page', 'chevron-right']
 ];
 
 /**
@@ -45,9 +45,9 @@ export function fillPagers() {
             <span class="pager-info" aria-live="polite"></span>
             <div class="pager-nav">
                 ${ARROWS.map(
-                    ([step, label, path]) => `
+                    ([step, label, name]) => `
                     <button class="btn btn-ghost btn-icon" ${target} data-step="${step}" aria-label="${label}">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>
                     </button>`
                 ).join('')}
             </div>`;

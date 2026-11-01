@@ -78,7 +78,7 @@ export function setChats(chats, preferred = null) {
 }
 
 const CHEVRON_RIGHT =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>';
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
 
 export const chatHint = (c) =>
     c.type === 'private' ? 'Private chat' : c.settings ? "Group · you're an admin" : 'Group · view only';
@@ -241,7 +241,7 @@ function resultsView() {
 // The 'info' link is Kinopoisk's page: its logo and an out arrow, as in the panel's History
 const KP_LOGO = '<svg class="kp-logo" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>';
 const OUT_ARROW =
-    '<svg class="icon kp-out" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>';
+    '<svg class="icon kp-out" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-up-right" /></svg>';
 
 const linkButtons = (links) =>
     links.length
