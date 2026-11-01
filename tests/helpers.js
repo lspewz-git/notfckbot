@@ -69,4 +69,13 @@ async function openProfilePage(page, section, from = 'my-subs') {
     await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
 }
 
-module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab, pickChat, openProfilePage, profileButton };
+async function openActions(page) {
+    if (isNarrow(page)) {
+        await page.locator('.tab-item[data-open="more-modal"]').click();
+        await page.locator('#more-modal [data-open="actions-modal"]').click();
+    } else {
+        await page.locator('#actions-btn').click();
+    }
+}
+
+module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab, pickChat, openProfilePage, profileButton, openActions };

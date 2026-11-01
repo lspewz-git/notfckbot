@@ -6,14 +6,23 @@ import { toast, openModal, closeModal, setReturnTo, clearReturnTo, showConfirm, 
 import { setSelectValue } from './select.js';
 import { BROADCAST_AUDIENCE_LABELS } from './format.js';
 
-export async function triggerCheck() {
+export function triggerCheck() {
     closeModal('actions-modal');
-    try {
-        await api('/trigger-check', { method: 'POST' });
-        toast('Update check triggered', 'success');
-    } catch (e) {
-        toast('Failed to trigger: ' + e.message, 'error');
-    }
+    setReturnTo(() => openModal('actions-modal'));
+    showConfirm({
+        title: 'Run update check?',
+        text: 'Check for updates now and send any new notifications to subscribed chats.',
+        confirmLabel: 'Run check',
+        cancelLabel: 'Cancel',
+        onConfirm: async () => {
+            try {
+                await api('/trigger-check', { method: 'POST' });
+                toast('Update check triggered', 'success');
+            } catch (e) {
+                toast('Failed to trigger: ' + e.message, 'error');
+            }
+        }
+    });
 }
 
 export function openBroadcastModal() {

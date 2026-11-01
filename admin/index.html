@@ -1000,7 +1000,7 @@
                                     <h2 class="settings-title">Panel access</h2>
                                     <p class="settings-desc">
                                         Admin: the whole panel. User: their own subscriptions, calendar and chat
-                                        settings. A person's role: Users → Actions → Panel access.
+                                        settings. A person's role: Users → Actions → Settings → Panel access.
                                     </p>
                                     <div class="alerts-rule">
                                         <span id="access-signup-label">
@@ -2076,34 +2076,6 @@
                                 <use href="/vendor/lucide.svg#chevron-right" /></svg
                         ></span>
                     </button>
-                    <button id="action-test-notify" class="action-row">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#bell-ring" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Send test notification</span>
-                            <span class="action-desc">Test series notification to this chat</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                    <button id="action-settings" class="action-row">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#settings" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Settings</span>
-                            <span class="action-desc">Who presses the bot's buttons, bottom menu</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
                     <button id="action-stats" class="action-row">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2132,39 +2104,14 @@
                                 <use href="/vendor/lucide.svg#chevron-right" /></svg
                         ></span>
                     </button>
-                    <div id="action-access" class="action-row action-row-select">
+                    <button id="action-settings" class="action-row">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#lock-keyhole" /></svg
+                                <use href="/vendor/lucide.svg#settings" /></svg
                         ></span>
                         <span class="action-text">
-                            <label class="action-title" for="action-access-role">Panel access</label>
-                            <span class="action-desc" id="action-access-desc">Saved when picked</span>
-                        </span>
-                        <select id="action-access-role" class="select-field action-select">
-                            <option value="admin">Admin</option>
-                            <option value="user">User</option>
-                            <option value="none">No access</option>
-                        </select>
-                    </div>
-                    <button id="action-password-remove" class="action-row" data-action="access-password-remove" hidden>
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#key-round" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Remove password</span>
-                            <span class="action-desc">Signs them out; Telegram sign-in stays</span>
-                        </span>
-                    </button>
-                    <button id="action-block" class="action-row">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#ban" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Block</span>
-                            <span class="action-desc">Ignore this chat for a while</span>
+                            <span class="action-title">Settings</span>
+                            <span class="action-desc">Who presses the bot's buttons, bottom menu</span>
                         </span>
                         <span class="action-chevron"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2205,7 +2152,7 @@
             <div class="modal-content modal-medium">
                 <h3 id="changes-title">Changes</h3>
                 <p class="modal-sub" id="changes-sub"></p>
-                <div id="changes-root" class="changes"></div>
+                <div id="changes-root" class="changes mt-md"></div>
                 <button data-close-return="changes-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
@@ -2355,6 +2302,47 @@
                     <p class="field-hint">What comes out in the week or month ahead, in the chat's time zone.</p>
                 </div>
                 <button id="chat-settings-save" class="btn btn-primary btn-block">Save</button>
+                <div class="action-list">
+                    <div id="action-access" class="action-row action-row-select">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <use href="/vendor/lucide.svg#lock-keyhole" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <label class="action-title" for="action-access-role">Panel access</label>
+                            <span class="action-desc" id="action-access-desc">Saved when picked</span>
+                        </span>
+                        <select id="action-access-role" class="select-field action-select">
+                            <option value="admin">Admin</option>
+                            <option value="user">User</option>
+                            <option value="none">No access</option>
+                        </select>
+                    </div>
+                    <button id="action-password-remove" class="action-row" data-action="access-password-remove" hidden>
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <use href="/vendor/lucide.svg#key-round" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Remove password</span>
+                            <span class="action-desc">Signs them out; Telegram sign-in stays</span>
+                        </span>
+                    </button>
+                    <button id="action-block" class="action-row">
+                        <span class="action-icon"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <use href="/vendor/lucide.svg#ban" /></svg
+                        ></span>
+                        <span class="action-text">
+                            <span class="action-title">Block</span>
+                            <span class="action-desc">Ignore this chat for a while</span>
+                        </span>
+                        <span class="action-chevron"
+                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <use href="/vendor/lucide.svg#chevron-right" /></svg
+                        ></span>
+                    </button>
+                </div>
                 <button data-close-return="chat-settings-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>

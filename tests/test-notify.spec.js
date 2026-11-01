@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { watchConsole, openSection } = require('./helpers');
+const { watchConsole, openSection, openActions } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
@@ -11,12 +11,13 @@ watchConsole();
 
 const dialog = (page) => page.locator('#test-notify-modal');
 
-/** Chats → alice's menu → Send test notification. */
+/** Dashboard → Actions → Send test notification, then pick Alice. */
 async function openForAlice(page) {
-    await openSection(page, 'chats');
-    await page.locator('[data-action="chat-actions"][data-id="101"]').click();
-    await page.locator('#action-test-notify').click();
+    await openSection(page, 'dashboard');
+    await openActions(page);
+    await page.locator('#test-notify-btn').click();
     await expect(dialog(page)).toBeVisible();
+    await pick(page, 'test-notify-chat-select', 'alice');
 }
 
 /** Picks an option of one of the dialog's styled dropdowns by its text. */

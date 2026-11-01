@@ -21,6 +21,12 @@ test('the panel: ten rows a page, the arrows, another page size, a search', asyn
     await openChanges(page, -1003);
     const log = page.locator('#changes-root');
     await expect(page.locator('#changes-sub')).toHaveText('Movie Club');
+    const gap = await page.evaluate(() => {
+        const label = document.querySelector('#changes-sub').getBoundingClientRect();
+        const search = document.querySelector('#changes-root .changes-search').getBoundingClientRect();
+        return search.top - label.bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(12);
     await expect(log.locator('.changes-row')).toHaveCount(10);
     await expect(log.locator('.pager-info')).toHaveText('1–10 of 23');
     // Who and where from, then what: a settings line as the bot says it, the panel's own as panel

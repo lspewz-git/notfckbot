@@ -7,7 +7,6 @@ import { toast, openModal, closeModal, setReturnTo, clearReturnTo, focusField } 
 import { chatLabel } from './format.js';
 import { setSelectValue } from './select.js';
 import { chatsById } from './store.js';
-import { openTestNotifyModal } from './test-notify.js';
 import { openChatStats } from './chat-stats.js';
 import { showChanges } from './changes.js';
 import { showAccessIn } from './access.js';
@@ -20,7 +19,6 @@ export function openChatActions(chatId) {
     const chat = chatsById.get(String(chatId));
     if (!chat) return;
 
-    const isBlocked = chat.blockedUntil && new Date(chat.blockedUntil) > new Date();
     const label = chatLabel(chat);
     const backToChat = () => openChatActions(chat.id);
 
@@ -37,12 +35,6 @@ export function openChatActions(chatId) {
         closeModal('chat-actions-modal');
         setReturnTo(backToChat);
         openDM(chat.id, label);
-    };
-
-    $('action-test-notify').onclick = () => {
-        closeModal('chat-actions-modal');
-        setReturnTo(backToChat);
-        openTestNotifyModal(chat.id);
     };
 
     $('action-settings').onclick = () => {
@@ -63,25 +55,6 @@ export function openChatActions(chatId) {
         setText('changes-sub', label);
         openModal('changes-modal');
         showChanges($('changes-root'), { path: `/chat/${encodeURIComponent(chat.id)}/changes` }).catch(() => {});
-    };
-
-    // Only a person can sign in: private chats get their role and password rows
-    showAccessIn(chat);
-
-    const blockBtn = $('action-block');
-    blockBtn.querySelector('.action-title').textContent = isBlocked ? 'Unblock' : 'Block';
-    blockBtn.querySelector('.action-desc').textContent = isBlocked
-        ? 'Let this chat use the bot again'
-        : 'Ignore this chat for a while';
-    blockBtn.classList.toggle('action-row-danger', !isBlocked);
-    blockBtn.onclick = () => {
-        closeModal('chat-actions-modal');
-        if (isBlocked) {
-            unblockUser(chat.id);
-        } else {
-            setReturnTo(backToChat);
-            blockUser(chat.id, label);
-        }
     };
 
     openModal('chat-actions-modal');
@@ -156,6 +129,33 @@ function syncQuietEnd() {
 }
 
 function openChatSettings(chat, label) {
+    setReturnTo(() => openChatActions(chat.id));
+    const backToSettings = () => {
+        setReturnTo(() => openChatActions(chat.id));
+        showAccessIn(chatsById.get(String(chat.id)) || chat, backToSettings);
+        openModal('chat-settings-modal');
+    };
+    const isBlocked = chat.blockedUntil && new Date(chat.blockedUntil) > new Date();
+    // Only a person can sign in: private chats get their role and password rows
+    showAccessIn(chat, backToSettings);
+
+    const blockBtn = $('action-block');
+    blockBtn.querySelector('.action-title').textContent = isBlocked ? 'Unblock' : 'Block';
+    blockBtn.querySelector('.action-desc').textContent = isBlocked
+        ? 'Let this chat use the bot again'
+        : 'Ignore this chat for a while';
+    blockBtn.classList.toggle('action-row-danger', !isBlocked);
+    blockBtn.onclick = () => {
+        closeModal('chat-settings-modal');
+        if (isBlocked) {
+            clearReturnTo();
+            unblockUser(chat.id);
+        } else {
+            setReturnTo(backToSettings);
+            blockUser(chat.id, label);
+        }
+    };
+
     const group = chat.type !== 'private';
     setText('chat-settings-sub', label);
     $('chat-settings-buttons-field').hidden = !group;

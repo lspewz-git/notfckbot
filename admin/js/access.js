@@ -1,12 +1,12 @@
 /**
- * Panel access (src/admin/routes/access.js): a person's role from Users → Actions → Panel access,
+ * Panel access (src/admin/routes/access.js): a person's role from Users → Actions → Settings → Panel access,
  * saved when picked; in Settings → Bot the sign-up switch and the system account's password.
  * Everything applies at once, no restart.
  */
 
 import { $, $field, setText } from './dom.js';
 import { api } from './api.js';
-import { toast, showConfirm, closeModal } from './ui.js';
+import { toast, showConfirm, closeModal, setReturnTo } from './ui.js';
 import { mutate } from './data.js';
 import { chatLabel } from './format.js';
 import { setSelectValue } from './select.js';
@@ -24,7 +24,10 @@ export const roleBadge = (role) =>
 // --- Users → Actions: the person's role and password ---
 
 /** Fills the menu's Panel access row and the password row for this chat (chats.js). */
-export function showAccessIn(chat) {
+let returnToSettings = null;
+
+export function showAccessIn(chat, back = returnToSettings) {
+    returnToSettings = back;
     const person = chat.type === 'private';
     $('action-access').hidden = !person;
     $('action-password-remove').hidden = !person || !chat.hasPassword;
@@ -69,7 +72,8 @@ async function saveRole(select) {
 function removePassword(id) {
     const chat = chatsById.get(id);
     const name = chat ? chatLabel(chat) : id;
-    closeModal('chat-actions-modal');
+    closeModal('chat-settings-modal');
+    setReturnTo(returnToSettings);
     showConfirm({
         title: 'Remove the password?',
         text: `${name} is signed out everywhere and will sign in with Telegram only. They can set a new password on their account page.`,
