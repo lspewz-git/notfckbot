@@ -25,6 +25,7 @@ const initDb = async () => {
 
         // Sync models
         await sequelize.sync({ alter: true });
+        await require('./account/auth').capSessionLifetimes();
         log.info('Database models synchronized.');
     } catch (error) {
         log.error({ err: error }, 'Unable to connect to the database');

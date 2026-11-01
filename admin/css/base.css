@@ -108,6 +108,9 @@
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;
     --control-h-sm: 2rem; /* buttons inside table rows */
+    --login-method-h: 4.25rem;
+    --login-qr-size: 14.5rem;
+    --qr-paper: #ffffff;
     --rail-width: 80px;
     --page-max-width: 1320px; /* rail and content, centered on wide screens */
 

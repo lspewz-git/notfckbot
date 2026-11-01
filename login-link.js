@@ -4,7 +4,7 @@
  *   docker compose exec app node login-link.js [userId]
  *       a one-time sign-in link, for when Telegram is out of reach and the panel is needed to fix it
  *   docker compose exec app node login-link.js --session [userId]
- *       a session token (30 days) for the browser tests on the live panel:
+ *       a session token (seven idle days) for the browser tests on the live panel:
  *       ADMIN_SESSION=<token> ADMIN_URL=http://192.168.2.112 npx playwright test
  *
  * Without an id: the system account (src/account/roles.js), or the first admin when it has no

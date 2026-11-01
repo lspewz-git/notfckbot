@@ -77,7 +77,7 @@ test('pulling the page down refreshes the open section without reloading the pag
     await page.evaluate(() => (window.__samePage = true));
 
     const asked = [];
-    page.on('request', (r) => r.url().includes('/api/') && asked.push(new URL(r.url()).pathname));
+    page.on('request', (r) => r.url().includes('/api/') && !r.url().endsWith('/api/account/activity') && asked.push(new URL(r.url()).pathname));
 
     // A short pull springs back and asks for nothing
     await pullDown(page, 60);
@@ -107,7 +107,8 @@ test('no pull to refresh while a dialog is open or the page is scrolled down', a
     await expect(page.locator('#popular-list [data-action="series"]').first()).toBeVisible();
 
     const asked = [];
-    page.on('request', (r) => r.url().includes('/api/') && asked.push(r.url()));
+    // A deliberate click renews the session; that is not a refresh of this section's data.
+    page.on('request', (r) => r.url().includes('/api/') && !r.url().endsWith('/api/account/activity') && asked.push(r.url()));
 
     await page.evaluate(() => window.scrollTo(0, 300));
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);

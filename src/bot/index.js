@@ -24,6 +24,7 @@ require('./middleware').register(bot);
 require('./access').register(bot);
 // For the chat's statistics: what it opens (only updates that got past the throttle and the block)
 require('./usage').register(bot);
+bot.use(require('./account-activity').accountActivity);
 // Before the commands: "/start L<code>" is a sign-in to the panel, not the usual /start
 require('./login').register(bot);
 require('./commands').register(bot);

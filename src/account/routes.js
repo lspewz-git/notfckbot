@@ -18,6 +18,10 @@ const password = require('./password');
 const roles = require('./roles');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
+const QRCode = require('qrcode');
+const { confirmation } = require('./confirmation');
+const { lruCache } = require('../lru');
+const confirmationCooldown = lruCache({ max: 2000, ttl: 60000 });
 
 /** A refusal from src/chat-ops.js with its own status; anything else is a 500 without details. */
 const fail = (res, err) => {
@@ -52,27 +56,44 @@ async function botUsername(bot) {
 }
 
 // "Войти через Telegram": a code for this page, and the bot's link that carries it
-router.post('/api/login/telegram', async (req, res) => {
+const challengeLimit = rateLimit({ windowMs: 60000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false });
+const pollLimit = rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false });
+
+router.post('/api/login/telegram', challengeLimit, async (req, res) => {
     try {
         const username = await botUsername(req.app.get('bot'));
         if (!username) throw new ops.OpError(503, "Telegram isn't answering. Try again later.");
-        const { code, secret, check } = auth.startCode();
-        res.json({ code, secret, check, url: `https://t.me/${username}?start=L${code}` });
+        const { expiresAt, ...start } = auth.startCode();
+        const url = `https://t.me/${username}?start=L${start.code}`;
+        const qr = await QRCode.toDataURL(url, { width: 232, margin: 4, errorCorrectionLevel: 'M' });
+        res.set('Cache-Control', 'no-store').json({
+            ...start,
+            url,
+            qr,
+            expiresIn: Math.max(0, expiresAt - Date.now())
+        });
     } catch (err) {
         fail(res, err);
     }
 });
 
-router.post('/api/login/telegram/poll', async (req, res) => {
+router.post('/api/login/telegram/poll', pollLimit, async (req, res) => {
     const body = valid(z.object({ code: z.string(), secret: z.string() }, { error: 'Bad code' }), req.body, res);
     if (!body) return;
     try {
         const result = await auth.pollCode(body.code, body.secret);
         if (result.state === 'in') auth.setCookie(req, res, result.token);
-        res.json({ state: result.state });
+        res.set('Cache-Control', 'no-store').json({ state: result.state });
     } catch (err) {
         fail(res, err);
     }
+});
+
+router.post('/api/login/telegram/cancel', pollLimit, (req, res) => {
+    const body = valid(z.object({ code: z.string(), secret: z.string() }), req.body, res);
+    if (!body) return;
+    auth.cancelCode(body.code, body.secret);
+    res.json({ success: true });
 });
 
 // A password (src/account/password.js): wrong tries are limited per address and per login, so
@@ -116,7 +137,10 @@ const passwordLimits = [
     limitBy(10, loginLimitKey)
 ];
 /** For the tests: every limit starts again. */
-const resetLimits = () => limitStores.forEach((store) => store.resetAll());
+const resetLimits = () => {
+    limitStores.forEach((store) => store.resetAll());
+    confirmationCooldown.clear();
+};
 
 router.post('/api/login/password', passwordLimits, async (req, res) => {
     const body = valid(
@@ -138,7 +162,54 @@ router.post('/api/login/password', passwordLimits, async (req, res) => {
     try {
         const session = await password.signInWithPassword(body.login, body.password);
         if (!session) return res.status(401).json({ error: 'Wrong username or password.' });
-        auth.setCookie(req, res, session.token);
+        if (session.token) {
+            auth.setCookie(req, res, session.token);
+            return res.json({ success: true });
+        }
+        const { code, secret, check, expiresAt, userId } = session;
+        if (confirmationCooldown.has(userId)) {
+            auth.cancelCode(code, secret);
+            return res.status(429).json({ error: 'A confirmation was sent recently. Try again in a minute.' });
+        }
+        confirmationCooldown.set(userId, true);
+        const bot = req.app.get('bot');
+        const ask = confirmation(code);
+        // Delivery retries may continue, but a late message cannot approve a cancelled challenge.
+        let timer;
+        try {
+            const result = await Promise.race([
+                deliver(bot, userId, ask.text, { extra: ask.extra }),
+                new Promise((resolve) => {
+                    timer = setTimeout(() => resolve({ status: 'failed' }), 5000);
+                })
+            ]);
+            if (result.status !== 'sent') throw new Error('Confirmation delivery failed');
+        } catch {
+            auth.cancelCode(code, secret);
+            throw new ops.OpError(503, "Couldn't send confirmation to Telegram. Try again later.");
+        } finally {
+            clearTimeout(timer);
+        }
+        const url = bot.botInfo?.username ? `https://t.me/${bot.botInfo.username}` : null;
+        res.set('Cache-Control', 'no-store').json({
+            code,
+            secret,
+            check,
+            expiresIn: Math.max(0, expiresAt - Date.now()),
+            url,
+            confirmation: true
+        });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+// Called only after a deliberate browser interaction; automatic API polling never renews inactivity.
+router.post('/api/account/activity', async (req, res) => {
+    try {
+        const [updated] = await auth.touchSessions({ id: req.user.id });
+        if (!updated && !(await auth.sessionOf(req)))
+            return res.status(401).json({ error: 'Your session has ended. Sign in again.' });
         res.json({ success: true });
     } catch (err) {
         fail(res, err);

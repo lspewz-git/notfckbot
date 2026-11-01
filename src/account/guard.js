@@ -7,7 +7,7 @@ const auth = require('./auth');
 const { log } = require('../log');
 
 // Relative to /api: signing in (link, Telegram code and its poll, password) and TMDB's public posters
-const OPEN = /^\/(login(\/telegram(\/poll)?|\/password)?|poster\/.*)$/;
+const OPEN = /^\/(login(\/telegram(\/poll|\/cancel)?|\/password)?|poster\/.*)$/;
 const ANY_ROLE = /^\/(account\/|logout$)/;
 
 async function guard(req, res, next) {
@@ -19,6 +19,7 @@ async function guard(req, res, next) {
             return res.status(401).json({ error: 'Sign in: /login in the bot' });
         }
         req.user = session;
+        auth.setCookie(req, res, auth.cookieToken(req.headers.cookie));
         if (session.role === 'admin' || ANY_ROLE.test(req.path)) return next();
         log.warn(`[Account] User ${session.userId} refused ${req.method} /api${req.path}: admins only`);
         res.status(403).json({ error: 'Only for the panel admins' });

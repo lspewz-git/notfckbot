@@ -32,6 +32,7 @@
     "node-cron": "^4.2.1",
     "pino": "^10.4.0",
     "piscina": "^5.3.2",
+    "qrcode": "^1.5.4",
     "satori": "^0.63.2",
     "sequelize": "^6.37.7",
     "socks-proxy-agent": "^8.0.5",

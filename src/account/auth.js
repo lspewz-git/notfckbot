@@ -16,13 +16,15 @@
  */
 const crypto = require('crypto');
 const { Op } = require('sequelize');
-const { AccountSession, LoginLink } = require('../db');
+const { AccountSession, LoginLink, AccountPassword } = require('../db');
 const { lruCache } = require('../lru');
 const { roleOf, isAllowed, isSystem } = require('./roles');
 const { log } = require('../log');
 
 const LINK_TTL_MS = 5 * 60 * 1000;
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// The server enforces inactivity. Bot activity cannot update a closed browser's cookie.
+const COOKIE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const COOKIE = 'nfb_session';
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const CODE = /^[A-Za-z0-9_-]{32}$/;
@@ -78,14 +80,30 @@ async function sessionOf(req, now = Date.now()) {
 const endSession = (session) => AccountSession.destroy({ where: { id: session.id } });
 
 /** Signs the user out everywhere but the session `keepId` (null: everywhere). */
-const endOtherSessions = (userId, keepId = null) =>
-    AccountSession.destroy({ where: keepId ? { userId, id: { [Op.ne]: keepId } } : { userId } });
+function endOtherSessions(userId, keepId = null) {
+    invalidateCodes(userId);
+    return AccountSession.destroy({ where: keepId ? { userId, id: { [Op.ne]: keepId } } : { userId } });
+}
+
+/** Only existing, unexpired sessions may be renewed. A concurrent revocation cannot recreate one. */
+const touchSessions = (where, now = Date.now()) =>
+    AccountSession.update(
+        { expiresAt: new Date(now + SESSION_TTL_MS) },
+        { where: { ...where, expiresAt: { [Op.gt]: new Date(now), [Op.lt]: new Date(now + SESSION_TTL_MS) } } }
+    );
+
+/** Cap legacy 30-day sessions once at startup; never extend a shorter deadline. */
+const capSessionLifetimes = (now = Date.now()) =>
+    AccountSession.update(
+        { expiresAt: new Date(now + SESSION_TTL_MS) },
+        { where: { expiresAt: { [Op.gt]: new Date(now + SESSION_TTL_MS) } } }
+    );
 
 /** Over HTTPS (directly, or behind a proxy that says so) the cookie is Secure too. */
 const isHttps = (req) => req.secure || req.headers['x-forwarded-proto'] === 'https';
 
 function setCookie(req, res, token) {
-    const parts = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${SESSION_TTL_MS / 1000}`];
+    const parts = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${COOKIE_TTL_MS / 1000}`];
     if (isHttps(req)) parts.push('Secure');
     res.setHeader('Set-Cookie', parts.join('; '));
 }
@@ -143,17 +161,35 @@ const codes = lruCache({ max: 2000, ttl: LINK_TTL_MS });
 const checkWord = (code) => String(parseInt(hash(`check:${code}`).slice(0, 8), 16) % 10000).padStart(4, '0');
 
 /** A new code for the sign-in page, the secret only that page knows, and the number to compare. */
-function startCode() {
+function startCode(boundUser = null, passwordHash = null, now = Date.now()) {
     const code = crypto.randomBytes(24).toString('base64url');
     const secret = newToken();
-    codes.set(code, { secretHash: hash(secret), user: null, refused: false });
-    return { code, secret, check: checkWord(code) };
+    const expiresAt = now + LINK_TTL_MS;
+    codes.set(code, { secretHash: hash(secret), boundUser, passwordHash, user: null, refused: false, expiresAt });
+    return { code, secret, check: checkWord(code), expiresAt };
+}
+
+const codeOf = (code, now = Date.now()) => {
+    const entry = CODE.test(String(code || '')) ? codes.get(code) : null;
+    return entry && entry.expiresAt > now ? entry : null;
+};
+
+function invalidateCodes(userId) {
+    for (const [code, entry] of codes) {
+        if (String((entry.boundUser || entry.user)?.userId) === String(userId)) codes.delete(code);
+    }
+}
+
+function cancelCode(code, secret) {
+    const entry = codeOf(code);
+    if (!entry || !TOKEN.test(String(secret || '')) || hash(secret) !== entry.secretHash) return false;
+    return codes.delete(code);
 }
 
 /** Whether a code is still waiting for the bot's question (it may be asked once). */
 const isWaiting = (code) => {
-    const entry = CODE.test(String(code || '')) ? codes.get(code) : null;
-    return Boolean(entry && !entry.user && !entry.refused);
+    const entry = codeOf(code);
+    return Boolean(entry && !entry.user && !entry.refused && !entry.redeeming);
 };
 
 /**
@@ -163,6 +199,7 @@ const isWaiting = (code) => {
 async function answerCode(code, user, yes) {
     if (!isWaiting(code) || !(await isAllowed(user.id)) || !isWaiting(code)) return false;
     const entry = codes.get(code);
+    if (entry.boundUser && String(entry.boundUser.userId) !== String(user.id)) return false;
     if (yes) entry.user = { userId: user.id, userName: user.name || null };
     else entry.refused = true;
     return true;
@@ -173,22 +210,38 @@ async function answerCode(code, user, yes) {
  * @returns {Promise<{ state: 'waiting' | 'refused' | 'gone' } | { state: 'in', token: string }>}
  */
 async function pollCode(code, secret, now = Date.now()) {
-    const entry = CODE.test(String(code || '')) ? codes.get(code) : null;
-    if (!entry || !TOKEN.test(String(secret || '')) || hash(secret) !== entry.secretHash) return { state: 'gone' };
+    const entry = codeOf(code, now);
+    if (!entry || entry.redeeming || !TOKEN.test(String(secret || '')) || hash(secret) !== entry.secretHash)
+        return { state: 'gone' };
     if (entry.refused) {
         codes.delete(code);
         return { state: 'refused' };
     }
     if (!entry.user) return { state: 'waiting' };
-    codes.delete(code);
-    if (!(await isAllowed(entry.user.userId))) return { state: 'gone' };
-    return { state: 'in', token: await startSession(entry.user, now) };
+    entry.redeeming = true;
+    try {
+        if (!(await isAllowed(entry.user.userId))) return { state: 'gone' };
+        if (entry.passwordHash) {
+            const current = await AccountPassword.findByPk(entry.user.userId);
+            if (!current || current.hash !== entry.passwordHash) return { state: 'gone' };
+        }
+        if (codeOf(code) !== entry) return { state: 'gone' };
+        const token = await startSession(entry.user, now);
+        if (codeOf(code) !== entry) {
+            await endSession({ id: hash(token) });
+            return { state: 'gone' };
+        }
+        return { state: 'in', token };
+    } finally {
+        codes.delete(code);
+    }
 }
 
 module.exports = {
     COOKIE,
     LINK_TTL_MS,
     SESSION_TTL_MS,
+    COOKIE_TTL_MS,
     roleOf,
     isAllowed,
     panelUrl,
@@ -197,11 +250,15 @@ module.exports = {
     sessionOf,
     endSession,
     endOtherSessions,
+    touchSessions,
+    capSessionLifetimes,
     setCookie,
     clearCookie,
     createLink,
     redeemLink,
     startCode,
+    invalidateCodes,
+    cancelCode,
     checkWord,
     isWaiting,
     answerCode,

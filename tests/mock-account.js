@@ -104,6 +104,7 @@ function accountState(options) {
         role: options.role || 'admin',
         sent: /** @type {{ method: string, path: string, body: any }[]} */ ([]),
         polls: 0,
+        confirmationState: 'in',
         chats: [
             { id: '42', type: 'private', title: 'My account', settings: true },
             { id: '-100', type: 'supergroup', title: 'Киноклуб', settings: Boolean(options.groupAdmin) }
@@ -220,16 +221,20 @@ function accountAnswer(state, req, url) {
         if (body.password === 'too-many')
             return { status: 429, body: { error: 'Too many attempts. Try again in 15 minutes.' } };
         if (['@me', '42'].includes(body.login) && body.password === 'good-password') {
-            state.signedIn = true;
-            return { success: true };
+            state.polls = 0;
+            return { confirmation: true, code: 'c'.repeat(32), secret: 's'.repeat(43), check: '0427', expiresIn: 300000 };
         }
+        if (body.login === 'admin' && body.password === 'good-password') { state.signedIn = true; return { success: true }; }
         return { status: 401, body: { error: 'Wrong username or password.' } };
     }
     if (p === '/api/login/telegram') {
+        state.polls = 0;
         return {
             code: 'c'.repeat(32),
             secret: 's'.repeat(43),
             check: '0427',
+            expiresIn: 300000,
+            qr: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+l8AAAAASUVORK5CYII=',
             url: 'https://t.me/notfckbot?start=Lcode'
         };
     }
@@ -237,10 +242,13 @@ function accountAnswer(state, req, url) {
         // "Да, это я" is pressed in the bot by the second question
         state.polls += 1;
         if (state.polls < 2) return { state: 'waiting' };
+        if (state.confirmationState !== 'in') return { state: state.confirmationState };
         state.signedIn = true;
         return { state: 'in' };
     }
+    if (p === '/api/login/telegram/cancel') return { success: true };
     if (!state.signedIn) return { status: 401, body: { error: 'Sign in: /login in the bot' } };
+    if (p === '/api/account/activity') return { success: true };
     if (p === '/api/logout') {
         state.signedIn = false;
         return { success: true };

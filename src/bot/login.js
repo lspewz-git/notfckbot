@@ -7,8 +7,8 @@
  * Neither is in /help. Who may sign in: src/account/roles.js (with sign-up open, everyone who
  * started the bot).
  */
-const { Markup } = require('telegraf');
 const auth = require('../account/auth');
+const { confirmation } = require('../account/confirmation');
 const { escapeHtml } = require('../constants');
 const { log } = require('../log');
 
@@ -29,17 +29,8 @@ function register(bot) {
         if (ctx.chat.type !== 'private') return;
         if (!(await auth.isAllowed(ctx.from.id))) return ctx.reply(CLOSED);
         if (!auth.isWaiting(code)) return ctx.reply(GONE);
-        await ctx.reply(
-            `🔐 <b>Войти в панель NotFckBot?</b>\n\nПроверочный код: <b>${auth.checkWord(code)}</b>. Нажмите «Да», только если ` +
-                'этот же код сейчас на вашей странице входа. Если вы не нажимали «Continue with Telegram», нажмите «Нет».',
-            {
-                parse_mode: 'HTML',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('✅ Да, это я', `login_ok_${code}`)],
-                    [Markup.button.callback('✖️ Нет', `login_no_${code}`)]
-                ])
-            }
-        );
+        const ask = confirmation(code);
+        await ctx.reply(ask.text, ask.extra);
     });
 
     bot.action(/^login_(ok|no)_([A-Za-z0-9_-]{32})$/, async (ctx) => {

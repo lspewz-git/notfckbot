@@ -64,6 +64,19 @@ beforeEach(() => {
             return row;
         },
         findByPk: async (id) => rows.get(id) || null,
+        update: async (values, { where }) => {
+            let count = 0;
+            for (const row of rows.values()) {
+                if (where.id && row.id !== where.id) continue;
+                if (where.userId && String(row.userId) !== String(where.userId)) continue;
+                const expiry = new Date(row.expiresAt).getTime();
+                if (where.expiresAt?.[Op.gt] && expiry <= Number(where.expiresAt[Op.gt])) continue;
+                if (where.expiresAt?.[Op.lt] && expiry >= Number(where.expiresAt[Op.lt])) continue;
+                Object.assign(row, values);
+                count += 1;
+            }
+            return [count];
+        },
         destroy: async ({ where }) => {
             if (typeof where.id === 'string') return rows.delete(where.id) ? 1 : 0;
             // A user's sessions, but the one kept (where.id[Op.ne])
@@ -78,7 +91,7 @@ beforeEach(() => {
         [LoginLink, links]
     ]) {
         const fake = table(rows);
-        for (const method of ['create', 'findByPk', 'destroy']) mock.method(model, method, fake[method]);
+        for (const method of ['create', 'findByPk', 'destroy', 'update']) mock.method(model, method, fake[method]);
     }
     members.forget();
 });
@@ -197,6 +210,107 @@ test('"Войти через Telegram": in only after "Да" in the bot, only fo
     const refused = auth.startCode();
     await auth.answerCode(refused.code, { id: 7 }, false);
     assert.deepEqual(await auth.pollCode(refused.code, refused.secret), { state: 'refused' });
+});
+
+test('confirmation: cancel requires the secret; timeout and concurrent polls cannot create another session', async () => {
+    const cancelled = auth.startCode();
+    assert.equal(auth.cancelCode(cancelled.code, 'x'.repeat(43)), false);
+    assert.equal(auth.isWaiting(cancelled.code), true);
+    assert.equal(auth.cancelCode(cancelled.code, cancelled.secret), true);
+    assert.equal(await auth.answerCode(cancelled.code, { id: 7 }, true), false);
+    const late = auth.startCode(null, null, Date.now() - auth.LINK_TTL_MS);
+    assert.deepEqual(await auth.pollCode(late.code, late.secret), { state: 'gone' });
+    const start = auth.startCode();
+    await auth.answerCode(start.code, { id: 7 }, true);
+    const results = await Promise.all([
+        auth.pollCode(start.code, start.secret),
+        auth.pollCode(start.code, start.secret)
+    ]);
+    assert.deepEqual(results.map((r) => r.state).sort(), ['gone', 'in']);
+    assert.equal(sessions.size, 1);
+});
+
+test('password confirmation: removal, change, access revocation and end-other-sessions invalidate pending approval', async (t) => {
+    t.mock.method(Chat, 'findByPk', async () => null);
+    await password.setPassword('7', 'secret-pass');
+    for (const action of ['remove', 'change', 'access', 'sessions', 'hash']) {
+        await password.setPassword('7', 'secret-pass');
+        panelRoles.set('7', 'user');
+        const start = await password.signInWithPassword('7', 'secret-pass');
+        await auth.answerCode(start.code, { id: 7 }, true);
+        if (action === 'remove') await password.removePassword('7');
+        if (action === 'change') await password.setPassword('7', 'different-pass');
+        if (action === 'access') panelRoles.set('7', 'none');
+        if (action === 'sessions') await auth.endOtherSessions('7');
+        if (action === 'hash') passwords.get('7').hash = 'replaced elsewhere';
+        assert.deepEqual(await auth.pollCode(start.code, start.secret), { state: 'gone' }, action);
+        assert.equal(sessions.size, 0);
+    }
+});
+
+test('revocation while the session insert is pending removes the newly inserted session', async (t) => {
+    const start = auth.startCode();
+    await auth.answerCode(start.code, { id: 7 }, true);
+    const create = AccountSession.create;
+    t.mock.method(AccountSession, 'create', async (row) => {
+        await auth.endOtherSessions('7');
+        return create(row);
+    });
+    assert.deepEqual(await auth.pollCode(start.code, start.secret), { state: 'gone' });
+    assert.equal(sessions.size, 0);
+});
+
+test('seven-day inactivity: reads do not renew; actor activity renews only valid sessions; migration only caps', async () => {
+    const now = Date.now();
+    const token = await auth.startSession({ userId: 7 }, now);
+    await auth.startSession({ userId: 8 }, now);
+    const req = { headers: { cookie: `nfb_session=${token}` } };
+    const row = [...sessions.values()].find((r) => String(r.userId) === '7');
+    assert.equal(auth.SESSION_TTL_MS, 7 * 86400000);
+    assert.ok(await auth.sessionOf(req, now + 86400000));
+    assert.equal(Number(row.expiresAt), now + auth.SESSION_TTL_MS, 'passive reads keep the deadline');
+    await auth.touchSessions({ userId: 7 }, now + 2 * 86400000);
+    assert.equal(Number(row.expiresAt), now + 2 * 86400000 + auth.SESSION_TTL_MS);
+    const other = [...sessions.values()].find((r) => String(r.userId) === '8');
+    assert.equal(Number(other.expiresAt), now + auth.SESSION_TTL_MS, 'another user is unchanged');
+    assert.deepEqual(await auth.touchSessions({ userId: 8 }, now + auth.SESSION_TTL_MS), [0]);
+    assert.equal(await auth.sessionOf({ headers: { cookie: `nfb_session=${token}` } }, Number(row.expiresAt)), null);
+    await auth.endOtherSessions(7);
+    await auth.touchSessions({ userId: 7 }, now + 3 * 86400000);
+    assert.equal(sessions.size, 1, 'revocation is never undone');
+    other.expiresAt = new Date(now + 30 * 86400000);
+    await auth.capSessionLifetimes(now);
+    assert.equal(Number(other.expiresAt), now + auth.SESSION_TTL_MS);
+    other.expiresAt = new Date(now - 1);
+    await auth.capSessionLifetimes(now);
+    assert.equal(Number(other.expiresAt), now - 1, 'expired stays expired');
+});
+
+test('bot activity uses the Telegram actor, ignores passive updates and anonymous senders', async (t) => {
+    const { accountActivity } = require('../../src/bot/account-activity');
+    await auth.startSession({ userId: 7 }, Date.now() - 86400000);
+    await auth.startSession({ userId: 8 }, Date.now() - 86400000);
+    const update = t.mock.method(AccountSession, 'update', AccountSession.update);
+    let handled = false;
+    await accountActivity(
+        { from: { id: 7 }, chat: { id: -100, type: 'supergroup' }, callbackQuery: { data: 'subs_o' } },
+        async () => {
+            handled = true;
+        }
+    );
+    assert.equal(handled, true);
+    assert.equal(update.mock.calls[0].arguments[1].where.userId, 7);
+    const own = [...sessions.values()].find((r) => r.userId === 7);
+    const other = [...sessions.values()].find((r) => r.userId === 8);
+    assert.ok(Number(own.expiresAt) > Number(other.expiresAt));
+    for (const ctx of [
+        {},
+        { from: { id: 7 }, message: { text: 'chatting' }, chat: { type: 'supergroup' } },
+        { from: { id: 7 }, message: { text: '/subs', sender_chat: { id: -1 } } }
+    ]) {
+        await accountActivity(ctx, async () => {});
+    }
+    assert.equal(update.mock.calls.length, 1);
 });
 
 /** Telegram's answer about members: chatId → userId → status, or an Error */
@@ -327,6 +441,9 @@ test('the API: the Telegram code goes with the bot link; the poll lets in the co
     const start = await call('POST', '/api/login/telegram');
     assert.match(start.body.url, /^https:\/\/t\.me\/notfckbot\?start=L[A-Za-z0-9_-]{32}$/);
     assert.equal(start.body.url.endsWith(start.body.code), true);
+    assert.match(start.body.qr, /^data:image\/png;base64,/);
+    assert.ok(start.body.qr.length > 200);
+    assert.ok(!start.body.url.includes(start.body.secret), 'QR target never contains the browser secret');
     const poll = () =>
         call('POST', '/api/login/telegram/poll', { body: { code: start.body.code, secret: start.body.secret } });
     assert.equal((await poll()).body.state, 'waiting');
@@ -334,6 +451,54 @@ test('the API: the Telegram code goes with the bot link; the poll lets in the co
     const done = await poll();
     assert.equal(done.body.state, 'in');
     assert.match(done.headers.get('set-cookie'), /nfb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly/);
+});
+
+test('the API: only deliberate activity renews the server deadline; cookie persistence alone grants nothing', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const token = await auth.startSession({ userId: 7 }, Date.now() - 86400000);
+    const row = [...sessions.values()][0];
+    const before = Number(row.expiresAt);
+    const read = await call('GET', '/api/account/me', { cookie: token });
+    assert.equal(Number(row.expiresAt), before);
+    assert.match(read.headers.get('set-cookie'), /Max-Age=31536000/);
+    assert.equal((await call('POST', '/api/account/activity', { cookie: token })).status, 200);
+    assert.ok(Number(row.expiresAt) > before);
+    row.expiresAt = new Date(Date.now() - 1);
+    assert.equal((await call('POST', '/api/account/activity', { cookie: token })).status, 401);
+    assert.equal(Number(row.expiresAt) < Date.now(), true);
+    const headers = {};
+    auth.setCookie(
+        { secure: true, headers: {} },
+        {
+            setHeader: (key, value) => {
+                headers[key] = value;
+            }
+        },
+        token
+    );
+    assert.match(headers['Set-Cookie'], /HttpOnly; SameSite=Lax; Max-Age=31536000; Secure/);
+});
+
+test('the API: undeliverable confirmation creates no session and repeated correct passwords cannot spam the bot', async (t) => {
+    require('../../src/account/routes').resetLimits();
+    t.mock.method(Chat, 'findByPk', async () => null);
+    await password.setPassword('7', 'secret-pass');
+    const bot = fakeBot({});
+    let sends = 0;
+    bot.telegram.sendMessage = async () => {
+        sends += 1;
+        throw Object.assign(new Error('bad request'), { response: { error_code: 400 } });
+    };
+    const { server, call } = await serve(bot);
+    t.after(() => server.close());
+    const login = () => call('POST', '/api/login/password', { body: { login: '7', password: 'secret-pass' } });
+    const failed = await login();
+    assert.equal(failed.status, 503);
+    assert.equal(failed.headers.get('set-cookie'), null);
+    assert.equal(sessions.size, 0);
+    assert.equal((await login()).status, 429);
+    assert.equal(sends, 1);
 });
 
 test("the API: a chat the user isn't in is closed; a member can't change a group's settings", async (t) => {
@@ -509,8 +674,13 @@ test('signing in with a password: by id or @username, only for people still on t
     t.mock.method(Chat, 'findByPk', async () => ({ username: '@Kirill' }));
     await password.setPassword('7', 'secret-pass');
     for (const login of ['7', '@kirill', 'Kirill', ' @KIRILL ']) {
-        const session = await password.signInWithPassword(login, 'secret-pass');
-        assert.ok(session, login);
+        const pending = await password.signInWithPassword(login, 'secret-pass');
+        assert.ok(pending, login);
+        assert.equal(pending.token, undefined, 'a password is not a session');
+        assert.deepEqual(await auth.pollCode(pending.code, pending.secret), { state: 'waiting' });
+        assert.equal(await auth.answerCode(pending.code, { id: 8 }, true), false, 'another account cannot approve');
+        await auth.answerCode(pending.code, { id: 7, name: '@Kirill' }, true);
+        const session = await auth.pollCode(pending.code, pending.secret);
         const signed = await auth.sessionOf({ headers: { cookie: `nfb_session=${session.token}` } });
         assert.deepEqual([signed.userId, signed.role, signed.userName], ['7', 'user', '@Kirill']);
     }
@@ -579,8 +749,14 @@ test('the API: set, use and remove a password; wrong tries stop at the limit', a
     const login = (pass, who = '7') => call('POST', '/api/login/password', { body: { login: who, password: pass } });
     const ok = await login('long-enough');
     assert.equal(ok.status, 200);
-    assert.match(ok.headers.get('set-cookie'), /nfb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly/);
-    ok.cookie = /nfb_session=([^;]+)/.exec(ok.headers.get('set-cookie'))[1];
+    assert.equal(ok.headers.get('set-cookie'), null, 'no session before bot confirmation');
+    assert.equal(ok.body.confirmation, true);
+    await auth.answerCode(ok.body.code, { id: 7 }, true);
+    const approved = await call('POST', '/api/login/telegram/poll', {
+        body: { code: ok.body.code, secret: ok.body.secret }
+    });
+    assert.match(approved.headers.get('set-cookie'), /nfb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly/);
+    ok.cookie = /nfb_session=([^;]+)/.exec(approved.headers.get('set-cookie'))[1];
     assert.equal((await login('')).status, 400);
     for (let i = 0; i < 4; i += 1) {
         const wrong = await login('wrong-one');

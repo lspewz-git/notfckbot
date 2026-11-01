@@ -27,25 +27,25 @@ const passwordField = (id, autocomplete, label) =>
 
 /** The form under "Continue with Telegram" (session.js draws the screen); the system account signs in here too. */
 export const signInForm = () =>
-    '<p class="login-or">or with a password</p>' +
     '<form class="login-password" data-login="password" novalidate>' +
     '<label class="field-label" for="login-name">Login</label>' +
     '<input id="login-name" class="input-field" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="@username or ID" maxlength="64" />' +
     '<label class="field-label" for="login-pass">Password</label>' +
     passwordField('login-pass', 'current-password', 'Password') +
     '<p class="login-error" id="login-pass-error" role="alert" hidden></p>' +
-    '<button type="submit" class="btn btn-outline btn-block">Sign in</button>' +
+    '<button type="submit" class="btn btn-primary btn-block">Continue</button>' +
     '</form>' +
-    '<p class="login-hint">Forgot it? Sign in with Telegram and set a new one in Settings.</p>';
+    '<p class="login-hint">Next, confirm this sign-in in the bot. The system account signs in directly.</p>';
 
 /**
  * Sends the sign-in form.
- * @returns {Promise<boolean>} whether the session started
+ * @returns {Promise<any>} the session or pending confirmation, null on error
  */
 export async function submitSignIn(form) {
     const error = $('login-pass-error');
     const login = $field('login-name').value.trim();
-    const password = $field('login-pass').value;
+    const passwordInput = $field('login-pass');
+    const password = passwordInput.value;
     const say = (text) => {
         error.textContent = text;
         error.hidden = !text;
@@ -53,18 +53,19 @@ export async function submitSignIn(form) {
     const missing = !login ? 'Enter your @username or ID.' : !password ? 'Enter your password.' : '';
     if (missing) {
         say(missing);
-        return false;
+        return null;
     }
     const button = /** @type {HTMLButtonElement} */ (form.querySelector('[type="submit"]'));
     button.disabled = true;
     say('');
     try {
-        await api('/login/password', { method: 'POST', body: { login, password } });
-        return true;
+        const result = await api('/login/password', { method: 'POST', body: { login, password } });
+        passwordInput.value = '';
+        return result;
     } catch (err) {
         say(err.message);
-        $field('login-pass').value = '';
-        return false;
+        passwordInput.value = '';
+        return null;
     } finally {
         button.disabled = false;
     }

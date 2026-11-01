@@ -1,5 +1,5 @@
 /**
- * Signing in with a password: a way in when Telegram isn't answering. A user sets it on their
+ * Signing in with a password and Telegram confirmation. A user sets it on their
  * account page after signing in with Telegram, so the password is always tied to a Telegram id and
  * its role (src/account/roles.js). They sign in with that id or their @username (the private chat
  * with the bot knows it). The system account signs in here too, with its login and the hash in
@@ -11,7 +11,7 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { AccountPassword, Chat } = require('../db');
-const { startSession } = require('./auth');
+const { startSession, startCode, invalidateCodes } = require('./auth');
 const roles = require('./roles');
 const { deliver } = require('../delivery');
 const { z } = require('../admin/validate');
@@ -87,7 +87,7 @@ async function userIdFor(login) {
 }
 
 /**
- * @returns {Promise<{ token: string } | null>} a session, or null for a wrong login or password and
+ * @returns {Promise<object | null>} a system session or pending personal confirmation; null for wrong credentials and
  *   for someone no longer on the lists
  */
 async function signInWithPassword(login, password, now = Date.now()) {
@@ -109,15 +109,17 @@ async function signInWithPassword(login, password, now = Date.now()) {
     }
     if (system) return { token: await startSession({ userId, userName: roles.systemLogin() }, now) };
     const chat = await Chat.findByPk(userId, { attributes: ['username'], raw: true });
-    return { token: await startSession({ userId, userName: chat ? chat.username : null }, now) };
+    return { ...startCode({ userId, userName: chat ? chat.username : null }, hash, now), userId };
 }
 
 async function setPassword(userId, password) {
+    invalidateCodes(userId);
     await AccountPassword.upsert({ userId, hash: await hashPassword(password) });
     log.info(`[Account] User ${userId} set a password`);
 }
 
 async function removePassword(userId) {
+    invalidateCodes(userId);
     const removed = await AccountPassword.destroy({ where: { userId } });
     if (removed) log.info(`[Account] Password of user ${userId} removed`);
     return removed > 0;

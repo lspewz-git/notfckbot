@@ -49,7 +49,12 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     await expect(gate).toBeVisible();
     await expect(page.locator('#login-tg')).toHaveAttribute('href', 'https://t.me/notfckbot?start=Lcode');
     await expect(page.locator('#login-tg')).toHaveText('Continue with Telegram');
-    await expect(page.locator('#login-name')).toHaveAttribute('placeholder', '@username or ID');
+    await expect(page.locator('#login-tg svg')).toBeVisible();
+    await expect(page.locator('[data-action="login-qr"]')).toBeVisible();
+    await expect(page.locator('[data-action="login-password"]')).toBeVisible();
+    await expect(page.locator('#login-name')).toHaveCount(0);
+    const tiles = await page.locator('.login-method').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+    expect(tiles.every((height) => height >= 44 && height <= 68)).toBe(true);
     // One code for the one screen, and no "session ended" on a first visit
     await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/);
     expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
@@ -75,6 +80,22 @@ test('"Continue with Telegram": the page waits for the answer in the bot, then o
     const poll = panel.account.sent.find((r) => r.path === '/api/login/telegram/poll');
     expect(poll.body).toEqual({ code: 'c'.repeat(32), secret: 's'.repeat(43) });
     await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
+});
+
+test('Telegram sign-in shows its logo', async ({ page }) => {
+    await mockPanel(page, { signedOut: true });
+    await expect(page.locator('#login-tg svg')).toBeVisible();
+});
+
+test('confirmation stays usable when the browser clock is ahead of the server', async ({ page }) => {
+    await page.addInitScript(() => { const now = Date.now.bind(Date); Date.now = () => now() + 360000; });
+    const panel = await mockPanel(page, { signedOut: true });
+    panel.account.confirmationState = 'waiting';
+    await page.locator('[data-action="login-qr"]:enabled').click();
+    await expect(page.locator('#login-wait')).toContainText('4:', { timeout: 5000 });
+    expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
+    panel.account.confirmationState = 'in';
+    await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
 });
 
 test('the link from /login signs in only after a press and opens the chat it came from', async ({ page }) => {
@@ -256,7 +277,7 @@ test('search titles open the shared series and film cards without adding anythin
     await rows.nth(2).click();
     await expect(page.locator('#mine-card-title')).toHaveText('Дюна');
     await expect(page.locator('#mine-card-modal .mine-modes')).toHaveCount(0);
-    expect(panel.account.sent.filter((r) => r.method === 'POST')).toHaveLength(0);
+    expect(panel.account.sent.filter((r) => r.method === 'POST' && r.path !== '/api/account/activity')).toHaveLength(0);
     await page.locator('#mine-card-modal').getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.locator('#mine-card-modal')).toBeHidden();
     await expect(page.locator('#mine-results .mine-row').nth(2).locator('.mine-chip')).toHaveText('Added');
@@ -505,7 +526,8 @@ test('settings are rows; a row opens its choices and saves the one picked', asyn
 
 test('a password signs in from the sign-in screen; a wrong one or too many tries say so', async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true });
-    await expect(page.locator('.login-or')).toHaveText('or with a password');
+    await expect(page.locator('.login-or')).toHaveText('or sign in with');
+    await page.locator('[data-action="login-password"]').click();
     const submit = page.locator('.login-password [type="submit"]');
     await submit.click();
     await expect(page.locator('#login-pass-error')).toHaveText('Enter your @username or ID.');
@@ -526,11 +548,54 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
     await page.locator('.login-password [data-action="password-show"]').click();
     await expect(page.locator('#login-pass')).toHaveAttribute('type', 'text');
     await submit.click();
+    await expect(page.locator('#login-wait')).toBeVisible();
+    expect(panel.account.signedIn).toBe(false);
     await expect(page.locator('#login-gate')).toBeHidden();
     expect(panel.account.sent.filter((r) => r.path === '/api/login/password').at(-1).body).toEqual({
         login: '@me',
         password: 'good-password'
     });
+});
+
+test('QR shares the Telegram confirmation and cancellation invalidates the pending attempt', async ({ page }) => {
+    const panel = await mockPanel(page, { signedOut: true });
+    panel.account.confirmationState = 'waiting';
+    await page.locator('[data-action="login-qr"]:enabled').click();
+    await expect(page.locator('.login-qr')).toBeVisible();
+    await expect(page.locator('.login-check b')).toHaveText('0427');
+    await expect(page.locator('#login-wait')).toBeVisible();
+    expect(panel.account.signedIn).toBe(false);
+    await page.locator('[data-action="login-cancel"]').click();
+    await expect(page.locator('[data-action="login-password"]')).toBeVisible();
+    await expect.poll(() => panel.account.sent.some((r) => r.path === '/api/login/telegram/cancel')).toBe(true);
+    await page.locator('[data-action="login-qr"]:enabled').click();
+    panel.account.confirmationState = 'in';
+    await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
+});
+
+test('a refused or expired confirmation returns to the method picker', async ({ page }) => {
+    const panel = await mockPanel(page, { signedOut: true });
+    for (const [state, message] of [['refused', 'cancelled in the bot'], ['gone', 'time to confirm has run out']]) {
+        panel.account.confirmationState = state;
+        await page.locator('[data-action="login-qr"]:enabled').click();
+        await expect(page.locator('#login-error')).toContainText(message, { timeout: 10000 });
+        expect(panel.account.signedIn).toBe(false);
+    }
+});
+
+test('the system password bypasses Telegram; deliberate panel use renews activity once per minute', async ({ page }) => {
+    const panel = await mockPanel(page, { signedOut: true, system: true });
+    await page.locator('[data-action="login-password"]').click();
+    await page.locator('#login-name').fill('admin');
+    await page.locator('#login-pass').fill('good-password');
+    await page.locator('.login-password [type="submit"]').click();
+    await expect(page.locator('#login-gate')).toBeHidden();
+    await expect(page.locator('#login-wait')).toHaveCount(0);
+    expect(panel.account.sent.some((r) => r.path === '/api/account/activity')).toBe(false);
+    await page.locator('#dashboard-section h1').click();
+    await expect.poll(() => panel.account.sent.filter((r) => r.path === '/api/account/activity').length).toBe(1);
+    await page.locator('#dashboard-section h1').click();
+    expect(panel.account.sent.filter((r) => r.path === '/api/account/activity')).toHaveLength(1);
 });
 
 test('the account page sets, changes and removes the password', async ({ page }) => {
