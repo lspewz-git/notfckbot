@@ -10,6 +10,8 @@ import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
 const MIN_LENGTH = 8;
 
 const EYE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /></svg>';
+const EYE_HIDDEN =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path d="m3 3 18 18" /></svg>';
 const CHEVRON_RIGHT =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
 
@@ -19,10 +21,10 @@ let me = null;
 /** Who is signed in, once /account/me answered (access.js: nobody changes their own role). */
 export const signedInUser = () => me;
 
-/** A password field with a show/hide button beside it. */
+/** A password field with a borderless show/hide button inside its right edge. */
 const passwordField = (id, autocomplete, label) =>
-    `<div class="token-row"><input id="${id}" class="input-field" type="password" autocomplete="${autocomplete}" maxlength="128" aria-label="${label}" />` +
-    `<button type="button" class="btn btn-outline btn-icon-square" data-action="password-show" data-for="${id}" aria-label="Show password" aria-pressed="false">${EYE}</button></div>`;
+    `<div class="password-input"><input id="${id}" class="input-field" type="password" autocomplete="${autocomplete}" maxlength="128" aria-label="${label}" />` +
+    `<button type="button" class="password-toggle" data-action="password-show" data-for="${id}" aria-label="Show password" aria-pressed="false">${EYE_HIDDEN}</button></div>`;
 
 /** The form under "Continue with Telegram" (session.js draws the screen); the system account signs in here too. */
 export const signInForm = () =>
@@ -32,7 +34,7 @@ export const signInForm = () =>
     '<label class="field-label" for="login-pass">Password</label>' +
     passwordField('login-pass', 'current-password', 'Password') +
     '<p class="login-error" id="login-pass-error" role="alert" hidden></p>' +
-    '<button type="submit" class="btn btn-primary btn-block">Continue</button>' +
+    '<button type="submit" class="btn btn-primary btn-block">Log In</button>' +
     '</form>' +
     '<p class="login-hint">Next, confirm this sign-in in the bot. The system account signs in directly.</p>';
 
@@ -195,6 +197,7 @@ export const passwordActions = {
         field.type = show ? 'text' : 'password';
         el.setAttribute('aria-pressed', String(show));
         el.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        if (el.classList.contains('password-toggle')) el.innerHTML = show ? EYE : EYE_HIDDEN;
     }
 };
 

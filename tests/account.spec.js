@@ -574,6 +574,19 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
     await expect(page.locator('.login-or')).toHaveText('or sign in with');
     await page.locator('[data-action="login-password"]').click();
     const submit = page.locator('.login-password [type="submit"]');
+    await expect(submit).toHaveText('Log In');
+    const eye = page.locator('.login-password [data-action="password-show"]');
+    await expect(eye.locator('path')).toHaveAttribute('d', 'm3 3 18 18');
+    const layout = await eye.evaluate((button) => {
+        const field = document.querySelector('#login-pass').getBoundingClientRect();
+        const toggle = button.getBoundingClientRect();
+        return {
+            inside: toggle.left >= field.left && toggle.right <= field.right && toggle.top >= field.top && toggle.bottom <= field.bottom,
+            right: toggle.left > field.left + field.width / 2,
+            border: getComputedStyle(button).borderWidth
+        };
+    });
+    expect(layout).toEqual({ inside: true, right: true, border: '0px' });
     await submit.click();
     await expect(page.locator('#login-pass-error')).toHaveText('Enter your @username or ID.');
     expect(panel.account.sent.filter((r) => r.path === '/api/login/password')).toHaveLength(0);
@@ -592,6 +605,12 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
     await page.locator('#login-pass').fill('good-password');
     await page.locator('.login-password [data-action="password-show"]').click();
     await expect(page.locator('#login-pass')).toHaveAttribute('type', 'text');
+    await expect(eye.locator('path')).toHaveCount(0);
+    await expect(eye).toHaveAttribute('aria-label', 'Hide password');
+    await eye.click();
+    await expect(page.locator('#login-pass')).toHaveAttribute('type', 'password');
+    await expect(eye.locator('path')).toHaveAttribute('d', 'm3 3 18 18');
+    await expect(eye).toHaveAttribute('aria-label', 'Show password');
     await submit.click();
     await expect(page.locator('#login-wait')).toBeVisible();
     expect(panel.account.signedIn).toBe(false);
