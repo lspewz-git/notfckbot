@@ -697,6 +697,50 @@ button.search-result-open:hover .mine-row-title {
 
 /* --- Choosing one of a few (pick-sheet.js) --- */
 
+#pick-modal.chat-picker .modal-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#pick-modal.chat-picker #pick-list {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.pick-search {
+    position: relative;
+    margin-top: var(--space-4);
+    flex: none;
+}
+
+.pick-search > .icon {
+    position: absolute;
+    left: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    pointer-events: none;
+}
+
+.pick-search input {
+    padding-inline: var(--space-8) var(--control-h);
+}
+
+#pick-clear {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: var(--control-h);
+    height: 100%;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
 .pick-avatar {
     width: 32px;
     height: 32px;

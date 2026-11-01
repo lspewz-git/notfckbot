@@ -1809,6 +1809,31 @@
         <dialog id="pick-modal" class="modal modal-sheet" aria-labelledby="pick-title">
             <div class="modal-content modal-narrow">
                 <h3 id="pick-title"></h3>
+                <div id="pick-search" class="pick-search" hidden>
+                    <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
+                        <use href="/vendor/lucide.svg#search" />
+                    </svg>
+                    <input
+                        id="pick-query"
+                        type="text"
+                        role="searchbox"
+                        placeholder="Search chats"
+                        aria-label="Search chats"
+                        aria-controls="pick-list"
+                        autocomplete="off"
+                    />
+                    <button
+                        type="button"
+                        id="pick-clear"
+                        data-action="chat-picker-clear"
+                        aria-label="Clear chat search"
+                        hidden
+                    >
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="/vendor/lucide.svg#x" />
+                        </svg>
+                    </button>
+                </div>
                 <div id="pick-list" class="action-list" role="listbox" aria-labelledby="pick-title"></div>
             </div>
         </dialog>

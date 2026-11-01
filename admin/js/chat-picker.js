@@ -1,5 +1,5 @@
 /** Shared chat chips and rows; callers supply only the chats their role can access. */
-import { $, escapeHtml } from './dom.js';
+import { $, $field, escapeHtml } from './dom.js';
 import { avatar } from './pick-sheet.js';
 import { openModal, closeModal } from './ui.js';
 
@@ -26,8 +26,20 @@ let choose = null;
 
 export function openChatPicker(chats, selected, onPick) {
     $('pick-title').textContent = 'Choose a chat';
-    $('pick-list').innerHTML =
-        chatRows(chats, selected, 'chat-picker-select') || '<p class="empty-note">No chats yet.</p>';
+    $('pick-modal').classList.add('chat-picker');
+    $('pick-search').hidden = false;
+    $field('pick-query').value = '';
+    const render = () => {
+        const query = $field('pick-query').value.trim().replace(/^@+/, '').toLocaleLowerCase();
+        const matches = chats.filter((c) => c.title.toLocaleLowerCase().includes(query));
+        $('pick-list').innerHTML =
+            chatRows(matches, selected, 'chat-picker-select') ||
+            `<p class="empty-note" role="status">${chats.length ? 'No chats found.' : 'No chats yet.'}</p>`;
+        $('pick-clear').hidden = !$field('pick-query').value;
+        $('pick-list').scrollTop = 0;
+    };
+    $('pick-search').oninput = render;
+    render();
     choose = (id) => {
         if (chats.some((c) => String(c.id) === id)) onPick(id);
     };
@@ -35,6 +47,11 @@ export function openChatPicker(chats, selected, onPick) {
 }
 
 export const chatPickerActions = {
+    'chat-picker-clear': () => {
+        $field('pick-query').value = '';
+        $field('pick-query').dispatchEvent(new Event('input', { bubbles: true }));
+        $field('pick-query').focus({ preventScroll: true });
+    },
     'chat-picker-select': (el) => {
         const done = choose;
         choose = null;

@@ -53,6 +53,109 @@ test('chat chooser has user-style avatars, marks the selection and Escape preser
     await expect(chip).toContainText('bob');
 });
 
+for (const section of ['subs', 'watchlist']) {
+    test(`${section}: chat search filters names, clears and selects the matching chat`, async ({ page }) => {
+        await mockPanel(page, {
+            chats: [
+                { id: 101, username: 'Alice', type: 'private' },
+                { id: 102, username: '@bob', type: 'private' },
+                { id: -1003, username: 'Никита & Кирилл', type: 'supergroup' }
+            ]
+        });
+        await openSection(page, section);
+        await page.locator(`#${section}-section [data-action="add-content"]`).click();
+        const chip = page.locator('#content-chat-field .mine-chat-chip');
+        await chip.click();
+        const query = page.getByRole('searchbox', { name: 'Search chats', exact: true });
+        const rows = page.locator('#pick-list .pick-row');
+        await query.fill('  НИК  ');
+        await expect(rows).toHaveCount(1);
+        await expect(rows.first()).toContainText('Никита & Кирилл');
+        await query.fill('no matching chat');
+        await expect(rows).toHaveCount(0);
+        await expect(page.locator('#pick-list')).toHaveText('No chats found.');
+        await page.getByRole('button', { name: 'Clear chat search' }).click();
+        await expect(query).toHaveValue('');
+        await expect(rows).toHaveCount(3);
+        await expect(query).toBeFocused();
+        await query.fill('@BO');
+        await expect(rows).toHaveCount(1);
+        await rows.first().click();
+        await expect(chip).toContainText('@bob');
+        await expect(page.locator('#pick-modal')).toBeHidden();
+        await chip.click();
+        await expect(query).toHaveValue('');
+        await expect(rows).toHaveCount(3);
+        await expect(rows.filter({ hasText: '@bob' })).toHaveAttribute('aria-selected', 'true');
+        await query.fill('Alice');
+        await page.keyboard.press('Escape');
+        await expect(chip).toContainText('@bob');
+        await expect(page.locator('#add-content-modal')).toBeVisible();
+    });
+}
+
+test('chat search stays above a long scrolling list and is absent from other pickers', async ({ page }, testInfo) => {
+    if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 1440, height: 900 });
+    await mockPanel(page, {
+        chats: Array.from({ length: 80 }, (_, i) => ({
+            id: 1000 + i,
+            username: `Chat ${i + 1}`,
+            type: 'supergroup'
+        }))
+    });
+    await openSection(page, 'subs');
+    await page.locator('#subs-section [data-action="add-content"]').click();
+    await page.locator('#content-chat-field .mine-chat-chip').click();
+    const query = page.locator('#pick-query');
+    const list = page.locator('#pick-list');
+    await expect(query).toBeInViewport({ ratio: 1 });
+    await page
+        .locator('#pick-modal .modal-content')
+        .evaluate((el) => Promise.all(el.getAnimations().map((animation) => animation.finished)));
+    const before = await query.boundingBox();
+    await list.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+    });
+    const lastRow = await page.locator('#pick-list .pick-row').last().boundingBox();
+    const listBox = await list.boundingBox();
+    // scrollTop is rounded to a CSS pixel; fractional row heights can leave less than one pixel clipped.
+    expect(lastRow.y + lastRow.height).toBeLessThanOrEqual(listBox.y + listBox.height + 1);
+    expect((await query.boundingBox()).y).toBeCloseTo(before.y, 0);
+    expect(await page.locator('#pick-modal .modal-content').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+        true
+    );
+    await query.fill('Chat 80');
+    const clear = page.locator('#pick-clear');
+    expect(
+        await clear.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        })
+    ).toBe(true);
+    if (testInfo.project.name === 'mobile') {
+        expect((await clear.boundingBox()).width).toBeGreaterThanOrEqual(44);
+        expect((await clear.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }
+    if (process.env.PICKER_SCREENSHOTS) {
+        await query.fill('');
+        await query.blur();
+        await page.locator('#pick-modal .modal-content').screenshot({ path: testInfo.outputPath('chat-search.png') });
+    }
+    await page.keyboard.press('Escape');
+    await page.evaluate(() =>
+        import('./js/pick-sheet.js').then(({ pickFrom }) =>
+            pickFrom({
+                title: 'Notification mode',
+                value: 'all',
+                options: [{ value: 'all', label: 'All episodes' }],
+                onPick() {}
+            })
+        )
+    );
+    await expect(page.locator('#pick-search')).toBeHidden();
+    await expect(page.locator('#pick-list .pick-row')).toHaveText('All episodes');
+});
+
 test('admin and user search popups have the same dialog geometry and close button', async ({ page }) => {
     const measure = (selector) =>
         page.locator(selector).evaluate((el) => {

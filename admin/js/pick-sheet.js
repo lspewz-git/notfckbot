@@ -40,6 +40,8 @@ let values = [];
  * }} spec  `avatar` is ready markup from `avatar()`; `onPick` runs only for another value
  */
 export function pickFrom({ title, options, value, onPick }) {
+    $('pick-search').hidden = true;
+    $('pick-modal').classList.remove('chat-picker');
     $('pick-title').textContent = title;
     values = options.map((o) => String(o.value));
     $('pick-list').innerHTML = options
