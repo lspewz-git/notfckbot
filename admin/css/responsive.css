@@ -308,6 +308,11 @@
         min-width: 0;
     }
 
+    .cell-compact > .title-poster {
+        float: left;
+        margin-right: var(--space-3);
+    }
+
     .compact-title {
         min-width: 0;
         overflow: hidden;

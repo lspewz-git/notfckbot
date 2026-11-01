@@ -79,7 +79,7 @@ function enhanceSelect(select) {
                 select.value = opt.value;
                 select.dispatchEvent(new Event('change', { bubbles: true }));
                 closeDropdown();
-                trigger.focus();
+                trigger.focus({ preventScroll: true });
             };
             panel.appendChild(row);
         });
@@ -98,10 +98,10 @@ function enhanceSelect(select) {
                 : `${rect.bottom + 6}px`;
 
         trigger.setAttribute('aria-expanded', 'true');
-        openDropdown = { trigger, panel };
+        openDropdown = { trigger, panel, top: rect.top, left: rect.left };
 
         const first = /** @type {HTMLElement} */ (panel.querySelector('.selected') || panel.firstElementChild);
-        if (first) first.focus();
+        if (first) first.focus({ preventScroll: true });
     };
 
     trigger.onclick = (e) => {
@@ -127,6 +127,12 @@ export function enhanceSelects() {
         (e) => {
             if (openDropdown && e.target && openDropdown.panel.contains(/** @type {Node} */ (e.target))) {
                 return;
+            }
+            // A trigger scrolled into view can deliver its scroll event after the click.
+            // Close only if the anchor has actually moved since the menu opened.
+            if (openDropdown) {
+                const rect = openDropdown.trigger.getBoundingClientRect();
+                if (rect.top === openDropdown.top && rect.left === openDropdown.left) return;
             }
             closeDropdown();
         },

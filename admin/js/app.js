@@ -45,7 +45,7 @@ import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions, pickFrom } from './pick-sheet.js';
 import { profileActions } from './profile.js';
-import { setupSearchForms } from './content-search.js';
+import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
 
 const REFRESH_SECONDS = 10;
@@ -167,6 +167,7 @@ function startTimer() {
 // Generated markup carries data-* attributes only, so nothing has to be
 // reachable from the global scope and no value ends up inside executable code.
 const CLICK_ACTIONS = {
+    'description-toggle': toggleDescription,
     'chat-actions': (el) => openChatActions(el.dataset.id),
     'view-pick': openViewPicker,
     'view-admin': () => switchSection(lastSection.admin),

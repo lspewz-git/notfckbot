@@ -7,6 +7,7 @@ import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from '
 import { setSelectValue } from './select.js';
 import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
+import { description } from './content-search.js';
 
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
 const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
@@ -74,7 +75,7 @@ async function openDetails(load) {
         if (request !== detailRequest) return;
         setText('detail-title', card.title);
         setText('detail-meta', card.meta);
-        setText('detail-desc', card.desc || 'No description available.');
+        $('detail-desc').innerHTML = description(card.desc);
         $('detail-people').innerHTML = card.people;
         const dates = $('detail-dates');
         dates.innerHTML = card.dates || '';
@@ -104,6 +105,7 @@ export const openSeriesDetails = (tmdbId) =>
             title: data.name,
             meta: `${rating} • ${data.number_of_seasons} season${data.number_of_seasons === 1 ? '' : 's'}`,
             desc: data.overview,
+            dates: `<dt>Premiere</dt><dd>${escapeHtml(formatReleaseDate(data.first_air_date))}</dd>`,
             people: subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>',
             poster: posterUrl(data.poster_path),
             kinopoisk: { type: 'tv', id: String(tmdbId).replace('tv_', '') }

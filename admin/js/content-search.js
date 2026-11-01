@@ -2,6 +2,35 @@
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
 
+/** Stored posters can be full TMDB URLs; always load them through the panel cache. */
+export function titlePoster(url, action, id) {
+    const path = String(url || '').match(/\/([^/]+\.(?:jpg|png|webp))$/i)?.[0];
+    const image = path
+        ? `<img src="/api/poster/w185${escapeHtml(path)}" alt="" loading="lazy" />`
+        : '<span class="title-poster-empty" aria-hidden="true"></span>';
+    return `<button type="button" class="title-poster" data-action="${action}" data-id="${escapeHtml(id)}" aria-label="Open details">${image}</button>`;
+}
+
+/** Keep a short readable preview, with the complete text available without another request. */
+export function description(text) {
+    const chars = Array.from(text || 'No description available.');
+    if (chars.length <= 300) return escapeHtml(chars.join(''));
+    const preview = chars
+        .slice(0, 299)
+        .join('')
+        .replace(/\s+\S*$/, '')
+        .trimEnd();
+    return `<span data-description-short>${escapeHtml(preview)}…</span><span data-description-full hidden>${escapeHtml(chars.join(''))}</span> <button type="button" class="description-toggle" data-action="description-toggle" aria-expanded="false">Show more</button>`;
+}
+
+export function toggleDescription(button) {
+    const expanded = button.getAttribute('aria-expanded') !== 'true';
+    button.parentElement.querySelector('[data-description-short]').hidden = expanded;
+    button.parentElement.querySelector('[data-description-full]').hidden = !expanded;
+    button.setAttribute('aria-expanded', String(expanded));
+    button.textContent = expanded ? 'Show less' : 'Show more';
+}
+
 export function searchForm({ context, inputId, query = '', placeholder = 'Series or film title', back = '' }) {
     return `<form class="mine-search" data-content-search="${context}">${back ? `<button type="button" class="btn btn-ghost" data-action="${back}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-left" /></svg>Back</button>` : ''}<input id="${inputId}" class="input-field" type="search" name="q" placeholder="${escapeHtml(placeholder)}" autocomplete="off" enterkeyhint="search" value="${escapeHtml(query)}" /><button type="submit" class="btn btn-primary">Search</button></form>`;
 }

@@ -173,7 +173,15 @@ test('a title looks clickable, like in the Serials and Movies tables, and opens 
         title.boundingBox(),
         page.locator('#history-series .history-main').first().boundingBox()
     ]);
-    expect(titleBox.width).toBeLessThan(rowBox.width / 2);
+    // The poster now takes part of the row: compare with the text itself rather than half
+    // the remaining width, so this still proves that blank space is not clickable.
+    const textWidth = await title.evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect().width;
+    });
+    expect(Math.abs(titleBox.width - textWidth)).toBeLessThan(1);
+    expect(titleBox.width).toBeLessThan(rowBox.width);
 
     await title.focus();
     await page.keyboard.press('Enter');

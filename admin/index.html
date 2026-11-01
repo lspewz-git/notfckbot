@@ -172,11 +172,11 @@
                         </svg>
                         <span class="nav-label" aria-hidden="true">Movies</span>
                     </button>
-                    <button class="nav-item" data-section="history" aria-label="History">
+                    <button class="nav-item" data-section="history" aria-label="Aired">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <use href="/vendor/lucide.svg#calendar" />
                         </svg>
-                        <span class="nav-label" aria-hidden="true">History</span>
+                        <span class="nav-label" aria-hidden="true">Aired</span>
                     </button>
                     <button class="nav-item" data-section="recap" aria-label="Year recap">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1339,7 +1339,7 @@
                     <section id="history-section" class="section">
                         <header>
                             <div class="header-info">
-                                <h1>History</h1>
+                                <h1>Aired</h1>
                                 <p>
                                     What came out in the last three years among the serials and movies in the database.
                                     A serial counts in every year it had an episode out.
@@ -1523,10 +1523,15 @@
                     <section id="watchlist-section" class="section">
                         <header class="section-header">
                             <h1>Movies</h1>
-                            <button class="btn btn-primary" data-action="add-content" data-kind="movie">
+                            <button
+                                class="btn btn-primary btn-add-round"
+                                data-action="add-content"
+                                data-kind="movie"
+                                aria-label="Add movie"
+                            >
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                    <use href="/vendor/lucide.svg#plus" /></svg
-                                >Add movie
+                                    <use href="/vendor/lucide.svg#plus" />
+                                </svg>
                             </button>
                         </header>
                         <div class="glass-card">
@@ -1634,10 +1639,15 @@
                     <section id="subs-section" class="section">
                         <header class="section-header">
                             <h1>Serials</h1>
-                            <button class="btn btn-primary" data-action="add-content" data-kind="tv">
+                            <button
+                                class="btn btn-primary btn-add-round"
+                                data-action="add-content"
+                                data-kind="tv"
+                                aria-label="Add serial"
+                            >
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                    <use href="/vendor/lucide.svg#plus" /></svg
-                                >Add serial
+                                    <use href="/vendor/lucide.svg#plus" />
+                                </svg>
                             </button>
                         </header>
                         <div class="glass-card">
@@ -1869,7 +1879,7 @@
                                 <use href="/vendor/lucide.svg#calendar" /></svg
                         ></span>
                         <span class="action-text">
-                            <span class="action-title">History</span>
+                            <span class="action-title">Aired</span>
                             <span class="action-desc">What came out, year by year</span>
                         </span>
                         <span class="action-chevron"

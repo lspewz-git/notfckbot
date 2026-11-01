@@ -16,6 +16,7 @@ import {
 } from './format.js';
 import { subKey } from './store.js';
 import { roleBadge } from './access.js';
+import { titlePoster } from './content-search.js';
 
 // The API decides (series ended or canceled on TMDB); the panel keeps no status list of its own
 const isArchivedSub = (sub) => Boolean(sub.archived);
@@ -32,15 +33,15 @@ const ICON = {
 /**
  * The phone card: the title (with a badge) on one line, the rest as one muted line, and any
  * `more` lines under it. Desktop hides this cell; phones hide every other cell except Actions.
- * @param {{ title: string, action?: string, id?: string, badge?: string, meta: string[], more?: string[] }} card
+ * @param {{ title: string, action?: string, id?: string, badge?: string, meta: string[], more?: string[], poster?: string }} card
  */
-function compactCell({ title, action, id, badge = '', meta, more = [] }) {
+function compactCell({ title, action, id, badge = '', meta, more = [], poster = '' }) {
     const titleHtml = action
         ? `<span class="compact-title link-text" data-action="${action}" data-id="${escapeHtml(id)}" role="button" tabindex="0">${title}</span>`
         : `<span class="compact-title">${title}</span>`;
     return `
         <td class="cell-compact">
-            <div class="compact-head">${titleHtml}${badge}</div>
+            ${poster}<div class="compact-head">${titleHtml}${badge}</div>
             <div class="compact-meta">${meta.filter(Boolean).map(escapeHtml).join(' · ')}</div>
             ${more.map((line) => `<div class="compact-meta">${escapeHtml(line)}</div>`).join('')}
         </td>`;
@@ -136,6 +137,7 @@ export const TABLES = {
                 : `<td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>`;
             const key = subKey(item.chatId, item.seriesId);
             const title = item.Series ? item.Series.title : 'Unknown';
+            const poster = titlePoster(item.Series?.poster_url, 'series', item.seriesId);
             const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
             const status = seriesStatusBadge(item.Series && item.Series.status);
             // Phones: one menu instead of two buttons; an archived row has only Delete, kept as an icon
@@ -147,13 +149,14 @@ export const TABLES = {
             return `
                 <tr class="row-compact">
                     <td data-label="User">${escapeHtml(user)}</td>
-                    <td data-label="Series" class="link-cell" data-action="series" data-id="${item.seriesId}"><span class="link-text">${escapeHtml(title)}</span></td>
+                    <td data-label="Series"><div class="title-with-poster">${poster}<span class="link-text" data-action="series" data-id="${item.seriesId}" role="button" tabindex="0">${escapeHtml(title)}</span></div></td>
                     <td data-label="Status">${status}</td>
                     ${next}
                     ${mode}
                     ${compactCell({
                         title: escapeHtml(title),
                         action: 'series',
+                        poster,
                         id: item.seriesId,
                         badge: status,
                         meta: archived
@@ -199,10 +202,11 @@ export const TABLES = {
         row: (item) => {
             const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
             const extras = releaseExtras(item);
+            const poster = titlePoster(item.poster_url, 'film', item.tmdb_id);
             return `
             <tr class="row-compact">
                 <td data-label="User">${escapeHtml(user)}</td>
-                <td data-label="Film Title" class="link-cell" data-action="film" data-id="${escapeHtml(item.tmdb_id)}"><span class="link-text">${escapeHtml(item.title)}</span></td>
+                <td data-label="Film Title"><div class="title-with-poster">${poster}<span class="link-text" data-action="film" data-id="${escapeHtml(item.tmdb_id)}" role="button" tabindex="0">${escapeHtml(item.title)}</span></div></td>
                 <td data-label="Year">${item.year || '—'}</td>
                 <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}${extras
                     .map((line) => `<span class="release-sub">${escapeHtml(line)}</span>`)
@@ -210,6 +214,7 @@ export const TABLES = {
                 ${compactCell({
                     title: escapeHtml(item.title),
                     action: 'film',
+                    poster,
                     id: item.tmdb_id,
                     badge: item.year ? `<span class="compact-year">${item.year}</span>` : '',
                     meta: [user, `Release ${formatReleaseDate(item.premiere_digital)}`],

@@ -155,13 +155,15 @@ export function renderSkeleton(type, rows = 4) {
             const isActions = i === columns.length - 1;
             const cls = isActions ? 'skeleton skeleton-btn' : 'skeleton';
             const width = isActions ? '100%' : SKELETON_WIDTHS[i % SKELETON_WIDTHS.length];
+            if (label === 'Series' || label === 'Film Title') {
+                return `<td data-label="${label}"><div class="title-with-poster"><span class="title-poster skeleton"></span><span class="skeleton" style="width:${width}"></span></div></td>`;
+            }
             return `<td data-label="${label}"><span class="${cls}" style="width:${width}"></span></td>`;
         })
         .join('');
 
     // Phones show only this cell and Actions, so the placeholder has the compact card's shape
-    const compact =
-        '<td class="cell-compact"><span class="skeleton" style="width:55%"></span><span class="skeleton skeleton-sub" style="width:80%"></span></td>';
+    const compact = `<td class="cell-compact">${type === 'subs' || type === 'films' ? '<span class="title-poster skeleton"></span>' : ''}<div class="compact-head"><span class="skeleton" style="width:55%"></span></div><div class="compact-meta"><span class="skeleton skeleton-sub" style="width:80%"></span></div></td>`;
     fillBody(
         type,
         Array.from(

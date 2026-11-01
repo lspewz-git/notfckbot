@@ -1,4 +1,85 @@
 /* Tables — shadcn data table: rows split by hairlines, no row fills */
+.title-with-poster {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.title-with-poster .link-text {
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: var(--space-1);
+}
+
+.title-with-poster .link-text:hover {
+    text-decoration-color: currentColor;
+}
+
+.title-poster {
+    position: relative;
+    display: block;
+    flex: none;
+    width: var(--title-poster-w);
+    height: var(--title-poster-h);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--fill-subtle);
+    cursor: pointer;
+}
+
+.title-poster img,
+.title-poster-empty {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.title-poster.skeleton {
+    height: var(--title-poster-h);
+}
+
+.btn.btn-add-round {
+    width: var(--control-h);
+    height: var(--control-h);
+    padding: 0;
+    border-radius: 50%;
+}
+
+.description-toggle {
+    position: relative;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: var(--space-1);
+    cursor: pointer;
+}
+
+@media (pointer: coarse) {
+    .title-with-poster .link-text {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--control-h);
+    }
+
+    .title-poster::after {
+        content: '';
+        position: absolute;
+        inset: 0 calc(-1 * var(--space-2));
+    }
+
+    .description-toggle {
+        min-height: var(--control-h);
+    }
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

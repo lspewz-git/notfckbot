@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { isUnchanged } from './render.js';
 import { toast } from './ui.js';
 import { PAGE_SIZES } from './pager.js';
+import { titlePoster } from './content-search.js';
 
 // The year on screen; null until the first answer, which picks the latest year with releases
 let selectedYear = null;
@@ -21,6 +22,7 @@ const SKELETON =
 // A row's shape without its content: as tall as a real one, but not seen or read out
 const FILLER_ROW = `
     <li class="history-item history-filler" aria-hidden="true">
+        <span class="title-poster"></span>
         <div class="history-main"><span>&nbsp;</span><span class="history-genres">&nbsp;</span></div>
         <span class="kp-link"><svg class="kp-logo"></svg><span>Kinopoisk</span>${OUT_ARROW}</span>
     </li>`;
@@ -54,6 +56,7 @@ function row(item, action) {
     const genres = `<span class="history-genres">${details ? escapeHtml(details) : '&nbsp;'}</span>`;
     return `
         <li class="history-item">
+            ${titlePoster(item.poster, action, item.tmdbId)}
             <div class="history-main">
                 <span class="link-text" data-action="${action}" data-id="${escapeHtml(item.tmdbId)}" role="button" tabindex="0">${escapeHtml(item.title)}</span>
                 ${genres}

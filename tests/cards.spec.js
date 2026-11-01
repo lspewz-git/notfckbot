@@ -29,8 +29,8 @@ test("a series card lists who is subscribed, with each chat's mode", async ({ pa
     await expect(rows.filter({ hasText: 'bob' })).toContainText('Whole season');
     await expect(rows.filter({ hasText: 'Movie Club' })).toContainText('Every episode');
     await expect(card(page).locator('#detail-meta')).toContainText('TMDB ⭐️ 8.4');
-    // Release dates are a film's: no block for a series
-    await expect(card(page).locator('#detail-dates')).toBeHidden();
+    await expect(card(page).locator('#detail-dates dt')).toHaveText('Premiere');
+    await expect(card(page).locator('#detail-dates dd')).toHaveText('15 Jul 2016');
 });
 
 test("the Kinopoisk button opens the title's page in a new tab", async ({ page }) => {

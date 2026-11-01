@@ -97,7 +97,8 @@ const SERIES = [
     status,
     next_episode_date: null,
     next_episode_season: null,
-    next_episode_number: null
+    next_episode_number: null,
+    poster_url: 'https://image.tmdb.org/t/p/w500/poster.png'
 }));
 
 // TMDB's next announced episode: one dated, one numbered but undated, one special (season 0)
@@ -130,6 +131,7 @@ const film = (id, title, year, premiere_digital, notified = false) => ({
     title,
     year,
     premiere_digital,
+    poster_url: 'https://image.tmdb.org/t/p/w500/poster.png',
     notified
 });
 
@@ -721,6 +723,7 @@ async function mockPanel(page, options = {}) {
                           {
                               tmdbId: 'tv_66732',
                               title: 'Stranger Things',
+                              poster: 'https://image.tmdb.org/t/p/w500/poster.png',
                               seasons: [4, 5],
                               genres: ['drama', 'mystery'],
                               kinopoiskUrl: kp(915196)
@@ -796,7 +799,8 @@ async function mockPanel(page, options = {}) {
                     name: series(id).title,
                     vote_average: 8.4,
                     number_of_seasons: 4,
-                    overview: 'A test series.',
+                    overview: options.overview ?? 'A test series.',
+                    first_air_date: '2016-07-15',
                     // options.poster: the card gets a poster (a 1x1 image, see /api/poster/ below)
                     poster_path: options.poster ? '/poster.png' : null,
                     subCount: subs.length,
@@ -821,7 +825,7 @@ async function mockPanel(page, options = {}) {
                         ruServices: rows[0].ru_services || null
                     },
                     status: rows[0].notified ? 'Released' : 'Post Production',
-                    overview: 'A test film.',
+                    overview: options.overview ?? 'A test film.',
                     poster_path: null,
                     waiting: rows.filter((f) => !f.notified).length,
                     notified: rows.filter((f) => f.notified).length,
