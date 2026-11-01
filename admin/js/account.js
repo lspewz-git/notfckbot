@@ -54,6 +54,11 @@ const state = {
     calWhat: 'series',
     /** @type {any} the calendar's last answer, for its cards */
     cal: null,
+    /** @type {any} */
+    aired: null,
+    airedYear: null,
+    airedWhat: 'all',
+    airedLimit: 20,
     query: '',
     /** @type {any[]} */
     results: [],
@@ -73,6 +78,7 @@ export function setChats(chats, preferred = null) {
     state.chatsError = null;
     state.list = null;
     state.cal = null;
+    resetAired();
     showChatChips();
     reload();
 }
@@ -109,6 +115,7 @@ function showChatChips() {
         label: chat ? `Profile and chat: ${name}` : 'Profile'
     });
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
+    for (const holder of all('[data-profile-chat]')) holder.textContent = name;
 }
 
 /** Another chat picked: every section shows it, and the open one loads it */
@@ -117,6 +124,7 @@ export async function selectChat(id) {
     state.chatId = id;
     state.list = null;
     state.cal = null;
+    resetAired();
     searchOpen = false;
     // The search's "Added" marks belong to the chat it was made for
     state.query = '';
@@ -343,6 +351,85 @@ let searchCardId = null;
 let searchRequest = 0;
 const pendingAdds = new Set();
 
+// --- Aired: the same chat-scoped yearly history as the bot ---
+
+let airedRequest = 0;
+
+function resetAired() {
+    airedRequest += 1;
+    state.aired = null;
+    state.airedYear = null;
+    state.airedLimit = 20;
+    const body = $('my-aired-body');
+    if (body) body.innerHTML = loading();
+}
+
+const airedItems = () =>
+    state.aired
+        ? [
+              ...state.aired.series.map((i) => ({ ...i, kind: 'tv' })),
+              ...state.aired.films.map((i) => ({ ...i, kind: 'movie' }))
+          ]
+        : [];
+
+const airedNote = (item) =>
+    [
+        item.kind === 'tv' ? (item.seasons || []).map((s) => `Season ${s}`).join(', ') : 'Digital release',
+        (item.genres || []).join(', ')
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+function airedView() {
+    const data = state.aired;
+    if (!data) return loading();
+    const items = airedItems()
+        .map((item, index) => ({ item, index }))
+        .filter(
+            ({ item }) => state.airedWhat === 'all' || (item.kind === 'tv' ? 'series' : 'films') === state.airedWhat
+        );
+    return (
+        (data.years.length
+            ? tabs(
+                  data.years.map((y) => [String(y), String(y)]),
+                  String(data.year),
+                  'mine-aired-year',
+                  'year'
+              )
+            : '') +
+        '<div class="mine-toolbar">' +
+        tabs(
+            [
+                ['all', 'All'],
+                ['series', 'Series'],
+                ['films', 'Films']
+            ],
+            state.airedWhat,
+            'mine-aired-what',
+            'what'
+        ) +
+        '</div>' +
+        (items.length
+            ? '<ul class="glass-card mine-rows">' +
+              items
+                  .slice(0, state.airedLimit)
+                  .map(({ item, index }) =>
+                      row('mine-aired-item', String(index), poster(item.poster), item.title, airedNote(item), '')
+                  )
+                  .join('') +
+              '</ul>'
+            : empty(
+                  'No releases yet',
+                  data.year
+                      ? `No releases in this category in ${data.year}.`
+                      : 'No releases among this chat’s subscriptions in the last three years.'
+              )) +
+        (items.length > state.airedLimit
+            ? '<button type="button" class="btn btn-outline" data-action="mine-aired-more">Show more</button>'
+            : '')
+    );
+}
+
 // --- Calendar ---
 
 const calWhatOf = (kind) => (kind === 'movie' ? 'films' : 'series');
@@ -514,7 +601,20 @@ export async function loadMine(section) {
     // Another chat picked meanwhile: this answer is old
     const stale = () => state.chatId !== chatNow;
     try {
-        if (section === 'my-subs') {
+        if (section === 'my-aired') {
+            const request = ++airedRequest;
+            if (!state.aired) body.innerHTML = loading();
+            try {
+                const data = await api(chatPath(`/aired${state.airedYear ? `?year=${state.airedYear}` : ''}`));
+                if (stale() || request !== airedRequest) return;
+                state.aired = data;
+                state.airedYear = data.year;
+                body.innerHTML = airedView();
+            } catch (err) {
+                if (stale() || request !== airedRequest) return;
+                throw err;
+            }
+        } else if (section === 'my-subs') {
             if (searchOpen) {
                 if (!body.querySelector('#mine-q')) {
                     body.innerHTML = searchView();
@@ -581,6 +681,30 @@ const showCalendar = () => {
 
 /** Click handlers, merged into app.js's delegation like the other modules' */
 export const accountActions = {
+    'mine-aired-year': (el) => {
+        state.airedYear = Number(el.dataset.year);
+        state.airedLimit = 20;
+        reload();
+    },
+    'mine-aired-what': (el) => {
+        state.airedWhat = el.dataset.what;
+        state.airedLimit = 20;
+        $('my-aired-body').innerHTML = airedView();
+    },
+    'mine-aired-more': () => {
+        state.airedLimit += 20;
+        $('my-aired-body').innerHTML = airedView();
+    },
+    'mine-aired-item': (el) => {
+        const item = airedItems()[Number(el.dataset.id)];
+        if (item)
+            openCard(
+                cardHead(poster(item.poster, 'mine-poster mine-poster-big'), item.title, [
+                    airedNote(item),
+                    String(state.aired.year)
+                ]) + kinopoiskLink(item.kinopoiskUrl)
+            );
+    },
     'mine-reload': () => {
         state.list = null;
         if (!state.chatsError) {

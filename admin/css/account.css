@@ -5,7 +5,6 @@
    the open section); a user has only "My account" and no switch --- */
 
 .tab-mine,
-.tab-admin,
 body:not(.view-mine) .rail-nav .nav-mine,
 body.view-mine .rail-nav .nav-item:not(.nav-mine),
 body.view-mine .rail-nav .rail-divider,
@@ -21,18 +20,27 @@ body:not(.view-mine) .view-mine-label {
     display: none;
 }
 
-body.view-mine .tabbar .tab-mine,
-body.view-mine:not(.role-user) .tabbar .tab-admin {
+body.view-mine .tabbar .tab-mine {
     display: flex;
 }
 
 body.view-mine .tabbar {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
 }
 
-/* The way back to the admin panel on an admin's phone */
-body.view-mine:not(.role-user) .tabbar {
-    grid-template-columns: repeat(3, 1fr);
+@media (max-width: 1024px) {
+    .mine-section .mine-chat {
+        display: none;
+    }
+    .tab-profile .pick-avatar {
+        width: var(--space-6);
+        height: var(--space-6);
+        font-size: var(--text-xs);
+    }
+}
+
+.tab-profile [data-profile-chat] {
+    display: none;
 }
 
 /* The switch stands out from the sections under it */
@@ -831,8 +839,20 @@ button.search-result-open:hover .mine-row-title {
     border-top: 1px solid var(--border-row);
 }
 
-/* Wider than a phone: a menu dropping from the chip (profile.js sets where), no dimmed page */
-@media (min-width: 641px) {
+@media (min-width: 641px) and (max-width: 1024px) {
+    .modal.profile-modal {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .profile-modal .modal-content {
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        border-bottom: none;
+    }
+}
+
+/* With the desktop rail: drop from the header chip (profile.js sets where). */
+@media (min-width: 1025px) {
     .modal.profile-modal {
         align-items: flex-start;
         justify-content: flex-end;

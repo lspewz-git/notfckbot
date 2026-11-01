@@ -198,6 +198,12 @@
                         <span class="nav-label" aria-hidden="true">Settings</span>
                     </button>
                     <span class="rail-divider nav-mine" aria-hidden="true"></span>
+                    <button class="nav-item nav-mine" data-section="my-aired" aria-label="Aired">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#calendar" />
+                        </svg>
+                        <span class="nav-label" aria-hidden="true">Aired</span>
+                    </button>
                     <button class="nav-item nav-mine" data-section="my-subs" aria-label="My subscriptions">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <use href="/vendor/lucide.svg#bookmark" />
@@ -1254,6 +1260,16 @@
                         </div>
                     </section>
 
+                    <section id="my-aired-section" class="section mine-section">
+                        <header>
+                            <div class="header-info">
+                                <h1>Aired</h1>
+                                <p>Series and films already released among the chosen chat's subscriptions.</p>
+                            </div>
+                            <div class="mine-chat" data-chat-picker></div>
+                        </header>
+                        <div id="my-aired-body" class="mine-body" aria-live="polite"></div>
+                    </section>
                     <section id="my-subs-section" class="section mine-section">
                         <header>
                             <div class="header-info">
@@ -1262,16 +1278,6 @@
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
-                        <div class="tab-filters mine-switch" role="group" aria-label="My account">
-                            <button
-                                type="button"
-                                class="btn btn-ghost active"
-                                data-section="my-subs"
-                                aria-current="page"
-                            >
-                                Subscriptions</button
-                            ><button type="button" class="btn btn-ghost" data-section="my-calendar">Calendar</button>
-                        </div>
                         <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1283,17 +1289,6 @@
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
-                        <div class="tab-filters mine-switch" role="group" aria-label="My account">
-                            <button type="button" class="btn btn-ghost" data-section="my-subs">Subscriptions</button
-                            ><button
-                                type="button"
-                                class="btn btn-ghost active"
-                                data-section="my-calendar"
-                                aria-current="page"
-                            >
-                                Calendar
-                            </button>
-                        </div>
                         <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1729,18 +1724,27 @@
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#ellipsis" /></svg
                 ><span>More</span>
             </button>
+            <button class="tab-item tab-mine" data-section="my-aired">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#calendar" /></svg
+                ><span>Aired</span>
+            </button>
             <button class="tab-item tab-mine" data-section="my-subs">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#bookmark" /></svg
-                ><span>Subscriptions</span>
+                ><span>Subs</span>
             </button>
             <button class="tab-item tab-mine" data-section="my-calendar">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <use href="/vendor/lucide.svg#calendar-days" /></svg
                 ><span>Calendar</span>
             </button>
-            <button class="tab-item tab-admin" data-action="view-admin">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#shield" /></svg>
-                <span>Admin</span>
+            <button
+                class="tab-item tab-mine tab-profile"
+                data-action="profile-open"
+                aria-label="Account"
+                aria-haspopup="dialog"
+                data-tab-sections="my-settings my-account"
+            >
+                <span data-profile-avatar></span><span>Account</span><span class="sr-only" data-profile-chat></span>
             </button>
         </nav>
 

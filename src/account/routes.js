@@ -8,6 +8,7 @@ const { Chat, Series, Subscription, Watchlist } = require('../db');
 const tmdb = require('../api/tmdb');
 const ops = require('../chat-ops');
 const { listPeriod, periodItems } = require('../calendar');
+const history = require('../history');
 const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
 const { deliver } = require('../delivery');
@@ -456,6 +457,22 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
     } catch (err) {
         log.warn(`[Account] Search failed: ${err.message}`);
         fail(res, new ops.OpError(502, "Search isn't answering. Try again later."));
+    }
+});
+
+// The same release history as the bot, scoped to a chat this person may open.
+router.get('/api/account/chats/:chatId/aired', openChat, async (req, res) => {
+    const query = valid(z.object({ year: z.coerce.number().int().min(1900).max(9999).optional() }), req.query, res);
+    if (!query) return;
+    try {
+        const data = await history.releaseHistory({ chatId: req.chatId, year: query.year });
+        res.json({
+            ...data,
+            series: data.series.map((i) => ({ ...i, poster: posterPath(i.poster) })),
+            films: data.films.map((i) => ({ ...i, poster: posterPath(i.poster) }))
+        });
+    } catch (err) {
+        fail(res, err);
     }
 });
 

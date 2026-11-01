@@ -296,6 +296,14 @@ function accountAnswer(state, req, url) {
     }
     if (rest === '/search') return SEARCH;
     if (rest === '/calendar') return CALENDAR;
+    if (rest === '/aired') {
+        const year = Number(url.searchParams.get('year') || 2026);
+        return {
+            years: [2026, 2025], year,
+            series: [{ tmdbId: 'tv_100', title: chatId === '-100' ? 'Group release' : 'Одни из нас', poster: null, seasons: [year === 2026 ? 2 : 1], genres: ['драма'], kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/' }],
+            films: year === 2026 ? [{ tmdbId: 'movie_9', title: 'Released film', poster: null, genres: ['фантастика'], kinopoiskUrl: 'https://www.kinopoisk.ru/film/9/' }] : []
+        };
+    }
     if (rest === '/settings' && method === 'GET') {
         return {
             settings: state.settings,

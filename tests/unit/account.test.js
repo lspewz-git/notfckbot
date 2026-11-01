@@ -585,6 +585,29 @@ test('the API: a film is removed only from the chat in the path', async (t) => {
     assert.equal(destroyed, false);
 });
 
+test('the API: Aired is scoped to an accessible chat and validates its year', async (t) => {
+    const { server, call } = await serve(fakeBot({ '-1': { 7: 'member' } }));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'supergroup' }));
+    const requests = [];
+    t.mock.method(require('../../src/history'), 'releaseHistory', async (options) => {
+        requests.push(options);
+        return {
+            years: [2026],
+            year: 2026,
+            series: [],
+            films: [{ tmdbId: 'movie_1', poster: 'https://image.tmdb.org/t/p/w500/poster.jpg' }]
+        };
+    });
+    const cookie = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/account/chats/-1/aired?year=2026', { cookie })).status, 200);
+    assert.deepEqual(requests, [{ chatId: '-1', year: 2026 }]);
+    assert.equal((await call('GET', '/api/account/chats/-2/aired', { cookie })).status, 403);
+    assert.equal((await call('GET', '/api/account/chats/-1/aired?year=oops', { cookie })).status, 400);
+    assert.equal((await call('GET', '/api/account/chats/-1/aired')).status, 401);
+    assert.equal(requests.length, 1);
+});
+
 // --- The bot ---
 
 function botHandlers() {

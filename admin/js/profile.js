@@ -30,6 +30,7 @@ let me = null;
 /** Who is signed in (session.js, from /account/me). */
 export function setProfile(user) {
     me = { id: String(user.id), name: user.name || null, role: user.role };
+    for (const el of document.querySelectorAll('[data-profile-avatar]')) el.innerHTML = avatar(nameOf(), true);
     renderAccount();
 }
 
@@ -69,6 +70,15 @@ function menuHtml() {
             ? `<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${choices}</div>`
             : '') +
         '<div class="action-list profile-links">' +
+        (me && me.role === 'admin'
+            ? row({
+                  action: 'view-admin',
+                  attrs: ' data-close="profile-modal"',
+                  iconHtml: `<span class="action-icon">${icon('shield')}</span>`,
+                  title: 'Admin panel',
+                  end: `<span class="action-chevron">${CHEVRON}</span>`
+              })
+            : '') +
         (chats.length ? pageRow('my-settings', SLIDERS, 'Chat settings') : '') +
         pageRow('my-account', PERSON, 'Account settings') +
         row({
