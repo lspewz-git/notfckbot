@@ -11,7 +11,7 @@ import { openTestNotifyModal } from './test-notify.js';
 import { openChatStats } from './chat-stats.js';
 import { showChanges } from './changes.js';
 import { showAccessIn } from './access.js';
-import { searchItem, searchResults as resultsView, searchCard } from './content-search.js';
+import { searchItem, searchResults as resultsView, openSearchCard } from './content-search.js';
 
 // --- The per-row menu ---
 // One button per row opens this instead of crowding the Actions column
@@ -346,14 +346,14 @@ export function selectContent(idx, quickAdd = false) {
         submitAddContent();
         return;
     }
-    $('content-card-body').innerHTML = searchCard(item, {
+    openSearchCard(item, {
         modeName: 'content-new-mode',
         submit: 'submit-content',
         modal: 'content-card-modal',
+        bodyId: 'content-card-body',
         buttonId: 'confirm-add-content',
         titleId: 'content-card-title'
     });
-    openModal('content-card-modal');
 }
 
 export async function submitAddContent() {

@@ -13,6 +13,31 @@ async function searchForAlice(page) {
 const result = (page, index) => page.locator('#content-search-results .search-result-open').nth(index);
 const card = (page) => page.locator('#content-card-modal');
 
+test('admin and user search popups have the same dialog geometry and close button', async ({ page }) => {
+    const measure = (selector) =>
+        page.locator(selector).evaluate((el) => {
+            const style = getComputedStyle(el);
+            const actions = getComputedStyle(el.querySelector('.modal-actions'));
+            return {
+                width: style.width,
+                padding: style.padding,
+                gap: style.gap,
+                actionsMargin: actions.marginTop,
+                close: el.querySelector('.modal-x').innerHTML
+            };
+        });
+    await mockPanel(page);
+    await searchForAlice(page);
+    await result(page, 2).click();
+    const admin = await measure('#content-card-modal .modal-content');
+    await mockPanel(page, { role: 'user' });
+    await page.getByRole('button', { name: '+ Add' }).click();
+    await page.locator('#mine-q').fill('дюна');
+    await page.locator('#mine-q').press('Enter');
+    await page.locator('#mine-results .search-result-open').first().click();
+    expect(await measure('#mine-card-modal .modal-content')).toEqual(admin);
+});
+
 test('regression: clicking a search title opens its card', async ({ page }) => {
     await mockPanel(page);
     await openSection(page, 'chats');

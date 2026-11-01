@@ -1,5 +1,17 @@
 /** Shared search results and preview cards for the admin panel and My subscriptions. */
-import { escapeHtml } from './dom.js';
+import { $, escapeHtml } from './dom.js';
+import { openModal } from './ui.js';
+
+export const cardClose = (modal) =>
+    `<button type="button" data-close="${modal}" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>`;
+
+/** Both views use the user's complete dialog: width, spacing, close button and focus. */
+export function openSearchCard(item, options) {
+    const { modal, bodyId } = options;
+    $(modal).innerHTML =
+        `<div class="modal-content modal-narrow search-card-body" id="${bodyId}">${searchCard(item, options)}${cardClose(modal)}</div>`;
+    openModal(modal);
+}
 
 export const MODES = {
     episode: { short: 'Every episode', long: 'Every episode' },

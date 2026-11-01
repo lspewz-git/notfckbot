@@ -10,7 +10,7 @@ import { avatar, pickFrom } from './pick-sheet.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
 
-import { MODES, modesField, searchResults, searchCard } from './content-search.js';
+import { MODES, modesField, searchResults, openSearchCard, cardClose } from './content-search.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -260,8 +260,7 @@ const cardHead = (picture, title, lines) =>
         .map((l) => `<p class="mine-dim">${escapeHtml(l)}</p>`)
         .join('')}</div></div>`;
 
-const CLOSE_X =
-    '<button type="button" data-close="mine-card-modal" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>';
+const CLOSE_X = cardClose('mine-card-modal');
 
 function seriesCard(s, { confirm = false } = {}) {
     return (
@@ -298,11 +297,14 @@ function filmCard(f, { confirm = false } = {}) {
     );
 }
 
-function newSeriesCard(r) {
-    return searchCard(r, {
+function openNewCard(r) {
+    cardVersion += 1;
+    searchCardId = r.tmdbId;
+    openSearchCard(r, {
         modeName: 'mine-new-mode',
         submit: r.kind === 'tv' ? 'mine-subscribe' : 'mine-add-film',
-        modal: 'mine-card-modal'
+        modal: 'mine-card-modal',
+        bodyId: 'mine-card-body'
     });
 }
 
@@ -652,11 +654,11 @@ export const accountActions = {
     },
     'mine-search-card': (el) => {
         const r = state.results.find((x) => x.tmdbId === el.dataset.id);
-        if (r) openCard(newSeriesCard(r), r.tmdbId);
+        if (r) openNewCard(r);
     },
     'mine-pick-series': (el) => {
         const r = state.results.find((x) => x.tmdbId === el.dataset.id);
-        if (r) openCard(newSeriesCard(r), r.tmdbId);
+        if (r) openNewCard(r);
     },
     'mine-subscribe': async (el) => {
         const chatNow = state.chatId;

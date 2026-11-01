@@ -293,10 +293,6 @@ button.search-result-open:hover .mine-row-title {
     padding: 0;
 }
 
-#content-card-body .modal-actions {
-    margin-top: var(--space-4);
-}
-
 .mine-row-text {
     display: flex;
     flex: 1;
@@ -613,7 +609,8 @@ button.search-result-open:hover .mine-row-title {
     height: 18px;
 }
 
-#mine-card-body .modal-actions {
+#mine-card-body .modal-actions,
+.search-card-body .modal-actions {
     margin-top: var(--space-2);
 }
 
