@@ -32,6 +32,7 @@
         <link rel="modulepreload" href="js/api.js" />
         <link rel="modulepreload" href="js/changes.js" />
         <link rel="modulepreload" href="js/chat-stats.js" />
+        <link rel="modulepreload" href="js/chat-picker.js" />
         <link rel="modulepreload" href="js/content-search.js" />
         <link rel="modulepreload" href="js/chats.js" />
         <link rel="modulepreload" href="js/dashboard-charts.js" />
@@ -2246,13 +2247,8 @@
                     <span id="add-content-heading">Add for</span> <span id="add-content-target"></span>
                 </h3>
                 <!-- Only when opened from Serials or Movies: there the chat isn't known yet -->
-                <div class="field-block mt-md" id="content-chat-field" hidden>
-                    <label class="field-label" for="content-chat-select">Chat</label>
-                    <select id="content-chat-select" class="select-field"></select>
-                </div>
-                <div class="search-box mt-md">
-                    <input type="text" id="content-search-input" placeholder="Search series or movies..." />
-                </div>
+                <div class="mt-md" id="content-chat-field" hidden></div>
+                <div id="content-search-form" class="mt-md"></div>
                 <div id="content-search-results" class="search-results"></div>
                 <!-- A corner ×, not a Cancel button under everything: on a phone that one sat below the
                      fold, past the results and the Add button -->

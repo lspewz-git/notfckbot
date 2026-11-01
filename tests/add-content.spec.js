@@ -8,10 +8,50 @@ async function searchForAlice(page) {
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await page.locator('#action-add').click();
     await page.locator('#content-search-input').fill('long title');
+    await page.locator('#content-search-input').press('Enter');
     await expect(page.locator('#content-search-results li')).toHaveCount(6);
 }
 const result = (page, index) => page.locator('#content-search-results .search-result-open').nth(index);
 const card = (page) => page.locator('#content-card-modal');
+
+test('shared search waits for Search or Enter; the admin has no Back button', async ({ page }) => {
+    await mockPanel(page);
+    const requests = [];
+    page.on('request', (r) => {
+        if (r.url().includes('/api/tmdb/search')) requests.push(r.url());
+    });
+    await openSection(page, 'subs');
+    await page.locator('#subs-section [data-action="add-content"]').click();
+    const form = page.locator('#content-search-form form');
+    await expect(form.getByRole('button', { name: 'Back' })).toHaveCount(0);
+    await form.getByRole('searchbox').fill('long title');
+    await page.waitForTimeout(650);
+    expect(requests).toHaveLength(0);
+    await form.getByRole('button', { name: 'Search', exact: true }).click();
+    await expect(page.locator('#content-search-results li')).toHaveCount(2);
+    await form.getByRole('searchbox').fill('');
+    await expect(page.locator('#content-search-results')).toBeEmpty();
+});
+
+test('chat chooser has user-style avatars, marks the selection and Escape preserves it', async ({ page }) => {
+    await mockPanel(page);
+    await openSection(page, 'subs');
+    await page.locator('#subs-section [data-action="add-content"]').click();
+    const chip = page.locator('#content-chat-field .mine-chat-chip');
+    await expect(chip.locator('.mine-chat-chip-name')).toHaveText('Choose a chat…');
+    await chip.click();
+    const rows = page.locator('#pick-list .pick-row');
+    await expect(rows).toHaveCount(3);
+    await expect(rows.first().locator('.pick-avatar')).toBeVisible();
+    await page.locator('#pick-list .pick-row', { hasText: 'bob' }).click();
+    await expect(chip).toContainText('bob');
+    await chip.click();
+    await expect(page.locator('#pick-list .pick-row', { hasText: 'bob' })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#pick-modal')).toBeHidden();
+    await expect(page.locator('#add-content-modal')).toBeVisible();
+    await expect(chip).toContainText('bob');
+});
 
 test('admin and user search popups have the same dialog geometry and close button', async ({ page }) => {
     const measure = (selector) =>
@@ -44,6 +84,7 @@ test('regression: clicking a search title opens its card', async ({ page }) => {
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await page.locator('#action-add').click();
     await page.locator('#content-search-input').fill('long title');
+    await page.locator('#content-search-input').press('Enter');
     await page
         .locator('#content-search-results .result-title, #content-search-results .search-result-open')
         .first()
@@ -170,6 +211,7 @@ test('an old add cannot close a new card for another chat', async ({ page }) => 
     await page.locator('[data-action="chat-actions"][data-id="102"]').click();
     await page.locator('#action-add').click();
     await page.locator('#content-search-input').fill('long title');
+    await page.locator('#content-search-input').press('Enter');
     await expect(page.locator('#content-search-results li')).toHaveCount(6);
     await result(page, 2).click();
     release();
@@ -185,15 +227,16 @@ test('Serials filters results and requires the chat to be chosen explicitly', as
     await openSection(page, 'subs');
     await page.locator('#subs-section [data-action="add-content"]').click();
     await page.locator('#content-search-input').fill('long title');
+    await page.locator('#content-search-input').press('Enter');
     await expect(page.locator('#content-search-results li')).toHaveCount(2);
     await result(page, 0).click();
     await card(page).locator('#confirm-add-content').click();
     await expect(card(page)).toBeHidden();
-    const trigger = page.locator('#content-chat-field .custom-select-trigger');
+    const trigger = page.locator('#content-chat-field .mine-chat-chip');
     await expect(trigger).toBeFocused();
     expect(panel.lastAdd).toBeUndefined();
     await trigger.click();
-    await page.locator('.custom-select-option', { hasText: 'bob' }).click();
+    await page.locator('#pick-list .pick-row', { hasText: 'bob' }).click();
     await result(page, 0).click();
     await card(page).locator('#confirm-add-content').click();
     await expect(card(page)).toBeHidden();
@@ -204,15 +247,16 @@ test('Movies filters films and Added belongs only to the selected chat', async (
     const panel = await mockPanel(page);
     await openSection(page, 'watchlist');
     await page.locator('#watchlist-section [data-action="add-content"]').click();
-    const trigger = page.locator('#content-chat-field .custom-select-trigger');
+    const trigger = page.locator('#content-chat-field .mine-chat-chip');
     await trigger.click();
-    await page.locator('.custom-select-option', { hasText: 'alice' }).click();
+    await page.locator('#pick-list .pick-row', { hasText: 'alice' }).click();
     await page.locator('#content-search-input').fill('long title');
+    await page.locator('#content-search-input').press('Enter');
     await expect(page.locator('#content-search-results li')).toHaveCount(4);
     await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(1);
     await trigger.click();
-    await page.locator('.custom-select-option', { hasText: 'bob' }).click();
+    await page.locator('#pick-list .pick-row', { hasText: 'bob' }).click();
     await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(0);
     expect(panel.lastAdd.body.chatId).toBe('101');
 });
@@ -230,6 +274,7 @@ for (const reopen of [false, true])
         await page.locator('#subs-section [data-action="add-content"]').click();
         const requested = page.waitForRequest('**/api/tmdb/search*');
         await page.locator('#content-search-input').fill('long title');
+        await page.locator('#content-search-input').press('Enter');
         await requested;
         if (reopen) {
             await page.locator('[data-close-return="add-content-modal"]').click();

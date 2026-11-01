@@ -6,11 +6,12 @@
 import { api } from './api.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal } from './ui.js';
-import { avatar, pickFrom } from './pick-sheet.js';
+import { pickFrom } from './pick-sheet.js';
+import { chatChip } from './chat-picker.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
 
-import { MODES, modesField, searchResults, openSearchCard, cardClose } from './content-search.js';
+import { MODES, modesField, searchResults, openSearchCard, cardClose, searchForm } from './content-search.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -76,8 +77,6 @@ export function setChats(chats, preferred = null) {
     reload();
 }
 
-const CHEVRON_DOWN =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>';
 const CHEVRON_RIGHT =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>';
 
@@ -103,9 +102,12 @@ export const chatList = () => ({ chats: state.chats || [], chatId: state.chatId 
 function showChatChips() {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
     const name = chat ? chat.title : ownerName || 'Account';
-    const html =
-        `<button type="button" class="mine-chat-chip" data-action="profile-open" aria-haspopup="dialog" aria-label="${chat ? `Profile and chat: ${escapeHtml(name)}` : 'Profile'}">` +
-        `${avatar(name, !chat || chat.type === 'private')}<span class="mine-chat-chip-name">${escapeHtml(name)}</span>${CHEVRON_DOWN}</button>`;
+    const html = chatChip({
+        title: name,
+        accent: !chat || chat.type === 'private',
+        action: 'profile-open',
+        label: chat ? `Profile and chat: ${name}` : 'Profile'
+    });
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
 }
 
@@ -221,10 +223,8 @@ function subsView() {
 
 function searchView() {
     return (
-        '<form class="mine-search" data-mine="search">' +
-        '<button type="button" class="btn btn-ghost" data-action="mine-search-close">← Back</button>' +
-        `<input id="mine-q" class="input-field" type="search" name="q" placeholder="Series or film title" autocomplete="off" enterkeyhint="search" value="${escapeHtml(state.query)}" />` +
-        '<button type="submit" class="btn btn-primary">Search</button></form><div id="mine-results"></div>'
+        searchForm({ context: 'account', inputId: 'mine-q', query: state.query, back: 'mine-search-close' }) +
+        '<div id="mine-results"></div>'
     );
 }
 
@@ -764,26 +764,29 @@ export function setupAccount() {
             }
         }
     });
+}
 
-    document.addEventListener('submit', async (event) => {
-        const form = /** @type {HTMLFormElement} */ (event.target);
-        if (form.dataset.mine !== 'search') return;
-        event.preventDefault();
-        const query = String(new FormData(form).get('q') || '').trim();
-        if (!query) return;
-        state.query = query;
-        const request = ++searchRequest;
-        const chatNow = state.chatId;
-        const results = $('mine-results');
-        results.innerHTML = loading();
-        try {
-            const found = await api(chatPath(`/search?q=${encodeURIComponent(query)}`));
-            if (request !== searchRequest || state.query !== query || state.chatId !== chatNow || !searchOpen) return;
-            state.results = found;
-            if ($('mine-results')) $('mine-results').innerHTML = resultsView();
-        } catch (err) {
-            if (request === searchRequest && state.chatId === chatNow && searchOpen)
-                results.innerHTML = failed(err.message);
-        }
-    });
+/** Role-specific loading behind the shared search form. */
+export async function searchAccount(query) {
+    if (!query) {
+        searchRequest += 1;
+        state.query = '';
+        state.results = [];
+        if ($('mine-results')) $('mine-results').innerHTML = '';
+        return;
+    }
+    state.query = query;
+    const request = ++searchRequest;
+    const chatNow = state.chatId;
+    const results = $('mine-results');
+    results.innerHTML = loading();
+    try {
+        const found = await api(chatPath(`/search?q=${encodeURIComponent(query)}`));
+        if (request !== searchRequest || state.query !== query || state.chatId !== chatNow || !searchOpen) return;
+        state.results = found;
+        if ($('mine-results')) $('mine-results').innerHTML = resultsView();
+    } catch (err) {
+        if (request === searchRequest && state.chatId === chatNow && searchOpen)
+            results.innerHTML = failed(err.message);
+    }
 }

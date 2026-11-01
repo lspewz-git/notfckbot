@@ -2,6 +2,26 @@
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
 
+export function searchForm({ context, inputId, query = '', placeholder = 'Series or film title', back = '' }) {
+    return `<form class="mine-search" data-content-search="${context}">${back ? `<button type="button" class="btn btn-ghost" data-action="${back}">← Back</button>` : ''}<input id="${inputId}" class="input-field" type="search" name="q" placeholder="${escapeHtml(placeholder)}" autocomplete="off" enterkeyhint="search" value="${escapeHtml(query)}" /><button type="submit" class="btn btn-primary">Search</button></form>`;
+}
+
+/** Both forms submit on Search or Enter; clearing the field invalidates an old answer. */
+export function setupSearchForms(handlers) {
+    document.addEventListener('submit', (event) => {
+        const form = /** @type {HTMLFormElement} */ (event.target);
+        const run = handlers[form.dataset.contentSearch];
+        if (!run) return;
+        event.preventDefault();
+        run(String(new FormData(form).get('q') || '').trim());
+    });
+    document.addEventListener('input', (event) => {
+        const input = /** @type {HTMLInputElement} */ (event.target);
+        const form = input.closest('form[data-content-search]');
+        if (form && input.value === '') handlers[/** @type {HTMLElement} */ (form).dataset.contentSearch]?.('');
+    });
+}
+
 export const cardClose = (modal) =>
     `<button type="button" data-close="${modal}" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>`;
 

@@ -1,6 +1,6 @@
 /** Acting on one chat: the row menu, messaging, blocking, adding content. */
 
-import { $, setText, escapeHtml, $field } from './dom.js';
+import { $, setText, $field } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { toast, openModal, closeModal, setReturnTo, clearReturnTo, focusField } from './ui.js';
@@ -11,7 +11,8 @@ import { openTestNotifyModal } from './test-notify.js';
 import { openChatStats } from './chat-stats.js';
 import { showChanges } from './changes.js';
 import { showAccessIn } from './access.js';
-import { searchItem, searchResults as resultsView, openSearchCard } from './content-search.js';
+import { searchItem, searchResults as resultsView, openSearchCard, searchForm } from './content-search.js';
+import { chatChip, openChatPicker } from './chat-picker.js';
 
 // --- The per-row menu ---
 // One button per row opens this instead of crowding the Actions column
@@ -216,6 +217,8 @@ let adding = false;
 // Opened from Serials or Movies: only that kind is searched, and the chat is picked in the
 // dialog. Null when opened from a chat's menu: both kinds, for that chat.
 let contentKind = null;
+let availableChats = [];
+let pickedChatId = '';
 
 const SEARCH_PLACEHOLDER = { tv: 'Search serials...', movie: 'Search movies...' };
 
@@ -229,13 +232,17 @@ function resetAddContent(kind, heading, target) {
     searchResults = [];
     existingContent = [];
     membership = null;
+    pickedChatId = '';
+    availableChats = [];
 
     setText('add-content-heading', heading);
     setText('add-content-target', target);
     $('content-chat-field').hidden = !kind;
-    const input = $field('content-search-input');
-    input.value = '';
-    input.placeholder = SEARCH_PLACEHOLDER[kind] || 'Search series or movies...';
+    $('content-search-form').innerHTML = searchForm({
+        context: 'admin',
+        inputId: 'content-search-input',
+        placeholder: SEARCH_PLACEHOLDER[kind] || 'Series or film title'
+    });
     $('content-search-results').innerHTML = '';
     closeModal('content-card-modal');
 }
@@ -255,7 +262,7 @@ function openAddContentModal(chatId, label) {
 export async function openAddContentFor(kind) {
     resetAddContent(kind, kind === 'tv' ? 'Add serial' : 'Add movie', '');
 
-    const select = $field('content-chat-select');
+    const session = dialogSession;
     let chats = Array.from(chatsById.values());
     if (!chats.length) {
         // The Chats table hasn't been loaded in this visit yet
@@ -267,17 +274,37 @@ export async function openAddContentFor(kind) {
     }
     // No chat is preselected: one picked by default is easy to miss, and that chat would then
     // get notifications it never asked for
-    const options = chats.map(
-        (c) =>
-            `<option value="${escapeHtml(String(c.id))}">${escapeHtml(chatLabel(c))} (${escapeHtml(c.type)})</option>`
-    );
-    select.innerHTML = `<option value="">${chats.length ? 'Choose a chat…' : 'No chats yet'}</option>${options.join('')}`;
-    // Keeps the styled dropdown's label in step with the new options
-    setSelectValue('content-chat-select', '');
-    select.onchange = renderContentResults;
+    if (session !== dialogSession) return;
+    availableChats = chats.map((c) => ({
+        id: String(c.id),
+        title: chatLabel(c),
+        type: c.type,
+        hint: c.type === 'private' ? 'Private chat' : c.type === 'channel' ? 'Channel' : 'Group'
+    }));
+    renderContentChat();
 
     openModal('add-content-modal');
     focusField($field('content-search-input'));
+}
+
+function renderContentChat() {
+    const chat = availableChats.find((c) => c.id === pickedChatId);
+    $('content-chat-field').innerHTML = chatChip({
+        title: chat?.title || 'Choose a chat…',
+        accent: chat?.type === 'private',
+        action: 'content-chat-open'
+    });
+}
+
+export function openContentChats() {
+    const session = dialogSession;
+    openChatPicker(availableChats, pickedChatId, (id) => {
+        if (session !== dialogSession) return;
+        pickedChatId = id;
+        renderContentChat();
+        renderContentResults();
+        $('content-chat-field').querySelector('button').focus({ preventScroll: true });
+    });
 }
 
 // Only the latest search may fill the list: an older, slower answer (or one for a dialog
@@ -325,7 +352,7 @@ function renderContentResults() {
         $('content-search-results').innerHTML = '';
         return;
     }
-    const chatId = contentKind ? $field('content-chat-select').value : targetChatId;
+    const chatId = contentKind ? pickedChatId : targetChatId;
     searchResults.forEach((r) => {
         r.added = existingContent.some((c) => c.chatId === String(chatId) && c.tmdbId === r.tmdbId);
     });
@@ -340,7 +367,7 @@ export function selectContent(idx, quickAdd = false) {
     const item = searchResults[idx];
     if (!item) return;
     // Snapshot the chat with the card: it cannot silently change underneath an add.
-    const chatId = contentKind ? $field('content-chat-select').value : targetChatId;
+    const chatId = contentKind ? pickedChatId : targetChatId;
     selected = { ...item, chatId };
     if (quickAdd) {
         submitAddContent();
@@ -362,7 +389,7 @@ export async function submitAddContent() {
     if (!item.chatId) {
         closeModal('content-card-modal');
         toast('Choose a chat first', 'error');
-        /** @type {HTMLElement} */ ($('content-chat-field').querySelector('.custom-select-trigger')).focus();
+        $('content-chat-field').querySelector('button').focus();
         return;
     }
     const session = dialogSession;

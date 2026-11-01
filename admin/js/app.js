@@ -1,6 +1,6 @@
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
-import { $, $field, all, closest, debounce } from './dom.js';
+import { $, all, closest } from './dom.js';
 import { runCheckNow, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setSubsChart, openRecentSends } from './dashboard-charts.js';
@@ -22,6 +22,7 @@ import { openServiceModal, setupServiceDialog } from './services.js';
 import {
     openChatActions,
     openAddContentFor,
+    openContentChats,
     searchContent,
     selectContent,
     submitAddContent,
@@ -38,12 +39,14 @@ import {
 import { triggerCheck, openBroadcastModal, sendBroadcast } from './maintenance.js';
 import { openAbout, loadAbout } from './about.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
-import { accountActions, setupAccount } from './account.js';
+import { accountActions, setupAccount, searchAccount } from './account.js';
 import { startSession, watchSession, sessionActions } from './session.js';
 import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions, pickFrom } from './pick-sheet.js';
 import { profileActions } from './profile.js';
+import { setupSearchForms } from './content-search.js';
+import { chatPickerActions } from './chat-picker.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -175,6 +178,7 @@ const CLICK_ACTIONS = {
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
     sort: (el) => setTableSort(el.dataset.table, el.dataset.sort),
     page: (el) => setTablePage(el.dataset.table, Number(el.dataset.step)),
+    'content-chat-open': () => openContentChats(),
     'select-content': (el) => selectContent(Number(el.dataset.index)),
     'add-content-film': (el) => selectContent(Number(el.dataset.index), true),
     'submit-content': () => submitAddContent(),
@@ -195,6 +199,7 @@ const CLICK_ACTIONS = {
     ...accountActions,
     ...passwordActions,
     ...pickActions,
+    ...chatPickerActions,
     ...profileActions,
     ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
@@ -288,8 +293,7 @@ function setupControls() {
     setupServiceDialog();
     setupTestNotifyDialog();
 
-    // One search box covering both series and movies
-    $field('content-search-input').oninput = debounce((e) => searchContent(e.target.value.trim()), 500);
+    setupSearchForms({ admin: searchContent, account: searchAccount });
 }
 
 // --- Boot ---

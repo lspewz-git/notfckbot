@@ -8,10 +8,11 @@ import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { avatar } from './pick-sheet.js';
+import { chatRows } from './chat-picker.js';
 import { chatList, chatHint, selectChat } from './account.js';
 
 const icon = (path) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>`;
-const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>';
+
 const CHEVRON = icon('m9 18 6-6-6-6');
 const SLIDERS = icon('M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6');
 const PERSON = icon('M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z');
@@ -56,24 +57,15 @@ function menuHtml() {
           `<span class="action-title">${escapeHtml(nameOf())}</span>` +
           `<span class="action-desc">${escapeHtml(ROLES[me.role] || me.role)} · ID ${escapeHtml(me.id)}</span></span></div>`
         : '';
-    const chatRows = chats
-        .map((c) => {
-            const on = c.id === chatId;
-            return row({
-                action: 'profile-chat',
-                attrs: ` data-id="${escapeHtml(c.id)}" aria-pressed="${on}"`,
-                cls: ` pick-row${on ? ' selected' : ''}`,
-                iconHtml: avatar(c.title, c.type === 'private'),
-                title: c.title,
-                hint: chatHint(c),
-                end: on ? `<span class="pick-check">${CHECK}</span>` : ''
-            });
-        })
-        .join('');
+    const choices = chatRows(
+        chats.map((c) => ({ ...c, hint: chatHint(c) })),
+        chatId,
+        'profile-chat'
+    );
     return (
         head +
         (chats.length
-            ? `<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${chatRows}</div>`
+            ? `<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${choices}</div>`
             : '') +
         '<div class="action-list profile-links">' +
         (chats.length ? pageRow('my-settings', SLIDERS, 'Chat settings') : '') +
