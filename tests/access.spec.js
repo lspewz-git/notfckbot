@@ -74,7 +74,7 @@ test('on a phone the four Users tabs stay inside the card: the track scrolls, th
     await expect(page.locator('.tab-filters [data-chats-tab="left"]')).toHaveClass(/active/);
 });
 
-test("the row's menu: the role is picked from a dropdown and saved at once; not for groups or yourself", async ({
+test("the row's menu: the role is picked from a dropdown and saved at once; not for groups", async ({
     page
 }) => {
     const panel = await mockPanel(page, { chats: CHATS });
@@ -85,10 +85,10 @@ test("the row's menu: the role is picked from a dropdown and saved at once; not 
     await expect(page.locator('#action-access')).toBeHidden();
     await page.locator('[data-close="chat-actions-modal"].modal-x').click();
 
-    // Your own role can't be changed
+    // Your own role uses the same dropdown
     await openMenu(page, 42);
-    await expect(page.locator('#action-access .custom-select')).toBeHidden();
-    await expect(page.locator('#action-access-desc')).toHaveText("Admin · yours, can't be changed here");
+    await expect(page.locator('#action-access .custom-select')).toBeVisible();
+    await expect(page.locator('#action-access-desc')).toHaveText('Saved when picked');
     await page.locator('[data-close="chat-actions-modal"].modal-x').click();
 
     // Without a role (sign-up closed) the dropdown says No access
@@ -105,6 +105,23 @@ test("the row's menu: the role is picked from a dropdown and saved at once; not 
         page.locator('#chats-body tr:visible', { hasText: '@new' }).locator('.access-badge:visible')
     ).toHaveText('User');
 });
+
+for (const role of ['user', 'none']) {
+    test(`an admin changes their own role to ${role} and the page applies the new access`, async ({ page }) => {
+        const panel = await mockPanel(page, { chats: CHATS });
+        await openSection(page, 'chats');
+        await openMenu(page, 42);
+        await pick(page, '#action-access-role', role === 'user' ? 'User' : 'No access');
+        await expect.poll(() => panel.accessSaves).toEqual([{ userId: '42', role }]);
+        if (role === 'user') {
+            await expect(page.locator('body')).toHaveClass(/role-user/);
+            await expect(page.locator('#chats-section')).toBeHidden();
+            await expect(page.locator('#login-gate')).toBeHidden();
+        } else {
+            await expect(page.locator('#login-gate')).toBeVisible();
+        }
+    });
+}
 
 test('a refused role change says why and shows the saved role again', async ({ page }) => {
     await mockPanel(page, {

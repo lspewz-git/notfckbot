@@ -557,6 +557,10 @@ async function mockPanel(page, options = {}) {
                 chat.panelRole = body.role;
                 if (body.role === 'none') chat.hasPassword = false;
             }
+            if (body.userId === '42' && !panel.account.system) {
+                panel.account.role = body.role;
+                if (body.role === 'none') panel.account.signedIn = false;
+            }
             return { userId: body.userId, role: body.role };
         },
         '/api/access/signup': (req) => {

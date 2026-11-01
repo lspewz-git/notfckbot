@@ -916,9 +916,3 @@ html:has(.modal[open]) {
         width: 100%;
     }
 }
-
-/* Your own role in the menu: said in the line under the title, not offered */
-.action-row-you .custom-select,
-.action-row-you .action-select {
-    display: none;
-}

@@ -29,17 +29,10 @@ export function showAccessIn(chat) {
     $('action-access').hidden = !person;
     $('action-password-remove').hidden = !person || !chat.hasPassword;
     if (!person) return;
-    const me = signedInUser();
-    const you = Boolean(me && me.id === String(chat.id));
     $field('action-access-role').dataset.id = String(chat.id);
     // setSelectValue fires "change": saveRole skips a value that is the saved one
     setSelectValue('action-access-role', chat.panelRole || 'none');
-    // Your own role: shown, not offered (the dropdown has no disabled state)
-    $('action-access').classList.toggle('action-row-you', you);
-    setText(
-        'action-access-desc',
-        you ? `${ROLE_LABELS[chat.panelRole] || 'No access'} · yours, can't be changed here` : 'Saved when picked'
-    );
+    setText('action-access-desc', 'Saved when picked');
     $('action-password-remove').dataset.id = String(chat.id);
 }
 
@@ -48,6 +41,17 @@ async function saveRole(select) {
     const chat = chatsById.get(userId);
     const role = select.value;
     if (!chat || role === (chat.panelRole || 'none')) return;
+    if (signedInUser()?.id === userId) {
+        try {
+            // Reload before any admin refresh: the new role may no longer allow it.
+            await api('/access', { method: 'POST', body: { userId, role } });
+            location.reload();
+        } catch (err) {
+            toast(err.message, 'error');
+            showAccessIn(chat);
+        }
+        return;
+    }
     const name = chatLabel(chat);
     const done = await mutate(
         '/access',

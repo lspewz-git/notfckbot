@@ -2,9 +2,8 @@
  * Panel access (src/account/roles.js): a person's role from the Users list (Actions → Panel access),
  * and in Settings → Bot whether anyone who starts the bot may sign up, and the system account's
  * password. Roles live in the database, the other two in .env (written there and into process.env
- * at once); everything applies without a restart. An admin can't change their own role; two admins
- * taking each other's away at the same moment could leave none, and then the system account (always
- * an admin) is the way back.
+ * at once); everything applies without a restart. Admins may change any person's role, including
+ * their own. The system account (always an admin) is the way back if no personal admins remain.
  */
 const { Chat } = require('../../db');
 const roles = require('../../account/roles');
@@ -35,9 +34,6 @@ router.post('/api/access', async (req, res) => {
     const body = valid(ACCESS, req.body, res);
     if (!body) return;
     const { userId, role } = body;
-    if (userId === String(req.user.userId)) {
-        return res.status(400).json({ error: "You can't change your own access" });
-    }
     try {
         // A role is for a person who wrote to the bot: that is the chat the panel knows them by
         const chat = await Chat.findOne({ where: { id: userId, type: 'private' }, attributes: ['id'] });

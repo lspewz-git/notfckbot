@@ -1,6 +1,6 @@
 /**
  * Panel access (src/admin/routes/access.js): a role is saved in the database for a person who wrote
- * to the bot; nobody changes their own; "No access" ends their sessions and removes their password;
+ * to the bot, including the admin themselves; "No access" ends sessions and removes the password;
  * sign-up and the system account's password go to .env and process.env at once; an admin removes
  * someone's password. The database is stubbed, .env a temporary file. Run: npm run test:unit
  */
@@ -105,8 +105,22 @@ describe('/api/access', () => {
         assert.equal(envFile(), 'BOT_TOKEN=x\n', '.env untouched');
     });
 
-    test('refused: your own role, someone who never wrote to the bot, a bad role or id, a non-admin', async () => {
-        assert.equal((await call('POST', { userId: '1', role: 'user' })).status, 400);
+    for (const role of ['admin', 'user', 'none']) {
+        test(`an admin can set their own role to ${role}`, async () => {
+            passwords.add('1');
+            const res = await call('POST', { userId: '1', role });
+            assert.deepEqual([res.status, res.body], [200, { userId: '1', role }]);
+            assert.equal(panelRoles.get('1'), role);
+            assert.deepEqual(destroyed, role === 'none' ? [['1', null]] : []);
+            assert.equal(passwords.has('1'), role !== 'none');
+            if (role !== 'admin') {
+                assert.equal((await call('POST', { userId: '1', role: 'admin' })).status, 403);
+                assert.equal((await call('POST', { userId: '7', role: 'admin' })).status, 403);
+            }
+        });
+    }
+
+    test('refused: someone who never wrote to the bot, a bad role or id, a non-admin', async () => {
         const stranger = await call('POST', { userId: '555', role: 'admin' });
         assert.deepEqual([stranger.status, stranger.body.error], [400, "This person hasn't written to the bot yet"]);
         assert.equal((await call('POST', { userId: '7', role: 'owner' })).status, 400);

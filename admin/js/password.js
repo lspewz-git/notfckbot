@@ -18,7 +18,7 @@ const CHEVRON_RIGHT =
 /** @type {{ id: string, name: string | null, hasPassword: boolean, system: boolean } | null} */
 let me = null;
 
-/** Who is signed in, once /account/me answered (access.js: nobody changes their own role). */
+/** Who is signed in, once /account/me answered (access.js uses it for own-role changes). */
 export const signedInUser = () => me;
 
 /** A password field with a borderless show/hide button inside its right edge. */
