@@ -162,9 +162,9 @@ test('the dashboard cards have their final height before the scripts run, and wi
     expectSame(await listHeights(page), loaded);
 });
 
-test('the placeholders are in the page itself: they show before any script has run', async ({ page }) => {
-    // The panel's script and Chart.js held back: what the first paint shows. Not awaited: the
-    // page's load waits for them
+test('the placeholders are in the page itself but stay hidden until the session is known', async ({ page }) => {
+    // The panel's script and Chart.js held back: placeholders reserve their layout but the
+    // panel must stay hidden before authentication. Not awaited: load waits for the modules.
     let release;
     const scripts = new Promise((r) => (release = r));
     const opened = mockPanel(page, { files: { 'js/app.js': scripts, 'vendor/chart.umd.js': scripts } });
@@ -172,7 +172,7 @@ test('the placeholders are in the page itself: they show before any script has r
     await expect(page.locator('#upcoming-list .skeleton-item')).toHaveCount(5);
     await expect(page.locator('#popular-list .skeleton-item')).toHaveCount(5);
     await expect(page.locator('.chart-box .chart-skeleton')).toHaveCount(2);
-    for (const el of await page.locator('.stat-value .skeleton, .chart-skeleton').all()) await expect(el).toBeVisible();
+    for (const el of await page.locator('.stat-value .skeleton, .chart-skeleton').all()) await expect(el).toBeHidden();
     const cards = await page.locator('.stat-card').evaluateAll((els) => els.map((e) => e.offsetHeight));
 
     release();

@@ -41,6 +41,31 @@ async function openMine(page, section, { admin = false } = {}) {
     if (section !== 'my-subs') await page.locator(`#my-subs-section .mine-switch [data-section="${section}"]`).click();
 }
 
+for (const options of [{ signedOut: true }, { role: 'user' }, {}]) {
+    test(`the first paint hides the panel until the session is known (${options.signedOut ? 'signed out' : options.role || 'admin'})`, async ({
+        page
+    }) => {
+        let release;
+        const hold = new Promise((resolve) => {
+            release = resolve;
+        });
+        const loaded = mockPanel(page, { ...options, files: { 'js/app.js': hold } });
+        try {
+            await expect(page.locator('#dashboard-section')).toBeAttached();
+            await expect(page.locator('.app-container')).toBeHidden();
+            await expect(page.locator('.tabbar')).toBeHidden();
+        } finally {
+            release();
+            await loaded;
+        }
+        if (options.signedOut) await expect(page.locator('#login-gate')).toBeVisible();
+        else
+            await expect(
+                page.locator(options.role === 'user' ? '#my-subs-section' : '#dashboard-section')
+            ).toBeVisible();
+    });
+}
+
 test('without a session the sign-in screen covers the panel; the Telegram button is a link to the bot', async ({
     page
 }) => {
