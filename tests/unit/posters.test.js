@@ -8,7 +8,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { Readable } = require('stream');
+const { Readable, PassThrough } = require('stream');
+const { setImmediate: nextTurn } = require('timers/promises');
 const axios = require('axios');
 const express = require('express');
 
@@ -131,6 +132,40 @@ test('serving from disk starts the age over, so a poster in use is never swept',
     await (await fetch(`${base}/w342/abc.jpg`)).arrayBuffer();
     await settle();
     assert.ok(Date.now() - fs.statSync(full).mtimeMs < 60e3);
+});
+
+test('a browser already disconnected does not open a cached poster stream', async (t) => {
+    fs.mkdirSync(path.join(DIR, 'w500'), { recursive: true });
+    fs.writeFileSync(stored('w500', 'cached.jpg'), IMAGE);
+    const response = new PassThrough();
+    response.set = () => response;
+    const closed = new Promise((resolve) => response.once('close', resolve));
+    response.destroy();
+    await closed;
+    const read = t.mock.method(fs, 'createReadStream', () => assert.fail('the response is already closed'));
+    await servePoster('w500', 'cached.jpg', response);
+    assert.equal(read.mock.callCount(), 0);
+});
+
+test('a browser disconnected before TMDB answers does not pause the disk download', async (t) => {
+    const source = Readable.from([Buffer.alloc(65536), Buffer.alloc(65536)]);
+    const ended = new Promise((resolve) => source.once('end', resolve));
+    t.after(() => source.destroy(new Error('test cleanup')));
+    upstream = () => ({ headers: JPEG, data: source });
+    const response = new PassThrough({ highWaterMark: 1 });
+    response.set = () => response;
+    const closed = new Promise((resolve) => response.once('close', resolve));
+    response.destroy();
+    await closed;
+    await servePoster('w500', 'disconnected.jpg', response);
+    await nextTurn();
+    assert.ok(
+        source.readableEnded || source.readableFlowing !== false,
+        'a closed response must not pause the download'
+    );
+    await ended;
+    for (let i = 0; i < 50 && !fs.existsSync(stored('w500', 'disconnected.jpg')); i++) await settle();
+    assert.equal(fs.statSync(stored('w500', 'disconnected.jpg')).size, 131072);
 });
 
 test('the browser leaving halfway: the download still finishes and the poster is kept whole', async () => {

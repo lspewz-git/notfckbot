@@ -42,8 +42,10 @@ async function servePoster(size, file, res) {
         const now = new Date();
         fs.promises.utimes(target, now, now).catch(() => {});
         res.set('Content-Length', String(stored.size));
+        if (res.destroyed) return;
         const disk = fs.createReadStream(target);
         disk.on('error', () => res.destroy());
+        res.once('close', () => disk.destroy());
         return disk.pipe(res);
     }
 
@@ -107,7 +109,13 @@ async function servePoster(size, file, res) {
     upstream.data.on('data', (chunk) => copy && !failed && copy.write(chunk));
     upstream.data.on('end', () => copy && !failed && copy.end());
     // The browser leaving early doesn't spoil the copy: the download carries on to the disk
-    upstream.data.pipe(res);
+    const detach = () => {
+        upstream.data.unpipe(res);
+        upstream.data.resume();
+    };
+    res.once('close', detach);
+    if (res.destroyed) detach();
+    else upstream.data.pipe(res);
 }
 
 /**
