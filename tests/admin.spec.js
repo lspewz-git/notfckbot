@@ -41,7 +41,21 @@ async function goToSection(page, section) {
 
 watchConsole();
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, context }) => {
+    // Use native cookies, without an injected Cookie header, when intercepting live requests.
+    if (process.env.ADMIN_SESSION) {
+        await context.setExtraHTTPHeaders({});
+        await context.addCookies([
+            { name: 'nfb_session', value: process.env.ADMIN_SESSION, url: process.env.ADMIN_URL || 'http://localhost:8088', httpOnly: true, sameSite: 'Lax' }
+        ]);
+    }
+    // Activity is tested on the mock. Never allow any other live API mutation from these checks.
+    await page.route('**/api/**', (route) => {
+        if (new URL(route.request().url()).pathname === '/api/account/activity')
+            return route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+        if (['GET', 'HEAD'].includes(route.request().method())) return route.continue();
+        return route.abort('blockedbyclient');
+    });
     await page.goto('/');
     await expect(page.locator('#chats-count')).not.toHaveText('-');
 });
