@@ -34,6 +34,7 @@ let passwords;
 let panelRoles;
 
 beforeEach(() => {
+    mock.method(require('../../src/api/kinopoisk'), 'knownKinopoiskId', () => null);
     savedEnv = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
     for (const k of ENV) delete process.env[k];
     process.env.PANEL_URL = 'http://box/';
@@ -621,7 +622,32 @@ test('the API: a film is removed only from the chat in the path', async (t) => {
     assert.equal(destroyed, false);
 });
 
+test('the API: Following films use cached Kinopoisk ids and IMDb context without waiting for services', async (t) => {
+    const tmdb = require('../../src/api/tmdb');
+    const kp = require('../../src/api/kinopoisk');
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private' }));
+    t.mock.method(Subscription, 'findAll', async () => []);
+    t.mock.method(Watchlist, 'findAll', async () => [{ id: 1, tmdb_id: 'movie_9', title: 'Film' }]);
+    t.mock.method(tmdb, 'peekDetails', () => ({ imdb_id: 'tt123' }));
+    const lookups = [];
+    t.mock.method(kp, 'knownKinopoiskId', (id, imdb) => {
+        lookups.push([id, imdb]);
+        return 12464471;
+    });
+    const cookie = await signIn(call, 7);
+    const response = await call('GET', '/api/account/chats/7/list', { cookie });
+    assert.equal(response.status, 200);
+    assert.deepEqual(lookups, [['movie_9', 'tt123']]);
+    assert.equal(response.body.films[0].links[1].url, 'https://www.kinopoisk.ru/film/12464471/');
+});
+
 test('the API: Aired is scoped to an accessible chat and validates its year', async (t) => {
+    t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => ({
+        overview: 'Released title description',
+        vote_average: 8.2
+    }));
     const { server, call } = await serve(fakeBot({ '-1': { 7: 'member' } }));
     t.after(() => server.close());
     t.mock.method(Chat, 'findByPk', async () => ({ type: 'supergroup' }));
@@ -632,11 +658,22 @@ test('the API: Aired is scoped to an accessible chat and validates its year', as
             years: [2026],
             year: 2026,
             series: [],
-            films: [{ tmdbId: 'movie_1', poster: 'https://image.tmdb.org/t/p/w500/poster.jpg' }]
+            films: [
+                {
+                    tmdbId: 'movie_1',
+                    poster: 'https://image.tmdb.org/t/p/w500/poster.jpg',
+                    links: [{ kind: 'watch', label: 'Смотреть', url: 'https://www.sspoisk.ru/film/9/' }]
+                }
+            ]
         };
     });
     const cookie = await signIn(call, 7);
-    assert.equal((await call('GET', '/api/account/chats/-1/aired?year=2026', { cookie })).status, 200);
+    const response = await call('GET', '/api/account/chats/-1/aired?year=2026', { cookie });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.films[0].overview, 'Released title description');
+    assert.equal(response.body.films[0].rating, 8.2);
+    assert.equal(response.body.films[0].poster, '/poster.jpg');
+    assert.equal(response.body.films[0].links[0].label, 'Watch on SSPoisk');
     assert.deepEqual(requests, [{ chatId: '-1', year: 2026 }]);
     assert.equal((await call('GET', '/api/account/chats/-2/aired', { cookie })).status, 403);
     assert.equal((await call('GET', '/api/account/chats/-1/aired?year=oops', { cookie })).status, 400);

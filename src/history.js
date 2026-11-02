@@ -5,7 +5,7 @@
  * TMDB already lists for it.
  */
 const { Series, Subscription, Watchlist } = require('./db');
-const { getDetailsCached } = require('./api/tmdb');
+const { getDetailsCached, peekDetails } = require('./api/tmdb');
 const { knownKinopoiskId } = require('./api/kinopoisk');
 const { getWatchLinks } = require('./constants');
 const { parseSeasons, airedYear } = require('./cron/release-seasons');
@@ -49,13 +49,36 @@ async function genresOf(numericId, type) {
 }
 
 /** A list entry: what the panel and the bot show for one title. */
-async function entry({ tmdbId, title, kinopoiskId, seasons, poster = null }) {
+async function entry({
+    tmdbId,
+    title,
+    kinopoiskId,
+    seasons,
+    poster = null,
+    date = null,
+    ruPremiere = null,
+    ruDigital = null,
+    networks = ''
+}) {
     const [type, numericId] = tmdbId.split('_');
     const mediaType = type === 'tv' ? 'tv' : 'movie';
-    const id = kinopoiskId || knownKinopoiskId(tmdbId);
-    const link = getWatchLinks({ title, kinopoiskId: id, mediaType }).find((l) => l.kind === 'info');
     const genres = await genresOf(numericId, mediaType);
-    return { tmdbId, title, ...(seasons ? { seasons } : {}), genres, kinopoiskUrl: link.url, poster };
+    const id = kinopoiskId || knownKinopoiskId(tmdbId, peekDetails(numericId, mediaType)?.imdb_id || null);
+    const links = getWatchLinks({ title, kinopoiskId: id, mediaType });
+    const link = links.find((l) => l.kind === 'info');
+    return {
+        tmdbId,
+        title,
+        ...(seasons ? { seasons } : {}),
+        genres,
+        kinopoiskUrl: link.url,
+        links,
+        poster,
+        date,
+        ruPremiere,
+        ruDigital,
+        networks
+    };
 }
 
 /**
@@ -78,13 +101,22 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
     for (const f of filmRows) {
         const filmYear = airedYear(f.premiere_digital, now);
         if (filmYear && !films.has(f.tmdb_id))
-            films.set(f.tmdb_id, { tmdbId: f.tmdb_id, title: f.title, year: filmYear, poster: f.poster_url || null });
+            films.set(f.tmdb_id, {
+                tmdbId: f.tmdb_id,
+                title: f.title,
+                year: filmYear,
+                poster: f.poster_url || null,
+                date: f.premiere_digital,
+                ruPremiere: f.ru_premiere,
+                ruDigital: f.ru_digital
+            });
     }
     const series = seriesRows.map((s) => ({
         tmdbId: s.tmdb_id,
         title: s.title,
         kinopoiskId: s.kinopoisk_id,
         poster: s.poster_url || null,
+        networks: s.networks || '',
         byYear: parseSeasons(s.release_seasons)
     }));
 

@@ -70,7 +70,7 @@ const cache = lruCache({
         for (const lookup of [() => fromWikidata(numericId, mediaType), () => fromKinopoiskApi(imdbId)]) {
             try {
                 const id = await lookup();
-                if (id) return { id, failed: false };
+                if (id) return { id, failed: false, imdbId };
             } catch (err) {
                 failed = true;
                 log.error(`[Kinopoisk] Lookup failed for ${tmdbId}: ${err.message}`);
@@ -79,7 +79,7 @@ const cache = lruCache({
         // A failure is remembered too, briefly: otherwise every page of search results would
         // ask a dead API again (and log it again) for each film Wikidata doesn't know
         options.ttl = failed ? FAIL_TTL_MS : MISS_TTL_MS;
-        return { id: null, failed };
+        return { id: null, failed, imdbId };
     }
 });
 
@@ -89,7 +89,15 @@ const cache = lruCache({
  * @returns {Promise<{ id: number | null, failed: boolean }>} `failed` means a source
  *   could not be asked (network, quota) — as opposed to it not knowing the title
  */
-const lookupKinopoiskId = (tmdbId, imdbId) => cache.fetch(tmdbId, { context: imdbId || null });
+const lookupKinopoiskId = async (tmdbId, imdbId) => {
+    const result = await cache.fetch(tmdbId, { context: imdbId || null });
+    // A background lookup may only have had the TMDB id. A later card/update with
+    // IMDb can ask the second source, even while that incomplete miss is fresh.
+    if (!result.id && imdbId && !result.imdbId) {
+        return cache.fetch(tmdbId, { context: imdbId, forceRefresh: true });
+    }
+    return result;
+};
 
 /**
  * The ID if a lookup already found it, without asking anyone; otherwise null, and a lookup is

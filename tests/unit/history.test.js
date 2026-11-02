@@ -45,7 +45,12 @@ mock.method(tmdb, 'getDetailsCached', async (id, type) => {
     return { genres: (GENRES[`${type}:${id}`] || []).map((name) => ({ name })), seasons };
 });
 // Kinopoisk: only film 7's ID is known
-mock.method(kinopoisk, 'knownKinopoiskId', (tmdbId) => (tmdbId === 'movie_7' ? 777 : null));
+let lookupContexts = [];
+mock.method(tmdb, 'peekDetails', (id, kind) => (kind === 'movie' && id === '7' ? { imdb_id: 'tt123' } : undefined));
+mock.method(kinopoisk, 'knownKinopoiskId', (tmdbId, imdbId) => {
+    lookupContexts.push([tmdbId, imdbId]);
+    return tmdbId === 'movie_7' ? 777 : null;
+});
 
 const { ensureReleaseSeasons } = require('../../src/cron/release-seasons');
 const { releaseHistory } = require('../../src/history');
@@ -71,6 +76,7 @@ const DETAILS = {
 
 beforeEach(() => {
     seasonRequests = [];
+    lookupContexts = [];
 });
 
 describe('ensureReleaseSeasons', () => {
@@ -142,6 +148,18 @@ describe('releaseHistory', () => {
         mock.method(Watchlist, 'findAll', async () => FILMS);
     });
 
+    test('history passes cached IMDb to the background lookup without another TMDB fetch', async () => {
+        await releaseHistory({ now });
+        assert.deepEqual(
+            lookupContexts.find(([id]) => id === 'movie_7'),
+            ['movie_7', 'tt123']
+        );
+        assert.deepEqual(
+            lookupContexts.find(([id]) => id === 'tv_2'),
+            ['tv_2', null]
+        );
+    });
+
     test('only the last three years, and of those only the ones with releases; the latest shown', async () => {
         const h = await releaseHistory({ now });
         // 2026 has releases, 2025 and 2024 have none; 2023 and 2019 are older than three years
@@ -171,6 +189,8 @@ describe('releaseHistory', () => {
         const abbey = h.series.find((s) => s.title === 'Аббатство');
         assert.match(abbey.kinopoiskUrl, /kp_query=/);
         assert.equal(h.films[0].kinopoiskUrl, 'https://www.kinopoisk.ru/film/777/');
+        assert.equal(h.films[0].date, '2026-03-01');
+        assert.equal(h.films[0].links.find((link) => link.kind === 'watch').url, 'https://www.sspoisk.ru/film/777/');
     });
 
     test('another year on request; one outside the three (or with nothing) falls back to the latest', async () => {

@@ -12,12 +12,14 @@ process.env.KINOPOISK_API_KEY = 'test-key';
 // What each source does, set per test: Wikidata knows nothing, the API rejects the key
 let requests;
 let wikidataKnows;
-mock.method(axios, 'get', async (url) => {
+let apiKnows;
+mock.method(axios, 'get', async (url, options) => {
     requests.push(url.includes('wikidata') ? 'wikidata' : 'kinopoisk');
     if (url.includes('wikidata')) {
         const bindings = wikidataKnows ? [{ kp: { value: String(wikidataKnows) } }] : [];
         return { data: { results: { bindings } } };
     }
+    if (apiKnows && options.params.imdbId === 'tt123') return { data: { items: [{ kinopoiskId: apiKnows }] } };
     throw Object.assign(new Error('Request failed with status code 401'), { response: { status: 401 } });
 });
 
@@ -26,6 +28,15 @@ const { findKinopoiskId, knownKinopoiskId } = require('../../src/api/kinopoisk')
 beforeEach(() => {
     requests = [];
     wikidataKnows = null;
+    apiKnows = null;
+});
+
+test('an IMDb id upgrades a recent background miss, including an in-flight lookup', async () => {
+    apiKnows = 12464471;
+    assert.equal(knownKinopoiskId('movie_4001'), null);
+    assert.equal(await findKinopoiskId('movie_4001', 'tt123'), 12464471);
+    assert.equal(knownKinopoiskId('movie_4001'), 12464471);
+    assert.deepEqual(requests, ['wikidata', 'wikidata', 'kinopoisk']);
 });
 
 test('a lookup that failed is not repeated right away (a page of search results asks often)', async () => {

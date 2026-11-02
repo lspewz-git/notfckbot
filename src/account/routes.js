@@ -6,6 +6,7 @@
 const router = require('express').Router();
 const { Chat, Series, Subscription, Watchlist, HiddenChat } = require('../db');
 const tmdb = require('../api/tmdb');
+const kinopoisk = require('../api/kinopoisk');
 const ops = require('../chat-ops');
 const { listPeriod, periodItems, todayIn } = require('../calendar');
 const history = require('../history');
@@ -350,6 +351,12 @@ const kinopoiskUrlOf = (title, kinopoiskId, mediaType) => {
     return info ? info.url : null;
 };
 
+/** Already-known id, with an exact IMDb lookup in the background on a cache miss. */
+const knownTitleId = (tmdbId) => {
+    const [kind, id] = String(tmdbId).split('_');
+    return kinopoisk.knownKinopoiskId(tmdbId, tmdb.peekDetails(id, kind)?.imdb_id || null);
+};
+
 /** Optional card data from the warmed cache; never wait for an external service. */
 const titleMetadata = (tmdbId) => {
     const [kind, id] = String(tmdbId).split('_');
@@ -398,7 +405,7 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
                 ruPremiere: f.ru_premiere,
                 ruDigital: f.ru_digital,
                 genres: f.genres,
-                links: linksOf(f.title, null, 'movie')
+                links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
             }))
         });
     } catch (err) {
@@ -500,10 +507,20 @@ router.get('/api/account/chats/:chatId/aired', openChat, async (req, res) => {
     if (!query) return;
     try {
         const data = await history.releaseHistory({ chatId: req.chatId, year: query.year });
+        const card = (item) => ({
+            ...item,
+            ...titleMetadata(item.tmdbId),
+            poster: posterPath(item.poster),
+            links: (item.links || []).map(({ kind, url }) => ({
+                kind,
+                url,
+                label: kind === 'watch' ? 'Watch on SSPoisk' : 'Kinopoisk'
+            }))
+        });
         res.json({
             ...data,
-            series: data.series.map((i) => ({ ...i, poster: posterPath(i.poster) })),
-            films: data.films.map((i) => ({ ...i, poster: posterPath(i.poster) }))
+            series: data.series.map(card),
+            films: data.films.map(card)
         });
     } catch (err) {
         fail(res, err);

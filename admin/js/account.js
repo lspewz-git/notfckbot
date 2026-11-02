@@ -321,24 +321,30 @@ const cardHead = (picture, title, lines, rating = '') =>
 
 const CLOSE_X = cardClose('mine-card-modal');
 
-/** Calendar and Following share the complete card, including its actions and spacing. */
-function followingCard(item, { event = null, today, confirm = false }) {
+/** Following, Calendar and Released share the complete card and spacing. */
+function followingCard(item, { event = null, today, confirm = false, releasedYear = null }) {
+    const released = releasedYear !== null;
     const busy =
         pendingModeSaves.has(titleKey(item, state.chatId)) || pendingUnfollows.has(titleKey(item, state.chatId));
     const tv = item.kind === 'tv';
     const date = event?.date || (tv ? item.next?.date : item.date);
-    const release = date
-        ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
-        : '<p class="mine-dim">Release date not known yet</p>';
+    const release =
+        released && tv
+            ? `<p class="mine-dim">${escapeHtml(String(releasedYear))}</p>`
+            : date
+              ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
+              : `<p class="mine-dim">${released ? escapeHtml(String(releasedYear)) : 'Release date not known yet'}</p>`;
     const lines = tv
         ? [
-              event
-                  ? `S${event.season}E${event.episode} · ${episodeName(event)}`
-                  : item.finished
-                    ? 'The series has ended'
-                    : item.next
-                      ? `Next: S${item.next.season}E${item.next.episode}`
-                      : 'Next episode date unknown',
+              released
+                  ? (item.seasons || []).map((season) => `Season ${season}`).join(', ')
+                  : event
+                    ? `S${event.season}E${event.episode} · ${episodeName(event)}`
+                    : item.finished
+                      ? 'The series has ended'
+                      : item.next
+                        ? `Next: S${item.next.season}E${item.next.episode}`
+                        : 'Next episode date unknown',
               event && MARKS[event.mark] ? MARKS[event.mark][0].toUpperCase() + MARKS[event.mark].slice(1) : '',
               [item.genres, item.networks].filter(Boolean).join(' · ')
           ]
@@ -362,10 +368,12 @@ function followingCard(item, { event = null, today, confirm = false }) {
         ) +
         secondaryDates +
         (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
-        (tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
-        (!tv ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>' : '') +
+        (!released && tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
+        (!released && !tv
+            ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>'
+            : '') +
         `<div class="mine-card-actions">${linkButtons(item.links || [])}${
-            item.id == null
+            released || item.id == null
                 ? ''
                 : confirm
                   ? `<div class="mine-confirm"><p>Unfollow “${escapeHtml(item.title)}”?</p><p>It will leave this chat’s following list and calendar. Release notifications will stop.</p><div class="modal-actions"><button type="button" class="btn btn-danger btn-grow" data-action="mine-confirm-unfollow"${busy ? ' disabled' : ''}>Yes, unfollow</button><button type="button" class="btn btn-ghost" data-action="mine-keep-following">Keep following</button></div></div>`
@@ -410,8 +418,6 @@ function openNewCard(r) {
 
 /** The episode's title, or "Episode 8" while TMDB has none (in the panel's language) */
 const episodeName = (item) => item.name || `Episode ${item.episode}`;
-
-const kinopoiskLink = (url) => (url ? linkButtons([{ kind: 'info', label: 'Kinopoisk', url }]) : '');
 
 /** An episode or a film from the calendar */
 function releaseCard(item, today) {
@@ -814,10 +820,16 @@ export const accountActions = {
         const item = airedItems()[Number(el.dataset.id)];
         if (item)
             openCard(
-                cardHead(poster(item.poster, 'mine-poster mine-poster-big'), item.title, [
-                    airedNote(item),
-                    String(state.aired.year)
-                ]) + kinopoiskLink(item.kinopoiskUrl)
+                followingCard(
+                    {
+                        ...item,
+                        genres: (item.genres || []).join(', '),
+                        links: item.links?.length
+                            ? item.links
+                            : [{ kind: 'info', label: 'Kinopoisk', url: item.kinopoiskUrl }]
+                    },
+                    { today: undefined, releasedYear: state.aired.year }
+                )
             );
     },
     'mine-reload': () => {

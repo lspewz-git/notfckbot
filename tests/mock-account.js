@@ -348,6 +348,13 @@ function accountAnswer(state, req, url) {
                     poster: null,
                     seasons: [year === 2026 ? 2 : 1],
                     genres: ['драма'],
+                    networks: 'HBO',
+                    rating: 8.6,
+                    overview: 'A released season description. '.repeat(20),
+                    links: [
+                        { kind: 'watch', label: 'Watch on SSPoisk', url: 'https://www.sspoisk.ru/series/1/' },
+                        { kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/series/1/' }
+                    ],
                     kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/'
                 }
             ],
@@ -359,6 +366,14 @@ function accountAnswer(state, req, url) {
                               title: 'Released film',
                               poster: null,
                               genres: ['фантастика'],
+                              date: '2026-03-01',
+                              rating: 7.4,
+                              overview: 'A released film description. '.repeat(20),
+                              ruPremiere: '2026-02-26',
+                              links: [
+                                  { kind: 'watch', label: 'Watch on SSPoisk', url: 'https://www.sspoisk.ru/film/9/' },
+                                  { kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/film/9/' }
+                              ],
                               kinopoiskUrl: 'https://www.kinopoisk.ru/film/9/'
                           }
                       ]
