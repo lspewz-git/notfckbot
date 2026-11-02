@@ -709,8 +709,6 @@ button.search-result-open:hover .mine-row-title {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    /* A short label and its value: across a wide screen they would drift apart */
-    max-width: 40rem;
 }
 
 .mine-group + .mine-group {
@@ -915,11 +913,6 @@ button.search-result-open:hover .mine-row-title {
 }
 
 /* --- Chat settings and Account settings: pages the profile menu opens (profile.js) --- */
-
-/* One column: the header's chip ends where the rows do, not across the screen */
-.mine-page {
-    max-width: 40rem;
-}
 
 .mine-page-title {
     display: flex;
