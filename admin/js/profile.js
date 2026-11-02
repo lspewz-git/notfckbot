@@ -8,7 +8,7 @@ import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { avatar } from './pick-sheet.js';
-import { chatRows } from './chat-picker.js';
+import { chatRows, chatChip } from './chat-picker.js';
 import { chatList, chatHint, selectChat, setChatHidden } from './account.js';
 import { openActionDropdown, closeDropdown } from './select.js';
 
@@ -26,18 +26,36 @@ const PAGES = ['my-settings', 'my-account'];
 
 const ROLES = { admin: 'Admin', user: 'User' };
 
-/** @type {{ id: string, name: string | null, role: string } | null} */
+/** @type {{ id: string, name: string | null, role: string, system: boolean } | null} */
 let me = null;
 const visibilitySaving = new Set();
 
 /** Who is signed in (session.js, from /account/me). */
 export function setProfile(user) {
-    me = { id: String(user.id), name: user.name || null, role: user.role };
+    me = { id: String(user.id), name: user.name || null, role: user.role, system: Boolean(user.system) };
+    backTo = me.system ? 'dashboard' : 'my-subs';
+    for (const back of document.querySelectorAll('.mine-back')) back.setAttribute('data-section', backTo);
+    for (const holder of document.querySelectorAll('[data-admin-profile]')) {
+        holder.innerHTML = chatChip({ title: 'My account', accent: true, action: 'profile-open', label: 'Profile' });
+        holder.querySelector('.pick-avatar').outerHTML = avatar(nameOf(), true);
+    }
     for (const el of document.querySelectorAll('[data-profile-avatar]')) el.innerHTML = avatar(nameOf(), true);
     renderAccount();
 }
 
 const nameOf = () => (me && (me.name || me.id)) || '';
+
+/** Every admin section shares the same profile entry, including the local account. */
+export function setupProfile() {
+    for (const header of document.querySelectorAll(
+        '.section:not(.mine-section) > header, #my-account-section > header'
+    )) {
+        const holder = document.createElement('div');
+        holder.className = 'admin-profile';
+        holder.setAttribute('data-admin-profile', '');
+        header.append(holder);
+    }
+}
 
 const row = ({ action, attrs = '', iconHtml, title, hint = '', end = '', cls = '' }) =>
     `<button type="button" class="action-row${cls}" data-action="${action}"${attrs}>` +
@@ -56,11 +74,11 @@ const pageRow = (section, iconHtml, title) =>
     });
 
 function menuHtml() {
-    const { chats, chatId } = chatList();
+    const { chats, chatId } = me?.system ? { chats: [], chatId: null } : chatList();
     const head = me
         ? `<div class="profile-head">${avatar(nameOf(), true)}<span class="action-text">` +
           `<span class="action-title">${escapeHtml(nameOf())}</span>` +
-          `<span class="action-desc">${escapeHtml(ROLES[me.role] || me.role)} · ID ${escapeHtml(me.id)}</span></span>` +
+          `<span class="action-desc">${escapeHtml(ROLES[me.role] || me.role)} · ${me.system ? 'Local account' : `ID ${escapeHtml(me.id)}`}</span></span>` +
           (chats.some((c) => c.type !== 'private')
               ? `<button type="button" class="icon-button" data-action="profile-options" aria-label="Chat display options" aria-expanded="false" aria-controls="profile-options-menu">${icon('ellipsis')}</button>`
               : '') +
@@ -80,12 +98,21 @@ function menuHtml() {
             ? `<button type="button" class="profile-hidden" data-action="profile-visibility">${HIDDEN}<span>Hidden chats</span><span class="mine-count">${chats.filter((c) => c.hidden).length}</span><span class="action-chevron">${CHEVRON}</span></button>`
             : '') +
         '<div class="action-list profile-links">' +
-        (me && me.role === 'admin'
+        (me && me.role === 'admin' && document.body.classList.contains('view-mine')
             ? row({
                   action: 'view-admin',
                   attrs: ' data-close="profile-modal"',
                   iconHtml: `<span class="action-icon">${icon('shield')}</span>`,
                   title: 'Admin panel',
+                  end: `<span class="action-chevron">${CHEVRON}</span>`
+              })
+            : '') +
+        (me?.role === 'admin' && !me.system && !document.body.classList.contains('view-mine')
+            ? row({
+                  action: 'view-mine',
+                  attrs: ' data-close="profile-modal"',
+                  iconHtml: `<span class="action-icon">${icon('bookmark')}</span>`,
+                  title: 'My subscriptions',
                   end: `<span class="action-chevron">${CHEVRON}</span>`
               })
             : '') +
@@ -106,7 +133,7 @@ function menuHtml() {
 let backTo = 'my-subs';
 
 function openMenu(chip) {
-    const open = document.querySelector('.mine-section.active');
+    const open = document.querySelector('.section.active');
     const from = open ? open.id.replace(/-section$/, '') : '';
     if (from && !PAGES.includes(from)) backTo = from;
     $('profile-body').innerHTML = menuHtml();
@@ -186,7 +213,7 @@ function renderAccount() {
     info.innerHTML =
         '<section class="mine-group"><h3 class="mine-group-title">Account</h3><ul class="glass-card mine-sets">' +
         `<li class="mine-set profile-who">${avatar(nameOf(), true)}<span class="mine-set-text"><span>${escapeHtml(nameOf())}</span>` +
-        `<span class="mine-dim">Telegram · ID ${escapeHtml(me.id)}</span></span></li>` +
+        `<span class="mine-dim">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span></li>` +
         `<li class="mine-set"><span class="mine-set-text">Role</span><span class="mine-set-value">${escapeHtml(ROLES[me.role] || me.role)}</span></li>` +
         '</ul></section>';
     $('my-devices').innerHTML =
@@ -222,6 +249,8 @@ export const profileActions = {
     'profile-chat': (el) => {
         closeModal('profile-modal');
         selectChat(el.dataset.id);
+        if (!document.body.classList.contains('view-mine'))
+            document.dispatchEvent(new window.CustomEvent('profile-chat-selected'));
     },
     // Runs before the section switch (app.js): the page's Back is pointed at where the menu was opened
     'profile-page': () => {

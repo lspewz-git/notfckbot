@@ -87,8 +87,15 @@ export function setMe(user) {
 
 function renderSignIn() {
     const holder = $('my-signin');
-    // The system account has no account page: its password is in Settings → Bot
-    if (!holder || !me || me.system) return;
+    if (!holder || !me) return;
+    if (me.system) {
+        holder.innerHTML =
+            '<section class="mine-group"><h3 class="mine-group-title">Sign-in</h3><ul class="glass-card mine-sets">' +
+            '<li><button type="button" class="mine-set mine-set-pick" data-action="access-system-password" aria-haspopup="dialog">' +
+            '<span class="mine-set-text">Password</span>' +
+            `<span class="mine-set-value">Change${CHEVRON_RIGHT}</span></button></li></ul></section>`;
+        return;
+    }
     // Who it is is shown in the Account group above (profile.js)
     holder.innerHTML =
         '<section class="mine-group"><h3 class="mine-group-title">Sign-in</h3><ul class="glass-card mine-sets">' +

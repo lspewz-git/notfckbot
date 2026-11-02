@@ -27,17 +27,14 @@ async function openMine(page, section, { admin = false } = {}) {
         await openMine(page, 'my-subs', { admin });
         return openProfilePage(page, section);
     }
+    if (admin) {
+        await page.locator('.section.active [data-admin-profile] button').click();
+        await page.locator('#profile-modal [data-action="view-mine"]').click();
+    }
     if (!isNarrow(page)) {
-        if (admin) {
-            await page.locator('.view-switch').click();
-            await page.locator('#pick-list .pick-row', { hasText: 'My account' }).click();
-        }
         return page.locator(`.nav-item[data-section="${section}"]`).click();
     }
     if (!admin) return page.locator(`.tab-item[data-section="${section}"]`).click();
-    // An admin's phone: one "My account" row in More, then the switch at the top of the section
-    await page.locator('.tab-item[data-open="more-modal"]').click();
-    await page.locator('#more-modal .action-row[data-section="my-subs"]').click();
     if (section !== 'my-subs') await page.locator(`.tab-item[data-section="${section}"]`).click();
 }
 
@@ -200,18 +197,10 @@ test("an admin's two views: the admin panel and My account, each with only its o
         : ['my-aired', 'my-subs', 'my-calendar'];
     expect(await visibleNav(page, isNarrow(page) ? nav : '.rail-nav .nav-item')).toEqual(mine);
 
-    // Back to the admin panel, on the section it was left on; the switch marks the current view
-    if (isNarrow(page)) {
-        await profileButton(page, 'my-calendar').click();
-        await page.locator('#profile-modal [data-action="view-admin"]').click();
-        await expect(page.locator('#profile-modal')).toBeHidden();
-    } else {
-        await expect(page.locator('.view-switch')).toContainText('Me');
-        await page.locator('.view-switch').click();
-        await expect(page.locator('#pick-list .pick-row.selected')).toContainText('My account');
-        await page.locator('#pick-list .pick-row', { hasText: 'Admin panel' }).click();
-        await expect(page.locator('.view-switch')).toContainText('Admin');
-    }
+    // Return through the shared profile to the remembered admin section.
+    await profileButton(page, 'my-calendar').click();
+    await page.locator('#profile-modal [data-action="view-admin"]').click();
+    await expect(page.locator('#profile-modal')).toBeHidden();
     await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
     expect(await visibleNav(page, nav)).not.toContain('my-calendar');
 });

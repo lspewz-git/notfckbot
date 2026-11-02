@@ -142,7 +142,7 @@ export async function startSession(preferredChat = null) {
     setProfile(me.user);
     resetChatChoice();
     document.body.classList.toggle('role-user', me.user.role !== 'admin');
-    // The system account is nobody in Telegram: no "My account"
+    // The system account has a profile, but no Telegram chats.
     document.body.classList.toggle('system-account', Boolean(me.user.system));
     document.body.classList.remove('signed-out');
     $('login-gate').hidden = true;

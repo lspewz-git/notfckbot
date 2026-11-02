@@ -189,7 +189,7 @@ test('Settings: sign-up is switched at once; the system account password is set 
     await expect(page.locator('#access-system-password')).toHaveText('Change password');
 });
 
-test('the system account has no "My account": no view switch, no Sign-in group', async ({ page, isMobile }) => {
+test('the system account has no Telegram chat pages or view switch', async ({ page, isMobile }) => {
     const panel = await mockPanel(page, { system: true });
     await expect(page.locator('#login-gate')).toBeHidden();
     if (!isMobile) await expect(page.locator('.view-switch')).toBeHidden();

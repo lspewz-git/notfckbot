@@ -43,8 +43,8 @@ import { accountActions, setupAccount, searchAccount } from './account.js';
 import { startSession, watchSession, sessionActions } from './session.js';
 import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
-import { pickActions, pickFrom } from './pick-sheet.js';
-import { profileActions } from './profile.js';
+import { pickActions } from './pick-sheet.js';
+import { profileActions, setupProfile } from './profile.js';
 import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
 
@@ -56,20 +56,8 @@ let activeSection = 'dashboard';
 
 // An admin has two views: the admin panel and "My account" (their own chats, what a user sees).
 // The open section sets the view; each view reopens on the section it was left on
-const viewOf = (id) => (id.startsWith('my-') ? 'mine' : 'admin');
+const viewOf = (id) => (id.startsWith('my-') && !document.body.classList.contains('system-account') ? 'mine' : 'admin');
 const lastSection = { admin: 'dashboard', mine: 'my-subs' };
-
-function openViewPicker() {
-    pickFrom({
-        title: 'Switch to',
-        options: [
-            { value: 'admin', label: 'Admin panel', hint: 'The bot, chats, logs and settings' },
-            { value: 'mine', label: 'My account', hint: 'Your subscriptions, calendar and chat settings' }
-        ],
-        value: viewOf(activeSection),
-        onPick: (view) => switchSection(lastSection[view])
-    });
-}
 
 function switchSection(id) {
     // Leaving Settings with changes not saved: ask, rather than lose them silently
@@ -87,7 +75,7 @@ function switchSection(id) {
         return;
     }
     activeSection = id;
-    lastSection[viewOf(id)] = id;
+    if (id !== 'my-account' && id !== 'my-settings') lastSection[viewOf(id)] = id;
     document.body.classList.toggle('view-mine', viewOf(id) === 'mine');
     setSection(id);
     // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
@@ -169,8 +157,8 @@ function startTimer() {
 const CLICK_ACTIONS = {
     'description-toggle': toggleDescription,
     'chat-actions': (el) => openChatActions(el.dataset.id),
-    'view-pick': openViewPicker,
     'view-admin': () => switchSection(lastSection.admin),
+    'view-mine': () => switchSection(lastSection.mine),
     series: (el) => openSeriesDetails(el.dataset.id),
     film: (el) => openFilmDetails(el.dataset.id),
     mode: (el) => openModeModal(el.dataset.key),
@@ -303,8 +291,9 @@ function setupControls() {
 function sectionFromHash(role) {
     const id = location.hash.slice(1);
     if (!/^[a-z-]+$/.test(id) || !document.getElementById(`${id}-section`)) return null;
-    // The system account has no "My account" and no switch back from it
-    if (id.startsWith('my-')) return document.body.classList.contains('system-account') ? null : id;
+    // Local accounts have profile settings, but no Telegram chat pages.
+    if (id.startsWith('my-'))
+        return document.body.classList.contains('system-account') && id !== 'my-account' ? null : id;
     return role === 'admin' ? id : null;
 }
 
@@ -332,6 +321,8 @@ async function init() {
     setupChatSettingsForm();
     setupProxyForm();
     setupAccount();
+    setupProfile();
+    document.addEventListener('profile-chat-selected', () => switchSection(lastSection.mine));
     setupPassword();
     watchSession();
     enhanceSelects();

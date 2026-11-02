@@ -121,8 +121,15 @@ async function toggleSignup() {
     render();
 }
 
-function systemPassword() {
-    if (!access) return;
+async function systemPassword() {
+    if (!access) {
+        try {
+            await loadAccess();
+        } catch (err) {
+            toast(err.message, 'error');
+            return;
+        }
+    }
     openPasswordDialog({
         title: `Password for "${access.system.login}"`,
         sub: "The system account isn't tied to Telegram: the way in when every other is lost.",
