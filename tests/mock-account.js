@@ -225,9 +225,18 @@ function accountAnswer(state, req, url) {
             return { status: 429, body: { error: 'Too many attempts. Try again in 15 minutes.' } };
         if (['@me', '42'].includes(body.login) && body.password === 'good-password') {
             state.polls = 0;
-            return { confirmation: true, code: 'c'.repeat(32), secret: 's'.repeat(43), check: '0427', expiresIn: 300000 };
+            return {
+                confirmation: true,
+                code: 'c'.repeat(32),
+                secret: 's'.repeat(43),
+                check: '0427',
+                expiresIn: 300000
+            };
         }
-        if (body.login === 'admin' && body.password === 'good-password') { state.signedIn = true; return { success: true }; }
+        if (body.login === 'admin' && body.password === 'good-password') {
+            state.signedIn = true;
+            return { success: true };
+        }
         return { status: 401, body: { error: 'Wrong username or password.' } };
     }
     if (p === '/api/login/telegram') {
@@ -280,6 +289,12 @@ function accountAnswer(state, req, url) {
     if (!m) return { status: 404, body: { error: 'Not mocked' } };
     const [, chatId, rest] = m;
     const chat = state.chats.find((c) => c.id === chatId);
+    if (rest === '/visibility' && method === 'PATCH') {
+        if (state.visibilityError) return { status: 503, body: { error: 'Could not save visibility' } };
+        if (!chat || chat.type === 'private') return { status: 400, body: { error: 'Cannot hide this chat' } };
+        chat.hidden = body.hidden;
+        return { hidden: chat.hidden };
+    }
     if (rest === '/list') {
         return { access: { edit: true, settings: chat.settings }, series: state.series, films: state.films };
     }
@@ -302,9 +317,30 @@ function accountAnswer(state, req, url) {
     if (rest === '/aired') {
         const year = Number(url.searchParams.get('year') || 2026);
         return {
-            years: [2026, 2025], year,
-            series: [{ tmdbId: 'tv_100', title: chatId === '-100' ? 'Group release' : 'Одни из нас', poster: null, seasons: [year === 2026 ? 2 : 1], genres: ['драма'], kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/' }],
-            films: year === 2026 ? [{ tmdbId: 'movie_9', title: 'Released film', poster: null, genres: ['фантастика'], kinopoiskUrl: 'https://www.kinopoisk.ru/film/9/' }] : []
+            years: [2026, 2025],
+            year,
+            series: [
+                {
+                    tmdbId: 'tv_100',
+                    title: chatId === '-100' ? 'Group release' : 'Одни из нас',
+                    poster: null,
+                    seasons: [year === 2026 ? 2 : 1],
+                    genres: ['драма'],
+                    kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/'
+                }
+            ],
+            films:
+                year === 2026
+                    ? [
+                          {
+                              tmdbId: 'movie_9',
+                              title: 'Released film',
+                              poster: null,
+                              genres: ['фантастика'],
+                              kinopoiskUrl: 'https://www.kinopoisk.ru/film/9/'
+                          }
+                      ]
+                    : []
         };
     }
     if (rest === '/settings' && method === 'GET') {

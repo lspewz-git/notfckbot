@@ -4,7 +4,7 @@
  * is src/account/guard.js; changes go through src/chat-ops.js, like the panel's own.
  */
 const router = require('express').Router();
-const { Chat, Series, Subscription, Watchlist } = require('../db');
+const { Chat, Series, Subscription, Watchlist, HiddenChat } = require('../db');
 const tmdb = require('../api/tmdb');
 const ops = require('../chat-ops');
 const { listPeriod, periodItems } = require('../calendar');
@@ -286,7 +286,13 @@ router.post('/api/account/sessions/end-others', async (req, res) => {
 router.get('/api/account/chats', async (req, res) => {
     try {
         // The system account is nobody in Telegram: no chats of its own
-        res.json(req.user.system ? [] : await chatsOf(req.user.userId));
+        if (req.user.system) return res.json([]);
+        const [chats, hidden] = await Promise.all([
+            chatsOf(req.user.userId),
+            HiddenChat.findAll({ where: { userId: req.user.userId }, attributes: ['chatId'], raw: true })
+        ]);
+        const ids = new Set(hidden.map((c) => String(c.chatId)));
+        res.json(chats.map((c) => ({ ...c, hidden: c.type !== 'private' && ids.has(String(c.id)) })));
     } catch (err) {
         fail(res, err);
     }
@@ -312,6 +318,21 @@ async function openChat(req, res, next) {
 }
 
 const who = (req) => ({ userId: req.user.userId, userName: req.user.userName, source: 'account' });
+
+router.patch('/api/account/chats/:chatId/visibility', openChat, async (req, res) => {
+    const body = valid(z.object({ hidden: z.boolean() }), req.body, res);
+    if (!body) return;
+    if (String(req.chatId) === String(req.user.userId))
+        return res.status(400).json({ error: 'Your own account stays visible' });
+    try {
+        const key = { userId: req.user.userId, chatId: req.chatId };
+        if (body.hidden) await HiddenChat.upsert(key);
+        else await HiddenChat.destroy({ where: key });
+        res.json({ hidden: body.hidden });
+    } catch (err) {
+        fail(res, err);
+    }
+});
 
 /** "https://image.tmdb.org/t/p/w500/abc.jpg" → "/abc.jpg", for /api/poster */
 const posterPath = (url) => (url ? (String(url).match(/\/[A-Za-z0-9]+\.(jpg|png)$/) || [null])[0] : null);

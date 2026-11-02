@@ -51,7 +51,7 @@ function whenText(day, today) {
 const MARKS = { premiere: 'season premiere', finale: 'season finale' };
 
 const state = {
-    /** @type {{ id: string, type: string, title: string, settings: boolean }[] | null} null until /api/account/chats answers */
+    /** @type {{ id: string, type: string, title: string, settings: boolean, hidden?: boolean }[] | null} null until /api/account/chats answers */
     chats: null,
     /** @type {string | null} why the chats couldn't be loaded */
     chatsError: null,
@@ -82,7 +82,7 @@ const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${
  */
 export function setChats(chats, preferred = null) {
     state.chats = chats;
-    const ids = chats.map((c) => c.id);
+    const ids = chats.filter((c) => !c.hidden).map((c) => c.id);
     state.chatId = preferred && ids.includes(String(preferred)) ? String(preferred) : ids[0] || null;
     state.chatsError = null;
     state.list = null;
@@ -108,6 +108,16 @@ export function setOwnerName(name) {
 
 /** The chats and the open one, for the profile menu (profile.js) */
 export const chatList = () => ({ chats: state.chats || [], chatId: state.chatId });
+
+/** Apply a saved preference; hiding the current group returns to the first visible chat. */
+export async function setChatHidden(id, hidden) {
+    const chat = (state.chats || []).find((c) => c.id === id);
+    if (!chat || chat.type === 'private') return;
+    chat.hidden = hidden;
+    if ((hidden && state.chatId === id) || (!hidden && !state.chatId)) {
+        await selectChat((state.chats || []).find((c) => !c.hidden)?.id || null);
+    }
+}
 
 /**
  * The chat at the top of each section: a small chip that opens the profile menu (profile.js) with

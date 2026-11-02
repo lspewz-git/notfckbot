@@ -920,6 +920,76 @@ button.search-result-open:hover .mine-row-title {
 
 /* --- The profile menu --- */
 
+.profile-head .action-text {
+    min-width: 0;
+}
+
+.profile-head > .icon-button {
+    margin-left: auto;
+    align-self: flex-start;
+    flex: none;
+    color: var(--text-dim);
+}
+
+.profile-options {
+    width: 14rem;
+    max-width: calc(100vw - var(--space-4));
+}
+
+.profile-hidden {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: calc(100% - var(--space-4));
+    min-height: var(--control-h);
+    margin: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.profile-hidden .action-chevron {
+    margin-left: auto;
+}
+
+#visibility-modal .modal-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#visibility-modal .modal-header,
+#visibility-modal .field-hint {
+    flex: none;
+}
+
+#visibility-list {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.profile-visibility-row {
+    flex: none;
+    cursor: default;
+}
+
+.profile-visibility-row .switch {
+    flex: none;
+    justify-content: center;
+    min-width: var(--control-h);
+    min-height: var(--control-h);
+}
+
+.profile-visibility-row .switch:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
 .profile-head {
     display: flex;
     align-items: center;

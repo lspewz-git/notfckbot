@@ -1854,6 +1854,22 @@
             <div class="modal-content modal-narrow" id="profile-body"></div>
         </dialog>
 
+        <dialog id="visibility-modal" class="modal modal-sheet" aria-labelledby="visibility-title">
+            <div class="modal-content modal-narrow">
+                <div class="modal-header">
+                    <h3 id="visibility-title">Chat visibility</h3>
+                    <button type="button" class="modal-x" data-close="visibility-modal" aria-label="Close">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#x" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="field-hint">Choose which chats appear in your list.</p>
+                <div id="visibility-list" class="action-list"></div>
+                <p class="field-hint">Changes are saved automatically.</p>
+            </div>
+        </dialog>
+
         <!-- "More" sheet behind the tab bar: what doesn't fit in five tabs -->
         <dialog id="more-modal" class="modal modal-sheet" aria-labelledby="more-title">
             <div class="modal-content modal-narrow">

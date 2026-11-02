@@ -16,6 +16,7 @@ const AccountSession = require('./models/AccountSession');
 const LoginLink = require('./models/LoginLink');
 const AccountPassword = require('./models/AccountPassword');
 const PanelRole = require('./models/PanelRole');
+const HiddenChat = require('./models/HiddenChat');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -51,5 +52,6 @@ module.exports = {
     AccountSession,
     LoginLink,
     AccountPassword,
-    PanelRole
+    PanelRole,
+    HiddenChat
 };

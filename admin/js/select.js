@@ -13,6 +13,26 @@ let openDropdown = null;
 /** @returns {boolean} Whether a dropdown panel is currently open. */
 export const isDropdownOpen = () => openDropdown !== null;
 
+/** A compact action menu using the same dismissal and Escape handling as selects. */
+export function openActionDropdown(trigger, html) {
+    const wasOpen = openDropdown?.trigger === trigger;
+    closeDropdown();
+    if (wasOpen) return;
+    const panel = document.createElement('div');
+    panel.className = 'custom-select-panel profile-options';
+    panel.id = 'profile-options-menu';
+    panel.setAttribute('role', 'group');
+    panel.setAttribute('aria-label', 'Chat display options');
+    panel.innerHTML = html;
+    (trigger.closest('dialog') || document.body).appendChild(panel);
+    const rect = trigger.getBoundingClientRect();
+    panel.style.top = `${rect.bottom + 6}px`;
+    panel.style.left = `${Math.max(8, rect.right - panel.offsetWidth)}px`;
+    trigger.setAttribute('aria-expanded', 'true');
+    openDropdown = { trigger, panel, top: rect.top, left: rect.left };
+    panel.querySelector('button')?.focus({ preventScroll: true });
+}
+
 export function closeDropdown() {
     if (!openDropdown) return;
     openDropdown.panel.remove();
@@ -120,7 +140,11 @@ export function enhanceIn(root) {
 export function enhanceSelects() {
     document.querySelectorAll('select.select-field').forEach(enhanceSelect);
 
-    document.addEventListener('click', closeDropdown);
+    document.addEventListener('click', (e) => {
+        const target = /** @type {HTMLElement} */ (e.target);
+        if (target.closest?.('[data-action="profile-options"]')) return;
+        closeDropdown();
+    });
     window.addEventListener('resize', closeDropdown);
     window.addEventListener(
         'scroll',

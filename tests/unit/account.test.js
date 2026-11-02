@@ -13,6 +13,7 @@ const {
     LoginLink,
     AccountPassword,
     PanelRole,
+    HiddenChat,
     Chat,
     Watchlist,
     Subscription
@@ -53,6 +54,7 @@ beforeEach(() => {
     sessions = new Map();
     links = new Map();
     passwords = new Map();
+    mock.method(HiddenChat, 'findAll', async () => []);
     mock.method(AccountPassword, 'findByPk', async (id) =>
         passwords.has(String(id)) ? passwords.get(String(id)) : null
     );
@@ -370,6 +372,40 @@ test('Telegram hanging: a membership question gives up after 3 s, and the next o
 });
 
 // --- The API, as src/admin/index.js puts it together ---
+
+test('chat visibility is personal, persists, requires membership and cannot hide the own account', async (t) => {
+    const hidden = new Map();
+    t.mock.method(HiddenChat, 'findAll', async ({ where }) =>
+        [...hidden.values()].filter((r) => String(r.userId) === String(where.userId))
+    );
+    t.mock.method(HiddenChat, 'upsert', async (row) => hidden.set(`${row.userId}:${row.chatId}`, row));
+    t.mock.method(HiddenChat, 'destroy', async ({ where }) => hidden.delete(`${where.userId}:${where.chatId}`));
+    const group = { id: '-1', type: 'supergroup', title: 'Group' };
+    t.mock.method(Chat, 'findByPk', async (id) => (String(id) === '-1' ? group : null));
+    t.mock.method(Chat, 'findAll', async () => [group]);
+    const { server, call } = await serve(fakeBot({ '-1': { 7: 'member', 8: 'member' } }));
+    t.after(() => server.close());
+    const cookie = await signIn(call, '7');
+    const other = await signIn(call, '8');
+    const save = (id, value, token = cookie) =>
+        call('PATCH', `/api/account/chats/${id}/visibility`, { cookie: token, body: { hidden: value } });
+    assert.equal((await save('-1', true)).status, 200);
+    assert.equal((await save('-1', true)).status, 200, 'idempotent');
+    assert.equal(hidden.size, 1);
+    const list = await call('GET', '/api/account/chats', { cookie });
+    assert.equal(list.status, 200);
+    assert.equal(list.body.find((c) => c.id === '-1').hidden, true);
+    assert.equal(
+        (await call('GET', '/api/account/chats', { cookie: other })).body.find((c) => c.id === '-1').hidden,
+        false
+    );
+    assert.equal((await save('7', true)).status, 400);
+    assert.equal((await save('-2', true)).status, 403);
+    assert.equal((await save('-1', 'yes')).status, 400);
+    assert.equal((await save('-1', true, '')).status, 401);
+    assert.equal((await save('-1', false)).status, 200);
+    assert.equal(hidden.size, 0);
+});
 
 async function serve(bot) {
     members.useBot(bot);
