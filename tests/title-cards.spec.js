@@ -44,7 +44,7 @@ test('Released reuses the poster and shows every listed season premiere, includi
         poster: true,
         history: () => ({
             years: [2026], year: 2026,
-            series: [{ tmdbId: 'tv_66732', title: 'Stranger Things', poster: 'https://image.tmdb.org/t/p/w500/poster.png', seasons: [4, 5, 6], genres: [], kinopoiskUrl: 'https://www.kinopoisk.ru/' }],
+            series: [{ tmdbId: 'tv_66732', title: 'Stranger Things', poster: 'https://image.tmdb.org/t/p/w500/poster.png', seasons: [4, 5, 6], seasonPremieres: [{season:4,date:'2025-12-15'},{season:5,date:'2026-03-20'},{season:6,date:'2026-06-01'}], genres: [], kinopoiskUrl: 'https://www.kinopoisk.ru/' }],
             films: []
         })
     });

@@ -340,6 +340,7 @@ function accountAnswer(state, req, url) {
     if (rest === '/calendar') return state.calendar;
     if (rest === '/aired') {
         const year = Number(url.searchParams.get('year') || 2026);
+        if (state.aired) return state.aired(year, chatId);
         return {
             years: [2026, 2025],
             year,

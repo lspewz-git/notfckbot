@@ -1,6 +1,6 @@
 /* History: what came out each year, serials and movies in two lists */
 
-#history-years {
+.history-years {
     margin-bottom: var(--space-3);
 }
 

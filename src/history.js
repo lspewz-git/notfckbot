@@ -58,6 +58,7 @@ async function entry({
     date = null,
     ruPremiere = null,
     ruDigital = null,
+    ruServices = null,
     networks = ''
 }) {
     const [type, numericId] = tmdbId.split('_');
@@ -69,6 +70,21 @@ async function entry({
     return {
         tmdbId,
         title,
+        overview: details?.overview || '',
+        rating: details?.vote_average || null,
+        status: details?.status || null,
+        seasonCount: details?.number_of_seasons || null,
+        dates:
+            mediaType === 'movie'
+                ? {
+                      release: details?.release_date || null,
+                      digital: details?.digital_release_date || date,
+                      digitalCountry: details?.digital_release_country || null,
+                      ruPremiere,
+                      ruDigital,
+                      ruServices
+                  }
+                : null,
         ...(seasons
             ? {
                   seasons,
@@ -116,7 +132,8 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
                 poster: f.poster_url || null,
                 date: f.premiere_digital,
                 ruPremiere: f.ru_premiere,
-                ruDigital: f.ru_digital
+                ruDigital: f.ru_digital,
+                ruServices: f.ru_services
             });
     }
     const series = seriesRows.map((s) => ({

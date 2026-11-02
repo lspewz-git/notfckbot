@@ -7,7 +7,7 @@ import { setSubsChart, openRecentSends } from './dashboard-charts.js';
 import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
 import { fillPagers } from './pager.js';
 import { filterLogs } from './logs.js';
-import { setHistoryYear, setHistoryPage, setupHistory } from './history.js';
+import { setHistoryYear, setHistoryPage, setupHistory, openHistoryTitle } from './history.js';
 import { pickPeriod, confirmSendOne } from './chat-stats.js';
 import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './recap.js';
 import { recapCardActions, setupRecapCards, openRecapSection } from './recap-cards.js';
@@ -172,8 +172,9 @@ const CLICK_ACTIONS = {
     'add-content-film': (el) => selectContent(Number(el.dataset.index), true),
     'submit-content': () => submitAddContent(),
     'add-content': (el) => openAddContentFor(el.dataset.kind === 'tv' ? 'tv' : 'movie'),
-    'history-year': (el) => setHistoryYear(Number(el.dataset.year)),
-    'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step)),
+    'history-open': openHistoryTitle,
+    'history-year': (el) => setHistoryYear(Number(el.dataset.year), el),
+    'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step), el),
     'chat-stats-period': (el) => pickPeriod(el.dataset.period),
     'recap-send-one': (el) => confirmSendOne(el.dataset.again === 'true'),
     'recap-send-open': () => openRecapSend(),

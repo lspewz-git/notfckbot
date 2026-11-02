@@ -147,20 +147,21 @@ test.describe('local title search', () => {
             await expect(input).toBeFocused();
             const sentBeforeTyping = panel.account.sent.length;
             await input.fill('  ОДНИ  ');
-            await expect(area.locator('.mine-row')).toHaveCount(1);
-            await expect(area.locator('.mine-row')).toContainText('Одни из нас');
+            const rows = area.locator(section === 'my-aired' ? '.history-item:not(.history-filler)' : '.mine-row');
+            await expect(rows).toHaveCount(1);
+            await expect(rows).toContainText('Одни из нас');
             await input.fill('no-such-title');
             await expect(area).toContainText('No matching titles');
             expect(panel.account.sent.slice(sentBeforeTyping).some((r) => r.path.includes('/search'))).toBe(false);
             await area.getByRole('button', { name: 'Cancel', exact: true }).click();
             await expect(input).toBeHidden();
-            await expect(area.locator('.mine-row')).toHaveCount(2);
+            await expect(rows).toHaveCount(2);
             await toggle.click();
             await input.fill('no-such-title');
             await input.press('Escape');
             await expect(input).toBeHidden();
             await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-            await expect(area.locator('.mine-row')).toHaveCount(2);
+            await expect(rows).toHaveCount(2);
         }
     });
 });

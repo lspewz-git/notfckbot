@@ -644,10 +644,9 @@ test('the API: Following films use cached Kinopoisk ids and IMDb context without
 });
 
 test('the API: Aired is scoped to an accessible chat and validates its year', async (t) => {
-    t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => ({
-        overview: 'Released title description',
-        vote_average: 8.2
-    }));
+    t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => {
+        throw new Error('History already contains shared display metadata');
+    });
     const { server, call } = await serve(fakeBot({ '-1': { 7: 'member' } }));
     t.after(() => server.close());
     t.mock.method(Chat, 'findByPk', async () => ({ type: 'supergroup' }));
@@ -662,6 +661,8 @@ test('the API: Aired is scoped to an accessible chat and validates its year', as
                 {
                     tmdbId: 'movie_1',
                     poster: 'https://image.tmdb.org/t/p/w500/poster.jpg',
+                    overview: 'Released title description',
+                    rating: 8.2,
                     links: [{ kind: 'watch', label: 'Смотреть', url: 'https://www.sspoisk.ru/film/9/' }]
                 }
             ]

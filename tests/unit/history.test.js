@@ -42,7 +42,14 @@ mock.method(tmdb, 'getSeasonDetailsCached', async (id, season) => ({
 mock.method(tmdb, 'getDetailsCached', async (id, type) => {
     if (tmdbStuck) await new Promise(() => {});
     const seasons = (type === 'tv' && UPCOMING_SEASONS[id]) || [];
-    return { genres: (GENRES[`${type}:${id}`] || []).map((name) => ({ name })), seasons };
+    return {
+        genres: (GENRES[`${type}:${id}`] || []).map((name) => ({ name })),
+        seasons,
+        overview: 'Shared release overview',
+        vote_average: 8.4,
+        number_of_seasons: type === 'tv' ? 5 : null,
+        release_date: type === 'movie' ? '2026-02-01' : null
+    };
 });
 // Kinopoisk: only film 7's ID is known
 let lookupContexts = [];
@@ -200,7 +207,14 @@ describe('releaseHistory', () => {
         { tmdb_id: 'tv_3', title: 'Старое шоу', kinopoisk_id: null, release_seasons: '2019:1' }
     ];
     const FILMS = [
-        { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01', chatId: 1 },
+        {
+            tmdb_id: 'movie_7',
+            title: 'Дюна',
+            premiere_digital: '2026-03-01',
+            ru_digital: '2026-03-02',
+            ru_services: 'Service A',
+            chatId: 1
+        },
         { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01', chatId: 2 }, // another chat's copy
         { tmdb_id: 'movie_8', title: 'Будущее', premiere_digital: '2099-01-01', chatId: 1 } // not out yet
     ];
@@ -277,6 +291,17 @@ describe('releaseHistory', () => {
         assert.equal(h.films[0].kinopoiskUrl, 'https://www.kinopoisk.ru/film/777/');
         assert.equal(h.films[0].date, '2026-03-01');
         assert.equal(h.films[0].links.find((link) => link.kind === 'watch').url, 'https://www.sspoisk.ru/film/777/');
+    });
+
+    test('shared history supplies card metadata and dates without fetching episodes', async () => {
+        const h = await releaseHistory({ now });
+        assert.equal(h.series[0].overview, 'Shared release overview');
+        assert.equal(h.series[0].rating, 8.4);
+        assert.equal(h.series[0].seasonCount, 5);
+        assert.equal(h.films[0].dates.release, '2026-02-01');
+        assert.equal(h.films[0].dates.digital, '2026-03-01');
+        assert.equal(h.films[0].dates.ruServices, 'Service A');
+        assert.deepEqual(seasonRequests, []);
     });
 
     test('another year on request; one outside the three (or with nothing) falls back to the latest', async () => {

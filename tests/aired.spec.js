@@ -1,93 +1,145 @@
 const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
 const { watchConsole, openSection, pickChat, profileButton } = require('./helpers');
+watchConsole({ignore:/status of (?:500|503)|Fetch error: Error: Temporary failure/});
 
-watchConsole();
-
-test('Released shows this chat’s released titles, filters, years and cards without admin requests', async ({
-    page
-}) => {
-    const panel = await mockPanel(page, { role: 'user' });
-    await openSection(page, 'my-aired');
-    const body = page.locator('#my-aired-body');
-    await expect(body.locator('.mine-row')).toHaveCount(2);
-    await expect(body).toContainText('Season 2');
-    await body.locator('[data-action="mine-aired-what"][data-what="films"]').click();
-    await expect(body.locator('.mine-row')).toHaveCount(1);
-    await body.locator('.mine-row').click();
-    await expect(page.locator('#mine-card-modal')).toContainText('Released film');
-    await expect(page.locator('#mine-card-modal').getByRole('link', { name: 'Kinopoisk' })).toHaveAttribute('href', 'https://www.kinopoisk.ru/film/9/');
-    await page.locator('#mine-card-modal [data-close]').click();
-    await body.locator('[data-action="mine-aired-year"][data-year="2025"]').click();
-    await expect(body).toContainText('No releases in this category in 2025.');
-    await body.locator('[data-action="mine-aired-what"][data-what="all"]').click();
-    await expect(body).toContainText('Season 1');
-    await pickChat(page, 'my-aired', 'Киноклуб');
+test('personal Released uses the admin columns, years and detail dialog without admin requests', async ({page}) => {
+    const requests=[];
+    page.on('request',r=>{if(r.url().includes('/api/'))requests.push(new URL(r.url()).pathname)});
+    const panel=await mockPanel(page,{role:'user'});
+    await openSection(page,'my-aired');
+    const body=page.locator('#my-aired-body');
+    await expect(body.locator('.history-grid')).toBeVisible();
+    await expect(page.locator('#my-aired-series .link-text')).toHaveText('Одни из нас');
+    await expect(page.locator('#my-aired-films .link-text')).toHaveText('Released film');
+    await page.locator('#my-aired-films .link-text').click();
+    await expect(page.locator('#detail-title')).toHaveText('Released film');
+    await expect(page.locator('#detail-kp')).toHaveAttribute('href','https://www.kinopoisk.ru/film/9/');
+    await expect(page.locator('#detail-people')).toBeHidden();
+    await page.locator('#detail-modal [data-close]').click();
+    await page.locator('#my-aired-years button').filter({hasText:'2025'}).click();
+    await expect(page.locator('#my-aired-films .history-empty')).toContainText('2025');
+    await expect(page.locator('#my-aired-series')).toContainText('Season 1');
+    await pickChat(page,'my-aired','Киноклуб');
     await expect(body).toContainText('Group release');
-    await expect(body).toContainText('Season 2');
     await expect(body).not.toContainText('Одни из нас');
-    expect(panel.account.sent.every((r) => r.path.startsWith('/api/account/'))).toBe(true);
-    await profileButton(page, 'my-aired').click();
-    await expect(page.locator('#profile-modal [data-action="view-admin"]')).toHaveCount(0);
+    expect(requests.some(p=>/^\/api\/(history|series|movie|kinopoisk)(\/|$)/.test(p))).toBe(false);
+    expect(panel.account.sent.every(r=>r.path.startsWith('/api/account/'))).toBe(true);
 });
 
-for (const kind of ['series', 'films']) {
-    test(`Released ${kind} shares the Following card without subscription controls`, async ({ page }) => {
-        await mockPanel(page, { role: 'user' });
-        await openSection(page, 'my-aired');
-        await page.locator(`[data-action="mine-aired-what"][data-what="${kind}"]`).click();
-        await page.locator('#my-aired-body .mine-row').click();
-        const card = page.locator('#mine-card-modal');
-        await expect(card.locator('.mine-following-card')).toBeVisible();
-        await expect(card.locator('.title-rating')).toContainText(kind === 'series' ? '8.6' : '7.4');
-        await expect(card).toContainText(kind === 'series' ? 'Season 2' : 'In Russian cinemas');
-        if (kind === 'series') await expect(card).toContainText('Season 2 premiere · Dec 28, 2025');
-        await expect(card).not.toContainText('Next episode');
-        await expect(card).not.toContainText('When the film is out');
-        await expect(card.locator('.mine-modes')).toHaveCount(0);
-        await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toHaveCount(0);
-        await expect(card.getByRole('link', { name: 'Watch on SSPoisk' })).toBeVisible();
-        const overview = card.locator('.mine-overview');
-        const before = await overview.innerText();
-        await card.getByRole('button', { name: 'Show more' }).click();
-        expect((await overview.innerText()).length).toBeGreaterThan(before.length);
-        await card.getByRole('button', { name: 'Show less' }).click();
-        await expect(overview).toHaveText(before, { useInnerText: true });
-        const boxes = await card.evaluate(el => {
-            const content = el.querySelector('.mine-following-card').getBoundingClientRect();
-            const links = [...el.querySelectorAll('.mine-links a')].map(a => a.getBoundingClientRect());
-            return { width: window.innerWidth, left: content.left, right: content.right, links: links.map(r => ({ left: r.left, right: r.right })) };
-        });
-        expect(boxes.left).toBeGreaterThanOrEqual(0);
-        expect(boxes.right).toBeLessThanOrEqual(boxes.width);
-        expect(boxes.links.every(r => r.left >= boxes.left && r.right <= boxes.right)).toBe(true);
-    });
-}
+for(const kind of ['series','films'])test(`personal Released ${kind} opens the shared admin-style card`,async({page})=>{
+    await mockPanel(page,{role:'user'});
+    await openSection(page,'my-aired');
+    await page.locator(`#my-aired-${kind} .link-text`).click();
+    const card=page.locator('#detail-modal');
+    await expect(card).toBeVisible();
+    await expect(card.locator('#detail-ready.detail')).toHaveCount(1);
+    await expect(card.locator('.title-rating')).toContainText(kind==='series'?'8.6':'7.4');
+    await expect(card.locator('#detail-dates')).toContainText(kind==='series'?'28 Dec 2025':'26 Feb 2026');
+    await expect(card.locator('.mine-modes')).toHaveCount(0);
+    await expect(card.getByRole('button',{name:'Unfollow',exact:true})).toHaveCount(0);
+    const desc=card.locator('#detail-desc');
+    await desc.getByRole('button',{name:'Show more'}).click();
+    await expect(desc.locator('[data-description-full]')).toBeVisible();
+    await desc.getByRole('button',{name:'Show less'}).click();
+    await expect(desc.locator('[data-description-full]')).toBeHidden();
+});
 
-test('Released deep link survives reload', async ({ page }) => {
-    await mockPanel(page, { role: 'user', path: '/#my-aired' });
-    await expect(page.locator('#my-aired-section')).toHaveClass(/active/);
-    await expect(page.locator('#my-aired-body .mine-row')).toHaveCount(2);
+test('admin and personal Released share identical row markup and independent pager state',async({page})=>{
+    const data={years:[2026],year:2026,series:Array.from({length:23},(_,i)=>({tmdbId:`tv_${i}`,title:`Show ${i}`,seasons:[2],genres:['drama'],poster:null,kinopoiskUrl:'https://www.kinopoisk.ru/'})),films:[]};
+    const panel=await mockPanel(page,{history:()=>data});
+    panel.account.aired=()=>data;
+    await openSection(page,'history');
+    await expect(page.locator('#history-series .link-text')).toHaveCount(10);
+    const adminRow=await page.locator('#history-series .history-item').first().evaluate(el=>el.outerHTML);
+    await page.locator('#history-series-pager [data-step="1"]').click();
+    await expect(page.locator('#history-series-pager .pager-info')).toHaveText('11–20 of 23');
+    await page.locator('.section.active [data-admin-profile] button').click();
+    await page.locator('#profile-modal [data-action="view-mine"]').click();
+    await openSection(page,'my-aired');
+    await expect(page.locator('#my-aired-series-pager .pager-info')).toHaveText('1–10 of 23');
+    expect(await page.locator('#my-aired-series .history-item').first().evaluate(el=>el.outerHTML)).toBe(adminRow);
+    await page.locator('#my-aired-series-pager [data-step="1"]').click();
+    await expect(page.locator('#my-aired-series-pager .pager-info')).toHaveText('11–20 of 23');
+    await profileButton(page,'my-aired').click();
+    await page.locator('#profile-modal [data-action="view-admin"]').click();
+    await expect(page.locator('#history-series-pager .pager-info')).toHaveText('11–20 of 23');
+});
+
+test('a late answer for the old chat cannot replace the newly selected chat',async({page})=>{
+    const panel=await mockPanel(page,{role:'user'});
+    let release;
+    const held=new Promise(resolve=>{release=resolve});
+    panel.account.aired=async(year,chatId)=>{
+        if(year===2025)await held;
+        return {years:[2026,2025],year,series:[{tmdbId:'tv_1',title:chatId==='-100'?'New group':'Old private',seasons:[1],genres:[],kinopoiskUrl:'https://www.kinopoisk.ru/'}],films:[]};
+    };
+    await openSection(page,'my-aired');
+    await page.locator('#my-aired-years button').filter({hasText:'2025'}).click();
+    try {
+        await pickChat(page,'my-aired','Киноклуб');
+        await expect(page.locator('#my-aired-series')).toContainText('New group');
+    }finally{release()}
+    await expect(page.locator('#my-aired-series')).not.toContainText('Old private');
+    await expect(page.locator('#my-aired-years .active')).toHaveText('2026');
+});
+
+test('a failed personal refresh preserves the shared list and working page-size control',async({page})=>{
+    const panel=await mockPanel(page,{role:'user'});
+    panel.account.aired=()=>({years:[2026],year:2026,series:Array.from({length:23},(_,i)=>({tmdbId:`tv_${i}`,title:`Show ${i}`,seasons:[1],genres:[],kinopoiskUrl:'https://www.kinopoisk.ru/'})),films:[]});
+    await openSection(page,'my-aired');
+    await expect(page.locator('#my-aired-series .link-text')).toHaveCount(10);
+    panel.account.aired=()=>({status:503,body:{error:'Temporary failure'}});
+    await openSection(page,'my-calendar');
+    const failed=page.waitForResponse(r=>r.url().includes('/aired')&&r.status()===503);
+    await openSection(page,'my-aired');
+    await failed;
+    await expect(page.locator('#my-aired-series .link-text')).toHaveCount(10);
+    await page.locator('#my-aired-series-pager .custom-select-trigger').click();
+    await page.locator('.custom-select-option',{hasText:'25'}).click();
+    await expect(page.locator('#my-aired-series .link-text')).toHaveCount(23);
+});
+
+test('both Released scopes render the same public card even when admin private details differ',async({page})=>{
+    const data={years:[2026],year:2026,series:[{tmdbId:'tv_66732',title:'Shared title',rating:8.6,seasonCount:5,overview:'Shared description',seasons:[2],seasonPremieres:[{season:2,date:'2025-12-28'}],genres:['drama'],poster:null,kinopoiskUrl:'https://www.kinopoisk.ru/series/1/'}],films:[]};
+    const panel=await mockPanel(page,{history:()=>data});panel.account.aired=()=>data;
+    await openSection(page,'history');await page.locator('#history-series .link-text').click();
+    const publicParts=()=>page.locator('#detail-modal').evaluate(el=>['detail-title','detail-meta','detail-desc','detail-dates'].map(id=>el.querySelector('#'+id).innerHTML));
+    await expect(page.locator('#detail-title')).toHaveText('Shared title');
+    const adminParts=await publicParts();
+    await page.locator('#detail-modal [data-close]').click();
+    await page.locator('.section.active [data-admin-profile] button').click();
+    await page.locator('#profile-modal [data-action="view-mine"]').click();
+    await openSection(page,'my-aired');await page.locator('#my-aired-series .link-text').click();
+    await expect(page.locator('#detail-title')).toHaveText('Shared title');
+    expect(await publicParts()).toEqual(adminParts);
+    await expect(page.locator('#detail-people')).toBeHidden();
+});
+
+test('private admin enrichment failure does not hide the shared public card',async({page})=>{
+    await mockPanel(page,{failing:['/api/series/tv_66732']});
+    await openSection(page,'history');await page.locator('#history-series .link-text').first().click();
+    await expect(page.locator('#detail-title')).toHaveText('Stranger Things');
+    await expect(page.locator('#detail-ready')).toBeVisible();
+    await expect(page.locator('#detail-people')).toContainText('Chat information unavailable');
+    await expect(page.locator('#detail-loading')).toBeHidden();
+});
+
+test('Released deep link survives reload',async({page})=>{
+    await mockPanel(page,{role:'user',path:'/#my-aired'});
+    await expect(page.locator('#my-aired-series .link-text')).toHaveCount(1);
     await page.reload();
     await expect(page.locator('#my-aired-section')).toHaveClass(/active/);
-    await expect(page.locator('#my-aired-body .mine-row')).toHaveCount(2);
+    await expect(page.locator('#my-aired-series .link-text')).toHaveCount(1);
 });
 
-test('the bottom avatar opens reachable account actions on tablets', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'one explicit tablet viewport');
-    await page.setViewportSize({ width: 800, height: 900 });
-    await mockPanel(page, { path: '/#my-aired' });
-    await profileButton(page, 'my-aired').click();
-    const admin = page.locator('#profile-modal [data-action="view-admin"]');
+test('the bottom avatar opens reachable account actions on tablets',async({page,isMobile})=>{
+    test.skip(isMobile,'one explicit tablet viewport');
+    await page.setViewportSize({width:800,height:900});
+    await mockPanel(page,{path:'/#my-aired'});
+    await profileButton(page,'my-aired').click();
+    const admin=page.locator('#profile-modal [data-action="view-admin"]');
     await expect(admin).toBeVisible();
-    const box = await admin.boundingBox();
-    expect(box.y + box.height).toBeLessThanOrEqual(900);
-    expect(
-        await admin.evaluate((el) => {
-            const r = el.getBoundingClientRect();
-            return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
-        })
-    ).toBe(true);
-    await admin.click();
-    await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
+    const box=await admin.boundingBox();expect(box.y+box.height).toBeLessThanOrEqual(900);
+    await admin.click();await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
 });

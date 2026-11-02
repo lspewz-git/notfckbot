@@ -509,7 +509,6 @@ router.get('/api/account/chats/:chatId/aired', openChat, async (req, res) => {
         const data = await history.releaseHistory({ chatId: req.chatId, year: query.year });
         const card = (item) => ({
             ...item,
-            ...titleMetadata(item.tmdbId),
             poster: posterPath(item.poster),
             links: (item.links || []).map(({ kind, url }) => ({
                 kind,

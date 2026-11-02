@@ -26,8 +26,9 @@ const ARROWS = [
  * list), and data-pager-label the select for screen readers. Runs before anything reads the
  * selects (setupFilters, setupHistory, enhanceSelects).
  */
-export function fillPagers() {
-    document.querySelectorAll('.pager[data-pager]').forEach((el) => {
+/** @param {ParentNode} [root] */
+export function fillPagers(root = document) {
+    root.querySelectorAll('.pager[data-pager]').forEach((el) => {
         const { pager = '', pagerLabel = '' } = /** @type {HTMLElement} */ (el).dataset;
         const history = pager.startsWith('history-');
         const name = escapeHtml(history ? pager.slice('history-'.length) : pager);

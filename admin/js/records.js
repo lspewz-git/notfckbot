@@ -63,7 +63,7 @@ async function fillKinopoisk(type, id, title, request) {
 /**
  * Opens the card and fills it from `load()`.
  * @param {() => Promise<{ title: string, meta: string, desc: string, people: string, poster: string,
- *   kinopoisk: { type: 'tv' | 'movie', id: string } }>} load
+ *   dates?: string, url?: string, peopleLoad?: () => Promise<string>, kinopoisk?: { type: 'tv' | 'movie', id: string } }>} load
  */
 let detailRequest = 0;
 
@@ -82,6 +82,7 @@ async function openDetails(load) {
         $('detail-meta').innerHTML = card.meta;
         $('detail-desc').innerHTML = description(card.desc);
         $('detail-people').innerHTML = card.people;
+        $('detail-people').hidden = !card.people;
         const dates = $('detail-dates');
         dates.innerHTML = card.dates || '';
         dates.hidden = !card.dates;
@@ -96,11 +97,93 @@ async function openDetails(load) {
 
         $('detail-loading').style.display = 'none';
         $('detail-ready').style.display = '';
-        fillKinopoisk(card.kinopoisk.type, card.kinopoisk.id, card.title, request);
+        if (card.url) setKinopoiskLink(card.url, !card.url.includes('kp_query='));
+        else if (card.kinopoisk) fillKinopoisk(card.kinopoisk.type, card.kinopoisk.id, card.title, request);
+        if (card.peopleLoad) {
+            const fill = (html) => {
+                if (request !== detailRequest) return;
+                $('detail-people').innerHTML = html;
+                $('detail-people').hidden = !html;
+            };
+            card.peopleLoad()
+                .then(fill)
+                .catch(() => fill('<p class="people-none">Chat information unavailable.</p>'));
+        }
     } catch (e) {
         if (request === detailRequest) $('detail-loading').innerText = 'Failed to load details.';
     }
 }
+
+function seasonDates(seasons, premieres) {
+    return seasons
+        .filter(Boolean)
+        .map(
+            (season) =>
+                `<dt>Season ${escapeHtml(season)} premiere</dt><dd>${escapeHtml(formatReleaseDate(premieres.find((s) => s.season === season)?.date))}</dd>`
+        )
+        .join('');
+}
+
+function filmDates(d) {
+    const row = (label, iso, note, format = formatReleaseDate) =>
+        iso ? `<dt>${label}</dt><dd>${escapeHtml(format(iso))}${note ? ` · ${escapeHtml(note)}` : ''}</dd>` : '';
+    return (
+        row('Release', d.release) +
+        row('Premiere in Russia', d.ruPremiere, null, formatPremiereRu) +
+        (d.digital && !(d.digitalCountry === 'RU' && d.digital === d.ruDigital)
+            ? row('Digital', d.digital, d.digitalCountry)
+            : '') +
+        row('Digital in Russia', d.ruDigital, d.ruServices)
+    );
+}
+
+/** Private enrichment never holds up the common public Released card. */
+async function releasedPeople(item) {
+    const tv = item.kind === 'tv';
+    let people;
+    const details = await api(`/${tv ? 'series' : 'movie'}/${item.tmdbId}`);
+    if (tv) {
+        const subs = details.subscribers || [];
+        people = subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>';
+    } else {
+        const chats = details.chats || [];
+        const waiting = chats.filter((chat) => !chat.notified),
+            notified = chats.filter((chat) => chat.notified);
+        people =
+            (waiting.length ? peopleGroup('Waiting for release', waiting) : '') +
+                (notified.length ? peopleGroup('Already notified', notified) : '') ||
+            '<p class="people-none">No chat has this film on its list.</p>';
+    }
+    return people;
+}
+
+/** One public card for both scopes; only admins request private subscriber/chat information. */
+export const openReleasedDetails = (item, source, admin = false) =>
+    openDetails(async () => {
+        const tv = item.kind === 'tv';
+        const count = item.seasonCount;
+        const rating = titleRating(item.rating) || 'Not rated on TMDB yet';
+        return {
+            title: item.title,
+            meta:
+                rating +
+                (tv
+                    ? count
+                        ? ` · ${escapeHtml(count)} season${count === 1 ? '' : 's'}`
+                        : ''
+                    : ` · ${escapeHtml(item.status || 'Unknown status')}`),
+            desc: item.overview || '',
+            people: admin ? '<p class="people-none">Loading chat information…</p>' : '',
+            peopleLoad: admin ? () => releasedPeople(item) : undefined,
+            dates: tv
+                ? seasonDates(item.seasons || [], item.seasonPremieres || [])
+                : filmDates(
+                      item.dates || { digital: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital }
+                  ),
+            poster: sourcePoster(source) || posterUrl(String(item.poster || '').match(/\/[^/]+\.(?:jpg|png)$/)?.[0]),
+            url: item.kinopoiskUrl
+        };
+    });
 
 export const openSeriesDetails = (tmdbId, source = null) => {
     const poster = sourcePoster(source);
@@ -116,13 +199,10 @@ export const openSeriesDetails = (tmdbId, source = null) => {
             meta: `${rating} · ${escapeHtml(data.number_of_seasons)} season${data.number_of_seasons === 1 ? '' : 's'}`,
             desc: data.overview,
             dates: year
-                ? seasons
-                      .filter(Boolean)
-                      .map(
-                          (season) =>
-                              `<dt>Season ${season} premiere</dt><dd>${escapeHtml(formatReleaseDate(data.seasons?.find((s) => s.season_number === season)?.air_date))}</dd>`
-                      )
-                      .join('') || `<dt>Season premiere in ${escapeHtml(year)}</dt><dd>None listed</dd>`
+                ? seasonDates(
+                      seasons,
+                      (data.seasons || []).map((s) => ({ season: s.season_number, date: s.air_date }))
+                  ) || `<dt>Season premiere in ${escapeHtml(year)}</dt><dd>None listed</dd>`
                 : `<dt>Premiere</dt><dd>${escapeHtml(formatReleaseDate(data.first_air_date))}</dd>`,
             people: subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>',
             poster: poster || posterUrl(data.poster_path),
@@ -136,16 +216,7 @@ export const openFilmDetails = (tmdbId, source = null) => {
     return openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
         const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
-        const d = data.dates || {};
-        const row = (label, iso, note, format = formatReleaseDate) =>
-            iso ? `<dt>${label}</dt><dd>${escapeHtml(format(iso))}${note ? ` · ${escapeHtml(note)}` : ''}</dd>` : '';
-        const dates =
-            row('Release', d.release || data.release_date) +
-            row('Premiere in Russia', d.ruPremiere, null, formatPremiereRu) +
-            (d.digital && !(d.digitalCountry === 'RU' && d.digital === d.ruDigital)
-                ? row('Digital', d.digital, d.digitalCountry)
-                : '') +
-            row('Digital in Russia', d.ruDigital, d.ruServices);
+        const dates = filmDates({ ...data.dates, release: data.dates?.release || data.release_date });
         const chats = data.chats || [];
         const waiting = chats.filter((c) => !c.notified);
         const notified = chats.filter((c) => c.notified);

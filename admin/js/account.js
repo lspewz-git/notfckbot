@@ -4,6 +4,8 @@
  * admin has the rest of the panel too. In English like the panel (a language switch comes later).
  */
 import { api } from './api.js';
+import { createHistory } from './history.js';
+import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal } from './ui.js';
 import { pickFrom } from './pick-sheet.js';
@@ -63,11 +65,6 @@ const state = {
     calWhat: 'series',
     /** @type {any} the calendar's last answer, for its cards */
     cal: null,
-    /** @type {any} */
-    aired: null,
-    airedYear: null,
-    airedWhat: 'all',
-    airedLimit: 20,
     query: '',
     /** @type {any[]} */
     results: [],
@@ -84,7 +81,7 @@ const noMatches = () => empty('No matching titles', 'Try another title or clear 
 function renderFiltered(section) {
     if (section === 'my-subs' && state.list && !searchOpen) $('my-subs-body').innerHTML = subsView();
     if (section === 'my-calendar' && state.cal) showCalendar();
-    if (section === 'my-aired' && state.aired) $('my-aired-body').innerHTML = airedView();
+    if (section === 'my-aired') airedHistory?.filter(filters['my-aired']);
 }
 
 function closeFilter(section) {
@@ -321,36 +318,24 @@ const cardHead = (picture, title, lines, rating = '') =>
 
 const CLOSE_X = cardClose('mine-card-modal');
 
-/** Following, Calendar and Released share the complete card and spacing. */
-function followingCard(item, { event = null, today, confirm = false, releasedYear = null }) {
-    const released = releasedYear !== null;
+/** Following and Calendar share their subscription card and spacing. */
+function followingCard(item, { event = null, today, confirm = false }) {
     const busy =
         pendingModeSaves.has(titleKey(item, state.chatId)) || pendingUnfollows.has(titleKey(item, state.chatId));
     const tv = item.kind === 'tv';
     const date = event?.date || (tv ? item.next?.date : item.date);
-    const release =
-        released && tv
-            ? (item.seasonPremieres || [])
-                  .map(
-                      (s) =>
-                          `<p class="mine-dim">Season ${escapeHtml(s.season)} premiere · ${escapeHtml(dateText(s.date, { withYear: true }) || 'TBA')}</p>`
-                  )
-                  .join('') ||
-              `<p class="mine-dim">No season premiere listed in ${escapeHtml(String(releasedYear))}</p>`
-            : date
-              ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
-              : `<p class="mine-dim">${released ? escapeHtml(String(releasedYear)) : 'Release date not known yet'}</p>`;
+    const release = date
+        ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
+        : '<p class="mine-dim">Release date not known yet</p>';
     const lines = tv
         ? [
-              released
-                  ? (item.seasons || []).map((season) => `Season ${season}`).join(', ')
-                  : event
-                    ? `S${event.season}E${event.episode} · ${episodeName(event)}`
-                    : item.finished
-                      ? 'The series has ended'
-                      : item.next
-                        ? `Next: S${item.next.season}E${item.next.episode}`
-                        : 'Next episode date unknown',
+              event
+                  ? `S${event.season}E${event.episode} · ${episodeName(event)}`
+                  : item.finished
+                    ? 'The series has ended'
+                    : item.next
+                      ? `Next: S${item.next.season}E${item.next.episode}`
+                      : 'Next episode date unknown',
               event && MARKS[event.mark] ? MARKS[event.mark][0].toUpperCase() + MARKS[event.mark].slice(1) : '',
               [item.genres, item.networks].filter(Boolean).join(' · ')
           ]
@@ -374,12 +359,10 @@ function followingCard(item, { event = null, today, confirm = false, releasedYea
         ) +
         secondaryDates +
         (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
-        (!released && !event && tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
-        (!released && !tv
-            ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>'
-            : '') +
+        (!event && tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
+        (!tv ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>' : '') +
         `<div class="mine-card-actions">${linkButtons(item.links || [])}${
-            released || item.id == null
+            item.id == null
                 ? ''
                 : confirm
                   ? `<div class="mine-confirm"><p>Unfollow “${escapeHtml(item.title)}”?</p><p>It will leave this chat’s following list and calendar. Release notifications will stop.</p><div class="modal-actions"><button type="button" class="btn btn-danger btn-grow" data-action="mine-confirm-unfollow"${busy ? ' disabled' : ''}>Yes, unfollow</button><button type="button" class="btn btn-ghost" data-action="mine-keep-following">Keep following</button></div></div>`
@@ -451,87 +434,20 @@ let searchCardId = null;
 let searchRequest = 0;
 const pendingAdds = new Set();
 
-// --- Aired: the same chat-scoped yearly history as the bot ---
-
-let airedRequest = 0;
-
+// --- Released: the same view as the admin panel, scoped to the selected chat ---
+let airedHistory = null;
+function getAiredHistory() {
+    return (airedHistory ||= createHistory({
+        prefix: 'my-aired',
+        fetchYear: (year) => api(chatPath('/aired' + (year ? '?year=' + year : ''))),
+        openTitle: openReleasedDetails
+    }));
+}
 function resetAired() {
-    airedRequest += 1;
-    state.aired = null;
-    state.airedYear = null;
-    state.airedLimit = 20;
+    airedHistory?.reset();
+    closeModal('detail-modal');
     const body = $('my-aired-body');
     if (body) body.innerHTML = loading();
-}
-
-const airedItems = () =>
-    state.aired
-        ? [
-              ...state.aired.series.map((i) => ({ ...i, kind: 'tv' })),
-              ...state.aired.films.map((i) => ({ ...i, kind: 'movie' }))
-          ]
-        : [];
-
-const airedNote = (item) =>
-    [
-        item.kind === 'tv' ? (item.seasons || []).map((s) => `Season ${s}`).join(', ') : 'Digital release',
-        (item.genres || []).join(', ')
-    ]
-        .filter(Boolean)
-        .join(' · ');
-
-function airedView() {
-    const data = state.aired;
-    if (!data) return loading();
-    const items = airedItems()
-        .map((item, index) => ({ item, index }))
-        .filter(
-            ({ item }) =>
-                matchesTitle(item.title, 'my-aired') &&
-                (state.airedWhat === 'all' || (item.kind === 'tv' ? 'series' : 'films') === state.airedWhat)
-        );
-    return (
-        (data.years.length
-            ? tabs(
-                  data.years.map((y) => [String(y), String(y)]),
-                  String(data.year),
-                  'mine-aired-year',
-                  'year'
-              )
-            : '') +
-        '<div class="mine-toolbar">' +
-        tabs(
-            [
-                ['all', 'All'],
-                ['series', 'Series'],
-                ['films', 'Films']
-            ],
-            state.airedWhat,
-            'mine-aired-what',
-            'what'
-        ) +
-        '</div>' +
-        (items.length
-            ? '<ul class="glass-card mine-rows">' +
-              items
-                  .slice(0, state.airedLimit)
-                  .map(({ item, index }) =>
-                      row('mine-aired-item', String(index), poster(item.poster), item.title, airedNote(item), '')
-                  )
-                  .join('') +
-              '</ul>'
-            : filters['my-aired']
-              ? noMatches()
-              : empty(
-                    'No releases yet',
-                    data.year
-                        ? `No releases in this category in ${data.year}.`
-                        : 'No releases among this chat’s subscriptions in the last three years.'
-                )) +
-        (items.length > state.airedLimit
-            ? '<button type="button" class="btn btn-outline" data-action="mine-aired-more">Show more</button>'
-            : '')
-    );
 }
 
 // --- Calendar ---
@@ -713,18 +629,7 @@ export async function loadMine(section) {
     const stale = () => state.chatId !== chatNow;
     try {
         if (section === 'my-aired') {
-            const request = ++airedRequest;
-            if (!state.aired) body.innerHTML = loading();
-            try {
-                const data = await api(chatPath(`/aired${state.airedYear ? `?year=${state.airedYear}` : ''}`));
-                if (stale() || request !== airedRequest) return;
-                state.aired = data;
-                state.airedYear = data.year;
-                body.innerHTML = airedView();
-            } catch (err) {
-                if (stale() || request !== airedRequest) return;
-                throw err;
-            }
+            await getAiredHistory().load();
         } else if (section === 'my-subs') {
             if (searchOpen) {
                 if (!body.querySelector('#mine-q')) {
@@ -751,7 +656,7 @@ export async function loadMine(section) {
             body.innerHTML = settingsView(data);
         }
     } catch (err) {
-        if (!stale()) body.innerHTML = failed(err.message);
+        if (!stale() && section !== 'my-aired') body.innerHTML = failed(err.message);
         throw err;
     }
 }
@@ -807,36 +712,6 @@ export const accountActions = {
         /** @type {HTMLElement} */ (
             document.querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`)
         ).focus();
-    },
-    'mine-aired-year': (el) => {
-        state.airedYear = Number(el.dataset.year);
-        state.airedLimit = 20;
-        reload();
-    },
-    'mine-aired-what': (el) => {
-        state.airedWhat = el.dataset.what;
-        state.airedLimit = 20;
-        $('my-aired-body').innerHTML = airedView();
-    },
-    'mine-aired-more': () => {
-        state.airedLimit += 20;
-        $('my-aired-body').innerHTML = airedView();
-    },
-    'mine-aired-item': (el) => {
-        const item = airedItems()[Number(el.dataset.id)];
-        if (item)
-            openCard(
-                followingCard(
-                    {
-                        ...item,
-                        genres: (item.genres || []).join(', '),
-                        links: item.links?.length
-                            ? item.links
-                            : [{ kind: 'info', label: 'Kinopoisk', url: item.kinopoiskUrl }]
-                    },
-                    { today: undefined, releasedYear: state.aired.year }
-                )
-            );
     },
     'mine-reload': () => {
         state.list = null;
@@ -1013,7 +888,6 @@ export function setupAccount() {
         const section = input.dataset.mineFilter;
         if (!Object.hasOwn(filters, section)) return;
         filters[section] = input.value;
-        state.airedLimit = 20;
         renderFiltered(section);
     });
     document.addEventListener('keydown', (event) => {

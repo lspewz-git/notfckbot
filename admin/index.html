@@ -1282,7 +1282,7 @@
                                 Cancel
                             </button>
                         </div>
-                        <div id="my-aired-body" class="mine-body" aria-live="polite"></div>
+                        <div id="my-aired-body" aria-live="polite"></div>
                     </section>
                     <section id="my-subs-section" class="section mine-section">
                         <header>
@@ -1418,41 +1418,10 @@
                         <header>
                             <div class="header-info">
                                 <h1>Released</h1>
-                                <p>
-                                    What came out in the last three years among the serials and movies in the database.
-                                    A serial counts in every year it had an episode out.
-                                </p>
+                                <p>Released seasons and films from the last three years.</p>
                             </div>
                         </header>
-                        <!-- Filled by history.js: of the last three years, those that had something out -->
-                        <div id="history-years" class="tab-filters" role="group" aria-label="Year"></div>
-                        <!-- Two cards: serials on the left, movies on the right (one above the other on a phone) -->
-                        <div class="history-grid">
-                            <div class="glass-card history-group">
-                                <h2 class="history-title">Serials <span id="history-series-count"></span></h2>
-                                <ul id="history-series" class="history-list" aria-busy="true"></ul>
-                                <!-- Filled by pager.js (fillPagers) -->
-                                <div
-                                    class="pager"
-                                    id="history-series-pager"
-                                    data-pager="history-series"
-                                    data-pager-label="Serials per page"
-                                    hidden
-                                ></div>
-                            </div>
-                            <div class="glass-card history-group">
-                                <h2 class="history-title">Movies <span id="history-films-count"></span></h2>
-                                <ul id="history-films" class="history-list" aria-busy="true"></ul>
-                                <!-- Filled by pager.js (fillPagers) -->
-                                <div
-                                    class="pager"
-                                    id="history-films-pager"
-                                    data-pager="history-films"
-                                    data-pager-label="Movies per page"
-                                    hidden
-                                ></div>
-                            </div>
-                        </div>
+                        <div id="history-body" aria-live="polite"></div>
                     </section>
 
                     <section id="recap-section" class="section">
