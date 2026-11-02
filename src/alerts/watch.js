@@ -56,7 +56,7 @@ async function afterCheck(run, queued, now = new Date()) {
             (t) =>
                 `🔴 <b>Проверка обновлений упала</b>\nНачалась в ${t(started)}, оборвалась через ${duration(run.durationMs)}.\n` +
                 `${code(run.fatal)}\nСледующая в ${t(cronStatus.getCronStatus().nextRunAt)}.`,
-            { now }
+            { now, fingerprint: JSON.stringify([run.startedAt, run.fatal]) }
         );
     } else {
         await alerts.resolve(
@@ -70,7 +70,7 @@ async function afterCheck(run, queued, now = new Date()) {
             'check_errors',
             (t) =>
                 `🟠 <b>Проверка прошла с ошибками</b>\n${t(started)}: ошибок ${run.errors}. Подробности — в Логах панели.`,
-            { now }
+            { now, fingerprint: JSON.stringify([run.startedAt, run.errors]) }
         );
     } else if (!run.fatal) {
         await alerts.resolve('check_errors', () => '🟢 <b>Проверка снова проходит без ошибок</b>');
@@ -87,7 +87,7 @@ async function afterCheck(run, queued, now = new Date()) {
                 `🔴 <b>Сообщения не уходят</b>\nПроверка ${t(started)}: ${failed} из ${sent + failed} не отправлены` +
                 `${queued ? `, в очереди ${queued}` : ''}.` +
                 (reason ? `\n${code(reason.text)}${reason.count > 1 ? ` × ${reason.count}` : ''}` : ''),
-            { now }
+            { now, fingerprint: JSON.stringify([run.startedAt, Object.keys(run.reasons || {}).sort()]) }
         );
     } else if (sent > 0) {
         await alerts.resolve(
@@ -104,7 +104,7 @@ async function afterCheck(run, queued, now = new Date()) {
             () =>
                 `🟠 <b>Очередь неотправленных растёт</b>\n${a} → ${b} → ${c} за три последние проверки. ` +
                 'Сообщения ждут, пока Telegram их примет.',
-            { now }
+            { now, fingerprint: String(run.startedAt) }
         );
     } else if (queued === 0 || (queueSizes.length > 1 && queued < queueSizes[queueSizes.length - 2])) {
         await alerts.resolve(
@@ -141,7 +141,7 @@ async function checkLate(now = new Date()) {
         (t) =>
             `🔴 <b>Проверка обновлений не запустилась</b>\nДолжна была в ${t(slot)}. ` +
             'Бот работает, но новые серии и фильмы не проверяются.',
-        { now, since: new Date(slot) }
+        { now, since: new Date(slot), fingerprint: String(slot) }
     );
 }
 
@@ -185,7 +185,7 @@ async function serviceSeen(name, value, now = new Date()) {
                     `С ${t(since)}. ${what}` +
                     (value.reason ? `\n${code(value.reason)}` : ''),
                 // Nothing goes out while Telegram is what's down: "it's back" will say how long it wasn't
-                { now, since, unsendable: name === 'telegram' }
+                { now, since, unsendable: name === 'telegram', fingerprint: String(value.reason || '') }
             );
         }
     }
@@ -200,7 +200,7 @@ async function serviceSeen(name, value, now = new Date()) {
                 () =>
                     `🟠 <b>Дневной лимит Кинопоиска исчерпан</b>\nИспользовано ${used} из ${limit}. ` +
                     'До сброса ссылки на Кинопоиск ищутся только через Wikidata.',
-                { now }
+                { now, fingerprint: String(limit) }
             );
         } else {
             await alerts.resolve('kinopoisk_quota', () => '🟢 <b>Лимит Кинопоиска снова доступен</b>', { now });
@@ -322,7 +322,9 @@ async function startupAlert(version, how, { pause = MINUTE_MS } = {}) {
         ? (t) => `🔴 <b>Бот перезапущен после сбоя</b>\n${t(processStart)}: прошлый запуск не завершился сам.${v}`
         : (t) => `⚪️ <b>Бот перезапущен</b>\n${t(processStart)}. ${why}${v}`;
     for (let i = 1; i <= START_TRIES; i += 1) {
-        const result = await alerts.once(key, text);
+        const result = await alerts.once(key, text, {
+            fingerprint: JSON.stringify([processStart.toISOString(), version, how.reason])
+        });
         if (!result || result.sent || result.failed <= result.unreachable || i === START_TRIES) return;
         await new Promise((resolve) => setTimeout(resolve, pause));
     }

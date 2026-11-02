@@ -36,7 +36,12 @@ let alerted = [];
 beforeEach(() => {
     alerted = [];
     stub(alerts, 'once', async (key, text, options) => {
-        alerted.push({ key, text: text(() => '00:00'), id: options && options.id });
+        alerted.push({
+            key,
+            text: text(() => '00:00'),
+            id: options && options.id,
+            fingerprint: options && options.fingerprint
+        });
         return null;
     });
 });
@@ -245,6 +250,19 @@ describe('the queue', () => {
         assert.match(rows[1].error, /blocked/);
         // A chat that blocked the bot left it: no news for the owners
         assert.deepEqual(alerted, []);
+    });
+
+    test('distinct recap failures are never hidden by a global hourly cap', async () => {
+        for (const cause of ['timeout', 'HTTP 401']) {
+            for (const r of rows) {
+                r.status = 'queued';
+                r.attempts = recap.MAX_ATTEMPTS - 1;
+            }
+            const errors = Array.from({ length: 12 }, () => Object.assign(new Error(cause), { code: 'ETIMEDOUT' }));
+            await recap.processQueue(albumBot(errors), { pause: 0, wait: async () => {} });
+        }
+        assert.equal(alerted.length, 4);
+        assert.notEqual(alerted[0].fingerprint, alerted[2].fingerprint);
     });
 
     test('Telegram down: back to the queue, failed after the third try', async () => {

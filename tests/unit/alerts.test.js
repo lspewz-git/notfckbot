@@ -108,6 +108,50 @@ describe('who hears what', () => {
 });
 
 describe('repeats and "fixed"', () => {
+    test('only the same incident is throttled, including critical alerts and repeats disabled', async () => {
+        process.env.ALERT_REPEAT_HOURS = '0';
+        const now = at('2026-10-29T10:00:00Z');
+        await alerts.raise('check_failed', () => 'first', { now, fingerprint: 'run-1' });
+        await alerts.raise('check_failed', () => 'elapsed time changed', { now, fingerprint: 'run-1' });
+        await alerts.raise('check_failed', () => 'second', { now, fingerprint: 'run-2' });
+        assert.deepEqual(
+            to(2).map((m) => m.text),
+            ['first', 'second']
+        );
+    });
+
+    test('overlapping identical observations send once, but a changed cause still sends', async () => {
+        let release;
+        const pending = new Promise((resolve) => {
+            release = resolve;
+        });
+        const original = bot.telegram.sendMessage;
+        mock.method(bot.telegram, 'sendMessage', async (...args) => {
+            await pending;
+            return original(...args);
+        });
+        const options = { fingerprint: 'timeout' };
+        const first = alerts.raise('check_failed', () => 'timeout', options);
+        const duplicate = alerts.raise('check_failed', () => 'duplicate', options);
+        const changed = alerts.raise('check_failed', () => 'unauthorized', { fingerprint: '401' });
+        release();
+        await Promise.all([first, duplicate, changed]);
+        assert.deepEqual(
+            to(2).map((m) => m.text),
+            ['timeout', 'unauthorized']
+        );
+    });
+
+    test('one-off deduplication distinguishes a different year, cause or version', async () => {
+        const now = at('2026-10-29T10:00:00Z');
+        for (const fingerprint of ['2025:timeout', '2025:timeout', '2026:timeout', '2026:401', '2025:timeout']) {
+            await alerts.once('recap_failed', () => fingerprint, { now, id: 1, fingerprint });
+        }
+        assert.equal(to(1).length, 3);
+        await alerts.once('restart', () => 'v1', { now, fingerprint: 'v1' });
+        await alerts.once('restart', () => 'v2', { now, fingerprint: 'v2' });
+        assert.equal(to(1).length, 5);
+    });
     test('raised again: nothing until the repeat time has passed', async () => {
         process.env.ALERT_REPEAT_HOURS = '3';
         await alerts.raise('check_failed', () => 'down', { now: at('2026-10-29T10:00:00Z') });
@@ -232,6 +276,20 @@ describe('services', () => {
     const t0 = Date.parse('2026-10-29T10:00:00Z');
     const minute = (n) => new Date(t0 + n * 60 * 1000);
 
+    test('a changed outage cause is new information; elapsed time alone is not', async () => {
+        for (const [n, reason] of [
+            [0, 'timeout'],
+            [10, 'timeout'],
+            [11, 'timeout'],
+            [12, 'HTTP 401'],
+            [13, 'HTTP 401']
+        ]) {
+            await watch.serviceSeen('tmdb', { tmdb: false, reason }, minute(n));
+        }
+        assert.equal(to(1).length, 2);
+        assert.match(to(1)[1].text, /HTTP 401/);
+    });
+
     test("down for the rule's minutes before an alert; back: how long it was out", async () => {
         process.env.ALERT_DOWN_MINUTES = '10';
         await watch.serviceSeen('tmdb', { tmdb: false, reason: 'timeout' }, minute(0));
@@ -301,6 +359,19 @@ describe('after an update check', () => {
         ...fields
     });
 
+    test('a new check or cause is not hidden by the previous check in the same category', async () => {
+        for (const fields of [{ fatal: 'timeout' }, { errors: 1 }, { failed: 1, reasons: { timeout: 1 } }]) {
+            alerts.reset();
+            watch.resetWatch();
+            const before = to(1).length;
+            const first = run(fields);
+            await watch.afterCheck(first, 0);
+            await watch.afterCheck(first, 0);
+            await watch.afterCheck(run({ ...fields, startedAt: '2026-10-29T10:01:00Z' }), 0);
+            assert.equal(to(1).length - before, 2);
+        }
+    });
+
     test('a failed check: the error and the next check; the next good one says it passes again', async () => {
         await watch.afterCheck(run({ fatal: 'connect ETIMEDOUT' }), 0);
         assert.match(to(2)[0].text, /Проверка обновлений упала[\s\S]*через 12 с[\s\S]*ETIMEDOUT/);
@@ -350,6 +421,21 @@ describe('after an update check', () => {
         assert.equal(to(2).length, 0);
         await watch.afterCheck(run({ sent: 0, failed: 3, gone: 1 }), 2);
         assert.match(to(2)[0].text, /2 из 2 не отправлены/);
+    });
+
+    test('each missed schedule slot is a new critical event', async () => {
+        mock.method(cronStatus, 'getCronStatus', () => ({
+            running: false,
+            intervalHours: 3,
+            lastRun: { startedAt: '2026-10-29T09:00:00Z', finishedAt: '2026-10-29T09:02:00Z', intervalHours: 3 }
+        }));
+        let slot = at('2026-10-29T12:00:00Z');
+        mock.method(cronStatus, 'lastSlotAt', () => slot);
+        await watch.checkLate(at('2026-10-29T12:10:00Z'));
+        await watch.checkLate(at('2026-10-29T12:11:00Z'));
+        slot = at('2026-10-29T15:00:00Z');
+        await watch.checkLate(at('2026-10-29T15:10:00Z'));
+        assert.equal(to(2).length, 2);
     });
 
     test("a check that didn't start on time", async () => {
@@ -410,6 +496,13 @@ describe('after an update check', () => {
 
 describe('how the last run ended', () => {
     const file = () => process.env.SHUTDOWN_FILE;
+
+    test('a changed startup version is a distinct event, identical startup calls are duplicates', async () => {
+        await watch.startupAlert('v1', { reason: 'signal' });
+        await watch.startupAlert('v1', { reason: 'signal' });
+        await watch.startupAlert('v2', { reason: 'signal' });
+        assert.equal(to(1).length, 2);
+    });
 
     test('a mark from the panel or a signal; none means a crash; the mark is used once', async () => {
         watch.markShutdown('panel');

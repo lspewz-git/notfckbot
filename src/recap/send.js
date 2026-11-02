@@ -253,24 +253,18 @@ async function drawFor(row) {
 }
 
 // A batch that fails whole (Telegram, the proxy) mustn't send the owners an alert per chat
-const RECAP_ALERTS_PER_HOUR = 3;
-let recapAlerted = [];
-
 /**
- * The alert for a recap that won't arrive: a gone chat is no news, it left the bot. One per chat
- * an hour, and a few an hour in all: the rest are in Year recap's list.
+ * A gone chat is no news. Only an identical failure for the same chat/year is a repeat;
+ * another chat, year or cause must not be hidden by a global rate limit.
  */
-async function recapFailed(row, chat, error, status, now = Date.now()) {
+async function recapFailed(row, chat, error, status) {
     if (status === 'gone') return;
-    recapAlerted = recapAlerted.filter((at) => now - at < 60 * 60 * 1000);
-    if (recapAlerted.length >= RECAP_ALERTS_PER_HOUR) return;
-    recapAlerted.push(now);
     await alerts.once(
         'recap_failed',
         () =>
             `🟠 <b>Итоги ${row.year} года не дошли до чата</b>\n${escapeHtml(chat.username || String(row.chatId))}: ` +
             `<code>${escapeHtml(error.slice(0, 200))}</code>\nПодробности — в разделе «Итоги года».`,
-        { id: row.chatId }
+        { id: row.chatId, fingerprint: JSON.stringify([row.year, error]) }
     );
 }
 

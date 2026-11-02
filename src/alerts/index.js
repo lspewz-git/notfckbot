@@ -18,6 +18,7 @@ const { isLeft } = require('../bot-status');
 const { zoneOf } = require('../quiet');
 const catalog = require('./catalog');
 const { log } = require('../log');
+const { lruCache } = require('../lru');
 
 const HOUR_MS = 60 * 60 * 1000;
 const ONCE_GAP_MS = HOUR_MS;
@@ -27,8 +28,8 @@ let bot = null;
 // event key -> { since, sentAt, delivered, sending } for a condition that holds now; sending:
 // the alert still going out
 let active = {};
-// event key (with its id) -> when once() last sent it
-let lastOnce = {};
+// Independent one-off events retain their own repeat window, even when they interleave.
+const lastOnce = lruCache({ max: 10000, ttl: ONCE_GAP_MS });
 
 /** The bot the alerts go out through; set once at start (src/index.js), and by tests. */
 function useBot(instance) {
@@ -38,7 +39,7 @@ function useBot(instance) {
 /** Forgets every condition and one-off: for tests. */
 function reset() {
     active = {};
-    lastOnce = {};
+    lastOnce.clear();
 }
 
 /**
@@ -112,12 +113,21 @@ async function send(key, kind, text, { only } = {}) {
  * A condition holds now. The first call sends, later ones only once the repeat time has passed.
  * @param {string} key
  * @param {(time: (date: any) => string, since: Date) => string} text
- * @param {{ since?: Date, now?: Date, unsendable?: boolean }} [options] since: when it started (else
+ * @param {{ since?: Date, now?: Date, unsendable?: boolean, fingerprint?: string }} [options] since: when it started (else
  *   now); unsendable: the alert can't go out (Telegram is what's down), so it's only marked as due,
  *   and resolve() will say what happened
  */
-async function raise(key, text, { since, now = new Date(), unsendable = false } = {}) {
-    const state = active[key] || (active[key] = { since: since || now, sentAt: null, delivered: false });
+async function raise(key, text, { since, now = new Date(), unsendable = false, fingerprint = '' } = {}) {
+    const previous = active[key];
+    if (previous?.sending) {
+        await previous.sending.catch(() => {});
+        return raise(key, text, { since, now, unsendable, fingerprint });
+    }
+    const state = active[key] || (active[key] = { since: since || now, sentAt: null, delivered: false, fingerprint });
+    if (state.fingerprint !== fingerprint) {
+        state.fingerprint = fingerprint;
+        state.sentAt = null;
+    }
     const repeatMs = catalog.ruleValue('repeatHours') * HOUR_MS;
     if (state.sentAt && (!repeatMs || now.getTime() - state.sentAt.getTime() < repeatMs)) return;
     state.sentAt = now;
@@ -160,21 +170,23 @@ async function resolve(key, text, { now = new Date() } = {}) {
 /**
  * A one-off event; the same one again within the hour is left out. One that reached nobody who
  * wanted it isn't counted, so the next one goes out.
- * @param {{ now?: Date, id?: string | number }} [options] id: what it is about (a chat), when the
+ * @param {{ now?: Date, id?: string | number, fingerprint?: string }} [options] id: what it is about (a chat), when the
  *   same event about another one is news of its own
  * @returns {Promise<{ sent: number, failed: number, wanted: number, unreachable: number } | null>} null:
  *   left out or not sent
  */
-async function once(key, text, { now = new Date(), id } = {}) {
-    const slot = id === undefined ? key : `${key}:${id}`;
-    if (lastOnce[slot] && now.getTime() - lastOnce[slot] < ONCE_GAP_MS) return null;
-    lastOnce[slot] = now.getTime();
+async function once(key, text, { now = new Date(), id, fingerprint = '' } = {}) {
+    const slot = JSON.stringify([key, id === undefined ? null : String(id), fingerprint]);
+    const previous = lastOnce.get(slot);
+    if (previous && now.getTime() - previous.at < ONCE_GAP_MS) return null;
+    const entry = { at: now.getTime() };
+    lastOnce.set(slot, entry);
     try {
         const result = await send(key, 'alert', (time) => text(time));
-        if (result.wanted && !result.sent) delete lastOnce[slot];
+        if (result.wanted && !result.sent && lastOnce.get(slot) === entry) lastOnce.delete(slot);
         return result;
     } catch (err) {
-        delete lastOnce[slot];
+        if (lastOnce.get(slot) === entry) lastOnce.delete(slot);
         log.error(`[Alerts] ${key} failed: ${err.message}`);
         return null;
     }
