@@ -985,6 +985,8 @@ async function mockPanel(page, options = {}) {
         if (url.pathname.startsWith('/api/poster/'))
             return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
         if (url.pathname.startsWith('/api/')) {
+            if (url.pathname === '/api/account/chats' && panel.account.chatsWait)
+                await panel.account.chatsWait;
             if (url.pathname.endsWith('/visibility') && panel.account.visibilityWait)
                 await panel.account.visibilityWait;
             const mine = await accountAnswer(panel.account, route.request(), url);

@@ -522,7 +522,7 @@ test('the profile menu: chats, both settings pages and Sign out; nothing else si
 test('the chip opens the menu even when the chats could not load', async ({ page }) => {
     await mockPanel(page, { role: 'user', chatsDown: true });
     const chip = profileButton(page, 'my-subs');
-    await expect(chip).toContainText('@me');
+    await expect(chip).toContainText('My account');
     await chip.click();
     await expect(page.locator('#profile-modal .pick-row')).toHaveCount(0);
     await expect(page.locator('#profile-modal .profile-links .action-title')).toHaveText([

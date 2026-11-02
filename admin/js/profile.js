@@ -214,7 +214,7 @@ export const profileActions = {
     'profile-options': (el) => {
         openActionDropdown(
             el,
-            `<button type="button" class="action-row" data-action="profile-visibility">${HIDDEN}<span class="action-text">Hidden chats</span><span class="action-chevron">${CHEVRON}</span></button>`
+            `<button type="button" class="action-row" data-action="profile-visibility">${icon('eye')}<span class="action-text">Chat visibility</span><span class="action-chevron">${CHEVRON}</span></button>`
         );
     },
     'profile-visibility': openVisibility,

@@ -101,6 +101,7 @@ function accountState(options) {
         hasPassword: Boolean(options.hasPassword),
         // /api/account/chats fails (Telegram down)
         chatsDown: Boolean(options.chatsDown),
+        chatsWait: options.chatsWait,
         // Signed in as the system account (not a Telegram user)
         system: Boolean(options.system),
         role: options.role || 'admin',

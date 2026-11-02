@@ -123,11 +123,10 @@ const CHEVRON_RIGHT =
 export const chatHint = (c) =>
     c.type === 'private' ? 'Private chat' : c.settings ? "Group · you're an admin" : 'Group · view only';
 
-/** The signed-in person's name: the chip shows it until the chats are there (session.js) */
-let ownerName = '';
-
-export function setOwnerName(name) {
-    ownerName = name || '';
+/** Show the stable account choice while the new session's chats are loading. */
+export function resetChatChoice() {
+    state.chats = null;
+    state.chatId = null;
     showChatChips();
 }
 
@@ -146,12 +145,12 @@ export async function setChatHidden(id, hidden) {
 
 /**
  * The chat at the top of each section: a small chip that opens the profile menu (profile.js) with
- * the chats, the settings and Sign out. Without a chat yet (loading, failed) it shows the person,
+ * the chats, the settings and Sign out. Without a chat yet (loading, failed) it shows My account,
  * so signing out is always in reach
  */
 function showChatChips() {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
-    const name = chat ? chat.title : ownerName || 'Account';
+    const name = chat ? chat.title : 'My account';
     const html = chatChip({
         title: name,
         accent: !chat || chat.type === 'private',
