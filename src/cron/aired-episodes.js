@@ -71,7 +71,13 @@ function seasonsToRescan(series, details) {
     const last = details && details.last_episode_to_air;
     if (!last || !last.season_number) return [];
     const moved = last.season_number !== series.last_season || last.episode_number !== series.last_episode;
-    return moved ? [last.season_number] : [];
+    // Notification progress may already be saved when a statistics fetch fails. Retry that gap.
+    const counted = [...parseAired(series.aired_episodes).values()].reduce(
+        (sum, seasons) => sum + (seasons.get(last.season_number)?.count || 0),
+        0
+    );
+    const behind = series.aired_episodes != null && counted < last.episode_number;
+    return moved || behind ? [last.season_number] : [];
 }
 
 /**

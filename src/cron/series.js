@@ -153,12 +153,6 @@ const checkSeriesUpdates = async (bot, allSeries) => {
 
             // Cached on the row after the first hit, so this is a lookup only for new titles
             await ensureKinopoiskId(item, data.imdb_id);
-            // For the release history; never holds up the notifications. A new series' first
-            // pass asks TMDB for every season (dozens for a long show), so it runs on its own
-            const seasonsDone = ensureReleaseSeasons(item, data).catch((err) =>
-                log.error(`[History] Release seasons for ${item.tmdb_id} failed: ${err.message}`)
-            );
-            if (item.release_seasons !== null && item.release_seasons !== undefined) await seasonsDone;
             // Read before notifyNewEpisodes() moves last_season and last_episode on
             const rescan = seasonsToRescan(item, data);
 
@@ -171,12 +165,12 @@ const checkSeriesUpdates = async (bot, allSeries) => {
 
             if (statusChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
 
-            // The statistics' episode counts, after the notifications so a slow TMDB never holds
+            // Statistics and release-year counts, after notifications so slow TMDB never holds
             // them up: the season with a new episode is read again; the first time, all of them,
-            // on its own like the release seasons above
-            const airedDone = ensureAiredEpisodes(item, data, rescan).catch((err) =>
-                log.error(`[Stats] Aired episodes for ${item.tmdb_id} failed: ${err.message}`)
-            );
+            // in the background for a title whose counts have not been filled yet
+            const airedDone = ensureAiredEpisodes(item, data, rescan)
+                .then(() => ensureReleaseSeasons(item, data))
+                .catch((err) => log.error(`[Stats] Aired episodes for ${item.tmdb_id} failed: ${err.message}`));
             if (item.aired_episodes !== null && item.aired_episodes !== undefined) await airedDone;
 
             // The calendar's seasons stay in memory: most came with the details above

@@ -1,5 +1,5 @@
 /**
- * The release history: for a year, the tracked series that had an episode out and the films that
+ * The release history: seasons with >70% of their episodes out in a year and the films that
  * came out, each with its genres and Kinopoisk link. For the whole database (the admin panel) or
  * for one chat's subscriptions and watchlist (the bot). For the bot also the year ahead: what
  * TMDB already lists for it.
@@ -38,13 +38,13 @@ async function soon(promise) {
     }
 }
 
-/** Genres in Russian, from the (usually cached) TMDB details; none if TMDB doesn't answer. */
-async function genresOf(numericId, type) {
+/** Genres and season dates from the same cached details request; empty if TMDB doesn't answer. */
+async function metadataOf(numericId, type) {
     try {
         const details = await soon(getDetailsCached(numericId, type));
-        return (details.genres || []).slice(0, GENRES_SHOWN).map((g) => g.name.toLowerCase());
+        return { genres: (details.genres || []).slice(0, GENRES_SHOWN).map((g) => g.name.toLowerCase()), details };
     } catch {
-        return [];
+        return { genres: [], details: null };
     }
 }
 
@@ -62,14 +62,22 @@ async function entry({
 }) {
     const [type, numericId] = tmdbId.split('_');
     const mediaType = type === 'tv' ? 'tv' : 'movie';
-    const genres = await genresOf(numericId, mediaType);
+    const { genres, details } = await metadataOf(numericId, mediaType);
     const id = kinopoiskId || knownKinopoiskId(tmdbId, peekDetails(numericId, mediaType)?.imdb_id || null);
     const links = getWatchLinks({ title, kinopoiskId: id, mediaType });
     const link = links.find((l) => l.kind === 'info');
     return {
         tmdbId,
         title,
-        ...(seasons ? { seasons } : {}),
+        ...(seasons
+            ? {
+                  seasons,
+                  seasonPremieres: seasons.map((season) => ({
+                      season,
+                      date: details?.seasons?.find((s) => s.season_number === season)?.air_date || null
+                  }))
+              }
+            : {}),
         genres,
         kinopoiskUrl: link.url,
         links,
@@ -129,7 +137,7 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
     const shown = years.includes(Number(year)) ? Number(year) : (years[0] ?? null);
 
     const [seriesOut, filmsOut] = await Promise.all([
-        // A serial with the seasons that had episodes out that year
+        // A serial with the seasons that passed the majority threshold for that year
         Promise.all(
             series
                 .filter((s) => shown !== null && s.byYear.has(shown))

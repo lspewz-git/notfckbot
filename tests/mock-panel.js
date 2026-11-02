@@ -801,8 +801,13 @@ async function mockPanel(page, options = {}) {
                     number_of_seasons: 4,
                     overview: options.overview ?? 'A test series.',
                     first_air_date: '2016-07-15',
+                    seasons: [
+                        { season_number: 4, air_date: '2025-12-15' },
+                        { season_number: 5, air_date: '2026-03-20' },
+                        { season_number: 6, air_date: '2026-06-01' }
+                    ],
                     // options.poster: the card gets a poster (a 1x1 image, see /api/poster/ below)
-                    poster_path: options.poster ? '/poster.png' : null,
+                    poster_path: options.poster ? '/different.png' : null,
                     subCount: subs.length,
                     subscribers: subs.map((s) => ({ chat: s.Chat, mode: s.notify_type }))
                 };
@@ -985,8 +990,7 @@ async function mockPanel(page, options = {}) {
         if (url.pathname.startsWith('/api/poster/'))
             return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
         if (url.pathname.startsWith('/api/')) {
-            if (url.pathname === '/api/account/chats' && panel.account.chatsWait)
-                await panel.account.chatsWait;
+            if (url.pathname === '/api/account/chats' && panel.account.chatsWait) await panel.account.chatsWait;
             if (url.pathname.endsWith('/visibility') && panel.account.visibilityWait)
                 await panel.account.visibilityWait;
             const mine = await accountAnswer(panel.account, route.request(), url);

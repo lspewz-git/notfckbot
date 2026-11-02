@@ -41,6 +41,7 @@ for (const kind of ['series', 'films']) {
         await expect(card.locator('.mine-following-card')).toBeVisible();
         await expect(card.locator('.title-rating')).toContainText(kind === 'series' ? '8.6' : '7.4');
         await expect(card).toContainText(kind === 'series' ? 'Season 2' : 'In Russian cinemas');
+        if (kind === 'series') await expect(card).toContainText('Season 2 premiere · Dec 28, 2025');
         await expect(card).not.toContainText('Next episode');
         await expect(card).not.toContainText('When the film is out');
         await expect(card.locator('.mine-modes')).toHaveCount(0);

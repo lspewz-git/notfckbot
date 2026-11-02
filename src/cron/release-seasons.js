@@ -1,13 +1,14 @@
 /**
- * The years in which each tracked series had an episode out, and which seasons those episodes
- * belonged to, for the release history. Filled once per series from every season's episode list;
- * after that the update check adds the latest aired episode it sees, which costs no extra request.
+ * The release year of each season: at least 70% of all its episodes must have aired
+ * in that year. An exact 50/50 split belongs to the premiere year. Rebuilt from saved monthly
+ * counts at startup and after episode checks.
  *
- * Stored on the series as "2023:1;2024:2;2025:2,3": year, then the seasons aired in it.
+ * Stored on the series as "2023:1;2024:2;2025:3": year, then the qualifying seasons.
  */
 const { Series } = require('../db');
 const { getDetailsCached, getSeasonDetails } = require('../api/tmdb');
 const { log } = require('../log');
+const { parseAired } = require('./aired-episodes');
 
 /** "2024:2;2025:2,3" → Map { 2024 → [2], 2025 → [2, 3] } */
 function parseSeasons(value) {
@@ -40,45 +41,85 @@ function addSeason(byYear, year, season) {
     if (!byYear.get(year).includes(season)) byYear.get(year).push(season);
 }
 
-/** Every year with an aired episode, with its seasons: one TMDB request per season (no specials). */
+/** At least 70% of a season owns the year; an exact 50/50 split uses the premiere year. */
+function majorityYear(counts, total, premiereYear = null) {
+    if (!(total > 0)) return null;
+    const denominator = Math.max(
+        total,
+        [...counts.values()].reduce((sum, count) => sum + count, 0)
+    );
+    for (const [year, count] of counts) if (count * 10 >= denominator * 7) return year;
+    // A fully aired season split evenly between two years belongs to its premiere year.
+    if (counts.size === 2 && [...counts.values()].every((count) => count * 2 === denominator)) {
+        return premiereYear || Math.min(...counts.keys());
+    }
+    return null;
+}
+
+/** The saved monthly episode counts avoid another TMDB request for each season. */
+function majoritySeasons(aired, details, now) {
+    const counts = new Map();
+    for (const [month, seasons] of parseAired(aired)) {
+        if (month > now.toISOString().slice(0, 7)) continue;
+        const year = Number(month.slice(0, 4));
+        for (const [season, { count }] of seasons) {
+            if (!counts.has(season)) counts.set(season, new Map());
+            const years = counts.get(season);
+            years.set(year, (years.get(year) || 0) + count);
+        }
+    }
+    const byYear = new Map();
+    for (const season of details.seasons || []) {
+        if (!season.season_number) continue;
+        const year = majorityYear(
+            counts.get(season.season_number) || new Map(),
+            season.episode_count,
+            airedYear(season.air_date, now)
+        );
+        if (year) addSeason(byYear, year, season.season_number);
+    }
+    return byYear;
+}
+
+/** Fallback for a title whose monthly counts have not been filled yet. */
 async function scanReleaseSeasons(numericId, details, now) {
     const byYear = new Map();
     for (const season of details.seasons || []) {
         if (!season.season_number || !season.episode_count) continue;
         const data = await getSeasonDetails(numericId, season.season_number);
+        const counts = new Map();
         for (const episode of (data && data.episodes) || []) {
             const year = airedYear(episode.air_date, now);
-            if (year) addSeason(byYear, year, season.season_number);
+            if (year) counts.set(year, (counts.get(year) || 0) + 1);
         }
+        const year = majorityYear(
+            counts,
+            Math.max(season.episode_count, data?.episodes?.length || 0),
+            airedYear(season.air_date, now)
+        );
+        if (year) addSeason(byYear, year, season.season_number);
     }
     return byYear;
 }
 
 /**
- * Brings a series' release seasons up to date. The first time, a full scan; afterwards only
- * `details.last_episode_to_air`. A failed scan leaves the column null, so it is retried.
+ * Rebuilds a series' release seasons from episode counts and the known full season sizes.
+ * Without monthly counts, scans the season lists; a failed scan leaves the old index intact.
  * @param {{ tmdb_id: string, release_seasons: string | null, update: Function }} series
  * @param {object} details TMDB series details
  */
 async function ensureReleaseSeasons(series, details, now = new Date()) {
-    if (series.release_seasons === null || series.release_seasons === undefined) {
-        const numericId = String(series.tmdb_id).replace('tv_', '');
-        const byYear = await scanReleaseSeasons(numericId, details, now);
-        await series.update({ release_seasons: formatSeasons(byYear) });
-        return;
-    }
-    const last = details.last_episode_to_air;
-    const year = airedYear(last && last.air_date, now);
-    if (!year || !last.season_number) return;
-    const byYear = parseSeasons(series.release_seasons);
-    if ((byYear.get(year) || []).includes(last.season_number)) return;
-    addSeason(byYear, year, last.season_number);
-    await series.update({ release_seasons: formatSeasons(byYear) });
+    const byYear =
+        series.aired_episodes != null
+            ? majoritySeasons(series.aired_episodes, details, now)
+            : await scanReleaseSeasons(String(series.tmdb_id).replace('tv_', ''), details, now);
+    const value = formatSeasons(byYear);
+    if (value !== series.release_seasons) await series.update({ release_seasons: value });
 }
 
-/** After a start, in the background: the full scan for every series that hasn't had one. */
+/** After a start, rebuild all derived years, including values stored under an older rule. */
 async function backfillReleaseSeasons() {
-    const pending = await Series.findAll({ where: { release_seasons: null } });
+    const pending = await Series.findAll();
     let failed = 0;
     for (const series of pending) {
         try {

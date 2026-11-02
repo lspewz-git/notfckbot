@@ -197,10 +197,10 @@ code {
     font-variant-numeric: tabular-nums;
 }
 
-/* One visible focus style for everything reachable by keyboard */
+/* Keep browser focus behaviour without drawing a ring on panel controls. */
+:focus,
 :focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
+    outline: none;
 }
 
 button {

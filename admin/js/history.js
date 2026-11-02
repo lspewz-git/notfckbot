@@ -55,7 +55,7 @@ function row(item, action) {
     const details = [seasons, item.genres.join(', ')].filter(Boolean).join(' · ');
     const genres = `<span class="history-genres">${details ? escapeHtml(details) : '&nbsp;'}</span>`;
     return `
-        <li class="history-item">
+        <li class="history-item" data-release-year="${selectedYear}" data-release-seasons="${escapeHtml((item.seasons || []).join(','))}">
             ${titlePoster(item.poster, action, item.tmdbId)}
             <div class="history-main">
                 <span class="link-text" data-action="${action}" data-id="${escapeHtml(item.tmdbId)}" role="button" tabindex="0">${escapeHtml(item.title)}</span>

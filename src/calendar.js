@@ -7,6 +7,7 @@
 const { Subscription, Series, Watchlist } = require('./db');
 const { getDetailsCached, getSeasonDetailsCached, hasSeason, refreshSeasons } = require('./api/tmdb');
 const { parseSeasons } = require('./cron/release-seasons');
+const { parseAired } = require('./cron/aired-episodes');
 const { zoneOf } = require('./quiet');
 const { escapeHtml, isFinishedStatus } = require('./constants');
 
@@ -138,7 +139,14 @@ async function inBatches(items, fn) {
 /** The seasons of a series that may have episodes between `from` and `to`. */
 function seasonsToAsk(series, details, from, to) {
     const seasons = new Set();
-    const byYear = parseSeasons(series.release_seasons);
+    // Calendars still include every aired episode, even when its year owns <70% of the season.
+    const byYear = series.aired_episodes == null ? parseSeasons(series.release_seasons) : new Map();
+    if (series.aired_episodes != null) {
+        for (const [month, seasons] of parseAired(series.aired_episodes)) {
+            const y = year(month);
+            byYear.set(y, [...new Set([...(byYear.get(y) || []), ...seasons.keys()])]);
+        }
+    }
     // Ended or canceled, nothing announced and the last season out before that year: nothing to ask
     const lastYear = Math.max(0, ...byYear.keys());
     if (isFinishedStatus(series.status) && !series.next_episode_season && lastYear && lastYear < year(from)) return [];

@@ -191,9 +191,9 @@ export function chatsFailed(message) {
 
 // --- Pieces ---
 
-const poster = (path, cls = 'mine-poster') =>
+const poster = (path, cls = 'mine-poster', loading = 'lazy') =>
     path
-        ? `<img class="${cls}" src="${escapeHtml(POSTER(path))}" alt="" loading="lazy" />`
+        ? `<img class="${cls}" src="${escapeHtml(POSTER(path))}" alt="" loading="${loading}" decoding="async" />`
         : `<span class="${cls} mine-poster-empty" aria-hidden="true"></span>`;
 
 const empty = (title, body) =>
@@ -330,7 +330,13 @@ function followingCard(item, { event = null, today, confirm = false, releasedYea
     const date = event?.date || (tv ? item.next?.date : item.date);
     const release =
         released && tv
-            ? `<p class="mine-dim">${escapeHtml(String(releasedYear))}</p>`
+            ? (item.seasonPremieres || [])
+                  .map(
+                      (s) =>
+                          `<p class="mine-dim">Season ${escapeHtml(s.season)} premiere · ${escapeHtml(dateText(s.date, { withYear: true }) || 'TBA')}</p>`
+                  )
+                  .join('') ||
+              `<p class="mine-dim">No season premiere listed in ${escapeHtml(String(releasedYear))}</p>`
             : date
               ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
               : `<p class="mine-dim">${released ? escapeHtml(String(releasedYear)) : 'Release date not known yet'}</p>`;
@@ -361,14 +367,14 @@ function followingCard(item, { event = null, today, confirm = false, releasedYea
     return (
         '<div class="mine-following-card">' +
         cardHead(
-            poster(item.poster, 'mine-poster mine-poster-big'),
+            poster(item.poster, 'mine-poster mine-poster-big', 'eager'),
             item.title,
             lines,
             titleRating(item.rating) + release
         ) +
         secondaryDates +
         (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
-        (!released && tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
+        (!released && !event && tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
         (!released && !tv
             ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>'
             : '') +

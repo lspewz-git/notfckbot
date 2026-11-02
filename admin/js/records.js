@@ -12,6 +12,11 @@ import { description, titleRating } from './content-search.js';
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
 const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
 
+/** Reuse the visible list image, including its already downloaded size. */
+function sourcePoster(source) {
+    return source?.closest('tr, .history-item')?.querySelector('.title-poster img')?.getAttribute('src') || '';
+}
+
 /**
  * One group of chats on a card: "Subscribers · 2", then a row per chat with its name and
  * avatar and, for subscriptions, the notification mode.
@@ -82,6 +87,7 @@ async function openDetails(load) {
         dates.hidden = !card.dates;
 
         const img = $img('detail-poster');
+        img.loading = 'eager';
         img.hidden = !card.poster;
         img.onerror = () => {
             img.hidden = true;
@@ -96,8 +102,12 @@ async function openDetails(load) {
     }
 }
 
-export const openSeriesDetails = (tmdbId) =>
-    openDetails(async () => {
+export const openSeriesDetails = (tmdbId, source = null) => {
+    const poster = sourcePoster(source);
+    const released = source?.closest('[data-release-year]');
+    const year = released?.dataset.releaseYear;
+    const seasons = (released?.dataset.releaseSeasons || '').split(',').map(Number);
+    return openDetails(async () => {
         const data = await api(`/series/${tmdbId}`);
         const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
         const subs = data.subscribers || [];
@@ -105,15 +115,25 @@ export const openSeriesDetails = (tmdbId) =>
             title: data.name,
             meta: `${rating} · ${escapeHtml(data.number_of_seasons)} season${data.number_of_seasons === 1 ? '' : 's'}`,
             desc: data.overview,
-            dates: `<dt>Premiere</dt><dd>${escapeHtml(formatReleaseDate(data.first_air_date))}</dd>`,
+            dates: year
+                ? seasons
+                      .filter(Boolean)
+                      .map(
+                          (season) =>
+                              `<dt>Season ${season} premiere</dt><dd>${escapeHtml(formatReleaseDate(data.seasons?.find((s) => s.season_number === season)?.air_date))}</dd>`
+                      )
+                      .join('') || `<dt>Season premiere in ${escapeHtml(year)}</dt><dd>None listed</dd>`
+                : `<dt>Premiere</dt><dd>${escapeHtml(formatReleaseDate(data.first_air_date))}</dd>`,
             people: subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>',
-            poster: posterUrl(data.poster_path),
+            poster: poster || posterUrl(data.poster_path),
             kinopoisk: { type: 'tv', id: String(tmdbId).replace('tv_', '') }
         };
     });
+};
 
-export const openFilmDetails = (tmdbId) =>
-    openDetails(async () => {
+export const openFilmDetails = (tmdbId, source = null) => {
+    const poster = sourcePoster(source);
+    return openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
         const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
         const d = data.dates || {};
@@ -138,10 +158,11 @@ export const openFilmDetails = (tmdbId) =>
             dates: dates || '<dt>Release</dt><dd>TBA</dd>',
             desc: data.overview,
             people: people || '<p class="people-none">No chat has this film on its list.</p>',
-            poster: posterUrl(data.poster_path),
+            poster: poster || posterUrl(data.poster_path),
             kinopoisk: { type: 'movie', id: String(tmdbId).replace('movie_', '') }
         };
     });
+};
 
 export function openModeModal(key) {
     const sub = subsByKey.get(key);

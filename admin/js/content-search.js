@@ -12,7 +12,7 @@ export function titleRating(value) {
 export function titlePoster(url, action, id) {
     const path = String(url || '').match(/\/([^/]+\.(?:jpg|png|webp))$/i)?.[0];
     const image = path
-        ? `<img src="/api/poster/w185${escapeHtml(path)}" alt="" loading="lazy" />`
+        ? `<img src="/api/poster/w185${escapeHtml(path)}" alt="" loading="lazy" decoding="async" />`
         : '<span class="title-poster-empty" aria-hidden="true"></span>';
     return `<button type="button" class="title-poster" data-action="${action}" data-id="${escapeHtml(id)}" aria-label="Open details">${image}</button>`;
 }
@@ -86,7 +86,7 @@ export const modesField = (name, current, id, disabled = false) =>
 
 const picture = (path, big = false) =>
     path
-        ? `<img class="mine-poster${big ? ' mine-poster-big' : ''}" src="/api/poster/w185${escapeHtml(path)}" alt="" />`
+        ? `<img class="mine-poster${big ? ' mine-poster-big' : ''}" src="/api/poster/w185${escapeHtml(path)}" alt="" loading="${big ? 'eager' : 'lazy'}" decoding="async" />`
         : `<span class="mine-poster mine-poster-empty${big ? ' mine-poster-big' : ''}" aria-hidden="true"></span>`;
 
 /** Adapt TMDB's response once; the account API already returns this shape. */

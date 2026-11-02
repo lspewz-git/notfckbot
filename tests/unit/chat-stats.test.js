@@ -94,6 +94,14 @@ test('the update check reads again only the season whose latest episode is new',
     assert.deepEqual(aired.seasonsToRescan(row, {}), []);
 });
 
+test('a failed stats refresh retries after the notification cursor has already advanced', () => {
+    const row = { last_season: 2, last_episode: 8, aired_episodes: '2025-12:2=1/10;2026-01:2=6/60' };
+    const details = { last_episode_to_air: { season_number: 2, episode_number: 8 } };
+    assert.deepEqual(aired.seasonsToRescan(row, details), [2]);
+    row.aired_episodes = '2025-12:2=1/10;2026-01:2=7/70';
+    assert.deepEqual(aired.seasonsToRescan(row, details), []);
+});
+
 describe('recording', () => {
     test('a notification is recorded with how it went; nothing is written until the flush', async () => {
         const writes = [];

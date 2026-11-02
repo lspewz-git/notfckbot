@@ -329,7 +329,9 @@ function accountAnswer(state, req, url) {
     if (rest === '/films' && method === 'POST') return { id: 9, released: false };
     if (rest.startsWith('/films/') && method === 'DELETE') {
         if (state.unfollowError) return { status: 503, body: { error: 'Could not unfollow' } };
-        const film = state.films.find((x) => String(x.id) === rest.slice(7)) || state.calendar.items.find((x) => String(x.listId) === rest.slice(7));
+        const film =
+            state.films.find((x) => String(x.id) === rest.slice(7)) ||
+            state.calendar.items.find((x) => String(x.listId) === rest.slice(7));
         state.films = state.films.filter((x) => x.tmdbId !== film?.tmdbId);
         state.calendar.items = state.calendar.items.filter((x) => x.tmdbId !== film?.tmdbId);
         return { removed: true };
@@ -347,6 +349,9 @@ function accountAnswer(state, req, url) {
                     title: chatId === '-100' ? 'Group release' : 'Одни из нас',
                     poster: null,
                     seasons: [year === 2026 ? 2 : 1],
+                    seasonPremieres: [
+                        { season: year === 2026 ? 2 : 1, date: year === 2026 ? '2025-12-28' : `${year}-03-20` }
+                    ],
                     genres: ['драма'],
                     networks: 'HBO',
                     rating: 8.6,

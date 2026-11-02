@@ -4,6 +4,70 @@ const { watchConsole, openSection, isPhone } = require('./helpers');
 
 watchConsole();
 
+test('native lazy loading loads visible posters and defers distant ones until scrolling', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('admin.pageSize.history-series', '100'));
+    const requested = [];
+    page.on('request', request => {
+        if (request.url().includes('/api/poster/')) requested.push(new URL(request.url()).pathname);
+    });
+    await mockPanel(page, { history: () => ({
+        years: [2026], year: 2026,
+        series: Array.from({ length: 100 }, (_, i) => ({
+            tmdbId: `tv_${i + 1}`, title: `Show ${i + 1}`, seasons: [1], genres: [],
+            poster: `https://image.tmdb.org/t/p/w500/lazy${i}.png`,
+            kinopoiskUrl: 'https://www.kinopoisk.ru/'
+        })), films: []
+    }) });
+    await openSection(page, 'history');
+    const images = page.locator('#history-series .title-poster img');
+    await expect(images).toHaveCount(100);
+    await expect.poll(() => images.first().evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+    expect(requested).toContain('/api/poster/w185/lazy0.png');
+    expect(requested).not.toContain('/api/poster/w185/lazy99.png');
+    await images.last().scrollIntoViewIfNeeded();
+    await expect.poll(() => images.last().evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+    expect(requested).toContain('/api/poster/w185/lazy99.png');
+});
+
+test('account list posters are lazy while the opened card poster loads eagerly', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    panel.account.series[0].poster = '/poster.png';
+    await openSection(page, 'my-subs');
+    const poster = page.locator('#my-subs-body .mine-row img').first();
+    await expect(poster).toHaveAttribute('loading', 'lazy');
+    await poster.click();
+    await expect(page.locator('#mine-card-modal img.mine-poster-big')).toHaveAttribute('loading', 'eager');
+});
+
+test('Released reuses the poster and shows every listed season premiere, including the previous December', async ({ page }) => {
+    await mockPanel(page, {
+        poster: true,
+        history: () => ({
+            years: [2026], year: 2026,
+            series: [{ tmdbId: 'tv_66732', title: 'Stranger Things', poster: 'https://image.tmdb.org/t/p/w500/poster.png', seasons: [4, 5, 6], genres: [], kinopoiskUrl: 'https://www.kinopoisk.ru/' }],
+            films: []
+        })
+    });
+    await openSection(page, 'history');
+    const row = page.locator('#history-series .history-item').first();
+    const image = row.locator('img');
+    await expect(image).toHaveAttribute('loading', 'lazy');
+    const title = row.locator('.link-text');
+    await title.focus();
+    expect(await title.evaluate(el => getComputedStyle(el).outlineStyle)).toBe('none');
+    await title.press('Enter');
+    await expect(page.locator('#detail-poster')).toHaveAttribute('loading', 'eager');
+    await expect(page.locator('#detail-poster')).toHaveAttribute('src', await image.getAttribute('src'));
+    await expect(page.locator('#detail-dates')).toContainText('Season 5 premiere');
+    await expect(page.locator('#detail-dates')).toContainText('20 Mar 2026');
+    await expect(page.locator('#detail-dates')).toContainText('Season 6 premiere');
+    await expect(page.locator('#detail-dates')).toContainText('15 Dec 2025');
+    await expect(page.locator('#detail-dates')).not.toContainText('2016');
+    await page.locator('#detail-modal [data-close="detail-modal"]').click();
+    await row.locator('.title-poster').click();
+    await expect(page.locator('#detail-dates')).toContainText('Season 6 premiere');
+});
+
 test('Serials and Movies show clickable posters, round add controls and release dates', async ({ page }) => {
     await mockPanel(page, { poster: true });
     for (const [section, body, label, date] of [

@@ -108,6 +108,16 @@ describe('dates', () => {
         assert.deepEqual(calendar.seasonsToAsk(series, details, '2026-10-14', '9999-12-31'), [3, 2]);
     });
 
+    test('calendar keeps minority-year episodes even when Released assigns the season to another year', () => {
+        const series = {
+            status: 'Ended',
+            release_seasons: '2025:2',
+            aired_episodes: '2025-12:2=8/80;2026-01:2=2/20',
+            last_season: 2
+        };
+        assert.deepEqual(calendar.seasonsToAsk(series, { seasons: [] }, '2026-01-01', '2026-12-31'), [2]);
+    });
+
     test("today is the chat's: late on Sunday in Moscow is Monday in Vladivostok", () => {
         const sunday = new Date('2026-10-18T18:00:00Z');
         assert.equal(calendar.todayIn('Europe/Moscow', sunday), '2026-10-18');

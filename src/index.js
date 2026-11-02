@@ -65,13 +65,13 @@ async function start() {
         startAlerts(bot, { version: getVersion().short, ended, ready: telegramReady });
 
         // In the background: the panel's cards are quick from the first one after a restart
-        // Then the release history's years for series that have none yet (once per series)
+        // Fill episode counts first, then rebuild season years using the current majority rule.
         warmDetailsCache()
             .catch((err) => log.error(`[Cache] Warm-up failed: ${err.message}`))
+            .then(backfillAiredEpisodes)
+            .catch((err) => log.error(`[Stats] Backfill failed: ${err.message}`))
             .then(backfillReleaseSeasons)
             .catch((err) => log.error(`[History] Backfill failed: ${err.message}`))
-            // And for the chats' statistics: episodes by month, what each title is (once per title)
-            .then(backfillAiredEpisodes)
             .then(backfillFilmFacts)
             .catch((err) => log.error(`[Stats] Backfill failed: ${err.message}`));
 

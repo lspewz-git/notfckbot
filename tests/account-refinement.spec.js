@@ -9,31 +9,40 @@ test.describe('shared cards and calendar unfollow', () => {
         const panel = await mockPanel(page, { role: 'user' });
         let release;
         panel.account.modeHold = new Promise(resolve => { release = resolve; });
-        await openSection(page, 'my-calendar');
-        const episode = page.locator('#my-calendar-body .mine-cal-row').first();
-        await episode.click();
+        await openSection(page, 'my-subs');
+        await page.locator('#my-subs-body .mine-row').first().click();
         const card = page.locator('#mine-card-modal');
         try {
             await card.getByLabel('When the whole season is out').check();
             await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeDisabled();
+            await card.getByRole('button', { name: 'Close', exact: true }).click();
+            await openSection(page, 'my-calendar');
+            const episode = page.locator('#my-calendar-body .mine-cal-row').first();
+            await episode.click();
+            await expect(card.locator('.mine-modes')).toHaveCount(0);
             await card.getByRole('button', { name: 'Close', exact: true }).click();
             await episode.click();
             await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeDisabled();
             expect(panel.account.sent.filter(r => r.method === 'DELETE')).toHaveLength(0);
         } finally { release(); }
         await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeEnabled();
-        await expect(card.getByLabel('When the whole season is out')).toBeChecked();
+        await expect(card.locator('.mine-modes')).toHaveCount(0);
         await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
         await card.getByRole('button', { name: 'Yes, unfollow', exact: true }).click();
         await expect(card).toBeHidden();
         expect(panel.account.series.some(item => item.id === 'tv_100')).toBe(false);
     });
 
-    test('calendar series card changes notification mode without first opening Following', async ({ page }) => {
+    test('notification mode can be changed in Following and is absent from Calendar', async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });
         await openSection(page, 'my-calendar');
         await page.locator('#my-calendar-body .mine-cal-row').first().click();
         const card = page.locator('#mine-card-modal');
+        await expect(card.locator('.mine-modes')).toHaveCount(0);
+        expect(panel.account.sent.filter(r => r.method === 'POST' && r.path.endsWith('/series'))).toHaveLength(0);
+        await card.getByRole('button', { name: 'Close', exact: true }).click();
+        await openSection(page, 'my-subs');
+        await page.locator('#my-subs-body .mine-row').first().click();
         await card.getByLabel('When the whole season is out').check();
         await expect(page.locator('.toast').last()).toContainText('Notifications changed');
         expect(panel.account.sent.find((r) => r.method === 'POST' && r.path.endsWith('/series')).body).toEqual({
@@ -41,8 +50,9 @@ test.describe('shared cards and calendar unfollow', () => {
             mode: 'season'
         });
         await card.getByRole('button', { name: 'Close', exact: true }).click();
+        await openSection(page, 'my-calendar');
         await page.locator('#my-calendar-body .mine-cal-row').first().click();
-        await expect(card.getByLabel('When the whole season is out')).toBeChecked();
+        await expect(card.locator('.mine-modes')).toHaveCount(0);
     });
 
     test('Following and Calendar use the same film card, compact date and spaced actions', async ({ page }) => {

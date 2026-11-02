@@ -52,7 +52,7 @@ mock.method(kinopoisk, 'knownKinopoiskId', (tmdbId, imdbId) => {
     return tmdbId === 'movie_7' ? 777 : null;
 });
 
-const { ensureReleaseSeasons } = require('../../src/cron/release-seasons');
+const { ensureReleaseSeasons, backfillReleaseSeasons } = require('../../src/cron/release-seasons');
 const { releaseHistory } = require('../../src/history');
 const { historyView, yearView, register } = require('../../src/bot/history');
 const { todayIn } = require('../../src/calendar');
@@ -80,42 +80,104 @@ beforeEach(() => {
 });
 
 describe('ensureReleaseSeasons', () => {
-    test('the first time, every season is scanned; a season crossing New Year counts in both', async () => {
+    test('startup rebuilds an existing legacy index after counts have been filled', async (t) => {
+        const previous = UPCOMING_SEASONS[1];
+        UPCOMING_SEASONS[1] = [{ season_number: 17, episode_count: 7 }];
+        const row = seriesRow({
+            tmdb_id: 'tv_1',
+            release_seasons: '2025:17;2026:17',
+            aired_episodes: '2025-12:17=6/60;2026-01:17=1/10'
+        });
+        t.mock.method(Series, 'findAll', async (options) => {
+            assert.equal(options, undefined, 'existing values must be included');
+            return [row];
+        });
+        try {
+            await backfillReleaseSeasons();
+            assert.equal(row.release_seasons, '2025:17');
+        } finally {
+            UPCOMING_SEASONS[1] = previous;
+        }
+    });
+
+    test('the first scan assigns a 50/50 season to its premiere year', async () => {
         const row = seriesRow({ tmdb_id: 'tv_1', release_seasons: null });
         await ensureReleaseSeasons(row, DETAILS, now);
-        assert.equal(row.release_seasons, '2023:1;2024:2;2025:2');
+        assert.equal(row.release_seasons, '2023:1;2024:2');
         assert.deepEqual(seasonRequests, ['1:1', '1:2', '1:3'], 'specials are skipped');
     });
 
-    test('afterwards only the latest aired episode is looked at: no more requests', async () => {
-        const row = seriesRow({ tmdb_id: 'tv_1', release_seasons: '2023:1;2025:2' });
-        await ensureReleaseSeasons(row, { last_episode_to_air: { air_date: '2026-04-01', season_number: 3 } }, now);
-        assert.equal(row.release_seasons, '2023:1;2025:2;2026:3');
-        // A second season in the same year joins the first
+    test('rebuilds legacy years from saved monthly counts, removing a bonus-only year without requests', async () => {
+        const row = seriesRow({
+            tmdb_id: 'tv_1',
+            release_seasons: '2025:17;2026:17,18,19',
+            aired_episodes: '2025-12:17=6/60;2026-01:17=1/10;2026-06:18=7/70;2026-09:19=6/60'
+        });
+        const details = {
+            seasons: [17, 18, 19].map((season_number) => ({
+                season_number,
+                episode_count: season_number === 19 ? 6 : 7
+            }))
+        };
+        await ensureReleaseSeasons(row, details, now);
+        assert.equal(row.release_seasons, '2025:17;2026:18,19');
+        assert.deepEqual(seasonRequests, []);
+    });
+
+    test('at least 70% uses all known episodes, including future and undated ones', async () => {
+        for (const [count, total, expected] of [
+            [7, 10, '2026:2'],
+            [8, 10, '2026:2'],
+            [6, 10, ''],
+            [3, 10, '2025:2'],
+            [7, 20, '']
+        ]) {
+            const row = seriesRow({
+                tmdb_id: 'tv_1',
+                release_seasons: '2025:2;2026:2',
+                aired_episodes: `2025-12:2=${10 - count}/20;2026-01:2=${count}/80`
+            });
+            await ensureReleaseSeasons(row, { seasons: [{ season_number: 2, episode_count: total }] }, now);
+            assert.equal(row.release_seasons, expected, `${count}/${total}`);
+        }
+    });
+
+    test('saved 50/50 counts use the premiere year, while a half-aired season does not qualify', async () => {
+        const row = seriesRow({
+            tmdb_id: 'tv_1',
+            release_seasons: '',
+            aired_episodes: '2025-12:2=5/50;2026-01:2=5/50'
+        });
         await ensureReleaseSeasons(
             row,
-            { last_episode_to_air: { air_date: '2026-11-01', season_number: 4 } },
-            new Date('2026-12-01')
+            { seasons: [{ season_number: 2, episode_count: 10, air_date: '2025-12-01' }] },
+            now
         );
-        assert.equal(row.release_seasons, '2023:1;2025:2;2026:3,4');
-        assert.deepEqual(seasonRequests, []);
+        assert.equal(row.release_seasons, '2025:2');
+        row.aired_episodes = '2026-01:2=5/50';
+        await ensureReleaseSeasons(
+            row,
+            { seasons: [{ season_number: 2, episode_count: 10, air_date: '2026-01-01' }] },
+            now
+        );
+        assert.equal(row.release_seasons, '');
     });
 
     test('two seasons in one year, from the scan', async () => {
         SEASONS['5:1'] = ['2025-02-01'];
-        SEASONS['5:2'] = ['2025-11-01', '2026-01-05'];
+        SEASONS['5:2'] = ['2025-11-01', '2025-11-02', '2025-11-03', '2025-11-04', '2026-01-05'];
         const row = seriesRow({ tmdb_id: 'tv_5', release_seasons: null });
         await ensureReleaseSeasons(
             row,
             {
                 seasons: [
                     { season_number: 1, episode_count: 1 },
-                    { season_number: 2, episode_count: 2 }
+                    { season_number: 2, episode_count: 5 }
                 ]
             },
             now
         );
-        assert.equal(row.release_seasons, '2025:1,2;2026:2');
+        assert.equal(row.release_seasons, '2025:1,2');
     });
 
     test('a series with nothing aired yet gets "" (scanned), not null (to scan again)', async () => {
@@ -146,6 +208,30 @@ describe('releaseHistory', () => {
     beforeEach(() => {
         mock.method(Series, 'findAll', async () => SERIES);
         mock.method(Watchlist, 'findAll', async () => FILMS);
+    });
+
+    test('season premieres retain original dates even when their majority year is later', async () => {
+        const previous = UPCOMING_SEASONS[1];
+        UPCOMING_SEASONS[1] = [
+            { season_number: 4, air_date: '2025-12-15' },
+            { season_number: 5, air_date: '2026-03-20' },
+            { season_number: 6, air_date: '2026-06-01' },
+            { season_number: 7, air_date: null }
+        ];
+        mock.method(Series, 'findAll', async () => [
+            { tmdb_id: 'tv_1', title: 'Show', release_seasons: '2026:4,5,6,7' }
+        ]);
+        try {
+            const h = await releaseHistory({ now });
+            assert.deepEqual(h.series[0].seasonPremieres, [
+                { season: 4, date: '2025-12-15' },
+                { season: 5, date: '2026-03-20' },
+                { season: 6, date: '2026-06-01' },
+                { season: 7, date: null }
+            ]);
+        } finally {
+            UPCOMING_SEASONS[1] = previous;
+        }
     });
 
     test('history passes cached IMDb to the background lookup without another TMDB fetch', async () => {
