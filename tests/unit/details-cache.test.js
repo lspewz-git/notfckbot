@@ -24,7 +24,7 @@ mock.method(axios, 'create', (options) =>
     })
 );
 
-const { getDetails, getDetailsCached } = require('../../src/api/tmdb');
+const { getDetails, getDetailsCached, peekDetails } = require('../../src/api/tmdb');
 
 let version;
 beforeEach(() => {
@@ -41,6 +41,31 @@ test('the update check always asks TMDB; the panel then answers from memory', as
     assert.equal(requests, 2);
     assert.equal((await getDetailsCached(101, 'tv')).name, 'v2');
     assert.equal(requests, 2);
+});
+
+test('optional title metadata never fetches: missing, fresh, refreshing and expired cache entries', async () => {
+    assert.equal(peekDetails(107, 'movie'), undefined);
+    assert.equal(requests, 0);
+    await getDetails(107, 'movie');
+    assert.equal(peekDetails(107, 'movie').name, 'v1');
+    assert.equal(peekDetails(107, 'tv'), undefined, 'movie and series ids do not collide');
+    let release;
+    gate = new Promise((resolve) => (release = resolve));
+    version = 2;
+    const refresh = getDetails(107, 'movie');
+    assert.equal(peekDetails(107, 'movie').name, 'v1');
+    release();
+    await refresh;
+    const realNow = Date.now;
+    try {
+        const later = realNow() + 7 * 24 * 3600e3;
+        Date.now = () => later;
+        assert.equal(peekDetails(107, 'movie'), undefined);
+        assert.equal(peekDetails(108, 'tv'), undefined);
+        assert.equal(requests, 2, 'peeking never requests metadata or waits for TMDB');
+    } finally {
+        Date.now = realNow;
+    }
 });
 
 test('callers asking at once share one request', async () => {

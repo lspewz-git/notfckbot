@@ -7,7 +7,7 @@ import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from '
 import { setSelectValue } from './select.js';
 import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
-import { description } from './content-search.js';
+import { description, titleRating } from './content-search.js';
 
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
 const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
@@ -74,7 +74,7 @@ async function openDetails(load) {
         const card = await load();
         if (request !== detailRequest) return;
         setText('detail-title', card.title);
-        setText('detail-meta', card.meta);
+        $('detail-meta').innerHTML = card.meta;
         $('detail-desc').innerHTML = description(card.desc);
         $('detail-people').innerHTML = card.people;
         const dates = $('detail-dates');
@@ -99,11 +99,11 @@ async function openDetails(load) {
 export const openSeriesDetails = (tmdbId) =>
     openDetails(async () => {
         const data = await api(`/series/${tmdbId}`);
-        const rating = data.vote_average ? `TMDB ⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated on TMDB yet';
+        const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
         const subs = data.subscribers || [];
         return {
             title: data.name,
-            meta: `${rating} • ${data.number_of_seasons} season${data.number_of_seasons === 1 ? '' : 's'}`,
+            meta: `${rating} · ${escapeHtml(data.number_of_seasons)} season${data.number_of_seasons === 1 ? '' : 's'}`,
             desc: data.overview,
             dates: `<dt>Premiere</dt><dd>${escapeHtml(formatReleaseDate(data.first_air_date))}</dd>`,
             people: subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>',
@@ -115,7 +115,7 @@ export const openSeriesDetails = (tmdbId) =>
 export const openFilmDetails = (tmdbId) =>
     openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
-        const rating = data.vote_average ? `TMDB ⭐️ ${data.vote_average.toFixed(1)}` : 'Not rated on TMDB yet';
+        const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
         const d = data.dates || {};
         const row = (label, iso, note, format = formatReleaseDate) =>
             iso ? `<dt>${label}</dt><dd>${escapeHtml(format(iso))}${note ? ` · ${escapeHtml(note)}` : ''}</dd>` : '';
@@ -134,7 +134,7 @@ export const openFilmDetails = (tmdbId) =>
             (notified.length ? peopleGroup('Already notified', notified) : '');
         return {
             title: data.title || data.original_title,
-            meta: `${rating} • ${data.status || 'Unknown status'}`,
+            meta: `${rating} · ${escapeHtml(data.status || 'Unknown status')}`,
             dates: dates || '<dt>Release</dt><dd>TBA</dd>',
             desc: data.overview,
             people: people || '<p class="people-none">No chat has this film on its list.</p>',

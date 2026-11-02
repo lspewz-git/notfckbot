@@ -610,6 +610,40 @@ test('the API: Aired is scoped to an accessible chat and validates its year', as
 
 // --- The bot ---
 
+test('the API: calendar includes cached film metadata and tolerates a cache miss without external requests', async (t) => {
+    const tmdb = require('../../src/api/tmdb');
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private', timezone: 'Europe/Moscow' }));
+    t.mock.method(Subscription, 'findAll', async () => []);
+    t.mock.method(Watchlist, 'findAll', async () => [
+        { tmdb_id: 'movie_10', title: 'With metadata', premiere_digital: '2099-12-30' },
+        { tmdb_id: 'movie_11', title: 'Without metadata', premiere_digital: '2099-12-31' }
+    ]);
+    const peeks = [];
+    t.mock.method(tmdb, 'peekDetails', (id, kind) => {
+        peeks.push([id, kind]);
+        return id === '10' ? { overview: 'A film description.', vote_average: 7.6 } : undefined;
+    });
+    const cookie = await signIn(call, 7);
+    const response = await call('GET', '/api/account/chats/7/calendar', { cookie });
+    assert.equal(response.status, 200);
+    assert.deepEqual(peeks, [
+        ['10', 'movie'],
+        ['11', 'movie']
+    ]);
+    assert.deepEqual(
+        response.body.items.map(({ overview, rating }) => ({ overview, rating })),
+        [
+            { overview: 'A film description.', rating: 7.6 },
+            { overview: '', rating: null }
+        ]
+    );
+    assert.equal((await call('GET', '/api/account/chats/8/calendar', { cookie })).status, 403);
+    assert.equal((await call('GET', '/api/account/chats/7/calendar')).status, 401);
+    assert.equal(peeks.length, 2, 'access checks still run before metadata is read');
+});
+
 function botHandlers() {
     const handlers = { commands: {}, actions: [] };
     require('../../src/bot/login').register({

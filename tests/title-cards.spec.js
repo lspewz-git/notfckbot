@@ -21,6 +21,11 @@ test('Serials and Movies show clickable posters, round add controls and release 
         await expect(poster.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
         await poster.click();
         await expect(page.locator('#detail-dates')).toContainText(date);
+        await expect(page.locator('#detail-meta .title-rating')).toContainText(section === 'subs' ? '8.4' : '7.1');
+        const star = page.locator('#detail-meta .title-rating svg');
+        await expect(star.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
+        await expect.poll(() => star.evaluate(el => el.getBBox().width)).toBeGreaterThan(10);
+        await expect(page.locator('#detail-meta')).not.toContainText('⭐');
         await page.locator('#detail-modal [data-close="detail-modal"]').click();
     }
 });

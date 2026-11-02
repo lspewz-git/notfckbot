@@ -372,11 +372,45 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
     await expect(card).toContainText('S2E5 · Feel Her Love');
     await expect(card).toContainText('Season finale');
     await expect(card).toContainText('Ellie and Dina head out.');
+    await expect(card.locator('.mine-release-date time')).toHaveText('Nov 4, 2026');
+    await expect(card.locator('.mine-release-date time')).toHaveAttribute('datetime', '2026-11-04');
+    await expect(card.locator('.mine-release-weekday')).toHaveText('Wednesday');
+    await expect(card.locator('.mine-release-count')).toHaveText('Today');
+    await expect(card.locator('.title-rating')).toHaveText('8.7/ 10 · TMDB');
+    await expect(card.locator('.title-rating use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
     await expect(card.getByRole('link', { name: 'Kinopoisk' })).toHaveAttribute(
         'href',
         'https://www.kinopoisk.ru/series/1/'
     );
     await expect(card.getByRole('button', { name: /series card/i })).toHaveCount(0);
+});
+
+test('calendar: film dates and countdown are distinct, descriptions expand and missing metadata stays hidden', async ({ page }) => {
+    await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-calendar');
+    const body = page.locator('#my-calendar-body');
+    await body.getByRole('button', { name: 'Films', exact: true }).click();
+    await body.locator('.mine-cal-row', { hasText: 'Дюна: Часть третья' }).click();
+    const card = page.locator('#mine-card-modal');
+    await expect(card.locator('.mine-release-date time')).toHaveText('Nov 6, 2026');
+    await expect(card.locator('.mine-release-count strong')).toHaveText('2');
+    await expect(card.locator('.mine-release-count span')).toHaveText('days to go');
+    await expect(card.locator('.title-rating')).toContainText('7.4');
+    await card.getByRole('button', { name: 'Show more', exact: true }).click();
+    await expect(card.locator('[data-description-full]')).toBeVisible();
+    await card.getByRole('button', { name: 'Show less', exact: true }).click();
+    await expect(card.locator('[data-description-full]')).toBeHidden();
+    const layout = await card.locator('.mine-release-date').evaluate(el => {
+        const date = el.querySelector('time').getBoundingClientRect();
+        const count = el.querySelector('.mine-release-count').getBoundingClientRect();
+        return { fits: el.scrollWidth <= el.clientWidth, separate: date.right <= count.left };
+    });
+    expect(layout).toEqual({ fits: true, separate: true });
+    await card.getByRole('button', { name: 'Close', exact: true }).click();
+    await body.locator('.mine-cal-row', { hasText: 'Мегалополис' }).click();
+    await expect(card.locator('.mine-release-count')).toHaveText('Yesterday');
+    await expect(card.locator('.title-rating')).toHaveCount(0);
+    await expect(card.locator('.mine-overview')).toHaveCount(0);
 });
 
 test('the panel opens on the own account, not on the group picked last time', async ({ page }) => {

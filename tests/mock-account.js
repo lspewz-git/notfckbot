@@ -167,6 +167,7 @@ const CALENDAR = {
             mark: 'finale',
             name: 'Feel Her Love',
             overview: 'Ellie and Dina head out.',
+            rating: 8.7,
             poster: '/p1.jpg',
             kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/'
         },
@@ -183,6 +184,8 @@ const CALENDAR = {
             kind: 'movie',
             tmdbId: 'movie_7',
             title: 'Дюна: Часть третья',
+            overview: 'A journey across the desert. '.repeat(18),
+            rating: 7.4,
             poster: null,
             kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=x'
         },

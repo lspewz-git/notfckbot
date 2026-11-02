@@ -11,7 +11,16 @@ import { chatChip } from './chat-picker.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
 
-import { MODES, modesField, searchResults, openSearchCard, cardClose, searchForm } from './content-search.js';
+import {
+    MODES,
+    modesField,
+    searchResults,
+    openSearchCard,
+    cardClose,
+    searchForm,
+    titleRating,
+    description
+} from './content-search.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -262,11 +271,11 @@ const linkButtons = (links) =>
               .join('')}</div>`
         : '';
 
-const cardHead = (picture, title, lines) =>
+const cardHead = (picture, title, lines, rating = '') =>
     `<div class="mine-card-head">${picture}<div><h3 id="mine-card-title">${escapeHtml(title)}</h3>${lines
         .filter(Boolean)
         .map((l) => `<p class="mine-dim">${escapeHtml(l)}</p>`)
-        .join('')}</div></div>`;
+        .join('')}${rating}</div></div>`;
 
 const CLOSE_X = cardClose('mine-card-modal');
 
@@ -323,18 +332,24 @@ const kinopoiskLink = (url) => (url ? linkButtons([{ kind: 'info', label: 'Kinop
 
 /** An episode or a film from the calendar */
 function releaseCard(item, today) {
-    const when = `${weekday(item.date)}, ${dateText(item.date, { withYear: true })} · ${whenText(item.date, today)}`;
+    const days = daysUntil(item.date, today);
+    const relative =
+        Math.abs(days) <= 1
+            ? `<strong>${whenText(item.date, today)}</strong>`
+            : `<strong>${Math.abs(days)}</strong><span>${days > 0 ? 'days to go' : 'days ago'}</span>`;
+    const label = item.kind === 'tv' ? 'Episode release' : 'Digital release';
+    const date = `<div class="mine-release-date"><div><p class="mine-release-label">${label}</p><time datetime="${escapeHtml(item.date)}">${escapeHtml(dateText(item.date, { withYear: true }))}</time><p class="mine-release-weekday">${new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${item.date}T00:00:00Z`))}</p></div><div class="mine-release-count">${relative}</div></div>`;
     const lines =
         item.kind === 'tv'
             ? [
                   `S${item.season}E${item.episode} · ${episodeName(item)}`,
-                  MARKS[item.mark] ? MARKS[item.mark][0].toUpperCase() + MARKS[item.mark].slice(1) : '',
-                  when
+                  MARKS[item.mark] ? MARKS[item.mark][0].toUpperCase() + MARKS[item.mark].slice(1) : ''
               ]
-            : ['Film · digital release', when];
+            : ['Film · digital release'];
     return (
-        cardHead(poster(item.poster, 'mine-poster mine-poster-big'), item.title, lines) +
-        (item.overview ? `<p class="mine-overview">${escapeHtml(item.overview)}</p>` : '') +
+        cardHead(poster(item.poster, 'mine-poster mine-poster-big'), item.title, lines, titleRating(item.rating)) +
+        date +
+        (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
         kinopoiskLink(item.kinopoiskUrl)
     );
 }

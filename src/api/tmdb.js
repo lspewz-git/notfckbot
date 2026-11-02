@@ -231,6 +231,9 @@ const getDetails = (id, media_type, { seasons = [] } = {}) =>
 /** The cached details when fresh enough, otherwise a fetch. For display only. */
 const getDetailsCached = (id, media_type) => fetchFresh(detailsCache, cacheKey(id, media_type));
 
+/** Optional display metadata only: never fetch or wait for TMDB on a cache miss. */
+const peekDetails = (id, media_type) => detailsCache.peek(cacheKey(id, media_type));
+
 // Returns season details including episodes
 const getSeasonDetails = async (tv_id, season_number, language = 'ru-RU') => {
     try {
@@ -304,6 +307,7 @@ module.exports = {
     digitalRelease,
     getDetails,
     getDetailsCached,
+    peekDetails,
     nextEpisodeFields,
     newSeriesFields,
     titleFacts,

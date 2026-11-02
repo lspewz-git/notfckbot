@@ -485,17 +485,20 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
         const { items, failed } = await periodItems(req.chatId, p.from, p.to);
         res.json({
             ...p,
-            items: items.map((i) => ({
-                date: i.date,
-                kind: i.kind,
-                tmdbId: i.tmdbId,
-                title: i.title,
-                ...(i.kind === 'tv'
-                    ? { season: i.season, episode: i.episode, mark: i.mark, name: i.name, overview: i.overview }
-                    : {}),
-                poster: posterPath(i.poster),
-                kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie')
-            })),
+            items: items.map((i) => {
+                const details = tmdb.peekDetails(String(i.tmdbId).replace(/^(tv|movie)_/, ''), i.kind);
+                return {
+                    date: i.date,
+                    kind: i.kind,
+                    tmdbId: i.tmdbId,
+                    title: i.title,
+                    ...(i.kind === 'tv' ? { season: i.season, episode: i.episode, mark: i.mark, name: i.name } : {}),
+                    overview: i.overview || details?.overview || '',
+                    rating: details?.vote_average || null,
+                    poster: posterPath(i.poster),
+                    kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie')
+                };
+            }),
             failed
         });
     } catch (err) {

@@ -28,7 +28,10 @@ test("a series card lists who is subscribed, with each chat's mode", async ({ pa
     await expect(rows.filter({ hasText: 'alice' })).toContainText('Every episode');
     await expect(rows.filter({ hasText: 'bob' })).toContainText('Whole season');
     await expect(rows.filter({ hasText: 'Movie Club' })).toContainText('Every episode');
-    await expect(card(page).locator('#detail-meta')).toContainText('TMDB ⭐️ 8.4');
+    await expect(card(page).locator('#detail-meta .title-rating')).toHaveText('8.4/ 10 · TMDB');
+    const ratingIcon = card(page).locator('#detail-meta .title-rating svg');
+    await expect(ratingIcon.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
+    await expect.poll(() => ratingIcon.evaluate(el => el.getBBox().width)).toBeGreaterThan(10);
     await expect(card(page).locator('#detail-dates dt')).toHaveText('Premiere');
     await expect(card(page).locator('#detail-dates dd')).toHaveText('15 Jul 2016');
 });

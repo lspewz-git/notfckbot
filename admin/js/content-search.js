@@ -2,6 +2,12 @@
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
 
+/** One rating treatment across account and admin cards. Zero means not rated. */
+export function titleRating(value) {
+    if (!Number.isFinite(value) || value <= 0 || value > 10) return '';
+    return `<span class="title-rating"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#star" /></svg><strong>${value.toFixed(1)}</strong><span class="mine-dim">/ 10 · TMDB</span></span>`;
+}
+
 /** Stored posters can be full TMDB URLs; always load them through the panel cache. */
 export function titlePoster(url, action, id) {
     const path = String(url || '').match(/\/([^/]+\.(?:jpg|png|webp))$/i)?.[0];
