@@ -141,3 +141,36 @@ test('on a wide screen the rail and content sit centered, every rail label fits'
     const last = await page.locator('.rail-bottom .nav-item:visible').last().boundingBox();
     expect(last.y + last.height).toBeLessThanOrEqual(900);
 });
+
+test('desktop navigation has readable rows, grouped utilities and stays inside the page', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop layout');
+    await mockPanel(page);
+    for (const width of [1920, 1440, 1280, 1050]) {
+        await page.setViewportSize({ width, height: 900 });
+        const rail = await page.locator('.sidebar').boundingBox();
+        const header = await page.locator('#dashboard-section header').boundingBox();
+        expect(Math.abs(rail.y - header.y)).toBeLessThanOrEqual(1);
+        expect(rail.x + rail.width).toBeLessThan(header.x);
+        const rows = await page.locator('.sidebar .nav-item:visible').evaluateAll((items) =>
+            items.map((item) => {
+                const icon = item.querySelector('.icon').getBoundingClientRect();
+                const label = item.querySelector('.nav-label').getBoundingClientRect();
+                return { gap: label.left - icon.right, center: Math.abs(label.top + label.height / 2 - icon.top - icon.height / 2) };
+            }),
+        );
+        for (const row of rows) {
+            expect(row.gap).toBeGreaterThanOrEqual(12);
+            expect(row.center).toBeLessThanOrEqual(1);
+        }
+        const nav = await page.locator('.rail-nav').boundingBox();
+        const footer = await page.locator('.rail-bottom').boundingBox();
+        expect(footer.y - nav.y - nav.height).toBeLessThanOrEqual(24);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.setViewportSize({ width: 1280, height: 460 });
+    const last = page.locator('.rail-bottom .nav-item:visible').last();
+    await last.scrollIntoViewIfNeeded();
+    const box = await last.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(460);
+});

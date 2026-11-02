@@ -10,6 +10,7 @@ body.view-mine .rail-nav .nav-item:not(.nav-mine),
 body.view-mine .rail-nav .rail-divider,
 body.view-mine #actions-btn,
 body.view-mine #about-btn,
+body.view-mine .rail-bottom,
 body.view-mine .tabbar .tab-item:not(.tab-mine),
 body.system-account #more-modal .action-row[data-section='my-subs'] {
     display: none;
