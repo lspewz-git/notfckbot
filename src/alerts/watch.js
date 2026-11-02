@@ -306,9 +306,9 @@ function lastShutdown() {
 const START_TRIES = 5;
 
 /**
- * At start: tells how the last run ended. Once an hour, by the log: a crash loop restarts the
- * process every minute. Tried again for a few minutes when it reached no one (the network that
- * brought the bot down may not be back yet).
+ * Every new process tells how the last run ended, even if another restart was just reported.
+ * Tried again for a few minutes when it reached no one (the network that brought the bot down
+ * may not be back yet). once() prevents duplicate successful sends within this process.
  * @param {string | null} version
  * @param {{ reason: string } | null} how lastShutdown(), read at the very start
  */
@@ -317,7 +317,6 @@ async function startupAlert(version, how, { pause = MINUTE_MS } = {}) {
     const v = version ? ` Версия ${code(version)}.` : '';
     const crash = how.reason === 'crash';
     const key = crash ? 'restart_crash' : 'restart';
-    if (await alerts.sentLately(key)) return;
     const why = how.reason === 'panel' ? 'Из панели.' : 'Контейнер перезапустили: обновление или сервер.';
     const text = crash
         ? (t) => `🔴 <b>Бот перезапущен после сбоя</b>\n${t(processStart)}: прошлый запуск не завершился сам.${v}`

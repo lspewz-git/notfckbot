@@ -936,6 +936,16 @@ button.search-result-open:hover .mine-row-title {
     max-width: calc(100vw - var(--space-4));
 }
 
+.profile-head [data-action='profile-options'] .icon {
+    transform: rotate(90deg);
+}
+
+.profile-options .action-row {
+    min-height: var(--control-h-sm);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+}
+
 .profile-hidden {
     display: flex;
     align-items: center;
@@ -946,10 +956,20 @@ button.search-result-open:hover .mine-row-title {
     padding: var(--space-2) var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
-    background: var(--surface-3);
+    background: transparent;
     color: var(--text-dim);
     font-size: var(--text-sm);
     cursor: pointer;
+}
+
+.profile-hidden:focus-visible {
+    background: var(--surface-3);
+}
+
+@media (hover: hover) {
+    .profile-hidden:hover {
+        background: var(--surface-3);
+    }
 }
 
 .profile-hidden .action-chevron {

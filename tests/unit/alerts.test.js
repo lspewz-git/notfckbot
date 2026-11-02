@@ -434,10 +434,15 @@ describe('how the last run ended', () => {
         assert.match(to(1)[1].text, /Бот перезапущен<\/b>[\s\S]*Контейнер перезапустили/);
     });
 
-    test('a crash loop: once an hour by the log, which outlives the process', async () => {
-        mock.method(AlertLog, 'findOne', async ({ where }) => (where.event === 'restart_crash' ? { id: 1 } : null));
-        await watch.startupAlert('abc1234', { reason: 'crash' });
-        assert.equal(bot.sent.length, 0);
+    test('each new process reports its restart even after a recent successful restart alert', async () => {
+        mock.method(AlertLog, 'findOne', async () => ({ id: 1 }));
+        for (const reason of ['signal', 'panel', 'crash']) {
+            // A new process resets only in-memory deduplication; the alert log remains.
+            alerts.reset();
+            const before = bot.sent.length;
+            await watch.startupAlert('abc1234', { reason });
+            assert.ok(bot.sent.length > before, `${reason} restart must be reported`);
+        }
     });
 
     test('a start alert that reached no one is tried again', async () => {
@@ -463,7 +468,6 @@ describe('how the last run ended', () => {
 
     test("the start alert waits for Telegram's first answer: an outage outlasts its tries", async () => {
         mock.method(alerts, 'sweepLog', async () => 0);
-        mock.method(alerts, 'sentLately', async () => false);
         const sent = [];
         mock.method(alerts, 'once', async (key) => {
             sent.push(key);

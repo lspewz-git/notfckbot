@@ -7,7 +7,8 @@
  * Two shapes of event. A condition (a service down, checks failing) is raised on every look
  * while it holds and resolved once it doesn't: raise() sends the first time and then only each
  * repeat; resolve() sends "fixed" if an alert went out. A one-off (a restart, a recap that
- * didn't arrive) goes through once(), at most once an hour per event.
+ * didn't arrive) goes through once(), at most once an hour per event within this process.
+ * Restart alerts are sent for each new process; previous processes never suppress them.
  * The state is in memory: after a restart a condition that still holds is alerted again.
  */
 const { Op } = require('sequelize');
@@ -179,19 +180,6 @@ async function once(key, text, { now = new Date(), id } = {}) {
     }
 }
 
-/** Whether this event reached someone within the hour: a check that survives a restart. */
-async function sentLately(key, now = new Date()) {
-    const row = await AlertLog.findOne({
-        where: {
-            event: key,
-            kind: 'alert',
-            sent: { [Op.gt]: 0 },
-            createdAt: { [Op.gte]: new Date(now.getTime() - ONCE_GAP_MS) }
-        }
-    });
-    return Boolean(row);
-}
-
 const PRESET_RU = { all: 'все оповещения', critical: 'только критичные', custom: 'выбранные в панели' };
 
 /** A test message, to one recipient or to all of them. */
@@ -214,4 +202,4 @@ async function sweepLog(now = new Date()) {
     return AlertLog.destroy({ where: { createdAt: { [Op.lt]: logSince(now) } } });
 }
 
-module.exports = { useBot, reset, raise, resolve, once, sentLately, sendTest, sweepLog, logSince, duration };
+module.exports = { useBot, reset, raise, resolve, once, sendTest, sweepLog, logSince, duration };
