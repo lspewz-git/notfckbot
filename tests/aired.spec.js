@@ -4,7 +4,9 @@ const { watchConsole, openSection, pickChat, profileButton } = require('./helper
 
 watchConsole();
 
-test('Aired shows this chat’s released titles, filters, years and cards without admin requests', async ({ page }) => {
+test('Released shows this chat’s released titles, filters, years and cards without admin requests', async ({
+    page
+}) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openSection(page, 'my-aired');
     const body = page.locator('#my-aired-body');
@@ -29,7 +31,7 @@ test('Aired shows this chat’s released titles, filters, years and cards withou
     await expect(page.locator('#profile-modal [data-action="view-admin"]')).toHaveCount(0);
 });
 
-test('Aired deep link survives reload', async ({ page }) => {
+test('Released deep link survives reload', async ({ page }) => {
     await mockPanel(page, { role: 'user', path: '/#my-aired' });
     await expect(page.locator('#my-aired-section')).toHaveClass(/active/);
     await expect(page.locator('#my-aired-body .mine-row')).toHaveCount(2);
@@ -47,10 +49,12 @@ test('the bottom avatar opens reachable account actions on tablets', async ({ pa
     await expect(admin).toBeVisible();
     const box = await admin.boundingBox();
     expect(box.y + box.height).toBeLessThanOrEqual(900);
-    expect(await admin.evaluate((el) => {
-        const r = el.getBoundingClientRect();
-        return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
-    })).toBe(true);
+    expect(
+        await admin.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+        })
+    ).toBe(true);
     await admin.click();
     await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
 });

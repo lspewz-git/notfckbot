@@ -644,6 +644,41 @@ test('the API: Aired is scoped to an accessible chat and validates its year', as
     assert.equal(requests.length, 1);
 });
 
+test('calendar unfollow removes old and waiting rows of the film only in the chosen chat', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    let rows = [
+        { id: 11, chatId: '7', tmdb_id: 'movie_1', title: 'Film', notified: true },
+        { id: 12, chatId: '7', tmdb_id: 'movie_1', title: 'Film', notified: false },
+        { id: 13, chatId: '8', tmdb_id: 'movie_1', title: 'Film', notified: false }
+    ];
+    t.mock.method(Watchlist, 'findByPk', async (id) => {
+        const row = rows.find((row) => row.id === Number(id));
+        return (
+            row && {
+                ...row,
+                destroy: async () => {
+                    rows = rows.filter((other) => other.id !== row.id);
+                }
+            }
+        );
+    });
+    t.mock.method(Watchlist, 'destroy', async ({ where }) => {
+        assert.deepEqual(where, { chatId: '7', tmdb_id: 'movie_1' });
+        rows = rows.filter((row) => row.chatId !== where.chatId || row.tmdb_id !== where.tmdb_id);
+        return 2;
+    });
+    const cookie = await signIn(call, 7);
+    const response = await call('DELETE', '/api/account/chats/7/films/11', { cookie });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { removed: true });
+    assert.deepEqual(
+        rows.map((row) => row.id),
+        [13],
+        'the active row is gone and another chat keeps its subscription'
+    );
+});
+
 // --- The bot ---
 
 test('the API: calendar includes cached film metadata and tolerates a cache miss without external requests', async (t) => {
@@ -653,8 +688,8 @@ test('the API: calendar includes cached film metadata and tolerates a cache miss
     t.mock.method(Chat, 'findByPk', async () => ({ type: 'private', timezone: 'Europe/Moscow' }));
     t.mock.method(Subscription, 'findAll', async () => []);
     t.mock.method(Watchlist, 'findAll', async () => [
-        { tmdb_id: 'movie_10', title: 'With metadata', premiere_digital: '2099-12-30' },
-        { tmdb_id: 'movie_11', title: 'Without metadata', premiere_digital: '2099-12-31' }
+        { id: 101, tmdb_id: 'movie_10', title: 'With metadata', premiere_digital: '2099-12-30' },
+        { id: 102, tmdb_id: 'movie_11', title: 'Without metadata', premiere_digital: '2099-12-31' }
     ]);
     const peeks = [];
     t.mock.method(tmdb, 'peekDetails', (id, kind) => {
@@ -678,6 +713,16 @@ test('the API: calendar includes cached film metadata and tolerates a cache miss
     assert.equal((await call('GET', '/api/account/chats/8/calendar', { cookie })).status, 403);
     assert.equal((await call('GET', '/api/account/chats/7/calendar')).status, 401);
     assert.equal(peeks.length, 2, 'access checks still run before metadata is read');
+    assert.deepEqual(
+        response.body.items.map((item) => item.listId),
+        [101, 102],
+        'calendar carries chat watchlist ids for complete unfollow'
+    );
+    const list = await call('GET', '/api/account/chats/7/list', { cookie });
+    assert.equal(list.status, 200);
+    assert.match(list.body.today, /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(list.body.films[0].rating, response.body.items[0].rating);
+    assert.equal(list.body.films[0].overview, response.body.items[0].overview);
 });
 
 function botHandlers() {

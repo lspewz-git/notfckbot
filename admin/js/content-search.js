@@ -74,8 +74,10 @@ export const MODES = {
     season: { short: 'Season', long: 'When the whole season is out' }
 };
 
-export const modesField = (name, current, id) =>
-    `<fieldset class="mine-modes"><legend class="field-label">Notify me</legend>${Object.entries(MODES)
+export const modesField = (name, current, id, disabled = false) =>
+    `<fieldset class="mine-modes"${disabled ? ' disabled' : ''}><legend class="field-label">Notify me</legend>${Object.entries(
+        MODES
+    )
         .map(
             ([key, m]) =>
                 `<label class="mine-radio"><input type="radio" name="${name}" value="${key}"${id ? ` data-mine="mode" data-id="${escapeHtml(id)}"` : ''}${current === key ? ' checked' : ''} /> ${m.long}</label>`

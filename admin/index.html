@@ -172,11 +172,11 @@
                         </svg>
                         <span class="nav-label" aria-hidden="true">Movies</span>
                     </button>
-                    <button class="nav-item" data-section="history" aria-label="Aired">
+                    <button class="nav-item" data-section="history" aria-label="Released">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <use href="/vendor/lucide.svg#calendar" />
                         </svg>
-                        <span class="nav-label" aria-hidden="true">Aired</span>
+                        <span class="nav-label" aria-hidden="true">Released</span>
                     </button>
                     <button class="nav-item" data-section="recap" aria-label="Year recap">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -198,13 +198,13 @@
                         <span class="nav-label" aria-hidden="true">Settings</span>
                     </button>
                     <span class="rail-divider nav-mine" aria-hidden="true"></span>
-                    <button class="nav-item nav-mine" data-section="my-aired" aria-label="Aired">
+                    <button class="nav-item nav-mine" data-section="my-aired" aria-label="Released">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <use href="/vendor/lucide.svg#calendar" />
                         </svg>
-                        <span class="nav-label" aria-hidden="true">Aired</span>
+                        <span class="nav-label" aria-hidden="true">Released</span>
                     </button>
-                    <button class="nav-item nav-mine" data-section="my-subs" aria-label="My subscriptions">
+                    <button class="nav-item nav-mine" data-section="my-subs" aria-label="Following">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <use href="/vendor/lucide.svg#bookmark" />
                         </svg>
@@ -1263,32 +1263,128 @@
                     <section id="my-aired-section" class="section mine-section">
                         <header>
                             <div class="header-info">
-                                <h1>Aired</h1>
+                                <div class="mine-heading">
+                                    <h1>Released</h1>
+                                    <button
+                                        type="button"
+                                        class="btn btn-ghost btn-icon-square"
+                                        data-action="mine-filter-toggle"
+                                        data-page="my-aired"
+                                        aria-label="Search titles"
+                                        aria-expanded="false"
+                                        aria-controls="my-aired-search"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#search" />
+                                        </svg>
+                                    </button>
+                                </div>
                                 <p>Series and films already released among the chosen chat's subscriptions.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <div id="my-aired-search" class="mine-filter mine-search" hidden>
+                            <input
+                                id="my-aired-filter"
+                                class="input-field"
+                                type="search"
+                                data-mine-filter="my-aired"
+                                aria-label="Search released titles"
+                                placeholder="Search titles…"
+                            /><button
+                                type="button"
+                                class="btn btn-ghost"
+                                data-action="mine-filter-close"
+                                data-page="my-aired"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                         <div id="my-aired-body" class="mine-body" aria-live="polite"></div>
                     </section>
                     <section id="my-subs-section" class="section mine-section">
                         <header>
                             <div class="header-info">
-                                <h1>My subscriptions</h1>
+                                <div class="mine-heading">
+                                    <h1>Following</h1>
+                                    <button
+                                        type="button"
+                                        class="btn btn-ghost btn-icon-square"
+                                        data-action="mine-filter-toggle"
+                                        data-page="my-subs"
+                                        aria-label="Search titles"
+                                        aria-expanded="false"
+                                        aria-controls="my-subs-search"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#search" />
+                                        </svg>
+                                    </button>
+                                </div>
                                 <p>Series and films the bot writes about in the chosen chat.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <div id="my-subs-search" class="mine-filter mine-search" hidden>
+                            <input
+                                id="my-subs-filter"
+                                class="input-field"
+                                type="search"
+                                data-mine-filter="my-subs"
+                                aria-label="Search followed titles"
+                                placeholder="Search titles…"
+                            /><button
+                                type="button"
+                                class="btn btn-ghost"
+                                data-action="mine-filter-close"
+                                data-page="my-subs"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                         <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
                     <section id="my-calendar-section" class="section mine-section">
                         <header>
                             <div class="header-info">
-                                <h1>Calendar</h1>
+                                <div class="mine-heading">
+                                    <h1>Calendar</h1>
+                                    <button
+                                        type="button"
+                                        class="btn btn-ghost btn-icon-square"
+                                        data-action="mine-filter-toggle"
+                                        data-page="my-calendar"
+                                        aria-label="Search titles"
+                                        aria-expanded="false"
+                                        aria-controls="my-calendar-search"
+                                    >
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#search" />
+                                        </svg>
+                                    </button>
+                                </div>
                                 <p>What comes out among the chosen chat's subscriptions.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <div id="my-calendar-search" class="mine-filter mine-search" hidden>
+                            <input
+                                id="my-calendar-filter"
+                                class="input-field"
+                                type="search"
+                                data-mine-filter="my-calendar"
+                                aria-label="Search calendar titles"
+                                placeholder="Search titles…"
+                            /><button
+                                type="button"
+                                class="btn btn-ghost"
+                                data-action="mine-filter-close"
+                                data-page="my-calendar"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                         <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1339,7 +1435,7 @@
                     <section id="history-section" class="section">
                         <header>
                             <div class="header-info">
-                                <h1>Aired</h1>
+                                <h1>Released</h1>
                                 <p>
                                     What came out in the last three years among the serials and movies in the database.
                                     A serial counts in every year it had an episode out.
@@ -1736,11 +1832,11 @@
             </button>
             <button class="tab-item tab-mine" data-section="my-aired">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#calendar" /></svg
-                ><span>Aired</span>
+                ><span>Released</span>
             </button>
             <button class="tab-item tab-mine" data-section="my-subs">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#bookmark" /></svg
-                ><span>Subs</span>
+                ><span>Following</span>
             </button>
             <button class="tab-item tab-mine" data-section="my-calendar">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1895,7 +1991,7 @@
                                 <use href="/vendor/lucide.svg#calendar" /></svg
                         ></span>
                         <span class="action-text">
-                            <span class="action-title">Aired</span>
+                            <span class="action-title">Released</span>
                             <span class="action-desc">What came out, year by year</span>
                         </span>
                         <span class="action-chevron"

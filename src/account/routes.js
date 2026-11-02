@@ -7,7 +7,7 @@ const router = require('express').Router();
 const { Chat, Series, Subscription, Watchlist, HiddenChat } = require('../db');
 const tmdb = require('../api/tmdb');
 const ops = require('../chat-ops');
-const { listPeriod, periodItems } = require('../calendar');
+const { listPeriod, periodItems, todayIn } = require('../calendar');
 const history = require('../history');
 const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
@@ -350,16 +350,25 @@ const kinopoiskUrlOf = (title, kinopoiskId, mediaType) => {
     return info ? info.url : null;
 };
 
+/** Optional card data from the warmed cache; never wait for an external service. */
+const titleMetadata = (tmdbId) => {
+    const [kind, id] = String(tmdbId).split('_');
+    const details = tmdb.peekDetails(id, kind);
+    return { overview: details?.overview || '', rating: details?.vote_average || null };
+};
+
 router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
     try {
-        const [subs, films] = await Promise.all([
+        const [subs, films, chat] = await Promise.all([
             Subscription.findAll({ where: { chatId: req.chatId }, include: [Series] }),
-            Watchlist.findAll({ where: { chatId: req.chatId, notified: false }, order: [['id', 'ASC']] })
+            Watchlist.findAll({ where: { chatId: req.chatId, notified: false }, order: [['id', 'ASC']] }),
+            Chat.findByPk(req.chatId)
         ]);
         const series = subs
             .filter((s) => s.Series)
             .map(({ notify_type: mode, Series: s }) => ({
                 id: s.tmdb_id,
+                ...titleMetadata(s.tmdb_id),
                 title: s.title,
                 poster: posterPath(s.poster_url),
                 mode,
@@ -376,10 +385,12 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
             .sort((a, b) => a.title.localeCompare(b.title, 'ru'));
         res.json({
             access: req.access,
+            today: todayIn(chat?.timezone),
             series,
             films: films.map((f) => ({
                 id: f.id,
                 tmdbId: f.tmdb_id,
+                ...titleMetadata(f.tmdb_id),
                 title: f.title,
                 poster: posterPath(f.poster_url),
                 year: f.year,
@@ -441,7 +452,9 @@ router.delete('/api/account/chats/:chatId/films/:id', openChat, async (req, res)
     const params = valid(z.object({ id: idOf(/^\d{1,15}$/, 'Bad id') }), { id: req.params.id }, res);
     if (!params) return;
     try {
-        res.json({ removed: await ops.removeFilm(params.id, { chatId: req.chatId, who: who(req) }) });
+        res.json({
+            removed: await ops.removeFilm(params.id, { chatId: req.chatId, who: who(req), allForTitle: true })
+        });
     } catch (err) {
         fail(res, err);
     }
@@ -507,15 +520,21 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
         res.json({
             ...p,
             items: items.map((i) => {
-                const details = tmdb.peekDetails(String(i.tmdbId).replace(/^(tv|movie)_/, ''), i.kind);
+                const metadata = titleMetadata(i.tmdbId);
                 return {
                     date: i.date,
                     kind: i.kind,
                     tmdbId: i.tmdbId,
                     title: i.title,
+                    listId: i.listId,
+                    mode: i.mode,
+                    genres: i.genres,
+                    networks: i.networks,
+                    ruPremiere: i.ruPremiere,
+                    ruDigital: i.ruDigital,
                     ...(i.kind === 'tv' ? { season: i.season, episode: i.episode, mark: i.mark, name: i.name } : {}),
-                    overview: i.overview || details?.overview || '',
-                    rating: details?.vote_average || null,
+                    overview: i.overview || metadata.overview,
+                    rating: metadata.rating,
                     poster: posterPath(i.poster),
                     kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie')
                 };

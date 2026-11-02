@@ -74,6 +74,30 @@ const state = {
     searching: false
 };
 
+const filters = { 'my-subs': '', 'my-calendar': '', 'my-aired': '' };
+const matchesTitle = (title, section) =>
+    String(title || '')
+        .toLocaleLowerCase()
+        .includes(filters[section].trim().toLocaleLowerCase());
+const noMatches = () => empty('No matching titles', 'Try another title or clear the search.');
+
+function renderFiltered(section) {
+    if (section === 'my-subs' && state.list && !searchOpen) $('my-subs-body').innerHTML = subsView();
+    if (section === 'my-calendar' && state.cal) showCalendar();
+    if (section === 'my-aired' && state.aired) $('my-aired-body').innerHTML = airedView();
+}
+
+function closeFilter(section) {
+    filters[section] = '';
+    const input = /** @type {HTMLInputElement} */ ($(`${section}-filter`));
+    input.value = '';
+    $(`${section}-search`).hidden = true;
+    document
+        .querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`)
+        .setAttribute('aria-expanded', 'false');
+    renderFiltered(section);
+}
+
 const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${rest}`;
 
 /**
@@ -88,6 +112,7 @@ export function setChats(chats, preferred = null) {
     state.list = null;
     state.cal = null;
     resetAired();
+    for (const section of Object.keys(filters)) closeFilter(section);
     showChatChips();
     reload();
 }
@@ -143,6 +168,9 @@ export async function selectChat(id) {
     state.chatId = id;
     state.list = null;
     state.cal = null;
+    cardVersion += 1;
+    closeModal('mine-card-modal');
+    for (const section of Object.keys(filters)) closeFilter(section);
     resetAired();
     searchOpen = false;
     // The search's "Added" marks belong to the chat it was made for
@@ -234,16 +262,21 @@ function subsView() {
         '<button type="button" class="btn btn-primary" data-action="mine-search-open">+ Add</button></div>';
     let body;
     if (tab === 'films') {
-        body = list.films.length
-            ? `<ul class="glass-card mine-rows">${list.films.map((f) => row('mine-film', f.id, poster(f.poster), f.title, filmNote(f), f.year)).join('')}</ul>`
-            : empty('No films waiting', 'Find a film and add it: the bot writes when it comes out.');
+        const films = list.films.filter((f) => matchesTitle(f.title, 'my-subs'));
+        body = films.length
+            ? `<ul class="glass-card mine-rows">${films.map((f) => row('mine-film', f.id, poster(f.poster), f.title, filmNote(f), f.year)).join('')}</ul>`
+            : filters['my-subs']
+              ? noMatches()
+              : empty('No films waiting', 'Find a film and add it: the bot writes when it comes out.');
     } else {
-        const items = tab === 'archive' ? archive : running;
+        const items = (tab === 'archive' ? archive : running).filter((s) => matchesTitle(s.title, 'my-subs'));
         body = items.length
             ? `<ul class="glass-card mine-rows">${items.map((s) => row('mine-series', s.id, poster(s.poster), s.title, seriesNote(s), MODES[s.mode]?.short)).join('')}</ul>`
-            : tab === 'archive'
-              ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.')
-              : empty('No subscriptions yet', 'Find a series and subscribe to its new episodes.');
+            : filters['my-subs']
+              ? noMatches()
+              : tab === 'archive'
+                ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.')
+                : empty('No subscriptions yet', 'Find a series and subscribe to its new episodes.');
     }
     return top + body;
 }
@@ -289,42 +322,83 @@ const cardHead = (picture, title, lines, rating = '') =>
 
 const CLOSE_X = cardClose('mine-card-modal');
 
-function seriesCard(s, { confirm = false } = {}) {
+/** Calendar and Following share the complete card, including its actions and spacing. */
+function followingCard(item, { event = null, today, confirm = false }) {
+    const busy =
+        pendingModeSaves.has(titleKey(item, state.chatId)) || pendingUnfollows.has(titleKey(item, state.chatId));
+    const tv = item.kind === 'tv';
+    const date = event?.date || (tv ? item.next?.date : item.date);
+    const release = date
+        ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
+        : '<p class="mine-dim">Release date not known yet</p>';
+    const lines = tv
+        ? [
+              event
+                  ? `S${event.season}E${event.episode} · ${episodeName(event)}`
+                  : item.finished
+                    ? 'The series has ended'
+                    : item.next
+                      ? `Next: S${item.next.season}E${item.next.episode}`
+                      : 'Next episode date unknown',
+              event && MARKS[event.mark] ? MARKS[event.mark][0].toUpperCase() + MARKS[event.mark].slice(1) : '',
+              [item.genres, item.networks].filter(Boolean).join(' · ')
+          ]
+        : ['Film · digital release', item.genres];
+    const secondaryDates = !tv
+        ? [
+              item.ruPremiere ? `In Russian cinemas: ${dateText(item.ruPremiere, { withYear: true })}` : '',
+              item.ruDigital ? `Online in Russia: ${dateText(item.ruDigital, { withYear: true })}` : ''
+          ]
+              .filter(Boolean)
+              .map((text) => `<p class="mine-dim mine-card-note">${escapeHtml(text)}</p>`)
+              .join('')
+        : '';
     return (
-        cardHead(poster(s.poster, 'mine-poster mine-poster-big'), s.title, [
-            [s.genres, s.networks].filter(Boolean).join(' · '),
-            s.finished
-                ? 'The series has ended'
-                : s.next
-                  ? `Next: S${s.next.season}E${s.next.episode}, ${dateText(s.next.date)}`
-                  : 'Next episode date unknown',
-            s.lastSeason ? `Last aired: S${s.lastSeason}E${s.lastEpisode}` : ''
-        ]) +
-        modesField('mine-mode', s.mode, s.id) +
-        linkButtons(s.links) +
-        (confirm
-            ? `<div class="mine-confirm"><p>Unsubscribe from “${escapeHtml(s.title)}”?</p><div class="modal-actions"><button type="button" class="btn btn-danger btn-grow" data-action="mine-unsubscribe" data-id="${escapeHtml(s.id)}">Yes, unsubscribe</button><button type="button" class="btn btn-ghost" data-action="mine-series" data-id="${escapeHtml(s.id)}">No</button></div></div>`
-            : `<button type="button" class="btn btn-danger-quiet btn-block" data-action="mine-ask-unsubscribe" data-id="${escapeHtml(s.id)}">Unsubscribe</button>`)
+        '<div class="mine-following-card">' +
+        cardHead(
+            poster(item.poster, 'mine-poster mine-poster-big'),
+            item.title,
+            lines,
+            titleRating(item.rating) + release
+        ) +
+        secondaryDates +
+        (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
+        (tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
+        (!tv ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>' : '') +
+        `<div class="mine-card-actions">${linkButtons(item.links || [])}${
+            item.id == null
+                ? ''
+                : confirm
+                  ? `<div class="mine-confirm"><p>Unfollow “${escapeHtml(item.title)}”?</p><p>It will leave this chat’s following list and calendar. Release notifications will stop.</p><div class="modal-actions"><button type="button" class="btn btn-danger btn-grow" data-action="mine-confirm-unfollow"${busy ? ' disabled' : ''}>Yes, unfollow</button><button type="button" class="btn btn-ghost" data-action="mine-keep-following">Keep following</button></div></div>`
+                  : `<button type="button" class="btn btn-danger-quiet btn-block" data-action="mine-ask-unfollow"${busy ? ' disabled' : ''}>Unfollow</button>`
+        }</div></div>`
     );
 }
 
-function filmCard(f, { confirm = false } = {}) {
-    return (
-        cardHead(poster(f.poster, 'mine-poster mine-poster-big'), f.title, [
-            f.genres,
-            f.date ? `Out: ${dateText(f.date, { withYear: true })}` : 'Release date not known yet',
-            f.ruPremiere ? `In Russian cinemas: ${dateText(f.ruPremiere, { withYear: true })}` : '',
-            f.ruDigital ? `Online in Russia: ${dateText(f.ruDigital, { withYear: true })}` : ''
-        ]) +
-        '<p class="mine-dim">When the film is out, the bot sends links to watch it.</p>' +
-        linkButtons(f.links) +
-        (confirm
-            ? `<div class="mine-confirm"><p>Remove “${escapeHtml(f.title)}” from the list?</p><div class="modal-actions"><button type="button" class="btn btn-danger btn-grow" data-action="mine-remove-film" data-id="${f.id}">Yes, remove</button><button type="button" class="btn btn-ghost" data-action="mine-film" data-id="${f.id}">No</button></div></div>`
-            : `<button type="button" class="btn btn-danger-quiet btn-block" data-action="mine-ask-remove-film" data-id="${f.id}">Remove from the list</button>`)
-    );
+let activeFollowing = null;
+const pendingUnfollows = new Set();
+const pendingModeSaves = new Set();
+const titleKey = (item, chatId) => `${chatId}:${item.kind}:${item.id}`;
+
+function syncFollowingBusy(item, chatId) {
+    const key = titleKey(item, chatId);
+    if (!activeFollowing || titleKey(activeFollowing.item, activeFollowing.chatId) !== key) return;
+    const busy = pendingModeSaves.has(key) || pendingUnfollows.has(key);
+    for (const control of all(
+        '#mine-card-body .mine-modes, #mine-card-body [data-action="mine-ask-unfollow"], #mine-card-body [data-action="mine-confirm-unfollow"]'
+    )) {
+        /** @type {HTMLFieldSetElement | HTMLButtonElement} */ (control).disabled = busy;
+    }
+}
+
+function openFollowing(item, options = {}) {
+    const context = { item, event: null, today: state.list?.today, ...options, chatId: state.chatId };
+    openCard(followingCard(item, context));
+    activeFollowing = context;
 }
 
 function openNewCard(r) {
+    activeFollowing = null;
     cardVersion += 1;
     searchCardId = r.tmdbId;
     openSearchCard(r, {
@@ -342,29 +416,19 @@ const kinopoiskLink = (url) => (url ? linkButtons([{ kind: 'info', label: 'Kinop
 
 /** An episode or a film from the calendar */
 function releaseCard(item, today) {
-    const days = daysUntil(item.date, today);
-    const relative =
-        Math.abs(days) <= 1
-            ? `<strong>${whenText(item.date, today)}</strong>`
-            : `<strong>${Math.abs(days)}</strong><span>${days > 0 ? 'days to go' : 'days ago'}</span>`;
-    const label = item.kind === 'tv' ? 'Episode release' : 'Digital release';
-    const date = `<div class="mine-release-date"><div><p class="mine-release-label">${label}</p><time datetime="${escapeHtml(item.date)}">${escapeHtml(dateText(item.date, { withYear: true }))}</time><p class="mine-release-weekday">${new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${item.date}T00:00:00Z`))}</p></div><div class="mine-release-count">${relative}</div></div>`;
-    const lines =
-        item.kind === 'tv'
-            ? [
-                  `S${item.season}E${item.episode} · ${episodeName(item)}`,
-                  MARKS[item.mark] ? MARKS[item.mark][0].toUpperCase() + MARKS[item.mark].slice(1) : ''
-              ]
-            : ['Film · digital release'];
-    return (
-        cardHead(poster(item.poster, 'mine-poster mine-poster-big'), item.title, lines, titleRating(item.rating)) +
-        date +
-        (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
-        kinopoiskLink(item.kinopoiskUrl)
+    openFollowing(
+        {
+            ...item,
+            id: item.kind === 'tv' ? item.tmdbId : item.listId,
+            links:
+                item.links || (item.kinopoiskUrl ? [{ kind: 'info', label: 'Kinopoisk', url: item.kinopoiskUrl }] : [])
+        },
+        { event: item.kind === 'tv' ? item : null, today }
     );
 }
 
 function openCard(html, tmdbId = null) {
+    activeFollowing = null;
     cardVersion += 1;
     searchCardId = tmdbId;
     $('mine-card-body').innerHTML = html + CLOSE_X;
@@ -411,7 +475,9 @@ function airedView() {
     const items = airedItems()
         .map((item, index) => ({ item, index }))
         .filter(
-            ({ item }) => state.airedWhat === 'all' || (item.kind === 'tv' ? 'series' : 'films') === state.airedWhat
+            ({ item }) =>
+                matchesTitle(item.title, 'my-aired') &&
+                (state.airedWhat === 'all' || (item.kind === 'tv' ? 'series' : 'films') === state.airedWhat)
         );
     return (
         (data.years.length
@@ -443,12 +509,14 @@ function airedView() {
                   )
                   .join('') +
               '</ul>'
-            : empty(
-                  'No releases yet',
-                  data.year
-                      ? `No releases in this category in ${data.year}.`
-                      : 'No releases among this chat’s subscriptions in the last three years.'
-              )) +
+            : filters['my-aired']
+              ? noMatches()
+              : empty(
+                    'No releases yet',
+                    data.year
+                        ? `No releases in this category in ${data.year}.`
+                        : 'No releases among this chat’s subscriptions in the last three years.'
+                )) +
         (items.length > state.airedLimit
             ? '<button type="button" class="btn btn-outline" data-action="mine-aired-more">Show more</button>'
             : '')
@@ -485,11 +553,18 @@ const monthTitle = (key, today) =>
 function daysBody(data) {
     const shown = data.items
         .map((item, index) => ({ item, index }))
-        .filter(({ item }) => calWhatOf(item.kind) === state.calWhat && daysUntil(item.date, data.today) >= -1);
+        .filter(
+            ({ item }) =>
+                calWhatOf(item.kind) === state.calWhat &&
+                daysUntil(item.date, data.today) >= -1 &&
+                matchesTitle(item.title, 'my-calendar')
+        );
     if (!shown.length)
-        return state.calWhat === 'films'
-            ? empty('No films coming', 'No films on the list have a release date yet.')
-            : empty('No episodes coming', 'No subscribed series have dated episodes yet.');
+        return filters['my-calendar']
+            ? noMatches()
+            : state.calWhat === 'films'
+              ? empty('No films coming', 'No films on the list have a release date yet.')
+              : empty('No episodes coming', 'No subscribed series have dated episodes yet.');
     let month = '';
     const rows = shown.map(({ item, index }) => {
         const key = item.date.slice(0, 7);
@@ -706,6 +781,22 @@ const showCalendar = () => {
 
 /** Click handlers, merged into app.js's delegation like the other modules' */
 export const accountActions = {
+    'mine-filter-toggle': (el) => {
+        const section = el.dataset.page;
+        if (!Object.hasOwn(filters, section)) return;
+        const holder = $(`${section}-search`);
+        if (!holder.hidden) return closeFilter(section);
+        holder.hidden = false;
+        el.setAttribute('aria-expanded', 'true');
+        $(`${section}-filter`).focus();
+    },
+    'mine-filter-close': (el) => {
+        const section = el.dataset.page;
+        closeFilter(section);
+        /** @type {HTMLElement} */ (
+            document.querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`)
+        ).focus();
+    },
     'mine-aired-year': (el) => {
         state.airedYear = Number(el.dataset.year);
         state.airedLimit = 20;
@@ -749,47 +840,51 @@ export const accountActions = {
     },
     'mine-series': (el) => {
         const s = findSeries(el.dataset.id);
-        if (s) openCard(seriesCard(s));
+        if (s) openFollowing({ ...s, kind: 'tv' });
     },
     'mine-film': (el) => {
         const f = findFilm(el.dataset.id);
-        if (f) openCard(filmCard(f));
+        if (f) openFollowing({ ...f, kind: 'movie' });
     },
-    'mine-ask-unsubscribe': (el) => {
-        const s = findSeries(el.dataset.id);
-        if (s) openCard(seriesCard(s, { confirm: true }));
+    'mine-ask-unfollow': () => {
+        if (activeFollowing?.chatId !== state.chatId) return;
+        if (pendingModeSaves.has(titleKey(activeFollowing.item, activeFollowing.chatId))) return;
+        openFollowing(activeFollowing.item, { ...activeFollowing, confirm: true });
     },
-    'mine-ask-remove-film': (el) => {
-        const f = findFilm(el.dataset.id);
-        if (f) openCard(filmCard(f, { confirm: true }));
+    'mine-keep-following': () => {
+        if (activeFollowing?.chatId !== state.chatId) return;
+        openFollowing(activeFollowing.item, { ...activeFollowing, confirm: false });
     },
-    'mine-unsubscribe': async (el) => {
+    'mine-confirm-unfollow': async (el) => {
+        const context = activeFollowing;
+        if (!context || context.chatId !== state.chatId || el.disabled) return;
+        const { item, chatId } = context;
+        const key = titleKey(item, chatId);
+        if (pendingUnfollows.has(key) || pendingModeSaves.has(key)) return;
+        pendingUnfollows.add(key);
+        syncFollowingBusy(item, chatId);
+        const cardNow = cardVersion;
+        el.disabled = true;
         try {
-            await api(chatPath(`/series/${encodeURIComponent(el.dataset.id)}`), { method: 'DELETE' });
-            closeModal('mine-card-modal');
-            toast('Unsubscribed', 'success');
+            await api(
+                `/account/chats/${encodeURIComponent(chatId)}/${item.kind === 'tv' ? 'series' : 'films'}/${encodeURIComponent(item.id)}`,
+                { method: 'DELETE' }
+            );
+            if (state.chatId !== chatId) return;
+            if (cardVersion === cardNow) closeModal('mine-card-modal');
+            toast('No longer following', 'success');
             state.cal = null;
-            // The subscriptions page refetches its list itself; elsewhere a card would find the old one
-            if (visibleSection() !== 'my-subs') state.list = null;
+            state.list = null;
             await reload();
         } catch (err) {
             toast(err.message, 'error');
-        }
-    },
-    'mine-remove-film': async (el) => {
-        try {
-            await api(chatPath(`/films/${encodeURIComponent(el.dataset.id)}`), { method: 'DELETE' });
-            closeModal('mine-card-modal');
-            toast('Film removed from the list', 'success');
-            state.cal = null;
-            // The subscriptions page refetches its list itself; elsewhere a card would find the old one
-            if (visibleSection() !== 'my-subs') state.list = null;
-            await reload();
-        } catch (err) {
-            toast(err.message, 'error');
+        } finally {
+            pendingUnfollows.delete(key);
+            syncFollowingBusy(item, chatId);
         }
     },
     'mine-search-open': () => {
+        closeFilter('my-subs');
         searchOpen = true;
         $('my-subs-body').innerHTML = searchView();
         if (state.query) $('mine-results').innerHTML = resultsView();
@@ -870,7 +965,7 @@ export const accountActions = {
     },
     'mine-cal-item': (el) => {
         const item = state.cal && state.cal.items && state.cal.items[Number(el.dataset.index)];
-        if (item) openCard(releaseCard(item, state.cal.today));
+        if (item) releaseCard(item, state.cal.today);
     },
     'mine-pick': (el) => {
         const name = el.dataset.name;
@@ -896,20 +991,60 @@ export const accountActions = {
 
 /** The mode radios and the search form. */
 export function setupAccount() {
+    document.addEventListener('input', (event) => {
+        const input = /** @type {HTMLInputElement} */ (event.target);
+        const section = input.dataset.mineFilter;
+        if (!Object.hasOwn(filters, section)) return;
+        filters[section] = input.value;
+        state.airedLimit = 20;
+        renderFiltered(section);
+    });
+    document.addEventListener('keydown', (event) => {
+        const input = /** @type {HTMLInputElement} */ (event.target);
+        if (event.key === 'Escape' && Object.hasOwn(filters, input.dataset.mineFilter)) {
+            event.preventDefault();
+            accountActions['mine-filter-close']({ dataset: { page: input.dataset.mineFilter } });
+        }
+    });
     document.addEventListener('change', async (event) => {
         const el = /** @type {HTMLInputElement | HTMLSelectElement} */ (event.target);
         const kind = el.dataset && el.dataset.mine;
         if (kind === 'mode') {
-            const s = findSeries(el.dataset.id);
+            const context = activeFollowing;
+            const s =
+                context?.item.kind === 'tv' && context.item.id === el.dataset.id
+                    ? context.item
+                    : findSeries(el.dataset.id);
             if (!s) return;
+            const chatNow = state.chatId;
+            const cardNow = cardVersion;
+            const item = { ...s, kind: 'tv' };
+            const key = titleKey(item, chatNow);
+            if (pendingModeSaves.has(key) || pendingUnfollows.has(key)) return;
+            pendingModeSaves.add(key);
+            syncFollowingBusy(item, chatNow);
             try {
                 await api(chatPath('/series'), { method: 'POST', body: { tmdbId: s.id, mode: el.value } });
                 s.mode = el.value;
+                if (state.chatId !== chatNow) return;
+                const listed = findSeries(s.id);
+                if (listed) listed.mode = el.value;
+                if (state.cal) for (const item of state.cal.items) if (item.tmdbId === s.id) item.mode = el.value;
+                if (activeFollowing && titleKey(activeFollowing.item, activeFollowing.chatId) === key) {
+                    activeFollowing.item.mode = el.value;
+                    for (const radio of all('#mine-card-body input[data-mine="mode"]')) {
+                        /** @type {HTMLInputElement} */ (radio).checked =
+                            /** @type {HTMLInputElement} */ (radio).value === el.value;
+                    }
+                }
                 toast('Notifications changed', 'success');
                 if (state.list && !searchOpen) $('my-subs-body').innerHTML = subsView();
             } catch (err) {
                 toast(err.message, 'error');
-                openCard(seriesCard(s));
+                if (state.chatId === chatNow && context && cardVersion === cardNow) openFollowing(s, context);
+            } finally {
+                pendingModeSaves.delete(key);
+                syncFollowingBusy(item, chatNow);
             }
         }
     });

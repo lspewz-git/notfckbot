@@ -237,6 +237,8 @@ async function seriesEpisodes(series, from, to) {
                 mark,
                 name: names.get(ep.episode_number) || '',
                 overview: ep.overview || '',
+                genres: series.genres,
+                networks: series.networks,
                 poster: series.poster_url || null,
                 kinopoiskId: series.kinopoisk_id || null
             });
@@ -262,13 +264,24 @@ async function periodItems(chatId, from, to) {
             return [];
         })
     );
-    const items = perSeries.flat();
+    const modes = new Map(subs.filter((s) => s.Series).map((s) => [s.Series.tmdb_id, s.notify_type]));
+    const items = perSeries.flat().map((item) => ({ ...item, mode: modes.get(item.tmdbId) }));
     const seenFilms = new Set();
     for (const f of films) {
         const date = f.premiere_digital && String(f.premiere_digital).slice(0, 10);
         if (!date || date < from || date > to || seenFilms.has(f.tmdb_id)) continue;
         seenFilms.add(f.tmdb_id);
-        items.push({ date, kind: 'movie', tmdbId: f.tmdb_id, title: f.title, poster: f.poster_url || null });
+        items.push({
+            date,
+            kind: 'movie',
+            tmdbId: f.tmdb_id,
+            listId: f.id,
+            title: f.title,
+            poster: f.poster_url || null,
+            genres: f.genres,
+            ruPremiere: f.ru_premiere,
+            ruDigital: f.ru_digital
+        });
     }
     items.sort(
         (a, b) =>

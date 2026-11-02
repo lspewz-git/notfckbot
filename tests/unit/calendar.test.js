@@ -66,7 +66,7 @@ const SERIES = {
     release_seasons: '2025:1;2026:2'
 };
 const FILMS = [
-    { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16' },
+    { id: 71, tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16' },
     { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16' }, // the same film twice
     { tmdb_id: 'movie_8', title: 'Позже', premiere_digital: '2026-12-01' }
 ];
@@ -74,13 +74,19 @@ const FILMS = [
 beforeEach(() => {
     seasonAsks = [];
     tmdbDown = false;
-    mock.method(Subscription, 'findAll', async () => [{ Series: SERIES }]);
+    mock.method(Subscription, 'findAll', async () => [{ Series: SERIES, notify_type: 'season' }]);
     mock.method(Watchlist, 'findAll', async () => FILMS);
 });
 
 // Wednesday 14 October 2026, 12:00 in Moscow
 const NOW = new Date('2026-10-14T09:00:00Z');
 const chat = (fields = {}) => ({ id: 10, timezone: 'Europe/Moscow', ...fields });
+
+test('calendar items carry full-unfollow film ids and the series notification mode', async () => {
+    const { items } = await calendar.periodItems(10, '2026-10-01', '2026-11-30');
+    assert.equal(items.find((item) => item.kind === 'movie').listId, 71);
+    assert.equal(items.find((item) => item.kind === 'tv').mode, 'season');
+});
 
 describe('dates', () => {
     test('a week runs Monday to Sunday; offsets go back and ahead, across months and years', () => {

@@ -15,7 +15,7 @@ test('Serials and Movies show clickable posters, round add controls and release 
         await expect(add).toHaveText('');
         const box = await add.boundingBox();
         expect(box.width).toBe(box.height);
-        expect(await add.evaluate(el => getComputedStyle(el).borderRadius)).toBe('50%');
+        expect(await add.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('50%');
         const row = page.locator(`#${body} tr`).first();
         const poster = row.locator(isPhone(page) ? '.cell-compact .title-poster' : '.title-with-poster .title-poster');
         await expect(poster.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
@@ -24,18 +24,18 @@ test('Serials and Movies show clickable posters, round add controls and release 
         await expect(page.locator('#detail-meta .title-rating')).toContainText(section === 'subs' ? '8.4' : '7.1');
         const star = page.locator('#detail-meta .title-rating svg');
         await expect(star.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
-        await expect.poll(() => star.evaluate(el => el.getBBox().width)).toBeGreaterThan(10);
+        await expect.poll(() => star.evaluate((el) => el.getBBox().width)).toBeGreaterThan(10);
         await expect(page.locator('#detail-meta')).not.toContainText('⭐');
         await page.locator('#detail-modal [data-close="detail-modal"]').click();
     }
 });
 
-test('Aired is renamed everywhere and its posters open the title card', async ({ page }) => {
+test('Released is renamed everywhere and its posters open the title card', async ({ page }) => {
     await mockPanel(page, { poster: true });
     await openSection(page, 'history');
-    await expect(page.locator('#history-section h1')).toHaveText('Aired');
-    await expect(page.locator('.nav-item[data-section="history"]')).toHaveAttribute('aria-label', 'Aired');
-    await expect(page.locator('#more-modal [data-section="history"]')).toContainText('Aired');
+    await expect(page.locator('#history-section h1')).toHaveText('Released');
+    await expect(page.locator('.nav-item[data-section="history"]')).toHaveAttribute('aria-label', 'Released');
+    await expect(page.locator('#more-modal [data-section="history"]')).toContainText('Released');
     const poster = page.locator('#history-series .title-poster').first();
     await expect(poster.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
     await poster.click();
@@ -46,7 +46,9 @@ test('long descriptions expand, collapse and reset when another card opens, with
     const overview = 'A long description with words. '.repeat(25) + '<img src=x onerror=alert(1)>';
     await mockPanel(page, { overview });
     await openSection(page, 'watchlist');
-    const titles = page.locator(isPhone(page) ? '#watchlist-body .compact-title' : '#watchlist-body .title-with-poster .link-text');
+    const titles = page.locator(
+        isPhone(page) ? '#watchlist-body .compact-title' : '#watchlist-body .title-with-poster .link-text'
+    );
     await titles.first().click();
     const desc = page.locator('#detail-desc');
     const toggle = desc.getByRole('button', { name: 'Show more' });
@@ -66,7 +68,10 @@ test('long descriptions expand, collapse and reset when another card opens, with
 test('short descriptions stay visible without an expander', async ({ page }) => {
     await mockPanel(page);
     await openSection(page, 'subs');
-    await page.locator(isPhone(page) ? '#subs-body .compact-title' : '#subs-body .title-with-poster .link-text').first().click();
+    await page
+        .locator(isPhone(page) ? '#subs-body .compact-title' : '#subs-body .title-with-poster .link-text')
+        .first()
+        .click();
     await expect(page.locator('#detail-desc')).toHaveText('A test series.');
     await expect(page.locator('#detail-desc button')).toHaveCount(0);
 });

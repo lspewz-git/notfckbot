@@ -55,11 +55,13 @@ const films = () => [
         title: 'Дюна: Часть третья',
         poster: null,
         year: 2026,
-        date: '2026-12-18',
+        date: '2026-11-06',
+        rating: 7.4,
+        overview: 'A journey across the desert. '.repeat(18),
         ruPremiere: null,
         ruDigital: null,
         genres: 'Фантастика',
-        links: []
+        links: [{ kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/index.php?kp_query=x' }]
     }
 ];
 
@@ -111,6 +113,8 @@ function accountState(options) {
         ],
         series: series(),
         films: films(),
+        calendar: structuredClone(CALENDAR),
+        unfollowError: false,
         settings: {
             buttons_mode: 'owner',
             menu_enabled: true,
@@ -168,6 +172,7 @@ const CALENDAR = {
             name: 'Feel Her Love',
             overview: 'Ellie and Dina head out.',
             rating: 8.7,
+            mode: 'episode',
             poster: '/p1.jpg',
             kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/'
         },
@@ -175,6 +180,7 @@ const CALENDAR = {
             date: '2026-11-03',
             kind: 'movie',
             tmdbId: 'movie_6',
+            listId: 6,
             title: 'Мегалополис',
             poster: null,
             kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=y'
@@ -183,6 +189,8 @@ const CALENDAR = {
             date: '2026-11-06',
             kind: 'movie',
             tmdbId: 'movie_7',
+            listId: 7,
+            genres: 'Фантастика',
             title: 'Дюна: Часть третья',
             overview: 'A journey across the desert. '.repeat(18),
             rating: 7.4,
@@ -296,24 +304,37 @@ function accountAnswer(state, req, url) {
         return { hidden: chat.hidden };
     }
     if (rest === '/list') {
-        return { access: { edit: true, settings: chat.settings }, series: state.series, films: state.films };
+        return {
+            access: { edit: true, settings: chat.settings },
+            today: state.calendar.today,
+            series: state.series,
+            films: state.films
+        };
     }
     if (rest === '/series' && method === 'POST') {
-        const s = state.series.find((x) => x.id === body.tmdbId);
-        if (s) s.mode = body.mode;
-        return { created: !s, mode: body.mode };
+        const save = () => {
+            const s = state.series.find((x) => x.id === body.tmdbId);
+            if (s) s.mode = body.mode;
+            return { created: !s, mode: body.mode };
+        };
+        return state.modeHold ? state.modeHold.then(save) : save();
     }
     if (rest.startsWith('/series/') && method === 'DELETE') {
+        if (state.unfollowError) return { status: 503, body: { error: 'Could not unfollow' } };
         state.series = state.series.filter((x) => x.id !== decodeURIComponent(rest.slice(8)));
+        state.calendar.items = state.calendar.items.filter((x) => x.tmdbId !== decodeURIComponent(rest.slice(8)));
         return { removed: true };
     }
     if (rest === '/films' && method === 'POST') return { id: 9, released: false };
     if (rest.startsWith('/films/') && method === 'DELETE') {
-        state.films = state.films.filter((x) => String(x.id) !== rest.slice(7));
+        if (state.unfollowError) return { status: 503, body: { error: 'Could not unfollow' } };
+        const film = state.films.find((x) => String(x.id) === rest.slice(7)) || state.calendar.items.find((x) => String(x.listId) === rest.slice(7));
+        state.films = state.films.filter((x) => x.tmdbId !== film?.tmdbId);
+        state.calendar.items = state.calendar.items.filter((x) => x.tmdbId !== film?.tmdbId);
         return { removed: true };
     }
     if (rest === '/search') return SEARCH;
-    if (rest === '/calendar') return CALENDAR;
+    if (rest === '/calendar') return state.calendar;
     if (rest === '/aired') {
         const year = Number(url.searchParams.get('year') || 2026);
         return {

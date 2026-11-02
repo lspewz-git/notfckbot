@@ -105,13 +105,15 @@ async function addFilm(chatId, tmdbId, who = {}) {
 
 /**
  * Removes a film row. With `chatId` only one of that chat's: the account pages pass it, so a user
- * can't remove another chat's film by its id; the panel removes any.
+ * can't remove another chat's film by its id; the panel removes any. Account Unfollow passes
+ * `allForTitle` so an old notified row cannot hide a newer waiting row of the same film.
  * @returns {Promise<boolean>}
  */
-async function removeFilm(id, { chatId = null, who = {} } = {}) {
+async function removeFilm(id, { chatId = null, who = {}, allForTitle = false } = {}) {
     const entry = await Watchlist.findByPk(id);
     if (!entry || (chatId !== null && String(entry.chatId) !== String(chatId))) return false;
-    await entry.destroy();
+    if (allForTitle) await Watchlist.destroy({ where: { chatId: entry.chatId, tmdb_id: entry.tmdb_id } });
+    else await entry.destroy();
     events.record(entry.chatId, { kind: 'film_removed', tmdb_id: entry.tmdb_id, title: entry.title, ...who });
     return true;
 }

@@ -987,7 +987,7 @@ async function mockPanel(page, options = {}) {
         if (url.pathname.startsWith('/api/')) {
             if (url.pathname.endsWith('/visibility') && panel.account.visibilityWait)
                 await panel.account.visibilityWait;
-            const mine = accountAnswer(panel.account, route.request(), url);
+            const mine = await accountAnswer(panel.account, route.request(), url);
             if (mine) {
                 if (route.request().headers()['x-requested-by'] !== 'notfckbot-panel')
                     return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });

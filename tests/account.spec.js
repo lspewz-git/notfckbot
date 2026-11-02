@@ -78,7 +78,9 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     await expect(page.locator('[data-action="login-qr"]')).toBeVisible();
     await expect(page.locator('[data-action="login-password"]')).toBeVisible();
     await expect(page.locator('#login-name')).toHaveCount(0);
-    const tiles = await page.locator('.login-method').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+    const tiles = await page
+        .locator('.login-method')
+        .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
     expect(tiles.every((height) => height >= 44 && height <= 68)).toBe(true);
     // One code for the one screen, and no "session ended" on a first visit
     await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/);
@@ -133,7 +135,10 @@ test('sign-in branding and confirmation fit without mixed-language instructions'
 });
 
 test('confirmation stays usable when the browser clock is ahead of the server', async ({ page }) => {
-    await page.addInitScript(() => { const now = Date.now.bind(Date); Date.now = () => now() + 360000; });
+    await page.addInitScript(() => {
+        const now = Date.now.bind(Date);
+        Date.now = () => now() + 360000;
+    });
     const panel = await mockPanel(page, { signedOut: true });
     panel.account.confirmationState = 'waiting';
     await page.locator('[data-action="login-qr"]:enabled').click();
@@ -166,7 +171,9 @@ test('a user sees only their own sections, and the panel asks for nothing else',
     const panel = await mockPanel(page, { role: 'user' });
     await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
     const nav = isNarrow(page) ? '.tabbar .tab-item' : '.rail-nav .nav-item';
-    expect(await visibleNav(page, nav)).toEqual(isNarrow(page) ? ['my-aired', 'my-subs', 'my-calendar', 'profile-open'] : ['my-aired', 'my-subs', 'my-calendar']);
+    expect(await visibleNav(page, nav)).toEqual(
+        isNarrow(page) ? ['my-aired', 'my-subs', 'my-calendar', 'profile-open'] : ['my-aired', 'my-subs', 'my-calendar']
+    );
     await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
     // No admin request was made for a user (they would all be refused)
     expect(panel.account.sent.every((r) => r.path.startsWith('/api/account/'))).toBe(true);
@@ -198,8 +205,7 @@ test("an admin's two views: the admin panel and My account, each with only its o
         await profileButton(page, 'my-calendar').click();
         await page.locator('#profile-modal [data-action="view-admin"]').click();
         await expect(page.locator('#profile-modal')).toBeHidden();
-    }
-    else {
+    } else {
         await expect(page.locator('.view-switch')).toContainText('Me');
         await page.locator('.view-switch').click();
         await expect(page.locator('#pick-list .pick-row.selected')).toContainText('My account');
@@ -217,10 +223,7 @@ test('a user has no view switch', async ({ page }) => {
     await expect(page.locator('.tab-admin')).toBeHidden();
 });
 
-test("on an admin's phone navigation appears once, with Account at the right edge", async ({
-    page,
-    isMobile
-}) => {
+test("on an admin's phone navigation appears once, with Account at the right edge", async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await mockPanel(page);
     await openMine(page, 'my-calendar', { admin: true });
@@ -228,7 +231,7 @@ test("on an admin's phone navigation appears once, with Account at the right edg
     await expect(page.locator('#my-calendar-section .mine-chat')).toBeHidden();
     const tabs = page.locator('.tabbar .tab-item:visible');
     await expect(tabs).toHaveCount(4);
-    await expect(tabs.first()).toHaveText('Aired');
+    await expect(tabs.first()).toHaveText('Released');
     await expect(tabs.last()).toHaveAttribute('data-action', 'profile-open');
 });
 
@@ -256,8 +259,8 @@ test('a series card changes the mode and unsubscribes after a confirmation', asy
     expect(
         panel.account.sent.find((r) => r.method === 'POST' && r.path === '/api/account/chats/42/series').body
     ).toEqual({ tmdbId: 'tv_100', mode: 'season' });
-    await card.getByRole('button', { name: 'Unsubscribe' }).click();
-    await card.getByRole('button', { name: 'Yes, unsubscribe' }).click();
+    await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
+    await card.getByRole('button', { name: 'Yes, unfollow' }).click();
     await expect(card).toBeHidden();
     await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(1);
 });
@@ -274,7 +277,7 @@ test('a card closes with the cross in its corner; its buttons are one height; Ki
     const kp = card.getByRole('link', { name: 'Kinopoisk' });
     await expect(kp.locator('.kp-logo use')).toHaveAttribute('href', '#kp-logo-symbol');
     const heights = await card
-        .locator('.mine-links .btn, [data-action="mine-ask-unsubscribe"]')
+        .locator('.mine-links .btn, [data-action="mine-ask-unfollow"]')
         .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
     expect(heights).toHaveLength(2);
     // The dialog may still be scaling in: equal up to a fraction of a pixel
@@ -374,7 +377,7 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
     await expect(card).toContainText('Ellie and Dina head out.');
     await expect(card.locator('.mine-release-date time')).toHaveText('Nov 4, 2026');
     await expect(card.locator('.mine-release-date time')).toHaveAttribute('datetime', '2026-11-04');
-    await expect(card.locator('.mine-release-weekday')).toHaveText('Wednesday');
+    await expect(card.locator('.mine-card-head .mine-release-date')).toHaveCount(1);
     await expect(card.locator('.mine-release-count')).toHaveText('Today');
     await expect(card.locator('.title-rating')).toHaveText('8.7/ 10 · TMDB');
     await expect(card.locator('.title-rating use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
@@ -385,7 +388,9 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
     await expect(card.getByRole('button', { name: /series card/i })).toHaveCount(0);
 });
 
-test('calendar: film dates and countdown are distinct, descriptions expand and missing metadata stays hidden', async ({ page }) => {
+test('calendar: film dates and countdown are distinct, descriptions expand and missing metadata stays hidden', async ({
+    page
+}) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
@@ -393,19 +398,20 @@ test('calendar: film dates and countdown are distinct, descriptions expand and m
     await body.locator('.mine-cal-row', { hasText: 'Дюна: Часть третья' }).click();
     const card = page.locator('#mine-card-modal');
     await expect(card.locator('.mine-release-date time')).toHaveText('Nov 6, 2026');
-    await expect(card.locator('.mine-release-count strong')).toHaveText('2');
-    await expect(card.locator('.mine-release-count span')).toHaveText('days to go');
+    await expect(card.locator('.mine-release-count')).toHaveText('In 2 days');
     await expect(card.locator('.title-rating')).toContainText('7.4');
     await card.getByRole('button', { name: 'Show more', exact: true }).click();
     await expect(card.locator('[data-description-full]')).toBeVisible();
     await card.getByRole('button', { name: 'Show less', exact: true }).click();
     await expect(card.locator('[data-description-full]')).toBeHidden();
-    const layout = await card.locator('.mine-release-date').evaluate(el => {
-        const date = el.querySelector('time').getBoundingClientRect();
-        const count = el.querySelector('.mine-release-count').getBoundingClientRect();
-        return { fits: el.scrollWidth <= el.clientWidth, separate: date.right <= count.left };
+    const layout = await card.locator('.mine-release-date').evaluate((el) => {
+        return {
+            fits: el.scrollWidth <= el.clientWidth,
+            border: getComputedStyle(el).borderStyle,
+            inHeading: Boolean(el.closest('.mine-card-head'))
+        };
     });
-    expect(layout).toEqual({ fits: true, separate: true });
+    expect(layout).toEqual({ fits: true, border: 'none', inHeading: true });
     await card.getByRole('button', { name: 'Close', exact: true }).click();
     await body.locator('.mine-cal-row', { hasText: 'Мегалополис' }).click();
     await expect(card.locator('.mine-release-count')).toHaveText('Yesterday');
@@ -448,10 +454,7 @@ test('signing out, or a session that ends, brings back the sign-in screen', asyn
     await expect(page.locator('#login-error')).toContainText('Your session has ended');
 });
 
-test('on a phone a user has four tabs, big enough to tap, and nothing scrolls sideways', async ({
-    page,
-    isMobile
-}) => {
+test('on a phone a user has four tabs, big enough to tap, and nothing scrolls sideways', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await mockPanel(page, { role: 'user' });
     await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
@@ -618,7 +621,11 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
         const field = document.querySelector('#login-pass').getBoundingClientRect();
         const toggle = button.getBoundingClientRect();
         return {
-            inside: toggle.left >= field.left && toggle.right <= field.right && toggle.top >= field.top && toggle.bottom <= field.bottom,
+            inside:
+                toggle.left >= field.left &&
+                toggle.right <= field.right &&
+                toggle.top >= field.top &&
+                toggle.bottom <= field.bottom,
             right: toggle.left > field.left + field.width / 2,
             border: getComputedStyle(button).borderWidth
         };
@@ -680,7 +687,10 @@ test('QR shares the Telegram confirmation and cancellation invalidates the pendi
 
 test('a refused or expired confirmation returns to the method picker', async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true });
-    for (const [state, message] of [['refused', 'cancelled in the bot'], ['gone', 'time to confirm has run out']]) {
+    for (const [state, message] of [
+        ['refused', 'cancelled in the bot'],
+        ['gone', 'time to confirm has run out']
+    ]) {
         panel.account.confirmationState = state;
         await page.locator('[data-action="login-qr"]:enabled').click();
         await expect(page.locator('#login-error')).toContainText(message, { timeout: 10000 });
@@ -688,7 +698,9 @@ test('a refused or expired confirmation returns to the method picker', async ({ 
     }
 });
 
-test('the system password bypasses Telegram; deliberate panel use renews activity once per minute', async ({ page }) => {
+test('the system password bypasses Telegram; deliberate panel use renews activity once per minute', async ({
+    page
+}) => {
     const panel = await mockPanel(page, { signedOut: true, system: true });
     await page.locator('[data-action="login-password"]').click();
     await page.locator('#login-name').fill('admin');
