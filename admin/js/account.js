@@ -111,8 +111,12 @@ export function setChats(chats, preferred = null) {
     resetAired();
     for (const section of Object.keys(filters)) closeFilter(section);
     showChatChips();
+    chatsChanged();
     reload();
 }
+
+/** The profile menu (profile.js) redraws itself if it is open while the chats arrive or fail */
+const chatsChanged = () => document.dispatchEvent(new window.CustomEvent('account-chats'));
 
 const CHEVRON_RIGHT =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
@@ -125,10 +129,16 @@ export function resetChatChoice() {
     state.chats = null;
     state.chatId = null;
     showChatChips();
+    chatsChanged();
 }
 
-/** The chats and the open one, for the profile menu (profile.js) */
-export const chatList = () => ({ chats: state.chats || [], chatId: state.chatId });
+/** The chats and the open one, for the profile menu (profile.js); `error` once they failed */
+export const chatList = () => ({
+    chats: state.chats || [],
+    chatId: state.chatId,
+    loading: !state.chats && !state.chatsError,
+    error: state.chatsError
+});
 
 /** Apply a saved preference; hiding the current group returns to the first visible chat. */
 export async function setChatHidden(id, hidden) {
@@ -183,6 +193,7 @@ export async function selectChat(id) {
 /** The chats didn't load: the sections say so, with a retry. */
 export function chatsFailed(message) {
     state.chatsError = message;
+    chatsChanged();
     reload();
 }
 
@@ -721,6 +732,7 @@ export const accountActions = {
         }
         state.chatsError = null;
         state.chats = null;
+        chatsChanged();
         reload();
         api('/account/chats')
             .then((chats) => setChats(chats))

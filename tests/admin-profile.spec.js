@@ -2,8 +2,9 @@ const { test, expect } = require('@playwright/test');
 const { watchConsole, openSection, profileButton } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
-// The final logout can race an in-flight authenticated refresh, which correctly receives 401.
-watchConsole({ ignore: /status of 401/ });
+// The final logout can race an in-flight authenticated refresh, which correctly receives 401; the
+// chats test makes Telegram fail with 503.
+watchConsole({ ignore: /status of (401|503)/ });
 
 const adminProfile = (page) => page.locator('.section.active [data-admin-profile] button');
 
@@ -72,4 +73,48 @@ test('local admin has profile settings, password and devices, without Telegram c
     await page.locator('#profile-modal [data-action="logout"]').click();
     await expect(page.locator('#login-gate')).toBeVisible();
     expect(panel.account.sent.some((r) => r.path === '/api/account/chats')).toBe(false);
+});
+
+test('the open profile menu draws the chats in when they arrive, from same-size skeleton rows', async ({ page }) => {
+    let finish;
+    const chatsWait = new Promise((resolve) => {
+        finish = resolve;
+    });
+    await mockPanel(page, { chatsWait });
+    await adminProfile(page).click();
+    const menu = page.locator('#profile-modal');
+    const skeletons = menu.locator('.pick-row.profile-skeleton');
+    await expect(skeletons).toHaveCount(2);
+    await expect(menu.locator('.profile-skeleton')).toHaveCount(3);
+    await expect(menu.locator('[data-action="profile-chat"]')).toHaveCount(0);
+    const skeletonHeight = await skeletons.first().evaluate((el) => el.getBoundingClientRect().height);
+    finish();
+    // No reopening: the chats and Chat settings appear in the menu that is already open
+    await expect(menu.locator('[data-action="profile-chat"]').first()).toBeVisible();
+    await expect(menu.locator('[data-section="my-settings"]')).toBeVisible();
+    await expect(menu.locator('.profile-skeleton')).toHaveCount(0);
+    const rowHeight = await menu
+        .locator('[data-action="profile-chat"]')
+        .first()
+        .evaluate((el) => el.getBoundingClientRect().height);
+    expect(Math.abs(rowHeight - skeletonHeight)).toBeLessThan(1);
+});
+
+test('chats failing while the profile menu is open show a retry that loads them', async ({ page }) => {
+    let finish;
+    const chatsWait = new Promise((resolve) => {
+        finish = resolve;
+    });
+    const panel = await mockPanel(page, { chatsWait, chatsDown: true });
+    await adminProfile(page).click();
+    const menu = page.locator('#profile-modal');
+    await expect(menu.locator('.profile-skeleton').first()).toBeVisible();
+    finish();
+    const retry = menu.locator('[data-action="mine-reload"]');
+    await expect(retry).toContainText("Couldn't load chats");
+    await expect(menu.locator('.profile-skeleton')).toHaveCount(0);
+    panel.account.chatsDown = false;
+    await retry.click();
+    await expect(menu.locator('[data-action="profile-chat"]').first()).toBeVisible();
+    await expect(retry).toHaveCount(0);
 });

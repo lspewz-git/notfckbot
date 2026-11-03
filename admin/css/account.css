@@ -1083,6 +1083,52 @@ button.search-result-open:hover .mine-row-title {
     text-transform: uppercase;
 }
 
+/* Chat rows while Telegram answers: each bar takes its text's line box, as on the dashboard, so
+   the real rows replace them without a jump */
+.profile-skeleton {
+    cursor: default;
+}
+
+.profile-skeleton:hover {
+    background: transparent;
+    border-color: transparent;
+}
+
+.profile-skeleton .action-icon {
+    border-color: var(--border);
+}
+
+.profile-skeleton .pick-avatar {
+    height: 32px;
+    border-radius: 50%;
+}
+
+.profile-skeleton .action-text .skeleton {
+    height: 1lh;
+    padding-block: calc((1lh - 0.9rem) / 2);
+    background-clip: content-box;
+}
+
+.profile-skeleton .action-title .skeleton {
+    width: 60%;
+}
+
+.profile-skeleton .action-desc .skeleton {
+    width: 40%;
+    padding-block: calc((1lh - 0.7rem) / 2);
+}
+
+.profile-skeleton + .profile-skeleton .skeleton {
+    animation-delay: 0.1s;
+}
+
+.profile-retry {
+    flex: none;
+    color: var(--accent);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
 .profile-links {
     margin-top: var(--space-2);
     padding-top: var(--space-2);

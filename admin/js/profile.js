@@ -55,6 +55,23 @@ export function setupProfile() {
         holder.setAttribute('data-admin-profile', '');
         header.append(holder);
     }
+    document.addEventListener('account-chats', redrawMenu);
+}
+
+/** The chats arrived (or failed) while the menu is open: draw them in, keeping focus on its row */
+function redrawMenu() {
+    const modal = /** @type {HTMLDialogElement} */ ($('profile-modal'));
+    if (!modal.open) return;
+    const body = $('profile-body');
+    const focused = /** @type {HTMLElement} */ (document.activeElement);
+    const key = body.contains(focused) && focused.dataset.action;
+    const section = key && focused.dataset.section;
+    body.innerHTML = menuHtml();
+    if (!key) return;
+    const again = [...body.querySelectorAll(`[data-action="${key}"]`)].find(
+        (el) => /** @type {HTMLElement} */ (el).dataset.section === section
+    );
+    /** @type {HTMLElement} */ (again || body).focus();
 }
 
 const row = ({ action, attrs = '', iconHtml, title, hint = '', end = '', cls = '' }) =>
@@ -73,8 +90,37 @@ const pageRow = (section, iconHtml, title) =>
         end: `<span class="action-chevron">${CHEVRON}</span>`
     });
 
+/** Chat rows still on their way from Telegram: the same size as the rows that replace them */
+const SKELETON_CHAT =
+    '<div class="action-row pick-row profile-skeleton" aria-hidden="true"><span class="pick-avatar skeleton"></span>' +
+    '<span class="action-text"><span class="action-title"><span class="skeleton"></span></span>' +
+    '<span class="action-desc"><span class="skeleton"></span></span></span></div>';
+const SKELETON_PAGE =
+    '<div class="action-row profile-skeleton" aria-hidden="true"><span class="action-icon"></span>' +
+    '<span class="action-text"><span class="action-title"><span class="skeleton"></span></span></span></div>';
+
+function chatsLoading() {
+    return (
+        '<h4 class="profile-label" id="profile-chats">Chat</h4>' +
+        `<div class="action-list" role="group" aria-labelledby="profile-chats" aria-busy="true">${SKELETON_CHAT.repeat(2)}</div>`
+    );
+}
+
+const chatsFailedRow = (message) =>
+    '<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list">' +
+    row({
+        action: 'mine-reload',
+        iconHtml: `<span class="action-icon">${icon('triangle-alert')}</span>`,
+        title: "Couldn't load chats",
+        hint: message,
+        end: '<span class="profile-retry">Retry</span>'
+    }) +
+    '</div>';
+
 function menuHtml() {
-    const { chats, chatId } = me?.system ? { chats: [], chatId: null } : chatList();
+    const { chats, chatId, loading, error } = me?.system
+        ? { chats: [], chatId: null, loading: false, error: null }
+        : chatList();
     const head = me
         ? `<div class="profile-head">${avatar(nameOf(), true)}<span class="action-text">` +
           `<span class="action-title">${escapeHtml(nameOf())}</span>` +
@@ -91,6 +137,8 @@ function menuHtml() {
     );
     return (
         head +
+        (loading ? chatsLoading() : '') +
+        (error ? chatsFailedRow(error) : '') +
         (chats.length
             ? `<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${choices}</div>`
             : '') +
@@ -116,7 +164,7 @@ function menuHtml() {
                   end: `<span class="action-chevron">${CHEVRON}</span>`
               })
             : '') +
-        (chats.length ? pageRow('my-settings', SLIDERS, 'Chat settings') : '') +
+        (chats.length ? pageRow('my-settings', SLIDERS, 'Chat settings') : loading ? SKELETON_PAGE : '') +
         pageRow('my-account', PERSON, 'Account settings') +
         row({
             action: 'logout',
