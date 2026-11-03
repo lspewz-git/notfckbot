@@ -9,7 +9,8 @@ import { $, escapeHtml } from './dom.js';
 import { api, apiImage, apiUpload } from './api.js';
 import { openModal, closeModal, showConfirm, toast } from './ui.js';
 import { showRecap } from './chat-stats.js';
-import { loadSchedule } from './recap-schedule.js';
+import { pickFrom } from './pick-sheet.js';
+import { loadSchedule, scheduleYear } from './recap-schedule.js';
 
 export const CARD_NAMES = ['Cover', 'Episodes', 'Taste', 'Best', 'Farewells', 'Ahead'];
 const POLL_MS = 3000;
@@ -17,7 +18,8 @@ const THUMB_LOADS = 3;
 
 const years = () => [new Date().getFullYear() - 1, new Date().getFullYear()];
 let year = new Date().getFullYear();
-let tab = 'looks';
+let tab = 'ready';
+export const recapSendYear = () => (tab === 'schedule' ? scheduleYear() : year);
 // Only the latest answer may fill the section: a year or tab switched meanwhile outruns the older
 const request = { looks: 0, ready: 0, preview: 0 };
 /** @type {{ cards: Array<{ card: number, background: string | null, dim: number }>, pictures: any[], maxDim: number, sample: { id: string, name: string } | null } | null} */
@@ -25,6 +27,7 @@ let looks = null;
 /** @type {{ chats: any[], drawing: { running: boolean, left: number } } | null} */
 let ready = null;
 let poll = null;
+let generating = false;
 
 // Object URLs of pictures' small copies, by id: a picture never changes under its id
 const pictureUrls = new Map();
@@ -89,13 +92,15 @@ function renderTabs() {
     $('recap-sched-pane').hidden = tab !== 'schedule';
     // The schedule has its own year, the day's
     $('recap-years').hidden = tab === 'schedule';
+    const send = document.querySelector('#recap-section [data-action="recap-send-open"]');
+    if (send) /** @type {HTMLButtonElement} */ (send).disabled = tab === 'schedule' && scheduleYear() === null;
 }
 
 /** Entering the section: loads what its tab shows. */
 export function openRecapSection() {
     renderYears();
     renderTabs();
-    loadLooks();
+    if (tab === 'looks') loadLooks();
     if (tab === 'ready') loadReady();
     if (tab === 'schedule') loadSchedule();
 }
@@ -103,7 +108,7 @@ export function openRecapSection() {
 function pickYear(value) {
     year = Number(value);
     renderYears();
-    loadLooks();
+    if (tab === 'looks') loadLooks();
     if (tab === 'ready') loadReady();
 }
 
@@ -112,6 +117,7 @@ function pickTab(value) {
     renderTabs();
     // Not in the section yet (the link in Settings): entering it loads the tab
     if (!$('recap-section').classList.contains('active')) return;
+    if (tab === 'looks') loadLooks();
     if (tab === 'ready') loadReady();
     if (tab === 'schedule') loadSchedule();
 }
@@ -132,7 +138,7 @@ function slotHtml(look) {
             </button>
             <div class="recap-slot-name">${look.card} · ${name}</div>
             <div class="recap-slot-what">${what}</div>
-            <button type="button" class="btn btn-outline btn-compact recap-slot-change" data-action="recap-look-open" data-card="${look.card}">Change</button>
+            <button type="button" class="btn btn-outline btn-compact recap-slot-change" data-action="recap-look-open" data-card="${look.card}">Change background</button>
         </div>`;
 }
 
@@ -166,7 +172,7 @@ function renderLooksLoading() {
             <div class="recap-thumb"><span class="skeleton"></span></div>
             <div class="recap-slot-name">${i + 1} · ${name}</div>
             <div class="recap-slot-what">&nbsp;</div>
-            <button type="button" class="btn btn-outline btn-compact recap-slot-change" disabled>Change</button>
+            <button type="button" class="btn btn-outline btn-compact recap-slot-change" disabled>Change background</button>
         </div>`
     ).join('');
     $('recap-slots').setAttribute('aria-busy', 'true');
@@ -352,36 +358,42 @@ async function saveLook() {
 const STATES = {
     ready: ['ok', 'Ready'],
     old: ['old', 'Out of date'],
-    none: ['none', 'Not drawn']
+    none: ['none', 'Not generated']
 };
 
-function summaryHtml(rows, drawing) {
-    const count = (s) => rows.filter((r) => r.state === s).length;
-    const bytes = rows.reduce((sum, r) => sum + (r.bytes || 0), 0);
+function summaryHtml(rows, drawing, loading = false) {
+    const count = (state) => rows.filter((r) => r.state === state).length;
     const todo = count('old') + count('none');
-    const fact = (value, label) => `<div class="recap-stat"><b>${value}</b><span>${label}</span></div>`;
-    const draw = drawing.running
-        ? `<button type="button" class="btn btn-outline" disabled aria-busy="true">Drawing… ${drawing.left} left</button>`
-        : `<button type="button" class="btn btn-outline" data-action="recap-draw"${todo ? '' : ' disabled'}>Draw missing and out of date (${todo})</button>`;
-    const kept = rows.filter((r) => r.state !== 'none').length;
-    return `
-        <div class="recap-stats">
-            ${fact(count('ready'), 'chats ready')}${fact(count('old'), 'out of date')}${fact(count('none'), 'not drawn')}${fact(kb(bytes), 'on disk')}
+    const bytes = rows.reduce((sum, row) => sum + (row.bytes || 0), 0);
+    const kept = rows.filter((row) => row.state !== 'none').length;
+    const placeholder = '<span class="skeleton recap-stat-skeleton"></span>';
+    const action = drawing.running
+        ? '<button type="button" class="btn btn-primary" disabled aria-busy="true">Generating… ' +
+          drawing.left +
+          ' left</button>'
+        : '<button type="button" class="btn btn-primary" data-action="recap-draw"' +
+          (loading || !todo ? ' disabled' : '') +
+          '>Generate cards' +
+          (todo ? ' (' + todo + ')' : '') +
+          '</button>';
+    return `<div class="recap-readiness" aria-busy="${loading}">
+        <div class="recap-readiness-main">
+            <div><div class="recap-readiness-count"><b>${loading ? placeholder : count('ready')}</b><span> / ${loading ? '—' : rows.length}</span></div><div class="recap-readiness-label">chats ready</div></div>
+            <div class="recap-readiness-status"><span>${loading ? placeholder : count('old') + ' out of date'}</span><span>${loading ? placeholder : count('none') + ' not generated'}</span></div>
+            ${action}
         </div>
-        <div class="recap-ready-actions">
-            ${draw}
-            <button type="button" class="btn btn-danger-quiet" data-action="recap-delete-all"${kept ? '' : ' disabled'}>Delete all…</button>
-        </div>`;
+        <div class="recap-readiness-footer"><span>${loading ? placeholder : kb(bytes) + ' stored'}</span><button type="button" class="btn btn-ghost btn-compact" data-action="recap-ready-menu"${loading || !kept ? ' disabled' : ''}>More…</button></div>
+    </div>`;
 }
 
 function rowHtml(r) {
     const [kind, label] = STATES[r.state];
     const note =
         r.state === 'ready'
-            ? `Drawn ${escapeHtml(when(r.drawnAt))} · ${kb(r.bytes)}`
+            ? `Generated ${escapeHtml(when(r.drawnAt))} · ${kb(r.bytes)}`
             : r.state === 'old'
-              ? 'Figures or backgrounds changed since'
-              : 'Drawn on the first look or send';
+              ? 'Statistics or backgrounds changed'
+              : 'Generated when previewed or sent';
     // Not drawn: the six places stay, empty, so every row's columns line up
     const strip = `<div class="recap-strip${r.state === 'none' ? ' recap-strip-empty' : ''}">${[1, 2, 3, 4, 5, 6]
         .map(
@@ -389,11 +401,25 @@ function rowHtml(r) {
                 `<span class="recap-strip-card">${r.state === 'none' ? '' : `<img data-thumb="${r.chatId}:${n}" alt="" />`}</span>`
         )
         .join('')}</div>`;
-    const actions =
+    const main =
+        r.state === 'ready'
+            ? '<button type="button" class="btn btn-outline btn-compact" data-action="recap-view" data-chat="' +
+              escapeHtml(r.chatId) +
+              '">Preview</button>'
+            : '<button type="button" class="btn btn-outline btn-compact" data-action="recap-draw" data-chat="' +
+              escapeHtml(r.chatId) +
+              '">' +
+              (r.state === 'old' ? 'Regenerate' : 'Generate') +
+              '</button>';
+    const more =
         r.state === 'none'
-            ? `<button type="button" class="btn btn-outline btn-compact" data-action="recap-draw" data-chat="${r.chatId}">Draw</button>`
-            : `<button type="button" class="btn btn-outline btn-compact" data-action="recap-view" data-chat="${r.chatId}">View</button>
-               <button type="button" class="btn btn-ghost btn-compact" data-action="recap-delete" data-chat="${r.chatId}">Delete</button>`;
+            ? ''
+            : '<button type="button" class="btn btn-ghost btn-compact" data-action="recap-row-menu" data-chat="' +
+              escapeHtml(r.chatId) +
+              '" aria-label="More actions for ' +
+              escapeHtml(r.name) +
+              '"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#ellipsis" /></svg></button>';
+    const actions = main + more;
     return `
         <li class="recap-row">
             <div class="recap-row-who"><b>${escapeHtml(r.name)}</b><span>${escapeHtml(r.chatId)} · ${escapeHtml(r.type || 'private')}</span></div>
@@ -432,7 +458,7 @@ function renderReady(answer, asked) {
     $('recap-ready-summary').innerHTML = summaryHtml(answer.chats, answer.drawing);
     $('recap-ready-list').innerHTML = answer.chats.length
         ? answer.chats.map(rowHtml).join('')
-        : '<li class="empty-note">No chat follows anything yet: there is nothing to draw.</li>';
+        : '<li class="empty-note">No chat follows anything yet: there are no cards to generate.</li>';
     $('recap-ready-list').setAttribute('aria-busy', 'false');
     fillThumbs(asked, year);
     clearTimeout(poll);
@@ -451,7 +477,7 @@ function followDrawing(asked) {
             if (asked !== request.ready) return;
             if (!drawing.running) return loadReady(false);
             const busy = $('recap-ready-summary').querySelector('.btn[aria-busy="true"]');
-            if (busy) busy.textContent = `Drawing… ${drawing.left} left`;
+            if (busy) busy.textContent = `Generating… ${drawing.left} left`;
         } catch {
             // Asked again on the next turn
         }
@@ -460,10 +486,7 @@ function followDrawing(asked) {
 }
 
 function renderReadyLoading() {
-    $('recap-ready-summary').innerHTML = summaryHtml([], { running: false, left: 0 }).replace(
-        /<b>[^<]*<\/b>/g,
-        '<b><span class="skeleton recap-stat-skeleton"></span></b>'
-    );
+    $('recap-ready-summary').innerHTML = summaryHtml([], { running: false, left: 0 }, true);
     $('recap-ready-list').innerHTML = [1, 2, 3]
         .map(
             () =>
@@ -475,7 +498,11 @@ function renderReadyLoading() {
 
 async function loadReady(blank = true) {
     const asked = ++request.ready;
-    if (blank) renderReadyLoading();
+    clearTimeout(poll);
+    if (blank) {
+        ready = null;
+        renderReadyLoading();
+    }
     try {
         const answer = await api(`/recap/ready?year=${year}`);
         if (asked !== request.ready) return;
@@ -483,24 +510,29 @@ async function loadReady(blank = true) {
         renderReady(answer, asked);
     } catch (err) {
         if (asked !== request.ready) return;
+        ready = null;
+        $('recap-ready-summary').innerHTML =
+            '<button type="button" class="btn btn-outline" data-action="recap-ready-retry">Try again</button>';
         $('recap-ready-list').innerHTML = `<li class="stats-failed">Failed to load: ${escapeHtml(err.message)}</li>`;
+        $('recap-ready-list').setAttribute('aria-busy', 'false');
     }
 }
 
 async function draw(chatId) {
+    if (!ready || generating || ready.drawing.running) return;
+    generating = true;
     try {
         const body = chatId ? { year, chatIds: [chatId] } : { year };
         const answer = await api('/recap/draw', { method: 'POST', body });
         toast(
-            answer.drawing.left
-                ? `Drawing ${chats(answer.drawing.left)} in the background`
-                : 'Nothing to draw: everything is ready',
+            answer.drawing.left ? `Generating ${chats(answer.drawing.left)} in the background` : 'All cards are ready',
             'success'
         );
     } catch (err) {
         toast(err.message, 'error');
     }
-    loadReady(false);
+    await loadReady(false);
+    generating = false;
 }
 
 function view(chatId) {
@@ -550,6 +582,7 @@ function confirmDeleteAll() {
 
 /** The section's buttons, for app.js's delegation. */
 export const recapCardActions = {
+    'recap-ready-retry': () => loadReady(),
     'recap-year': (el) => pickYear(el.dataset.year),
     'recap-tab': (el) => pickTab(el.dataset.tab),
     'recap-look-open': (el) => openPicker(Number(el.dataset.card)),
@@ -560,7 +593,30 @@ export const recapCardActions = {
     'recap-draw': (el) => draw(el.dataset.chat),
     'recap-view': (el) => view(el.dataset.chat),
     'recap-delete': (el) => confirmDelete(el.dataset.chat),
-    'recap-delete-all': () => confirmDeleteAll()
+    'recap-delete-all': () => confirmDeleteAll(),
+    'recap-ready-menu': () =>
+        pickFrom({
+            title: 'Stored cards',
+            value: '',
+            options: [
+                {
+                    value: 'clear',
+                    label: 'Clear generated files…',
+                    hint: 'Cards can be regenerated. Sending history is kept.'
+                }
+            ],
+            onPick: () => confirmDeleteAll()
+        }),
+    'recap-row-menu': (el) =>
+        pickFrom({
+            title: 'Card actions',
+            value: '',
+            options: [
+                { value: 'preview', label: 'Preview cards' },
+                { value: 'clear', label: 'Clear generated files…', hint: 'Sending history is kept.' }
+            ],
+            onPick: (action) => (action === 'preview' ? view(el.dataset.chat) : confirmDelete(el.dataset.chat))
+        })
 };
 
 /** The file field, dropping a picture on the upload tile, and the dim slider. */

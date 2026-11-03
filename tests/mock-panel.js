@@ -990,6 +990,10 @@ async function mockPanel(page, options = {}) {
         if (url.pathname.startsWith('/api/poster/'))
             return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
         if (url.pathname.startsWith('/api/')) {
+            if (url.pathname === '/api/recap/schedule') {
+                if (route.request().method() === 'PUT' && options.recapScheduleSaveWait) await options.recapScheduleSaveWait;
+                else if (route.request().method() === 'GET' && options.recapScheduleWait) await options.recapScheduleWait;
+            }
             if (url.pathname === '/api/account/chats' && panel.account.chatsWait) await panel.account.chatsWait;
             if (url.pathname.endsWith('/visibility') && panel.account.visibilityWait)
                 await panel.account.visibilityWait;

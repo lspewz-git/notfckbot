@@ -89,6 +89,8 @@
     --text-lg: 1rem;
     --text-xl: 1.25rem;
     --text-2xl: 1.5rem;
+    --recap-stat-size: 2.75rem;
+    --tool-card-width: 26rem;
 
     /* Spacing — 4px grid */
     --space-1: 0.25rem;

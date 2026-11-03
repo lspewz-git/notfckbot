@@ -219,7 +219,6 @@ function fillFields(settings, card) {
     $('settings-db-name').textContent = settings.database.name || '—';
     $('settings-db-user').textContent = settings.database.user || '—';
 
-    renderRecapSchedule(settings);
     renderRestart(settings);
     showErrors({}, card ? CARD_ERRORS[card] : undefined);
     refreshChanges();
@@ -313,21 +312,6 @@ async function saveChangesKeep() {
     }
 }
 
-/** The year recap by date: only what is set; it is set in Year recap → Schedule. */
-function renderRecapSchedule(settings) {
-    const r = settings.recap || {};
-    const when = r.day
-        ? `${new Date(`${r.day}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, ${String(r.hour).padStart(2, '0')}:00 chat's time`
-        : '';
-    $('settings-recap').textContent = r.on
-        ? `On · ${when}`
-        : r.done
-          ? `Sent · ${when}`
-          : when
-            ? `Off · ${when} picked`
-            : 'Off';
-}
-
 /** Changes made, a token field open for pasting, or the cursor in a field: the page is in use. */
 function isEditing() {
     if (hasUnsavedSettings()) return true;
@@ -342,10 +326,9 @@ export async function loadSettings() {
     // A save answered meanwhile has newer values than this answer
     if (before !== saves || saving.size) return;
     if (saved && isEditing()) {
-        // Only what can't conflict with them: the restart state and the recap schedule
-        saved = { ...saved, restart: settings.restart, recap: settings.recap };
+        // Only what can't conflict with them: the restart state
+        saved = { ...saved, restart: settings.restart };
         renderRestart(saved);
-        renderRecapSchedule(saved);
         return;
     }
     saved = settings;

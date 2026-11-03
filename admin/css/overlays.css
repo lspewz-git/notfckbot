@@ -756,12 +756,6 @@ html:has(.modal[open]) {
     }
 }
 
-.stats-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: var(--space-4);
-}
-
 /* The year's recap preview: six 4:5 cards, three across (two on a phone) */
 .modal-recap {
     max-width: 760px;

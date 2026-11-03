@@ -9,6 +9,40 @@ const { mockPanel } = require('./mock-panel');
 
 watchConsole();
 
+test('Tools above Logs contains recap, keeps its navigation active and survives a direct reload', async ({ page }) => {
+    await mockPanel(page);
+    for (const parent of ['.rail-nav', '#more-modal']) {
+        const sections = await page.locator(`${parent} [data-section]`).evaluateAll((items) =>
+            items.map((item) => item.dataset.section),
+        );
+        expect(sections.indexOf('tools')).toBe(sections.indexOf('logs') - 1);
+        expect(sections).not.toContain('recap');
+    }
+    await expect(page.locator('#chats-section [data-action="recap-send-open"]')).toHaveCount(0);
+    await openSection(page, 'tools');
+    await expect(page.locator('#tools-section')).toBeVisible();
+    await page.locator('#tools-section [data-section="recap"]').click();
+    await expect(page.locator('#recap-section')).toBeVisible();
+    await expect(page).toHaveURL(/#recap$/);
+    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('.tab-item[data-open="more-modal"]')).toHaveAttribute('aria-current', 'page');
+    await page.reload();
+    await expect(page.locator('#recap-ready-list .recap-row')).toHaveCount(3);
+    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'page');
+    await page.locator('#recap-section [data-section="tools"]').click();
+    await expect(page.locator('#tools-section')).toBeVisible();
+    await expect(page).toHaveURL(/#tools$/);
+    await page.reload();
+    await expect(page.locator('#tools-section')).toBeVisible();
+});
+
+test('Tools direct links stay unavailable to a user', async ({ page }) => {
+    await mockPanel(page, { role: 'user', path: '/#tools' });
+    await expect(page.locator('#my-subs-section')).toBeVisible();
+    await expect(page.locator('#tools-section')).toBeHidden();
+    await expect(page).toHaveURL(/#my-subs$/);
+});
+
 test('a section opens at its top, not where the previous one was scrolled to', async ({ page }) => {
     await mockPanel(page);
     await expect(page.locator('#popular-list [data-action="series"]').first()).toBeVisible();

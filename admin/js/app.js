@@ -10,7 +10,7 @@ import { filterLogs } from './logs.js';
 import { setHistoryYear, setHistoryPage, setupHistory, openHistoryTitle } from './history.js';
 import { pickPeriod, confirmSendOne } from './chat-stats.js';
 import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './recap.js';
-import { recapCardActions, setupRecapCards, openRecapSection } from './recap-cards.js';
+import { recapCardActions, setupRecapCards, openRecapSection, recapSendYear } from './recap-cards.js';
 import { recapScheduleActions, setupRecapSchedule } from './recap-schedule.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
 import { accessActions, setupAccess } from './access.js';
@@ -177,7 +177,10 @@ const CLICK_ACTIONS = {
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step), el),
     'chat-stats-period': (el) => pickPeriod(el.dataset.period),
     'recap-send-one': (el) => confirmSendOne(el.dataset.again === 'true'),
-    'recap-send-open': () => openRecapSend(),
+    'recap-send-open': () => {
+        const year = recapSendYear();
+        if (year !== null) openRecapSend(year);
+    },
     'recap-send-year': (el) => pickRecapYear(el.dataset.year),
     'recap-send-all': () => confirmSendAll(),
     'recap-send-stop': () => stopRecapSend(),

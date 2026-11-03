@@ -17,9 +17,48 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 async function openRecap(page) {
     await openSection(page, 'recap');
     await expect(page.locator('#recap-section')).toHaveClass(/active/);
+    await page.locator('#recap-section [data-tab="looks"]').click();
     await expect(page.locator('#recap-slots .recap-slot-name')).toHaveCount(6);
     await expect(page.locator('#recap-slots')).toHaveAttribute('aria-busy', 'false');
 }
+
+test('readiness opens first; Regenerate queues only the stale chat and cleanup still asks', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openSection(page, 'recap');
+    await expect(page.locator('#recap-ready-pane')).toBeVisible();
+    await expect(page.locator('#recap-looks-pane')).toBeHidden();
+    await expect(page.locator('.recap-readiness-count')).toHaveText('1 / 3');
+    await page.locator('[data-action="recap-row-menu"][data-chat="101"]').click();
+    await page.locator('#pick-modal [data-action="pick"]', { hasText: 'Clear generated files' }).click();
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await page.locator('#modal-cancel-btn').click();
+    expect(panel.recapDeleted).toBeUndefined();
+    await page.locator('[data-action="recap-draw"][data-chat="101"]').click();
+    await expect.poll(() => panel.recapDraws).toEqual([{ year: YEAR, chatIds: ['101'] }]);
+});
+
+test('failed readiness has no endless skeleton or active actions and can be retried', async ({ page }) => {
+    const failures = ['/api/recap/ready'];
+    await mockPanel(page, { failing: failures });
+    await openSection(page, 'recap');
+    await expect(page.locator('#recap-ready-list')).toContainText('Failed to load');
+    await expect(page.locator('#recap-ready-pane .skeleton')).toHaveCount(0);
+    await expect(page.locator('#recap-ready-list')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.locator('[data-action="recap-draw"]')).toHaveCount(0);
+    failures.length = 0;
+    await page.locator('[data-action="recap-ready-retry"]').click();
+    await expect(page.locator('.recap-readiness-count')).toHaveText('1 / 3');
+    await expect(page.locator('#recap-ready-list .recap-row')).toHaveCount(3);
+});
+
+test('an empty readiness list shows no chats and does not offer generation or cleanup', async ({ page }) => {
+    await mockPanel(page, { recapReady: { year: YEAR, chats: [], drawing: { running: false, left: 0 } } });
+    await openSection(page, 'recap');
+    await expect(page.locator('.recap-readiness-count')).toHaveText('0 / 0');
+    await expect(page.locator('#recap-ready-list')).toContainText('no cards to generate');
+    await expect(page.locator('[data-action="recap-draw"]')).toBeDisabled();
+    await expect(page.locator('[data-action="recap-ready-menu"]')).toBeDisabled();
+});
 
 test('Backgrounds: the six cards with what each is drawn on, and the pictures with the cards using them', async ({
     page
@@ -101,9 +140,11 @@ test('Ready cards: the counts, a row per chat with its state, every row on the s
     await mockPanel(page);
     await openRecap(page);
     await page.locator('[data-action="recap-tab"][data-tab="ready"]').click();
-    await expect(page.locator('#recap-ready-list .recap-tag')).toHaveText(['Ready', 'Out of date', 'Not drawn']);
-    await expect(page.locator('.recap-stat b')).toHaveText(['1', '1', '1', '818 KB']);
-    await expect(page.locator('[data-action="recap-draw"]').first()).toHaveText('Draw missing and out of date (2)');
+    await expect(page.locator('#recap-ready-list .recap-tag')).toHaveText(['Ready', 'Out of date', 'Not generated']);
+    await expect(page.locator('.recap-readiness-count')).toHaveText('1 / 3');
+    await expect(page.locator('.recap-readiness-status')).toHaveText('1 out of date1 not generated');
+    await expect(page.locator('.recap-readiness-footer')).toContainText('818 KB stored');
+    await expect(page.locator('[data-action="recap-draw"]').first()).toHaveText('Generate cards (2)');
     // The six small copies of a drawn set; six empty places for the one not drawn
     await expect(page.locator('#recap-ready-list li').nth(0).locator('.recap-strip-card img')).toHaveCount(6);
     await expect(page.locator('#recap-ready-list li').nth(2).locator('.recap-strip-card')).toHaveCount(6);
@@ -125,7 +166,7 @@ test('Ready cards: draw what is missing, delete one or all (each asked first), v
 
     await page.locator('#recap-ready-summary [data-action="recap-draw"]').click();
     expect(panel.recapDraws).toEqual([{ year: YEAR }]);
-    await expect(page.locator('#recap-ready-summary .btn[aria-busy="true"]')).toHaveText('Drawing… 2 left');
+    await expect(page.locator('#recap-ready-summary .btn[aria-busy="true"]')).toHaveText('Generating… 2 left');
     panel.recapReady.drawing = { running: false, left: 0 };
 
     await page.locator('[data-action="recap-view"][data-chat="-1003"]').click();
@@ -134,16 +175,18 @@ test('Ready cards: draw what is missing, delete one or all (each asked first), v
     await page.locator('#recap-modal .modal-x').click();
     await expect(page.locator('#recap-modal')).toBeHidden();
 
-    await page.locator('[data-action="recap-delete"][data-chat="101"]').click();
+    await page.locator('[data-action="recap-row-menu"][data-chat="101"]').click();
+    await page.locator('#pick-modal [data-action="pick"]', { hasText: 'Clear generated files' }).click();
     await expect(page.locator('#confirm-title')).toHaveText('Delete the cards of alice?');
     await page.locator('#modal-confirm-btn').click();
-    await expect(page.locator('#recap-ready-list .recap-tag').nth(1)).toHaveText('Not drawn');
+    await expect(page.locator('#recap-ready-list .recap-tag').nth(1)).toHaveText('Not generated');
     expect(panel.recapDeleted).toBe('101');
 
-    await page.locator('[data-action="recap-delete-all"]').click();
+    await page.locator('[data-action="recap-ready-menu"]').click();
+    await page.locator('#pick-modal [data-action="pick"]').click();
     await expect(page.locator('#confirm-title')).toHaveText(`Delete the ${YEAR} cards of 1 chat?`);
     await page.locator('#modal-confirm-btn').click();
-    await expect(page.locator('#recap-ready-list .recap-tag')).toHaveText(['Not drawn', 'Not drawn', 'Not drawn']);
+    await expect(page.locator('#recap-ready-list .recap-tag')).toHaveText(['Not generated', 'Not generated', 'Not generated']);
     expect(panel.recapDeletedAll).toBe(true);
 });
 
@@ -158,7 +201,8 @@ test('Schedule: off, with 28 December and 12:00 offered; showing it saves nothin
 }) => {
     const panel = await mockPanel(page);
     await openSchedule(page);
-    await expect(page.locator('#recap-sched-state')).toContainText('Off');
+    await expect(page.locator('#recap-sched-state')).toContainText('Schedule is off');
+    await expect(page.locator('#recap-sched-state')).toContainText(`${YEAR} recap · 28 Dec · 12:00, each chat’s time`);
     // The schedule has its own year: the year buttons go
     await expect(page.locator('#recap-years')).toBeHidden();
     await expect(page.locator('#recap-sched-pane .custom-select-trigger')).toHaveText([`28 December ${YEAR}`, '12:00']);
@@ -195,7 +239,7 @@ test('Schedule: turning on asks first and says when and to how many; then the da
     await page.locator('#modal-confirm-btn').click();
     await expect(sw).toHaveAttribute('aria-checked', 'true');
     expect(panel.recapScheduleSaves).toEqual([{ on: true, day: `${YEAR}-12-28`, hour: 12 }]);
-    await expect(page.locator('#recap-sched-state')).toContainText(`On: 28 December ${YEAR}, 12:00 chat's time`);
+    await expect(page.locator('#recap-sched-state')).toContainText(`Scheduled · ${YEAR} recap · 28 Dec · 12:00`);
     await expect(page.locator('#recap-sched-state')).toContainText('until the first chat');
     await expect(page.locator('#recap-sched-pane .custom-select-trigger').first()).toBeDisabled();
 
@@ -228,7 +272,7 @@ test('Schedule: after the day it says it was sent; while sending it shows how fa
         }
     });
     await openSchedule(page);
-    await expect(page.locator('#recap-sched-state')).toContainText(`Sent on 28 December ${YEAR}`);
+    await expect(page.locator('#recap-sched-state')).toContainText(`Schedule finished · ${YEAR} recap · 28 Dec`);
     await expect(page.locator('#recap-sched-state')).toContainText('3 chats got it');
     await expect(page.locator('#recap-sched-switch')).toHaveAttribute('aria-checked', 'false');
 });
@@ -272,7 +316,7 @@ test('Schedule: turned off during the sending, it says what is still queued and 
     });
     await openSchedule(page);
     await expect(page.locator('#recap-sched-state')).toContainText(
-        '2 chats already queued still go out; Stop in the Send window takes them off.'
+        '2 chats already queued still go out; Stop in Send now takes them off.'
     );
 });
 

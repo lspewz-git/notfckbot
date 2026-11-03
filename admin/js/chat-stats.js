@@ -8,7 +8,7 @@
 import { $, escapeHtml } from './dom.js';
 import { activeLine, shortDay } from './format.js';
 import { api, apiImage } from './api.js';
-import { openModal, closeModal, setReturnTo, showConfirm, toast } from './ui.js';
+import { openModal, setReturnTo, showConfirm, toast } from './ui.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FEATURES = {
@@ -29,7 +29,6 @@ const number = new Intl.NumberFormat('en-GB');
 let chatId = null;
 let chatName = '';
 // Back to the chat's menu, from the statistics (chats.js gives it)
-let backToMenu = null;
 let period = 'year';
 // Only the latest request may fill a dialog: switching the period or the chat outruns the older
 const state = { request: 0, recap: 0 };
@@ -254,24 +253,14 @@ async function load() {
     }
 }
 
-/** The year the recap button shows: the period's, or this year for all time. */
-const recapYear = () => (period === 'last' ? thisYear() - 1 : thisYear());
-
-function renderRecapButton() {
-    $('chat-stats-recap').textContent = `Preview ${recapYear()} recap`;
-}
-
 /** Opens the dialog for a chat, on this year. */
-export function openChatStats(chat, label, back = null) {
+export function openChatStats(chat, label) {
     chatId = chat.id;
     chatName = label;
-    backToMenu = back;
     chatType = chat.type || 'private';
     period = 'year';
     $('chat-stats-sub').textContent = [label, chatType, activeLine(chat.last_seen_at)].filter(Boolean).join(' · ');
     renderPeriods();
-    renderRecapButton();
-    $('chat-stats-recap').onclick = openRecap;
     openModal('chat-stats-modal');
     load();
 }
@@ -281,7 +270,6 @@ export function pickPeriod(key) {
     if (!chatId) return;
     period = key;
     renderPeriods();
-    renderRecapButton();
     load();
 }
 
@@ -289,18 +277,8 @@ export function pickPeriod(key) {
 
 // The object URLs on show, freed when the next preview opens
 let shown = [];
-// The preview on screen: its chat and year, and how closing it goes back to the statistics
+// The preview on screen: its chat and year, and where closing it returns
 const preview = { id: null, year: null, back: null, sentAt: null };
-
-function openRecap() {
-    closeModal('chat-stats-modal');
-    // Closing the preview goes back to the statistics, and from there to the chat's menu
-    const menu = backToMenu;
-    showRecap(chatId, chatName, recapYear(), () => {
-        openModal('chat-stats-modal');
-        if (menu) setReturnTo(menu);
-    });
-}
 
 /**
  * The preview of a chat's year: its six cards and whether it was sent, with the button. Also from

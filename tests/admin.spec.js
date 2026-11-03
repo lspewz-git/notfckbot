@@ -68,6 +68,22 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 
+test('Tools opens readiness-first recap and its schedule without changing anything', async ({ page }) => {
+    await goToSection(page, 'tools');
+    await page.locator('#tools-section [data-section="recap"]').click();
+    await expect(page.locator('#recap-ready-pane')).toBeVisible();
+    await expect(page.locator('#recap-ready-list')).toHaveAttribute('aria-busy', 'false', { timeout: 15000 });
+    await expect(page.locator('.recap-readiness-count b')).toHaveText(/^\d+$/);
+    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'page');
+    await page.locator('#recap-section [data-tab="schedule"]').click();
+    await expect(page.locator('#recap-sched-pane')).toHaveAttribute('aria-busy', 'false', { timeout: 15000 });
+    await expect(page.locator('#recap-sched-state')).toContainText('recap');
+    const gaps = await page.locator('.recap-sched-field').evaluateAll((fields) => fields.map((field) =>
+        field.querySelector('.custom-select').getBoundingClientRect().top - field.querySelector('label').getBoundingClientRect().bottom,
+    ));
+    for (const gap of gaps) expect(gap).toBe(8);
+});
+
 test('a table shows skeleton rows before its data arrives', async ({ page }) => {
     // The skeleton is painted in the same tick as the click
     await openSection(page, 'chats');

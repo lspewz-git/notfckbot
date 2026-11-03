@@ -1,5 +1,5 @@
 /**
- * Sending the year's recap to every chat that has something to show (Users / Chats → Year recap…,
+ * Sending the year's recap to every chat that has something to show (Tools → Year recap → Send…,
  * src/recap/send.js): who would get it, then how the sending goes, with Stop.
  */
 
@@ -112,8 +112,8 @@ async function load(blank = true) {
 }
 
 /** The header's button (data-action="recap-send-open"). */
-export function openRecapSend() {
-    year = new Date().getFullYear();
+export function openRecapSend(selectedYear = new Date().getFullYear()) {
+    year = selectedYear;
     last = null;
     renderYears();
     openModal('recap-send-modal');

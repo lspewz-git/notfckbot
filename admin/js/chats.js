@@ -46,7 +46,7 @@ export function openChatActions(chatId) {
     $('action-stats').onclick = () => {
         closeModal('chat-actions-modal');
         setReturnTo(backToChat);
-        openChatStats(chat, label, backToChat);
+        openChatStats(chat, label);
     };
 
     $('action-changes').onclick = () => {

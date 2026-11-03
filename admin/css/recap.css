@@ -1,5 +1,39 @@
 /* Year recap: the cards' backgrounds and the sets drawn so far (recap-cards.js) */
 
+#recap-section > .recap-header {
+    margin-bottom: var(--space-3);
+    gap: var(--space-2);
+}
+
+.recap-heading,
+.recap-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.recap-heading .recap-back {
+    flex: none;
+    width: var(--control-h);
+    padding: 0;
+    background: transparent;
+    border-color: transparent;
+}
+
+.recap-heading .recap-back:hover {
+    background: var(--surface-2);
+}
+
+.recap-heading h1 {
+    margin: 0;
+}
+
+.recap-toolbar {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
 .recap-head-actions {
     display: flex;
     align-items: center;
@@ -15,8 +49,23 @@
     display: none;
 }
 
-.recap-tabs {
-    margin-bottom: var(--space-4);
+.recap-toolbar .recap-tabs {
+    margin: 0;
+}
+
+@media (max-width: 760px) {
+    .recap-toolbar .recap-tabs,
+    .recap-head-actions {
+        width: 100%;
+    }
+
+    .recap-head-actions {
+        justify-content: space-between;
+    }
+
+    .recap-head-actions > .btn {
+        margin-left: auto;
+    }
 }
 
 .recap-h {
@@ -298,43 +347,10 @@ button.recap-thumb:focus-visible {
     margin-bottom: var(--space-4);
 }
 
-.recap-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-}
-
-.recap-stat {
-    min-width: 130px;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
-}
-
-.recap-stat b {
-    display: block;
-    min-height: 1.3em;
-    font-size: var(--text-xl);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-}
-
-.recap-stat span {
-    color: var(--text-dim);
-    font-size: var(--text-xs);
-}
-
 .recap-stat-skeleton {
     display: inline-block;
     width: 3ch;
     height: 1em;
-}
-
-.recap-ready-actions {
-    display: flex;
-    gap: var(--space-2);
-    margin-left: auto;
 }
 
 .recap-ready {
@@ -632,10 +648,6 @@ button.recap-thumb:focus-visible {
         font-size: var(--text-lg);
     }
 
-    .recap-head-actions .btn-outline {
-        display: none;
-    }
-
     .recap-pictures {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -658,24 +670,6 @@ button.recap-thumb:focus-visible {
     }
 
     /* Two by two: four in a row leave no room for a figure and its label */
-    .recap-stats {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        width: 100%;
-    }
-
-    .recap-stat {
-        min-width: 0;
-    }
-
-    .recap-ready-actions {
-        width: 100%;
-        margin-left: 0;
-    }
-
-    .recap-ready-actions .btn:first-child {
-        flex: 1;
-    }
 
     /* A row as a small card: who and the button, the state, the six under them */
     .recap-row {
@@ -721,5 +715,144 @@ button.recap-thumb:focus-visible {
         content: '';
         position: absolute;
         inset: 0 -6px;
+    }
+}
+
+/* Recap: readiness leads; technical storage stays secondary. */
+.recap-readiness {
+    width: 100%;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-6);
+}
+.recap-readiness-main {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+}
+.recap-readiness-count {
+    font-size: var(--text-2xl);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+.recap-readiness-count b {
+    font-size: var(--recap-stat-size);
+    font-weight: 600;
+}
+.recap-readiness-count span {
+    color: var(--text-dim);
+}
+.recap-readiness-label {
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+}
+.recap-readiness-status {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+.recap-readiness-main > .btn {
+    margin-left: auto;
+}
+.recap-readiness-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    border-top: 1px solid var(--border);
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+.recap-row-actions {
+    flex-wrap: wrap;
+}
+.recap-sched-field {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+}
+.recap-sched-field .settings-label {
+    display: block;
+    padding: 0;
+    line-height: 1.4;
+}
+.recap-sched-fields {
+    row-gap: var(--space-4);
+}
+.tool-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+}
+.tool-card {
+    display: grid;
+    grid-template-columns: var(--space-6) minmax(0, 1fr) var(--space-5);
+    align-items: center;
+    gap: var(--space-4);
+    width: var(--tool-card-width);
+    max-width: 100%;
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.tool-card:hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+}
+.tool-card-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+.tool-card-title {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+.tool-card-desc {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+}
+.tool-card-icon {
+    width: var(--space-6);
+    height: var(--space-6);
+}
+.tool-card-arrow {
+    width: var(--space-5);
+    height: var(--space-5);
+    color: var(--text-dim);
+}
+@media (max-width: 760px) {
+    .recap-readiness {
+        padding: var(--space-4);
+    }
+    .recap-readiness-main {
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        justify-content: space-between;
+    }
+    .recap-readiness-main > .btn {
+        width: 100%;
+        margin-left: 0;
+    }
+    .recap-readiness-footer > span {
+        max-width: 70%;
+    }
+    .recap-slot-change {
+        padding-inline: var(--space-1);
+        font-size: var(--text-xs);
     }
 }

@@ -17,9 +17,16 @@ const DAY_MS = 24 * HOUR_MS;
 let request = 0;
 /** @type {any} */
 let state = null;
+export const scheduleYear = () => (busy ? null : (state?.year ?? null));
 let busy = false;
 // Filling the fields fires their change events: those are not picks
 let rendering = false;
+
+function syncManualSend() {
+    if ($('recap-sched-pane').hidden) return;
+    const button = document.querySelector('#recap-section [data-action="recap-send-open"]');
+    if (button) /** @type {HTMLButtonElement} */ (button).disabled = scheduleYear() === null;
+}
 
 const chats = (n) => `${n} ${n === 1 ? 'chat' : 'chats'}`;
 const dayLabel = (day, withYear = true) =>
@@ -47,10 +54,15 @@ function until(iso, now = Date.now()) {
 
 /** The line at the top: off, on and waiting, sending, sent. */
 function stateHtml(s) {
+    const day = s.day || s.suggested.day;
+    const hour = s.hour === null ? s.suggested.hour : s.hour;
+    const summary = escapeHtml(
+        s.year + ' recap · ' + dayLabel(day, false) + ' · ' + hourLabel(hour) + ', each chat’s time'
+    );
     if (!s.on && s.done) {
         const p = s.progress;
         const note = `${chats(p.sent)} got it${p.queued + p.sending ? `, ${p.queued + p.sending} still in the queue` : ''}${p.failed ? `, ${p.failed} failed` : ''}. Pick a new day to send again.`;
-        return `<div class="recap-sched-state"><i class="recap-sched-dot" aria-hidden="true"></i><div class="recap-sched-grow"><b>Sent on ${escapeHtml(dayLabel(s.day))}</b><span>${escapeHtml(note)}</span></div></div>`;
+        return `<div class="recap-sched-state"><i class="recap-sched-dot" aria-hidden="true"></i><div class="recap-sched-grow"><b>Schedule finished · ${summary}</b><span>${escapeHtml(note)}</span></div></div>`;
     }
     if (!s.on) {
         // Turned off during the sending: what is queued still goes, only Stop takes it off
@@ -59,15 +71,15 @@ function stateHtml(s) {
         const now = Date.now();
         const midway = s.firstAt && new Date(s.firstAt).getTime() <= now && now < new Date(s.lastAt).getTime();
         const note = [
-            waiting ? `${chats(waiting)} already queued still go out; Stop in the Send window takes them off.` : '',
+            waiting ? `${chats(waiting)} already queued still go out; Stop in Send now takes them off.` : '',
             midway ? "Chats whose hour hasn't come won't get it by date: send them by hand." : '',
-            !waiting && !midway ? 'Nothing will go out by itself. Sending by hand works as before.' : ''
+            !waiting && !midway ? 'Schedule is off. Send now is available separately.' : ''
         ]
             .filter(Boolean)
             .join(' ');
-        return `<div class="recap-sched-state"><i class="recap-sched-dot" aria-hidden="true"></i><div class="recap-sched-grow"><b>Off</b><span>${escapeHtml(note)}</span></div></div>`;
+        return `<div class="recap-sched-state"><i class="recap-sched-dot" aria-hidden="true"></i><div class="recap-sched-grow"><b>${summary}</b><span>${escapeHtml(note)}</span></div></div>`;
     }
-    const title = `On: ${escapeHtml(dayLabel(s.day))}, ${hourLabel(s.hour)} chat's time`;
+    const title = `Scheduled · ${summary}`;
     if (s.firstAt && Date.now() < new Date(s.firstAt).getTime()) {
         const [n, unit] = until(s.firstAt);
         const east =
@@ -140,11 +152,17 @@ function fill(s) {
         row('Blocked in the panel', a.blocked) +
         (a.left ? row('Left the bot', a.left) : '');
     $('recap-sched-pane').setAttribute('aria-busy', 'false');
+    syncManualSend();
 }
 
 /** Opening the tab. */
 export async function loadSchedule() {
     const asked = ++request;
+    state = null;
+    syncManualSend();
+    lockFields(true);
+    /** @type {HTMLButtonElement} */ ($('recap-sched-switch')).disabled = true;
+    $('recap-sched-pane').setAttribute('aria-busy', 'true');
     try {
         const answer = await api('/recap/schedule');
         if (asked === request) render(answer);
@@ -164,6 +182,7 @@ export async function loadSchedule() {
 async function save(body, done) {
     if (busy) return;
     busy = true;
+    syncManualSend();
     const sw = $('recap-sched-switch');
     sw.setAttribute('aria-busy', 'true');
     ++request;
@@ -177,6 +196,7 @@ async function save(body, done) {
         loadSchedule();
     } finally {
         busy = false;
+        syncManualSend();
         sw.removeAttribute('aria-busy');
     }
 }

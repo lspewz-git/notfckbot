@@ -3,18 +3,15 @@ const { watchConsole, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
- * Sending the year's recap from the panel, on the canned API: the switch in Settings, one chat
- * from its preview, every chat from Users / Chats. Nothing goes out without a second "yes".
+ * Sending the year's recap from Tools, on the canned API. Nothing goes out without confirmation.
  */
 
 watchConsole();
 
 const YEAR = new Date().getFullYear();
 async function openPreview(page) {
-    await openSection(page, 'chats');
-    await page.locator('[data-action="chat-actions"][data-id="-1003"]').click();
-    await page.locator('#action-stats').click();
-    await page.locator('#chat-stats-recap').click();
+    await openSection(page, 'recap');
+    await page.locator('[data-action="recap-view"][data-chat="-1003"]').click();
     await expect(page.locator('#recap-modal')).toBeVisible();
 }
 
@@ -29,7 +26,7 @@ test('one chat: "No" sends nothing; "Send" queues it once, and the footer says s
     await page.locator('#modal-cancel-btn').click();
     await expect(page.locator('#confirm-modal')).toBeHidden();
     await expect(page.locator('#recap-modal')).toBeVisible();
-    // The question's No goes back to the preview, not past it to the statistics
+    // The question's No goes back to the preview.
     await expect(page.locator('#chat-stats-modal')).toBeHidden();
     expect(panel.recapSendOne).toBeUndefined();
 
@@ -41,9 +38,10 @@ test('one chat: "No" sends nothing; "Send" queues it once, and the footer says s
     await expect(page.locator('#recap-actions .btn')).toBeDisabled();
     expect(panel.recapSendOne).toEqual({ chatId: '-1003', body: { year: YEAR } });
 
-    // Closing the preview still goes back to the statistics
+    // Closing the preview returns to Ready cards.
     await page.locator('#recap-modal .modal-x').click();
-    await expect(page.locator('#chat-stats-modal')).toBeVisible();
+    await expect(page.locator('#recap-modal')).toBeHidden();
+    await expect(page.locator('#recap-ready-pane')).toBeVisible();
 });
 
 test('a chat that has its year: when, and "Send again" behind its own question', async ({ page }) => {
@@ -67,8 +65,8 @@ test('a chat that has its year: when, and "Send again" behind its own question',
 
 test('every chat: the counts, a second "yes", then the progress with Stop', async ({ page }) => {
     const panel = await mockPanel(page);
-    await openSection(page, 'chats');
-    await page.locator('#chats-section [data-action="recap-send-open"]').click();
+    await openSection(page, 'recap');
+    await page.locator('#recap-section [data-action="recap-send-open"]').click();
     const dialog = page.locator('#recap-send-modal');
     await expect(dialog.locator('.recap-fact b')).toHaveText(['37', '3', '5', '2']);
     await expect(dialog.locator('#recap-send-years .btn.active')).toHaveText(String(YEAR));
@@ -85,19 +83,47 @@ test('every chat: the counts, a second "yes", then the progress with Stop', asyn
     expect(panel.recapStopped).toBe(true);
 });
 
-test('Settings: the recap by date only says what is set, and opens Year recap → Schedule', async ({ page }) => {
-    // The first chat far ahead: the tab shows it waiting
-    await mockPanel(page, {
-        recapSchedule: { on: true, day: `${YEAR}-12-28`, hour: 12, firstAt: `${YEAR + 5}-12-28T00:00:00Z` }
-    });
+test('Send now keeps the selected recap year, including the schedule year', async ({ page }) => {
+    await mockPanel(page, { recapSchedule: { year: YEAR - 1 } });
+    await openSection(page, 'recap');
+    await page.locator(`#recap-years [data-year="${YEAR - 1}"]`).click();
+    await page.locator('#recap-section [data-action="recap-send-open"]').click();
+    await expect(page.locator('#recap-send-years .btn.active')).toHaveText(String(YEAR - 1));
+    await page.locator('#recap-send-modal .modal-x').click();
+    await page.locator(`#recap-years [data-year="${YEAR}"]`).click();
+    await page.locator('#recap-section [data-tab="schedule"]').click();
+    await expect(page.locator('#recap-sched-pane')).toHaveAttribute('aria-busy', 'false');
+    await page.locator('#recap-section [data-action="recap-send-open"]').click();
+    await expect(page.locator('#recap-send-years .btn.active')).toHaveText(String(YEAR - 1));
+});
+
+test('Send now waits for a current schedule year while loading or saving', async ({ page }) => {
+    let releaseLoad, releaseSave;
+    const recapScheduleWait = new Promise((resolve) => { releaseLoad = resolve; });
+    const recapScheduleSaveWait = new Promise((resolve) => { releaseSave = resolve; });
+    await mockPanel(page, { recapScheduleWait, recapScheduleSaveWait });
+    await openSection(page, 'recap');
+    await page.locator(`#recap-years [data-year="${YEAR - 1}"]`).click();
+    await page.locator('#recap-section [data-tab="schedule"]').click();
+    const send = page.locator('#recap-section [data-action="recap-send-open"]');
+    await expect(send).toBeDisabled();
+    releaseLoad();
+    await expect(send).toBeEnabled();
+    await send.click();
+    await expect(page.locator('#recap-send-years .btn.active')).toHaveText(String(YEAR));
+    await page.locator('#recap-send-modal .modal-x').click();
+    await page.locator('#recap-sched-pane .custom-select-trigger').nth(1).click();
+    await page.locator('.custom-select-option', { hasText: '18:00' }).click();
+    await expect(send).toBeDisabled();
+    releaseSave();
+    await expect(send).toBeEnabled();
+});
+
+test('Settings has no shortcut into year recap', async ({ page }) => {
+    await mockPanel(page);
     await openSection(page, 'settings');
     await page.locator('[data-action="settings-tab"][data-tab="bot"]').click();
-    await expect(page.locator('.settings-title', { hasText: 'Year recap' })).not.toContainText('in dev');
-    await expect(page.locator('#settings-recap')).toHaveText(`On · 28 Dec ${YEAR}, 12:00 chat's time`);
-    await page.locator('#settings-section [data-tab="schedule"]').click();
-    await expect(page.locator('#recap-section')).toHaveClass(/active/);
-    await expect(page.locator('#recap-sched-pane')).toBeVisible();
-    await expect(page.locator('#recap-sched-state')).toContainText(`On: 28 December ${YEAR}, 12:00 chat's time`);
+    await expect(page.locator('#settings-section [data-section="recap"]')).toHaveCount(0);
 });
 
 test('Stop with sending by date on, .env not writable: a warning that a restart turns it on again', async ({
@@ -107,8 +133,8 @@ test('Stop with sending by date on, .env not writable: a warning that a restart 
         recapSchedule: { on: true, day: `${YEAR}-12-28`, hour: 12, firstAt: `${YEAR + 5}-12-28T00:00:00Z` },
         recapStopSaved: false
     });
-    await openSection(page, 'chats');
-    await page.locator('#chats-section [data-action="recap-send-open"]').click();
+    await openSection(page, 'recap');
+    await page.locator('#recap-section [data-action="recap-send-open"]').click();
     const dialog = page.locator('#recap-send-modal');
     await dialog.locator('[data-action="recap-send-all"]').click();
     await page.locator('#modal-confirm-btn').click();

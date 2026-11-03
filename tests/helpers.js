@@ -35,6 +35,11 @@ function watchConsole({ ignore } = {}) {
 
 /** Opens a section from the sidebar, the tab bar, or the More sheet for those without a tab. */
 async function openSection(page, section) {
+    if (section === 'recap') {
+        await openSection(page, 'tools');
+        await page.locator('#tools-section [data-section="recap"]').click();
+        return;
+    }
     if (!isNarrow(page)) {
         await page.locator(`.nav-item[data-section="${section}"]`).click();
         return;

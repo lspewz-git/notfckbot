@@ -167,13 +167,13 @@
                         </svg>
                         <span class="nav-label" aria-hidden="true">Released</span>
                     </button>
-                    <button class="nav-item" data-section="recap" aria-label="Year recap">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#notebook-text" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Recap</span>
-                    </button>
                     <span class="rail-divider" aria-hidden="true"></span>
+                    <button class="nav-item" data-section="tools" data-tab-sections="recap" aria-label="Tools">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#sliders-horizontal" />
+                        </svg>
+                        <span class="nav-label" aria-hidden="true">Tools</span>
+                    </button>
                     <button class="nav-item" data-section="logs" aria-label="Activity Logs">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <use href="/vendor/lucide.svg#file-text" />
@@ -640,7 +640,6 @@
                     <section id="chats-section" class="section">
                         <header>
                             <h1>Users / Chats</h1>
-                            <button class="btn btn-outline" data-action="recap-send-open">Year recap…</button>
                         </header>
                         <div class="glass-card">
                             <div class="tab-filters" role="group" aria-label="Which chats to show">
@@ -1058,26 +1057,6 @@
                                         </div>
                                     </div>
                                 </div>
-
-                                <div class="glass-card settings-card">
-                                    <h2 class="settings-title">Year recap by date</h2>
-                                    <p class="settings-desc">
-                                        Every chat gets its year's six cards by itself on a day before New Year. Sending
-                                        by hand, from Users / Chats or a chat's Statistics, works either way.
-                                    </p>
-                                    <div class="settings-recap-row">
-                                        <span id="settings-recap" class="settings-recap-state">Off</span>
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline btn-compact"
-                                            data-action="recap-tab"
-                                            data-tab="schedule"
-                                            data-section="recap"
-                                        >
-                                            Open Schedule
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                             <div class="settings-col">
                                 <div class="glass-card settings-card">
@@ -1424,41 +1403,78 @@
                         <div id="history-body" aria-live="polite"></div>
                     </section>
 
+                    <section id="tools-section" class="section">
+                        <header><h1>Tools</h1></header>
+                        <div class="tool-grid">
+                            <button class="tool-card" data-section="recap">
+                                <svg class="icon tool-card-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#notebook-text" />
+                                </svg>
+                                <span class="tool-card-copy"
+                                    ><span class="tool-card-title">Year recap</span
+                                    ><span class="tool-card-desc"
+                                        >Prepare cards and schedule your year in review.</span
+                                    ></span
+                                >
+                                <svg class="icon tool-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#chevron-right" />
+                                </svg>
+                            </button>
+                        </div>
+                    </section>
                     <section id="recap-section" class="section">
-                        <header class="section-header">
-                            <h1>Year recap</h1>
+                        <header class="recap-header">
+                            <div class="recap-heading">
+                                <button
+                                    type="button"
+                                    class="btn btn-ghost recap-back"
+                                    data-section="tools"
+                                    aria-label="Back to Tools"
+                                >
+                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <use href="/vendor/lucide.svg#arrow-left" />
+                                    </svg>
+                                </button>
+                                <h1>Year recap</h1>
+                            </div>
+                        </header>
+                        <div class="recap-toolbar">
+                            <div class="tab-filters recap-tabs" role="group" aria-label="Recap task">
+                                <button
+                                    class="btn btn-ghost active"
+                                    data-action="recap-tab"
+                                    data-tab="ready"
+                                    aria-pressed="true"
+                                >
+                                    Ready cards
+                                </button>
+                                <button
+                                    class="btn btn-ghost"
+                                    data-action="recap-tab"
+                                    data-tab="looks"
+                                    aria-pressed="false"
+                                >
+                                    Backgrounds
+                                </button>
+                                <button
+                                    class="btn btn-ghost"
+                                    data-action="recap-tab"
+                                    data-tab="schedule"
+                                    aria-pressed="false"
+                                >
+                                    Schedule
+                                </button>
+                            </div>
                             <div class="recap-head-actions">
                                 <!-- Filled by recap-cards.js: last year and this one -->
                                 <div id="recap-years" class="tab-filters" role="group" aria-label="Year"></div>
-                                <button class="btn btn-outline" data-action="recap-send-open">Send…</button>
+                                <button class="btn btn-outline" data-action="recap-send-open">Send now…</button>
                             </div>
-                        </header>
-                        <div class="tab-filters recap-tabs" role="group" aria-label="What to show">
-                            <button
-                                class="btn btn-ghost active"
-                                data-action="recap-tab"
-                                data-tab="looks"
-                                aria-pressed="true"
-                            >
-                                Backgrounds
-                            </button>
-                            <button class="btn btn-ghost" data-action="recap-tab" data-tab="ready" aria-pressed="false">
-                                Ready cards
-                            </button>
-                            <button
-                                class="btn btn-ghost"
-                                data-action="recap-tab"
-                                data-tab="schedule"
-                                aria-pressed="false"
-                            >
-                                Schedule
-                            </button>
                         </div>
-
                         <div id="recap-looks-pane">
                             <div class="glass-card">
                                 <h2 class="recap-h">
-                                    The six cards
+                                    Card backgrounds
                                     <small
                                         >A change applies to every chat's cards: they are drawn again when next
                                         needed.</small
@@ -1484,8 +1500,8 @@
                             <div class="glass-card">
                                 <ul id="recap-ready-list" class="recap-ready" aria-busy="true"></ul>
                                 <p class="recap-hint">
-                                    View opens the preview with Send. Delete only removes the files: the cards are drawn
-                                    again on the next look or send.
+                                    Preview cards before sending. Clearing files keeps sending history; cards can be
+                                    regenerated.
                                 </p>
                             </div>
                         </div>
@@ -1503,7 +1519,7 @@
                             </div>
                             <div class="recap-sched">
                                 <div class="glass-card">
-                                    <h2 class="recap-h">When <small>A day from 15 December to 10 January.</small></h2>
+                                    <h2 class="recap-h">Delivery date <small>15 December – 10 January</small></h2>
                                     <div class="recap-sched-fields">
                                         <div class="recap-sched-field">
                                             <label class="settings-label" for="recap-sched-day">Day</label>
@@ -1516,12 +1532,12 @@
                                             <select id="recap-sched-hour" class="select-field"></select>
                                         </div>
                                     </div>
-                                    <p id="recap-sched-year" class="recap-sched-year">
+                                    <p id="recap-sched-year" class="recap-sched-year" hidden>
                                         <span class="skeleton recap-sched-line"></span>
                                     </p>
                                     <div class="recap-sched-switch-row">
                                         <div class="recap-sched-grow">
-                                            <b>Send on this day</b>
+                                            <b>Enable schedule</b>
                                             <span id="recap-sched-switch-note">Asks before turning on</span>
                                         </div>
                                         <button
@@ -1530,7 +1546,7 @@
                                             class="switch"
                                             role="switch"
                                             aria-checked="false"
-                                            aria-label="Send on this day"
+                                            aria-label="Enable schedule"
                                             data-action="recap-sched-toggle"
                                         >
                                             <span class="switch-track" aria-hidden="true"
@@ -1541,7 +1557,7 @@
                                 </div>
                                 <div class="glass-card">
                                     <h2 class="recap-h">
-                                        Who gets it <small>Counted now; counted again at the hour.</small>
+                                        Audience <small>Counted now; counted again at the hour.</small>
                                     </h2>
                                     <ul id="recap-sched-who" class="recap-sched-who">
                                         <li>
@@ -1559,8 +1575,8 @@
                                     </ul>
                                     <p class="recap-hint">
                                         Each chat once a year: a chat sent by hand earlier is skipped. Cards not drawn
-                                        by then are drawn the night before, from 03:00 Moscow time. Stop in the Send
-                                        window also turns this off.
+                                        by then are drawn the night before, from 03:00 Moscow time. Stop in Send now
+                                        also turns this off.
                                     </p>
                                 </div>
                             </div>
@@ -1775,7 +1791,7 @@
             <button
                 class="tab-item"
                 data-open="more-modal"
-                data-tab-sections="logs history recap settings"
+                data-tab-sections="tools logs history recap settings"
                 aria-haspopup="dialog"
             >
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#ellipsis" /></svg
@@ -1950,14 +1966,14 @@
                                 <use href="/vendor/lucide.svg#chevron-right" /></svg
                         ></span>
                     </button>
-                    <button class="action-row" data-section="recap" data-close="more-modal">
+                    <button class="action-row" data-section="tools" data-close="more-modal">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#notebook-text" /></svg
+                                <use href="/vendor/lucide.svg#sliders-horizontal" /></svg
                         ></span>
                         <span class="action-text">
-                            <span class="action-title">Year recap</span>
-                            <span class="action-desc">Card backgrounds, ready cards</span>
+                            <span class="action-title">Tools</span>
+                            <span class="action-desc">Year recap and occasional tasks</span>
                         </span>
                         <span class="action-chevron"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2243,9 +2259,6 @@
                     <div id="chat-stats-periods" class="tab-filters" role="group" aria-label="Period"></div>
                 </div>
                 <div id="chat-stats-body" aria-live="polite"></div>
-                <div class="stats-actions">
-                    <button id="chat-stats-recap" type="button" class="btn btn-outline">Preview year recap</button>
-                </div>
                 <button data-close-return="chat-stats-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
