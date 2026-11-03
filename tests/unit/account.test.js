@@ -865,7 +865,18 @@ test('signing in with a password: by id or @username, only for people still on t
     assert.equal(await password.signInWithPassword('8', 'secret-pass'), null, 'no password set');
     assert.equal(await password.signInWithPassword('first name', 'secret-pass'), null, 'only @usernames');
     panelRoles.set('7', 'none');
-    assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'access taken away');
+    t.mock.method(Chat, 'findOne', async ({ where }) =>
+        where.id === '7' && where.type === 'private' ? { id: 7 } : null
+    );
+    const { server, call } = await serve(fakeBot());
+    t.after(() => server.close());
+    const login = (who) => call('POST', '/api/login/password', { body: { login: who, password: 'secret-pass' } });
+    for (const who of ['7', '@Kirill']) {
+        const denied = await login(who);
+        assert.deepEqual([denied.status, denied.body.error], [403, 'No access to the panel.']);
+        assert.equal(denied.headers.get('set-cookie'), null);
+    }
+    assert.equal((await login('999')).status, 401, 'unknown numeric ID');
     panelRoles.set('7', 'user');
     assert.equal(await password.removePassword('7'), true);
     assert.equal(await password.signInWithPassword('7', 'secret-pass'), null, 'removed');

@@ -164,6 +164,7 @@ router.post('/api/login/password', passwordLimits, async (req, res) => {
     try {
         const session = await password.signInWithPassword(body.login, body.password);
         if (!session) return res.status(401).json({ error: 'Wrong username or password.' });
+        if (session.noAccess) return res.status(403).json({ error: 'No access to the panel.' });
         if (session.token) {
             auth.setCookie(req, res, session.token);
             return res.json({ success: true });

@@ -87,17 +87,22 @@ async function userIdFor(login) {
 }
 
 /**
- * @returns {Promise<object | null>} a system session or pending personal confirmation; null for wrong credentials and
- *   for someone no longer on the lists
+ * @returns {Promise<object | null>} a system session, pending personal confirmation, or access denial;
+ *   null for wrong credentials
  */
 async function signInWithPassword(login, password, now = Date.now()) {
     const userId = await userIdFor(login);
     const system = userId !== null && roles.isSystem(userId);
     let hash = null;
     if (system) hash = roles.systemHash() || null;
-    else if (userId && (await roles.isAllowed(userId))) {
-        const row = await AccountPassword.findByPk(userId);
-        hash = row ? row.hash : null;
+    else if (userId) {
+        if (await roles.isAllowed(userId)) {
+            const row = await AccountPassword.findByPk(userId);
+            hash = row ? row.hash : null;
+        } else {
+            const chat = await Chat.findOne({ where: { id: userId, type: 'private' }, attributes: ['id'], raw: true });
+            if (chat) return { noAccess: true };
+        }
     }
     if (!hash) {
         await matches(password, await dummyHash());
