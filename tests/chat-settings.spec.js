@@ -53,12 +53,13 @@ test('a private chat has no "who presses" choice: only the menu is sent', async 
     const panel = await mockPanel(page);
     await openSettings(page, 101);
     await expect(page.locator('#chat-settings-buttons-field')).toBeHidden();
+    await page.getByRole('switch', { name: 'Bottom menu' }).click();
     await page.locator('#chat-settings-save').click();
     await expect(page.locator('.toast', { hasText: 'Settings saved' })).toBeVisible();
     expect(panel.lastSettings).toEqual({
         chatId: '101',
         body: {
-            menu_enabled: true,
+            menu_enabled: false,
             quiet_start: null,
             quiet_end: null,
             timezone: 'Europe/Moscow',
@@ -83,16 +84,24 @@ test('quiet hours: from, to and the time zone go with Save; Off sends none', asy
     await expect(toggle).not.toBeChecked();
     await expect(lists).toHaveCount(3);
     for (const list of await lists.all()) {
-        await expect(list).toBeVisible();
+        await expect(list).toBeHidden();
         await expect(list).toBeDisabled();
     }
 
+    await expect(page.locator('#chat-settings-save')).toBeDisabled();
+    await page.getByRole('switch', { name: 'Bottom menu' }).click();
     await page.locator('#chat-settings-save').click();
     await expect(page.locator('#chat-settings-modal')).toBeHidden();
     expect(panel.lastSettings.body).toMatchObject({ quiet_start: null, quiet_end: null });
 
     await openSettings(page, 101);
     await toggle.click();
+    const save = page.locator('#chat-settings-save');
+    const [buttonBox, dialogBox] = await Promise.all([
+        save.boundingBox(),
+        page.locator('#chat-settings-modal .modal-content').boundingBox()
+    ]);
+    expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(dialogBox.y + dialogBox.height);
     await pick(page, 'chat-settings-quiet-start', '23:00');
     await pick(page, 'chat-settings-quiet-end', '08:00');
     await pick(page, 'chat-settings-timezone', 'Vladivostok');
@@ -115,8 +124,8 @@ test('quiet hours with the same start and end are not sent', async ({ page }) =>
 test('digests: weekly and monthly go with Save', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSettings(page, 101);
-    await pick(page, 'chat-settings-digest-week', 'Weekly: Mondays');
-    await pick(page, 'chat-settings-digest-month', 'Monthly: the 1st');
+    await page.locator('#chat-settings-digest-week').click();
+    await page.locator('#chat-settings-digest-month').click();
     await page.locator('#chat-settings-save').click();
     await expect(page.locator('.toast', { hasText: 'Settings saved' })).toBeVisible();
     expect(panel.lastSettings.body).toMatchObject({ digest_week: true, digest_month: true });

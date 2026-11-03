@@ -35,7 +35,7 @@ export function showAccessIn(chat, back = returnToSettings) {
     $field('action-access-role').dataset.id = String(chat.id);
     // setSelectValue fires "change": saveRole skips a value that is the saved one
     setSelectValue('action-access-role', chat.panelRole || 'none');
-    setText('action-access-desc', 'Saved when picked');
+    setText('action-access-desc', 'Applies immediately');
     $('action-password-remove').dataset.id = String(chat.id);
 }
 

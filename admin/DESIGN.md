@@ -85,5 +85,6 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
   dismiss the entire Users → Actions flow.
 - **On/off settings:** use the shared `.switch` control from Chat visibility for binary settings.
   Put the label on the left and the switch on the right. In Users → Actions → Settings,
-  Bottom menu and Quiet hours apply on Save. Keep dependent fields visible and disabled when
-  their switch is off.
+  notification and bot controls apply on Save. Reveal the quiet-hours schedule when enabled.
+  Keep Save visible below the scrolling settings. Panel access applies immediately and
+  blocking is separated from the role picker.

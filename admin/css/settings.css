@@ -101,6 +101,121 @@
     border-color: var(--border-strong);
 }
 
+#chat-settings-modal .chat-setting {
+    margin-bottom: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-row);
+}
+
+#chat-settings-modal .chat-setting .field-label {
+    color: var(--text);
+    font-size: var(--text-base);
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+#chat-settings-modal .settings-switch-heading {
+    min-height: var(--control-h);
+    margin-bottom: 0;
+}
+
+#chat-settings-modal .settings-switch-heading + .field-hint {
+    margin-top: 0;
+}
+
+#chat-settings-modal .settings-switch-heading .switch {
+    flex: none;
+    justify-content: center;
+    min-width: var(--control-h);
+    min-height: var(--control-h);
+}
+
+.chat-setting-quiet .quiet-hours-fields {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+}
+
+.chat-setting-quiet .settings-pair > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-setting-quiet fieldset label {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.chat-settings-access {
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-row);
+}
+
+#chat-settings-modal #action-block {
+    margin-top: var(--space-2);
+    border-top-color: var(--border-row);
+}
+
+#chat-settings-modal :is(.switch, .modal-back, .modal-x, .custom-select-trigger):focus-visible {
+    background-color: var(--surface-3);
+}
+
+#chat-settings-modal .modal-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-settings-scroll {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.chat-settings-scroll h4 {
+    margin-block: var(--space-3) var(--space-1);
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+}
+
+.chat-settings-scroll small,
+.chat-settings-footer small {
+    color: var(--text-dim);
+}
+
+.chat-settings-footer {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-row);
+}
+
+@media (max-width: 520px) {
+    #chat-settings-modal #action-access:not([hidden]) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-2);
+        padding-inline: 0;
+    }
+
+    #chat-settings-modal #action-access > .action-icon {
+        display: none;
+    }
+
+    #chat-settings-modal #action-access > .custom-select {
+        width: 100%;
+    }
+}
+
 .settings-interval {
     max-width: 12rem;
 }

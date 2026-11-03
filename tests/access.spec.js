@@ -91,7 +91,7 @@ test("the row's menu: the role is picked from a dropdown and saved at once; not 
     // Your own role uses the same dropdown
     await openMenu(page, 42);
     await expect(page.locator('#action-access .custom-select')).toBeVisible();
-    await expect(page.locator('#action-access-desc')).toHaveText('Saved when picked');
+    await expect(page.locator('#action-access-desc')).toHaveText('Applies immediately');
     await page.locator('#chat-settings-modal .modal-x').click();
 
     // Without a role (sign-up closed) the dropdown says No access

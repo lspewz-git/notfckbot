@@ -31,7 +31,7 @@ test('the backdrop and close button dismiss the chat action flow', async ({ page
     await openSection(page, 'chats');
     const opener = page.locator('[data-action="chat-actions"][data-id="101"]');
     const settings = page.locator('#chat-settings-modal');
-    const trigger = settings.locator('.custom-select:has(#chat-settings-digest-week) .custom-select-trigger');
+    const trigger = settings.locator('.custom-select:has(#action-access-role) .custom-select-trigger');
     const openSettings = async () => {
         await opener.click();
         await page.locator('#action-settings').click();

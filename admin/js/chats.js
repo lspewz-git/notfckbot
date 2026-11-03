@@ -111,21 +111,46 @@ const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POS
 // --- Settings ---
 /** The chat's bot settings: who presses its buttons (groups only) and the bottom menu. */
 const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
+const chatSettingsSwitches = ['menu', 'quiet-toggle', 'digest-week', 'digest-month'];
+const settingsSwitch = (name) => $(`chat-settings-${name}`);
+const switchOn = (name) => settingsSwitch(name).getAttribute('aria-checked') === 'true';
+let savedChatSettings = '';
+
+function chatSettingsState() {
+    return JSON.stringify([
+        ...chatSettingsSwitches.map(switchOn),
+        ...['buttons', 'quiet-start', 'quiet-end', 'timezone'].map((name) => $field(`chat-settings-${name}`).value)
+    ]);
+}
+
+function syncChatSettingsSave() {
+    const save = /** @type {HTMLButtonElement} */ ($('chat-settings-save'));
+    const dirty = chatSettingsState() !== savedChatSettings;
+    save.disabled = !dirty || save.hasAttribute('aria-busy');
+    setText('chat-settings-status', dirty ? 'Unsaved changes' : 'All changes saved');
+}
 
 /** Populate the schedule fields and wire the Quiet hours switch. */
 export function setupChatSettingsForm() {
     const hours = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${hourLabel(h)}</option>`).join('');
     $('chat-settings-quiet-start').innerHTML = hours;
     $('chat-settings-quiet-end').innerHTML = hours;
-    const toggle = $('chat-settings-quiet-toggle');
-    toggle.onclick = () => setQuietHoursEnabled(toggle.getAttribute('aria-checked') !== 'true');
-    const menu = $('chat-settings-menu');
-    menu.onclick = () => menu.setAttribute('aria-checked', String(menu.getAttribute('aria-checked') !== 'true'));
+    for (const name of chatSettingsSwitches) {
+        settingsSwitch(name).onclick = () => {
+            const enabled = !switchOn(name);
+            if (name === 'quiet-toggle') setQuietHoursEnabled(enabled);
+            else settingsSwitch(name).setAttribute('aria-checked', String(enabled));
+            syncChatSettingsSave();
+        };
+    }
+    $('chat-settings-modal').querySelector('.chat-settings-scroll').addEventListener('change', syncChatSettingsSave);
 }
 
 function setQuietHoursEnabled(enabled) {
     $('chat-settings-quiet-toggle').setAttribute('aria-checked', String(enabled));
-    /** @type {HTMLFieldSetElement} */ ($('chat-settings-quiet-fields')).disabled = !enabled;
+    const fields = /** @type {HTMLFieldSetElement} */ ($('chat-settings-quiet-fields'));
+    fields.disabled = !enabled;
+    fields.hidden = !enabled;
 }
 
 function openChatSettings(chat, label) {
@@ -166,12 +191,14 @@ function openChatSettings(chat, label) {
     setSelectValue('chat-settings-quiet-start', String(quietOn ? chat.quiet_start : 23));
     setSelectValue('chat-settings-quiet-end', String(quietOn ? chat.quiet_end : 8));
     setSelectValue('chat-settings-timezone', chat.timezone || 'Europe/Moscow');
-    setSelectValue('chat-settings-digest-week', chat.digest_week ? 'on' : 'off');
-    setSelectValue('chat-settings-digest-month', chat.digest_month ? 'on' : 'off');
+    settingsSwitch('digest-week').setAttribute('aria-checked', String(Boolean(chat.digest_week)));
+    settingsSwitch('digest-month').setAttribute('aria-checked', String(Boolean(chat.digest_month)));
     setQuietHoursEnabled(quietOn);
+    savedChatSettings = chatSettingsState();
+    syncChatSettingsSave();
 
     const save = /** @type {HTMLButtonElement} */ ($('chat-settings-save'));
-    save.onclick = async () => {
+    const saveSettings = async () => {
         if (save.disabled) return;
         const body = { menu_enabled: menu.getAttribute('aria-checked') === 'true' };
         if (group) body.buttons_mode = $field('chat-settings-buttons').value;
@@ -185,21 +212,24 @@ function openChatSettings(chat, label) {
         body.quiet_start = quietEnabled ? Number(start) : null;
         body.quiet_end = quietEnabled ? Number(end) : null;
         body.timezone = $field('chat-settings-timezone').value;
-        body.digest_week = $field('chat-settings-digest-week').value === 'on';
-        body.digest_month = $field('chat-settings-digest-month').value === 'on';
+        body.digest_week = switchOn('digest-week');
+        body.digest_month = switchOn('digest-month');
+        const submitted = chatSettingsState();
         save.disabled = true;
         save.setAttribute('aria-busy', 'true');
         try {
             const ok = await mutate(`/chat/${chat.id}/settings`, { method: 'PATCH', body }, 'Settings saved');
-            if (ok) {
+            if (ok && save.onclick === saveSettings) {
+                savedChatSettings = submitted;
                 clearReturnTo();
                 closeModal('chat-settings-modal');
             }
         } finally {
-            save.disabled = false;
             save.removeAttribute('aria-busy');
+            syncChatSettingsSave();
         }
     };
+    save.onclick = saveSettings;
     openModal('chat-settings-modal');
 }
 

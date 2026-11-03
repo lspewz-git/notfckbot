@@ -2378,142 +2378,182 @@
                             <use href="/vendor/lucide.svg#arrow-left" />
                         </svg>
                     </button>
-                    <h3 id="chat-settings-title">Settings</h3>
+                    <h3 id="chat-settings-title">Chat settings</h3>
                 </div>
                 <p class="modal-sub" id="chat-settings-sub"></p>
-                <!-- Groups only: a private chat has one person to press anything -->
-                <div class="field-block" id="chat-settings-buttons-field">
-                    <label class="field-label" for="chat-settings-buttons">Who can press the bot's buttons</label>
-                    <select id="chat-settings-buttons" class="select-field">
-                        <option value="owner">Only whoever called them up</option>
-                        <option value="all">Everyone in the chat</option>
-                    </select>
-                    <p class="field-hint">A search or the subscriptions menu called up by one member.</p>
-                </div>
-                <div class="field-block">
-                    <div class="settings-switch-heading">
-                        <span class="field-label" id="chat-settings-menu-label">Bottom menu</span>
-                        <button
-                            type="button"
-                            id="chat-settings-menu"
-                            class="switch"
-                            role="switch"
-                            aria-checked="true"
-                            aria-labelledby="chat-settings-menu-label"
-                        >
-                            <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
-                        </button>
-                    </div>
-                    <p class="field-hint">Shows up in the chat with the bot's next reply there.</p>
-                </div>
-                <!-- Hours filled by chats.js; the zones are src/quiet.js ZONES (a unit test keeps them equal) -->
-                <div class="field-block">
-                    <div class="settings-switch-heading">
-                        <span class="field-label" id="chat-settings-quiet-label">Quiet hours</span>
-                        <button
-                            type="button"
-                            id="chat-settings-quiet-toggle"
-                            class="switch"
-                            role="switch"
-                            aria-checked="false"
-                            aria-labelledby="chat-settings-quiet-label"
-                            aria-controls="chat-settings-quiet-fields"
-                        >
-                            <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
-                        </button>
-                    </div>
-                    <fieldset
-                        id="chat-settings-quiet-fields"
-                        class="quiet-hours-fields"
-                        disabled
-                        aria-labelledby="chat-settings-quiet-label"
-                    >
-                        <div class="settings-pair">
-                            <select
-                                id="chat-settings-quiet-start"
-                                class="select-field"
-                                aria-label="Quiet hours from"
-                            ></select>
-                            <select
-                                id="chat-settings-quiet-end"
-                                class="select-field"
-                                aria-label="Quiet hours to"
-                            ></select>
+                <div class="chat-settings-scroll">
+                    <h4>Notifications</h4>
+                    <div class="field-block chat-setting chat-setting-quiet">
+                        <div class="settings-switch-heading">
+                            <span class="field-label" id="chat-settings-quiet-label">Quiet hours</span>
+                            <button
+                                type="button"
+                                id="chat-settings-quiet-toggle"
+                                class="switch"
+                                role="switch"
+                                aria-checked="false"
+                                aria-labelledby="chat-settings-quiet-label"
+                                aria-controls="chat-settings-quiet-fields"
+                            >
+                                <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                            </button>
                         </div>
-                        <div class="mt-sm">
-                            <select id="chat-settings-timezone" class="select-field" aria-label="Time zone">
-                                <option value="Europe/Kaliningrad">Kaliningrad (UTC+2)</option>
-                                <option value="Europe/Moscow">Moscow (UTC+3)</option>
-                                <option value="Europe/Samara">Samara (UTC+4)</option>
-                                <option value="Asia/Yekaterinburg">Yekaterinburg (UTC+5)</option>
-                                <option value="Asia/Omsk">Omsk (UTC+6)</option>
-                                <option value="Asia/Novosibirsk">Novosibirsk (UTC+7)</option>
-                                <option value="Asia/Irkutsk">Irkutsk (UTC+8)</option>
-                                <option value="Asia/Yakutsk">Yakutsk (UTC+9)</option>
-                                <option value="Asia/Vladivostok">Vladivostok (UTC+10)</option>
-                                <option value="Asia/Magadan">Magadan (UTC+11)</option>
-                                <option value="Asia/Kamchatka">Kamchatka (UTC+12)</option>
+                        <p class="field-hint">Delivers notifications together when quiet hours end.</p>
+                        <fieldset
+                            id="chat-settings-quiet-fields"
+                            class="quiet-hours-fields"
+                            disabled
+                            aria-labelledby="chat-settings-quiet-label"
+                        >
+                            <div class="settings-pair">
+                                <div>
+                                    <label for="chat-settings-quiet-start">From</label>
+                                    <select
+                                        id="chat-settings-quiet-start"
+                                        class="select-field"
+                                        aria-label="Quiet hours from"
+                                    ></select>
+                                </div>
+                                <div>
+                                    <label for="chat-settings-quiet-end">Until</label>
+                                    <select
+                                        id="chat-settings-quiet-end"
+                                        class="select-field"
+                                        aria-label="Quiet hours to"
+                                    ></select>
+                                </div>
+                            </div>
+                            <div class="mt-sm">
+                                <label for="chat-settings-timezone">Time zone</label>
+                                <select id="chat-settings-timezone" class="select-field" aria-label="Time zone">
+                                    <option value="Europe/Kaliningrad">Kaliningrad (UTC+2)</option>
+                                    <option value="Europe/Moscow">Moscow (UTC+3)</option>
+                                    <option value="Europe/Samara">Samara (UTC+4)</option>
+                                    <option value="Asia/Yekaterinburg">Yekaterinburg (UTC+5)</option>
+                                    <option value="Asia/Omsk">Omsk (UTC+6)</option>
+                                    <option value="Asia/Novosibirsk">Novosibirsk (UTC+7)</option>
+                                    <option value="Asia/Irkutsk">Irkutsk (UTC+8)</option>
+                                    <option value="Asia/Yakutsk">Yakutsk (UTC+9)</option>
+                                    <option value="Asia/Vladivostok">Vladivostok (UTC+10)</option>
+                                    <option value="Asia/Magadan">Magadan (UTC+11)</option>
+                                    <option value="Asia/Kamchatka">Kamchatka (UTC+12)</option>
+                                </select>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="field-block chat-setting">
+                        <div class="settings-switch-heading">
+                            <span id="chat-settings-digest-week-label"
+                                ><strong>Weekly digest</strong><br /><small>Mondays at 10:00</small></span
+                            >
+                            <button
+                                type="button"
+                                id="chat-settings-digest-week"
+                                class="switch"
+                                role="switch"
+                                aria-checked="false"
+                                aria-labelledby="chat-settings-digest-week-label"
+                            >
+                                <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                            </button>
+                        </div>
+                        <div class="settings-switch-heading">
+                            <span id="chat-settings-digest-month-label"
+                                ><strong>Monthly digest</strong><br /><small
+                                    >First day of the month at 10:00</small
+                                ></span
+                            >
+                            <button
+                                type="button"
+                                id="chat-settings-digest-month"
+                                class="switch"
+                                role="switch"
+                                aria-checked="false"
+                                aria-labelledby="chat-settings-digest-month-label"
+                            >
+                                <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                            </button>
+                        </div>
+                    </div>
+                    <h4>Bot controls</h4>
+                    <!-- Groups only: a private chat has one person to press anything -->
+                    <div class="field-block" id="chat-settings-buttons-field">
+                        <label class="field-label" for="chat-settings-buttons">Who can press the bot's buttons</label>
+                        <select id="chat-settings-buttons" class="select-field">
+                            <option value="owner">Only whoever called them up</option>
+                            <option value="all">Everyone in the chat</option>
+                        </select>
+                        <p class="field-hint">A search or the subscriptions menu called up by one member.</p>
+                    </div>
+                    <div class="field-block chat-setting">
+                        <div class="settings-switch-heading">
+                            <span class="field-label" id="chat-settings-menu-label">Bottom menu</span>
+                            <button
+                                type="button"
+                                id="chat-settings-menu"
+                                class="switch"
+                                role="switch"
+                                aria-checked="true"
+                                aria-labelledby="chat-settings-menu-label"
+                            >
+                                <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                            </button>
+                        </div>
+                        <p class="field-hint">Appears with the bot’s next reply in this chat.</p>
+                    </div>
+                    <!-- Hours filled by chats.js; the zones are src/quiet.js ZONES (a unit test keeps them equal) -->
+                    <h4>Permissions &amp; restrictions</h4>
+                    <div class="action-list chat-settings-access">
+                        <div id="action-access" class="action-row action-row-select">
+                            <span class="action-icon"
+                                ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#lock-keyhole" /></svg
+                            ></span>
+                            <span class="action-text">
+                                <label class="action-title" for="action-access-role">Panel access</label>
+                                <span class="action-desc" id="action-access-desc">Applies immediately</span>
+                            </span>
+                            <select id="action-access-role" class="select-field action-select">
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                                <option value="none">No access</option>
                             </select>
                         </div>
-                    </fieldset>
-                    <p class="field-hint">Notifications in these hours come in one message when they end.</p>
-                </div>
-                <div class="field-block">
-                    <span class="field-label" id="chat-settings-digests-label">Digests</span>
-                    <div class="settings-pair" role="group" aria-labelledby="chat-settings-digests-label">
-                        <select id="chat-settings-digest-week" class="select-field" aria-label="Weekly digest">
-                            <option value="off">No weekly digest</option>
-                            <option value="on">Weekly: Mondays, 10:00</option>
-                        </select>
-                        <select id="chat-settings-digest-month" class="select-field" aria-label="Monthly digest">
-                            <option value="off">No monthly digest</option>
-                            <option value="on">Monthly: the 1st, 10:00</option>
-                        </select>
+                        <button
+                            id="action-password-remove"
+                            class="action-row"
+                            data-action="access-password-remove"
+                            hidden
+                        >
+                            <span class="action-icon"
+                                ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#key-round" /></svg
+                            ></span>
+                            <span class="action-text">
+                                <span class="action-title">Remove password</span>
+                                <span class="action-desc">Signs them out; Telegram sign-in stays</span>
+                            </span>
+                        </button>
+                        <button id="action-block" class="action-row">
+                            <span class="action-icon"
+                                ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#ban" /></svg
+                            ></span>
+                            <span class="action-text">
+                                <span class="action-title">Block</span>
+                                <span class="action-desc">Ignore this chat for a while</span>
+                            </span>
+                            <span class="action-chevron"
+                                ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#chevron-right" /></svg
+                            ></span>
+                        </button>
                     </div>
-                    <p class="field-hint">What comes out in the week or month ahead, in the chat's time zone.</p>
                 </div>
-                <button id="chat-settings-save" class="btn btn-primary btn-block">Save</button>
-                <div class="action-list">
-                    <div id="action-access" class="action-row action-row-select">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#lock-keyhole" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <label class="action-title" for="action-access-role">Panel access</label>
-                            <span class="action-desc" id="action-access-desc">Saved when picked</span>
-                        </span>
-                        <select id="action-access-role" class="select-field action-select">
-                            <option value="admin">Admin</option>
-                            <option value="user">User</option>
-                            <option value="none">No access</option>
-                        </select>
-                    </div>
-                    <button id="action-password-remove" class="action-row" data-action="access-password-remove" hidden>
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#key-round" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Remove password</span>
-                            <span class="action-desc">Signs them out; Telegram sign-in stays</span>
-                        </span>
-                    </button>
-                    <button id="action-block" class="action-row">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#ban" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Block</span>
-                            <span class="action-desc">Ignore this chat for a while</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                </div>
+                <footer class="chat-settings-footer">
+                    <small id="chat-settings-status" role="status"></small>
+                    <button id="chat-settings-save" class="btn btn-primary">Save changes</button>
+                </footer>
                 <button data-close="chat-settings-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
