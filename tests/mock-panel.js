@@ -555,10 +555,7 @@ async function mockPanel(page, options = {}) {
             panel.accessSaves = [...(panel.accessSaves || []), body];
             if (options.accessSave) return options.accessSave(body);
             const chat = panel.chats.find((c) => String(c.id) === body.userId);
-            if (chat) {
-                chat.panelRole = body.role;
-                if (body.role === 'none') chat.hasPassword = false;
-            }
+            if (chat) chat.panelRole = body.role;
             if (body.userId === '42' && !panel.account.system) {
                 panel.account.role = body.role;
                 if (body.role === 'none') panel.account.signedIn = false;

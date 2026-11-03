@@ -218,7 +218,7 @@ function renderAccount() {
         '</ul></section>';
     $('my-devices').innerHTML =
         '<section class="mine-group"><h3 class="mine-group-title">Devices</h3><ul class="glass-card mine-sets">' +
-        '<li><button type="button" class="mine-set mine-set-pick profile-end-others" data-action="profile-end-others">' +
+        '<li><button type="button" class="mine-set mine-set-pick mine-set-danger" data-action="profile-end-others">' +
         '<span class="mine-set-text">Sign out on other devices</span></button></li>' +
         '</ul><p class="mine-group-note">This device stays signed in.</p></section>';
 }

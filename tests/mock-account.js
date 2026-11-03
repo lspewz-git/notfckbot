@@ -281,6 +281,7 @@ function accountAnswer(state, req, url) {
                 name: state.system ? 'admin' : '@me',
                 role: state.role,
                 hasPassword: state.hasPassword,
+                passwordChangedAt: state.passwordChangedAt || null,
                 system: state.system
             }
         };
@@ -288,7 +289,8 @@ function accountAnswer(state, req, url) {
         if (method === 'PUT' && body.password.length < 8)
             return { status: 400, body: { error: 'At least 8 characters' } };
         state.hasPassword = method === 'PUT';
-        return { hasPassword: state.hasPassword };
+        state.passwordChangedAt = state.hasPassword ? new Date().toISOString() : null;
+        return { hasPassword: state.hasPassword, passwordChangedAt: state.passwordChangedAt };
     }
     if (p === '/api/account/sessions/end-others') return { ended: 2 };
     if (p === '/api/account/chats')

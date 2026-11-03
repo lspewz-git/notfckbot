@@ -63,7 +63,6 @@ async function saveRole(select) {
     );
     if (done) {
         chat.panelRole = done.role;
-        if (role === 'none') chat.hasPassword = false;
     }
     // Refused, the pick goes back to the saved role
     showAccessIn(chat);

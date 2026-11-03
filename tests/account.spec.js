@@ -710,11 +710,13 @@ test('the account page sets, changes and removes the password', async ({ page })
     const group = page.locator('#my-signin');
     await expect(group).toContainText('Connected');
     const row = group.locator('[data-action="password-open"]');
-    await expect(row).toContainText('Not set');
+    const remove = group.locator('[data-action="password-remove-own"]');
+    await expect(row).toContainText('Not set: Telegram sign-in only');
+    await expect(row).toContainText('Set up');
+    await expect(remove).toHaveCount(0);
 
     await row.click();
     await expect(page.locator('#password-title')).toHaveText('Set a password');
-    await expect(page.locator('#password-remove')).toBeHidden();
     await page.locator('#password-new').fill('short');
     await page.locator('#password-form [type="submit"]').click();
     await expect(page.locator('#password-error')).toHaveText('At least 8 characters.');
@@ -726,15 +728,19 @@ test('the account page sets, changes and removes the password', async ({ page })
     await page.locator('#password-form [type="submit"]').click();
     await expect(page.locator('#password-modal')).toBeHidden();
     await expect(page.locator('.toast').last()).toHaveText('Password set');
-    await expect(row).toContainText('Set');
+    await expect(row.locator('.mine-set-sub')).toHaveText(/^Set · changed \d{1,2} [A-Z][a-z]{2}/);
+    await expect(row.locator('.mine-set-value')).toHaveText('OnChange');
     expect(panel.account.sent.find((r) => r.method === 'PUT').body).toEqual({ password: 'long-enough' });
 
     await row.click();
     await expect(page.locator('#password-title')).toHaveText('Change password');
     await expect(page.locator('#password-new')).toHaveValue('');
-    await page.locator('#password-remove').click();
+    await page.locator('#password-modal [data-close="password-modal"]').click();
+    await remove.click();
+    await expect(page.locator('#confirm-title')).toHaveText('Remove the password?');
     await page.locator('#modal-confirm-btn').click();
     await expect(page.locator('.toast').last()).toHaveText('Password removed');
     await expect(row).toContainText('Not set');
+    await expect(remove).toHaveCount(0);
     expect(panel.account.sent.some((r) => r.method === 'DELETE' && r.path === '/api/account/password')).toBe(true);
 });

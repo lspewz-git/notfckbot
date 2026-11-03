@@ -761,6 +761,11 @@ button.search-result-open:hover .mine-row-title {
     min-width: 0;
 }
 
+.mine-set-sub {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
 .mine-set-pick {
     border: none;
     border-radius: inherit;
@@ -786,6 +791,18 @@ button.search-result-open:hover .mine-row-title {
     min-width: 0;
     color: var(--text-dim);
     white-space: nowrap;
+}
+
+.mine-set-action {
+    color: var(--text);
+}
+
+.mine-set-accent {
+    color: var(--accent);
+}
+
+.mine-set-value .badge {
+    margin-right: var(--space-1);
 }
 
 .mine-set-value .icon {
@@ -947,7 +964,8 @@ button.search-result-open:hover .mine-row-title {
     gap: var(--space-3);
 }
 
-.profile-end-others .mine-set-text {
+/* A row that ends or removes something: Sign out on other devices, Remove password */
+.mine-set-danger .mine-set-text {
     color: var(--danger);
 }
 

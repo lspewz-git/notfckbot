@@ -43,8 +43,8 @@ router.post('/api/access', async (req, res) => {
             return res.status(403).json({ error: 'Only for the panel admins' });
         }
         await roles.setRole(userId, role);
-        // No access: their sessions and password go too, so a role given back doesn't revive them
-        if (role === 'none') await Promise.all([endOtherSessions(userId), password.removePassword(userId)]);
+        // No access ends their sessions; the password stays (sign-in is refused without a role)
+        if (role === 'none') await endOtherSessions(userId);
         log.info(`[Access] User ${req.user.userId} set ${userId} to ${role}`);
         res.json({ userId, role: (await roles.rolesOf([userId])).get(userId) });
     } catch (err) {

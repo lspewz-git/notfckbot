@@ -59,7 +59,10 @@ beforeEach(() => {
     mock.method(AccountPassword, 'findByPk', async (id) =>
         passwords.has(String(id)) ? passwords.get(String(id)) : null
     );
-    mock.method(AccountPassword, 'upsert', async (row) => passwords.set(String(row.userId), row));
+    // MariaDB stamps updatedAt on every upsert
+    mock.method(AccountPassword, 'upsert', async (row) =>
+        passwords.set(String(row.userId), { ...row, updatedAt: new Date('2026-11-02T10:00:00Z') })
+    );
     mock.method(AccountPassword, 'destroy', async ({ where }) => Number(passwords.delete(String(where.userId))));
     const table = (rows) => ({
         create: async (row) => {
@@ -463,7 +466,14 @@ test('the API: a session for everything but signing in; the panel itself for adm
     const user = await signIn(call, 7);
     assert.equal((await call('GET', '/api/stats', { cookie: user })).status, 403);
     const me = await call('GET', '/api/account/me', { cookie: user });
-    assert.deepEqual(me.body.user, { id: '7', name: '@u7', role: 'user', hasPassword: false, system: false });
+    assert.deepEqual(me.body.user, {
+        id: '7',
+        name: '@u7',
+        role: 'user',
+        hasPassword: false,
+        passwordChangedAt: null,
+        system: false
+    });
     assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, []);
 
     const admin = await signIn(call, 42);
@@ -915,8 +925,9 @@ test('the API: set, use and remove a password; wrong tries stop at the limit', a
     assert.equal((await call('PUT', '/api/account/password', { body: { password: 'long-enough' } })).status, 401);
     const other = await signIn(call, 7);
     const set = await call('PUT', '/api/account/password', { cookie: user, body: { password: 'long-enough' } });
-    assert.deepEqual(set.body, { hasPassword: true });
-    assert.equal((await call('GET', '/api/account/me', { cookie: user })).body.user.hasPassword, true);
+    assert.deepEqual(set.body, { hasPassword: true, passwordChangedAt: '2026-11-02T10:00:00.000Z' });
+    const me = (await call('GET', '/api/account/me', { cookie: user })).body.user;
+    assert.deepEqual([me.hasPassword, me.passwordChangedAt], [true, '2026-11-02T10:00:00.000Z']);
     assert.equal(await sentCount(sent, 1), 1);
     assert.equal(sent[0].chatId, '7');
     assert.match(sent[0].text, /задан пароль/);
@@ -1009,7 +1020,14 @@ test('the API: the system account has no chats and no own password here, its pas
     process.env.SYSTEM_PASSWORD_HASH = await password.hashPassword('system-pass');
     const token = await auth.startSession({ userId: '0', userName: 'admin' });
     const me = await call('GET', '/api/account/me', { cookie: token });
-    assert.deepEqual(me.body.user, { id: '0', name: 'admin', role: 'admin', hasPassword: true, system: true });
+    assert.deepEqual(me.body.user, {
+        id: '0',
+        name: 'admin',
+        role: 'admin',
+        hasPassword: true,
+        passwordChangedAt: null,
+        system: true
+    });
     assert.deepEqual((await call('GET', '/api/account/chats', { cookie: token })).body, []);
     const own = await call('PUT', '/api/account/password', { cookie: token, body: { password: 'long-enough' } });
     assert.deepEqual([own.status, own.body.error], [400, "The system account's password is in Settings"]);

@@ -235,8 +235,10 @@ router.post('/api/logout', async (req, res) => {
 router.get('/api/account/me', async (req, res) => {
     try {
         const { userId, userName: name, role, system } = req.user;
-        const hasPassword = system ? true : await password.hasPassword(userId);
-        res.json({ user: { id: userId, name, role, hasPassword, system } });
+        // The system account's password lives in .env: always set, no date
+        const changed = system ? null : await password.passwordChangedAt(userId);
+        const hasPassword = system || Boolean(changed);
+        res.json({ user: { id: userId, name, role, hasPassword, passwordChangedAt: changed, system } });
     } catch (err) {
         fail(res, err);
     }
@@ -254,7 +256,7 @@ router.put('/api/account/password', async (req, res) => {
         await password.setPassword(userId, body.password);
         if (had) await auth.endOtherSessions(userId, req.user.id);
         password.notifyPassword(req.app.get('bot'), userId, had ? 'changed' : 'set');
-        res.json({ hasPassword: true });
+        res.json({ hasPassword: true, passwordChangedAt: await password.passwordChangedAt(userId) });
     } catch (err) {
         fail(res, err);
     }
@@ -268,7 +270,7 @@ router.delete('/api/account/password', async (req, res) => {
             await auth.endOtherSessions(userId, req.user.id);
             password.notifyPassword(req.app.get('bot'), userId, 'removed');
         }
-        res.json({ hasPassword: false });
+        res.json({ hasPassword: false, passwordChangedAt: null });
     } catch (err) {
         fail(res, err);
     }

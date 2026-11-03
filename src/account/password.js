@@ -153,6 +153,12 @@ function notifyPassword(bot, userId, kind) {
 
 const hasPassword = async (userId) => Boolean(await AccountPassword.findByPk(userId, { attributes: ['userId'] }));
 
+/** @returns {Promise<Date | null>} when the user last set their password, null without one */
+async function passwordChangedAt(userId) {
+    const row = await AccountPassword.findByPk(userId, { attributes: ['updatedAt'], raw: true });
+    return row ? new Date(row.updatedAt) : null;
+}
+
 /** @returns {Promise<Set<string>>} the ids that have a password, for the access list */
 async function withPasswords() {
     const rows = await AccountPassword.findAll({ attributes: ['userId'], raw: true });
@@ -171,6 +177,7 @@ module.exports = {
     setPassword,
     removePassword,
     hasPassword,
+    passwordChangedAt,
     withPasswords,
     notifyPassword
 };

@@ -6,6 +6,7 @@
 import { api } from './api.js';
 import { $, $field, setText } from './dom.js';
 import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
+import { shortDay } from './format.js';
 
 const MIN_LENGTH = 8;
 
@@ -15,7 +16,7 @@ const PASSWORD_EYE =
 const CHEVRON_RIGHT =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
 
-/** @type {{ id: string, name: string | null, hasPassword: boolean, system: boolean } | null} */
+/** @type {{ id: string, name: string | null, hasPassword: boolean, changedAt: string | null, system: boolean } | null} */
 let me = null;
 
 /** Who is signed in, once /account/me answered (access.js uses it for own-role changes). */
@@ -80,6 +81,7 @@ export function setMe(user) {
         id: String(user.id),
         name: user.name || null,
         hasPassword: Boolean(user.hasPassword),
+        changedAt: user.passwordChangedAt || null,
         system: Boolean(user.system)
     };
     renderSignIn();
@@ -96,32 +98,41 @@ function renderSignIn() {
             `<span class="mine-set-value">Change${CHEVRON_RIGHT}</span></button></li></ul></section>`;
         return;
     }
-    // Who it is is shown in the Account group above (profile.js)
+    // Who it is is shown in the Account group above (profile.js). The row says the state in words,
+    // its right side the action; removing is a row of its own (issue #16)
+    const changed = me.changedAt ? shortDay(me.changedAt) : '';
+    const state = me.hasPassword ? `Set${changed ? ` · changed ${changed}` : ''}` : 'Not set: Telegram sign-in only';
+    const action = me.hasPassword
+        ? '<span class="badge ok">On</span><span class="mine-set-action">Change</span>'
+        : '<span class="mine-set-action mine-set-accent">Set up</span>';
     holder.innerHTML =
         '<section class="mine-group"><h3 class="mine-group-title">Sign-in</h3><ul class="glass-card mine-sets">' +
         '<li class="mine-set"><span class="mine-set-text">Telegram</span><span class="mine-set-value">Connected</span></li>' +
         '<li><button type="button" class="mine-set mine-set-pick" data-action="password-open" aria-haspopup="dialog">' +
-        '<span class="mine-set-text">Password</span>' +
-        `<span class="mine-set-value">${me.hasPassword ? 'Set' : 'Not set'}${CHEVRON_RIGHT}</span></button></li>` +
+        `<span class="mine-set-text"><span>Password</span><span class="mine-set-sub">${state}</span></span>` +
+        `<span class="mine-set-value">${action}${CHEVRON_RIGHT}</span></button></li>` +
+        (me.hasPassword
+            ? '<li><button type="button" class="mine-set mine-set-pick mine-set-danger" data-action="password-remove-own" aria-haspopup="dialog">' +
+              '<span class="mine-set-text">Remove password</span></button></li>'
+            : '') +
         '</ul><p class="mine-group-note">With a password you can sign in when Telegram isn\'t answering.</p></section>';
 }
 
 /**
  * The password dialog: the own one from the account page, the system account's from Settings.
- * @type {{ save: (password: string) => Promise<void>, remove: (() => void) | null } | null}
+ * @type {{ save: (password: string) => Promise<void> } | null}
  */
 let dialog = null;
 
 /**
- * @param {{ title: string, sub: string, hint: string, save: (password: string) => Promise<void>,
- *   remove?: () => void }} options save throws to show its message in the dialog
+ * @param {{ title: string, sub: string, hint: string, save: (password: string) => Promise<void> }} options
+ *   save throws to show its message in the dialog
  */
-export function openPasswordDialog({ title, sub, hint, save, remove = null }) {
-    dialog = { save, remove };
+export function openPasswordDialog({ title, sub, hint, save }) {
+    dialog = { save };
     setText('password-title', title);
     setText('password-sub', sub);
     setText('password-hint', hint);
-    $('password-remove').hidden = !remove;
     for (const id of ['password-new', 'password-again']) {
         const field = $field(id);
         field.value = '';
@@ -142,11 +153,11 @@ function openOwn() {
         title: me.hasPassword ? 'Change password' : 'Set a password',
         sub: "For signing in when Telegram isn't answering, with your @username or ID.",
         hint: 'At least 8 characters. A change signs you out on your other devices; the bot tells you about it.',
-        remove: me.hasPassword ? removeOwn : null,
         save: async (password) => {
             const changed = me.hasPassword;
-            await api('/account/password', { method: 'PUT', body: { password } });
+            const result = await api('/account/password', { method: 'PUT', body: { password } });
             me.hasPassword = true;
+            me.changedAt = result.passwordChangedAt || null;
             renderSignIn();
             toast(changed ? 'Password changed' : 'Password set', 'success');
         }
@@ -176,7 +187,6 @@ async function save(form) {
 }
 
 function removeOwn() {
-    closeModal('password-modal');
     showConfirm({
         title: 'Remove the password?',
         text: 'You will sign in with Telegram only. You can set a new password at any time.',
@@ -185,6 +195,7 @@ function removeOwn() {
             try {
                 await api('/account/password', { method: 'DELETE' });
                 me.hasPassword = false;
+                me.changedAt = null;
                 renderSignIn();
                 toast('Password removed', 'success');
             } catch (err) {
@@ -197,7 +208,7 @@ function removeOwn() {
 /** Click handlers, merged into app.js's delegation */
 export const passwordActions = {
     'password-open': () => openOwn(),
-    'password-remove': () => dialog && dialog.remove && dialog.remove(),
+    'password-remove-own': () => removeOwn(),
     'password-show': (el) => {
         const field = $field(el.dataset.for);
         const show = field.type === 'password';
@@ -209,6 +220,9 @@ export const passwordActions = {
 
 /** The dialog's form; the sign-in form is session.js's. */
 export function setupPassword() {
+    // The same field as the sign-in form's, drawn into the placeholders that hold its id
+    $('password-new').outerHTML = passwordField('password-new', 'new-password', 'New password');
+    $('password-again').outerHTML = passwordField('password-again', 'new-password', 'Repeat it');
     $('password-form').addEventListener('submit', (event) => {
         event.preventDefault();
         save(event.target);

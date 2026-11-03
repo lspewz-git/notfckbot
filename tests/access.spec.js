@@ -174,7 +174,6 @@ test('Settings: sign-up is switched at once; the system account password is set 
     await expect(page.locator('#access-system-state')).toHaveText("No password: it can't sign in");
     await page.locator('#access-system-password').click();
     await expect(page.locator('#password-title')).toHaveText('Password for "admin"');
-    await expect(page.locator('#password-remove')).toBeHidden();
     await page.locator('#password-new').fill('system-pass');
     await page.locator('#password-again').fill('system-pass');
     await page.locator('#password-form [type="submit"]').click();

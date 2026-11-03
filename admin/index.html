@@ -1833,47 +1833,12 @@
                 <h3 id="password-title">Set a password</h3>
                 <p class="modal-sub" id="password-sub"></p>
                 <label class="field-label" for="password-new">New password</label>
-                <div class="token-row">
-                    <input
-                        id="password-new"
-                        class="input-field"
-                        type="password"
-                        autocomplete="new-password"
-                        maxlength="128"
-                    />
-                    <button
-                        type="button"
-                        class="btn btn-outline btn-icon-square"
-                        data-action="password-show"
-                        data-for="password-new"
-                        aria-label="Show password"
-                        aria-pressed="false"
-                    >
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#eye" />
-                        </svg>
-                    </button>
-                </div>
+                <div id="password-new"></div>
                 <label class="field-label" for="password-again">Repeat it</label>
-                <input
-                    id="password-again"
-                    class="input-field"
-                    type="password"
-                    autocomplete="new-password"
-                    maxlength="128"
-                />
+                <div id="password-again"></div>
                 <p class="field-hint" id="password-hint"></p>
                 <p class="login-error" id="password-error" role="alert" hidden></p>
                 <button type="submit" class="btn btn-primary btn-block">Save</button>
-                <button
-                    type="button"
-                    class="btn btn-danger-quiet btn-block"
-                    id="password-remove"
-                    data-action="password-remove"
-                    hidden
-                >
-                    Remove password
-                </button>
                 <button type="button" data-close="password-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>

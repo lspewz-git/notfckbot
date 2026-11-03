@@ -91,7 +91,7 @@ describe('/api/access', () => {
     };
     const envFile = () => fs.readFileSync(process.env.ENV_FILE, 'utf8');
 
-    test('a role is saved in the database; "No access" signs them out and removes their password', async () => {
+    test('a role is saved in the database; "No access" signs them out and keeps their password', async () => {
         let res = await call('POST', { userId: '7', role: 'admin' });
         assert.deepEqual([res.status, res.body], [200, { userId: '7', role: 'admin' }]);
         assert.equal(panelRoles.get('7'), 'admin');
@@ -101,7 +101,7 @@ describe('/api/access', () => {
         res = await call('POST', { userId: 7, role: 'none' });
         assert.deepEqual(res.body, { userId: '7', role: 'none' });
         assert.deepEqual(destroyed, [['7', null]], 'signed out everywhere');
-        assert.equal(passwords.has('7'), false);
+        assert.equal(passwords.has('7'), true, 'the password stays for a role given back');
         assert.equal(envFile(), 'BOT_TOKEN=x\n', '.env untouched');
     });
 
@@ -112,7 +112,7 @@ describe('/api/access', () => {
             assert.deepEqual([res.status, res.body], [200, { userId: '1', role }]);
             assert.equal(panelRoles.get('1'), role);
             assert.deepEqual(destroyed, role === 'none' ? [['1', null]] : []);
-            assert.equal(passwords.has('1'), role !== 'none');
+            assert.equal(passwords.has('1'), true);
             if (role !== 'admin') {
                 assert.equal((await call('POST', { userId: '1', role: 'admin' })).status, 403);
                 assert.equal((await call('POST', { userId: '7', role: 'admin' })).status, 403);
