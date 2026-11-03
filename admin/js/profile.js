@@ -101,13 +101,13 @@ const SKELETON_PAGE =
 
 function chatsLoading() {
     return (
-        '<h4 class="profile-label" id="profile-chats">Chat</h4>' +
+        '<h4 class="profile-label" id="profile-chats">Chats</h4>' +
         `<div class="action-list" role="group" aria-labelledby="profile-chats" aria-busy="true">${SKELETON_CHAT.repeat(2)}</div>`
     );
 }
 
 const chatsFailedRow = (message) =>
-    '<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list">' +
+    '<h4 class="profile-label" id="profile-chats">Chats</h4><div class="action-list">' +
     row({
         action: 'mine-reload',
         iconHtml: `<span class="action-icon">${icon('triangle-alert')}</span>`,
@@ -140,10 +140,10 @@ function menuHtml() {
         (loading ? chatsLoading() : '') +
         (error ? chatsFailedRow(error) : '') +
         (chats.length
-            ? `<h4 class="profile-label" id="profile-chats">Chat</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${choices}</div>`
+            ? `<h4 class="profile-label" id="profile-chats">Chats</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${choices}</div>`
             : '') +
         (chats.some((c) => c.hidden)
-            ? `<button type="button" class="profile-hidden" data-action="profile-visibility">${HIDDEN}<span>Hidden chats</span><span class="mine-count">${chats.filter((c) => c.hidden).length}</span><span class="action-chevron">${CHEVRON}</span></button>`
+            ? `<button type="button" class="action-row profile-hidden" data-action="profile-visibility"><span class="action-icon">${HIDDEN}</span><span>Hidden chats <span class="mine-count">${chats.filter((c) => c.hidden).length}</span></span><span class="action-chevron">${CHEVRON}</span></button>`
             : '') +
         '<div class="action-list profile-links">' +
         (me && me.role === 'admin' && document.body.classList.contains('view-mine')

@@ -61,6 +61,12 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
 - **Stat card:** label, 44px figure with an optional quiet secondary ("+6 archived"), then a title
   and a description. Show only real numbers; there is no history to make trends from.
 - **Lists on cards:** rows split by `--border-row`, no fills; the title underlines on hover.
+- **Profile menu:** use one grid for chat choices and actions. Align avatars and borderless
+  Lucide icons in 32px slots, labels on the same left edge, and checkmarks or chevrons on the
+  right. Keep one-line actions at least 44px high and give chat names with descriptions room
+  for two lines. Use sentence case and a tight gap below the Chats label. Use a surface fill
+  and an accent checkmark for the selected chat. Keep Hidden chats subdued, with its count
+  beside the label, and use the danger colour for Sign out.
 - **Tabs:** a `--surface-3` track. The selected trigger is raised to the panel colour.
 - **Buttons:** primary is inverted, outline for secondary actions on cards, destructive is red.
 - **Title card (series / film):** the poster on the left, the text beside it. On a phone a small

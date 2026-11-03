@@ -998,19 +998,9 @@ button.search-result-open:hover .mine-row-title {
 }
 
 .profile-hidden {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    width: calc(100% - var(--space-4));
-    min-height: var(--control-h);
-    margin: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
+    margin-top: var(--space-1);
     color: var(--text-dim);
     font-size: var(--text-sm);
-    cursor: pointer;
 }
 
 .profile-hidden:focus-visible {
@@ -1079,8 +1069,10 @@ button.search-result-open:hover .mine-row-title {
     color: var(--text-dim);
     font-size: var(--text-xs);
     font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+}
+
+.profile-label + .action-list {
+    margin-top: 0;
 }
 
 /* Chat rows while Telegram answers: each bar takes its text's line box, as on the dashboard, so
@@ -1133,6 +1125,18 @@ button.search-result-open:hover .mine-row-title {
     margin-top: var(--space-2);
     padding-top: var(--space-2);
     border-top: 1px solid var(--border-row);
+}
+
+.profile-links .action-row,
+.profile-hidden {
+    min-height: calc(var(--space-8) + var(--space-3));
+    padding-block: var(--space-1);
+}
+
+.profile-links .action-icon,
+.profile-hidden .action-icon {
+    border-color: transparent;
+    background: transparent;
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {
