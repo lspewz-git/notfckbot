@@ -61,6 +61,7 @@ test('a toast shown while a dialog is open is drawn above it, and stays after it
 test('a dialog closed by the panel itself (a save) takes an open list with it', async ({ page }) => {
     await mockPanel(page);
     await openChatSettings(page);
+    await page.getByRole('switch', { name: 'Quiet hours' }).click();
     await page.locator('.custom-select:has(#chat-settings-timezone) .custom-select-trigger').click();
     await expect(page.locator('.custom-select-panel')).toHaveCount(1);
     await page.evaluate(() => import('./js/ui.js').then((ui) => ui.closeModal('chat-settings-modal')));
@@ -110,6 +111,7 @@ test('a dropdown list in a dialog is above it and can be picked from; Escape clo
 }) => {
     await mockPanel(page);
     await openChatSettings(page);
+    await page.getByRole('switch', { name: 'Quiet hours' }).click();
     await page.locator('.custom-select:has(#chat-settings-timezone) .custom-select-trigger').click();
     const option = page.locator('.custom-select-option').nth(1);
     await expect(option).toBeVisible();

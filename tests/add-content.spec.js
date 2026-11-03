@@ -309,8 +309,7 @@ test('an old add cannot close a new card for another chat', async ({ page }) => 
     await result(page, 0).click();
     await card(page).locator('#confirm-add-content').click();
     await card(page).locator('.modal-x').click();
-    await page.locator('[data-close-return="add-content-modal"]').click();
-    await page.keyboard.press('Escape');
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
     await page.locator('[data-action="chat-actions"][data-id="102"]').click();
     await page.locator('#action-add').click();
     await page.locator('#content-search-input').fill('long title');
@@ -321,7 +320,8 @@ test('an old add cannot close a new card for another chat', async ({ page }) => 
     await expect(page.locator('.toast', { hasText: 'The bot writes' })).toBeVisible();
     await expect(card(page)).toBeVisible();
     await expect(card(page).locator('#content-card-title')).toContainText('series title');
-    await card(page).locator('.modal-x').click();
+    await card(page).getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.locator('#add-content-modal')).toBeVisible();
     await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(0);
 });
 
@@ -380,7 +380,7 @@ for (const reopen of [false, true])
         await page.locator('#content-search-input').press('Enter');
         await requested;
         if (reopen) {
-            await page.locator('[data-close-return="add-content-modal"]').click();
+            await page.locator('#add-content-modal .modal-x').click();
             await openSection(page, 'watchlist');
             await page.locator('#watchlist-section [data-action="add-content"]').click();
         } else {

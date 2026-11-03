@@ -46,13 +46,6 @@
     border-color: var(--text-dim);
 }
 
-.select-field:focus,
-.input-field:focus {
-    outline: none;
-    border-color: var(--primary-text);
-    box-shadow: 0 0 0 3px var(--primary-soft);
-}
-
 /* Custom dropdown — the native <select> popup is drawn by the OS and cannot
    be themed, so the real element is hidden and a styled one drives it. */
 .custom-select {
@@ -70,11 +63,6 @@
 .custom-select-trigger {
     text-align: left;
     cursor: pointer;
-}
-
-.custom-select-trigger[aria-expanded='true'] {
-    border-color: var(--primary-text);
-    box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .custom-select-panel {

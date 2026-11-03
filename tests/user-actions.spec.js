@@ -14,15 +14,43 @@ test('user actions end with Settings and keep access and blocking inside it', as
     await expect(page.locator('#action-test-notify')).toHaveCount(0);
     await page.locator('#action-settings').click();
     await expect(page.locator('#chat-settings-modal #action-access')).toBeVisible();
-    await page.locator('.custom-select:has(#chat-settings-menu) .custom-select-trigger').click();
-    await page.locator('.custom-select-option', { hasText: /^Off$/ }).click();
+    const menu = page.getByRole('switch', { name: 'Bottom menu' });
+    await expect(menu).toBeChecked();
+    await menu.click();
     await page.locator('#action-block').click();
     await expect(page.locator('#block-modal')).toBeVisible();
     await page.locator('#block-modal [data-close-return="block-modal"]').click();
     await expect(page.locator('#chat-settings-modal')).toBeVisible();
-    await expect(page.locator('#chat-settings-menu')).toHaveValue('off');
-    await page.locator('#chat-settings-modal .modal-x').click();
+    await expect(menu).not.toBeChecked();
+    await page.locator('#chat-settings-modal .modal-back').click();
     await expect(page.locator('#chat-actions-modal')).toBeVisible();
+});
+
+test('the backdrop and close button dismiss the chat action flow', async ({ page }) => {
+    await mockPanel(page);
+    await openSection(page, 'chats');
+    const opener = page.locator('[data-action="chat-actions"][data-id="101"]');
+    const settings = page.locator('#chat-settings-modal');
+    const trigger = settings.locator('.custom-select:has(#chat-settings-digest-week) .custom-select-trigger');
+    const openSettings = async () => {
+        await opener.click();
+        await page.locator('#action-settings').click();
+    };
+
+    await openSettings();
+    await trigger.focus();
+    await expect(trigger).toHaveCSS('outline-style', 'none');
+    await expect(trigger).toHaveCSS('box-shadow', 'none');
+    await trigger.click();
+    await expect(trigger).toHaveCSS('box-shadow', 'none');
+    await settings.click({ position: { x: 2, y: 2 } });
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    await expect(page.locator('.custom-select-panel')).toHaveCount(0);
+
+    await openSettings();
+    await page.locator('#action-block').click();
+    await page.locator('#block-modal .modal-x').click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
 });
 
 test('Run update check sends nothing until confirmed; Cancel and Escape return to Actions', async ({ page }) => {

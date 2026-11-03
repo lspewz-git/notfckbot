@@ -414,10 +414,10 @@
     }
 
     .modal-content {
+        --modal-padding: var(--space-5);
         width: 100%;
         max-height: 88vh;
         max-height: 88svh;
-        padding: var(--space-5);
         border-radius: var(--radius-lg);
     }
 

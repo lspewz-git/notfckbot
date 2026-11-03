@@ -100,11 +100,11 @@ test('while loading the dialog keeps its size', async ({ page }) => {
     expect(Math.abs(loaded - loading)).toBeLessThanOrEqual(2);
 });
 
-test('a failed answer: a note instead of figures, and closing goes back to the chat menu', async ({ page }) => {
+test('a failed answer: a note instead of figures, and Back returns to the chat menu', async ({ page }) => {
     await mockPanel(page, { failing: ['/api/chat/101/stats'] });
     await openStats(page, 101);
     await expect(page.locator('#chat-stats-body .stats-failed')).toContainText('Failed to load');
-    await page.locator('#chat-stats-modal .modal-x').click();
+    await page.locator('#chat-stats-modal .modal-back').click();
     await expect(page.locator('#chat-stats-modal')).toBeHidden();
     await expect(page.locator('#chat-actions-modal')).toBeVisible();
 });

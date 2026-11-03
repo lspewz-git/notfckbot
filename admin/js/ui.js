@@ -43,7 +43,7 @@ function focusables(modal) {
     // tabIndex -1 rules out e.g. the native <select> hidden behind a custom dropdown:
     // focusing it opens the OS picker on iOS the moment the dialog appears
     return /** @type {HTMLElement[]} */ ([...modal.querySelectorAll(FOCUSABLE)]).filter(
-        (el) => !el.hasAttribute('disabled') && el.offsetParent !== null && el.tabIndex !== -1
+        (el) => !el.matches(':disabled') && el.offsetParent !== null && el.tabIndex !== -1
     );
 }
 
@@ -166,6 +166,14 @@ export const clearReturnTo = () => {
     returnTo = null;
 };
 
+/** Close the entire chat action flow from its backdrop or close button. */
+export function dismissChatModals() {
+    if (!openStack.some((modal) => modal.hasAttribute('data-dismiss-stack'))) return false;
+    clearReturnTo();
+    while (openStack.length) closeModal(topmostModal().id);
+    return true;
+}
+
 /**
  * Dismissing a modal opened from a menu goes back to that menu instead of
  * dropping the user all the way out.
@@ -187,13 +195,14 @@ export function closeModalReturning(id) {
  * Confirmation dialog. The safe choice ("No") is the visually dominant one.
  *
  * @param {{ title?: string, text: string, confirmLabel?: string, cancelLabel?: string,
- *           onConfirm: () => void | Promise<void> }} options
+ *           dismissStack?: boolean, onConfirm: () => void | Promise<void> }} options
  */
 export function showConfirm({
     title = 'Are you sure?',
     text,
     confirmLabel = 'Yes',
     cancelLabel = 'No, cancel',
+    dismissStack = false,
     onConfirm
 }) {
     setText('confirm-title', title);
@@ -201,6 +210,8 @@ export function showConfirm({
 
     const confirmBtn = $('modal-confirm-btn');
     const cancelBtn = $('modal-cancel-btn');
+    $('confirm-modal').toggleAttribute('data-dismiss-stack', dismissStack);
+    $('modal-confirm-close').hidden = !dismissStack;
     confirmBtn.innerText = confirmLabel;
     cancelBtn.innerText = cancelLabel;
 
@@ -210,7 +221,7 @@ export function showConfirm({
         closeModal('confirm-modal');
         await onConfirm();
     };
-    // Like Escape and the backdrop: back to the menu this was opened from, if any
+    // Like Escape: back to the menu this was opened from, if any
     cancelBtn.onclick = () => closeModalReturning('confirm-modal');
 
     openModal('confirm-modal');

@@ -69,8 +69,7 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
 
 ## Interaction
 
-- **Focus:** one focus ring for everything, `:focus-visible` with a 2px `--focus-ring` outline
-  and a 2px offset.
+- **Focus:** controls receive keyboard focus without an outline or a focus ring.
 - **Hover:** changes the background or colour over 150–200ms. Nothing moves.
 - **Navigation:** rail items are real `<button>`s with `aria-label`, inside `<nav>`. The current
   section carries `aria-current="page"`.
@@ -80,3 +79,11 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
   floats over an open dialog goes inside it: toasts move into the dialog on top, dropdown lists
   open in their dialog. On a touch screen focus lands on the dialog's box, never on a field or a
   button.
+- **Nested dialogs:** use a borderless Lucide back arrow to the left of the title and a close
+  icon on the same line at the right. Align the subtitle with the title. Both icons use
+  32px buttons with 44px touch targets. Back returns one level. Close and the backdrop
+  dismiss the entire Users → Actions flow.
+- **On/off settings:** use the shared `.switch` control from Chat visibility for binary settings.
+  Put the label on the left and the switch on the right. In Users → Actions → Settings,
+  Bottom menu and Quiet hours apply on Save. Keep dependent fields visible and disabled when
+  their switch is off.

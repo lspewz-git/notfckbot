@@ -86,15 +86,13 @@ test("the row's menu: the role is picked from a dropdown and saved at once; not 
     // A group can't sign in
     await openMenu(page, -1003);
     await expect(page.locator('#action-access')).toBeHidden();
-    await page.locator('[data-close-return="chat-settings-modal"].modal-x').click();
-    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
+    await page.locator('#chat-settings-modal .modal-x').click();
 
     // Your own role uses the same dropdown
     await openMenu(page, 42);
     await expect(page.locator('#action-access .custom-select')).toBeVisible();
     await expect(page.locator('#action-access-desc')).toHaveText('Saved when picked');
-    await page.locator('[data-close-return="chat-settings-modal"].modal-x').click();
-    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
+    await page.locator('#chat-settings-modal .modal-x').click();
 
     // Without a role (sign-up closed) the dropdown says No access
     await openMenu(page, 104);
@@ -105,8 +103,7 @@ test("the row's menu: the role is picked from a dropdown and saved at once; not 
     // The dialog stays open on the new role, and the row's badge follows
     await expect(page.locator('#chat-settings-modal')).toBeVisible();
     await expect(page.locator('#action-access-role')).toHaveValue('user');
-    await page.locator('[data-close-return="chat-settings-modal"].modal-x').click();
-    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
+    await page.locator('#chat-settings-modal .modal-x').click();
     await expect(
         page.locator('#chats-body tr:visible', { hasText: '@new' }).locator('.access-badge:visible')
     ).toHaveText('User');
@@ -146,8 +143,7 @@ test("someone's password: a row in their menu removes it after a confirmation", 
     await openSection(page, 'chats');
     await openMenu(page, 101);
     await expect(page.locator('#action-password-remove')).toBeHidden();
-    await page.locator('[data-close-return="chat-settings-modal"].modal-x').click();
-    await page.locator('[data-close="chat-actions-modal"].modal-x').click();
+    await page.locator('#chat-settings-modal .modal-x').click();
 
     await openMenu(page, 102);
     await page.locator('#action-password-remove').click();

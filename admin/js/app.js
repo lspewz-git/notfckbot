@@ -15,7 +15,15 @@ import { recapScheduleActions, setupRecapSchedule } from './recap-schedule.js';
 import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
 import { accessActions, setupAccess } from './access.js';
 import { alertsActions, setupAlerts } from './alerts.js';
-import { openModal, closeModal, closeModalReturning, topmostModal, setReturnTo, showConfirm } from './ui.js';
+import {
+    openModal,
+    closeModal,
+    closeModalReturning,
+    dismissChatModals,
+    topmostModal,
+    setReturnTo,
+    showConfirm
+} from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
@@ -225,14 +233,14 @@ function setupDelegation() {
         if (filmsTab) setTableTab('films', filmsTab);
         if (chatsTab) setTableTab('chats', chatsTab);
         if (section) switchSection(section);
-        if (close) closeModal(close);
+        if (close && !(el.classList.contains('modal-x') && dismissChatModals())) closeModal(close);
         if (closeReturn) closeModalReturning(closeReturn);
         // After any close, so a menu row can swap its sheet for the dialog it names
         if (open) openModal(open);
         if (logFilter) filterLogs(logFilter);
     });
 
-    // A click on the dimmed backdrop dismisses the dialog, like Cancel. The press must also
+    // A click on the dimmed backdrop dismisses the dialog. The press must also
     // start there: dragging a text selection out of a field ends the click on the backdrop too.
     let pressedBackdrop = null;
     document.addEventListener('mousedown', (e) => {
@@ -240,7 +248,8 @@ function setupDelegation() {
         pressedBackdrop = t.classList && t.classList.contains('modal') ? t : null;
     });
     document.addEventListener('click', (e) => {
-        if (pressedBackdrop && e.target === pressedBackdrop) closeModalReturning(pressedBackdrop.id);
+        if (pressedBackdrop && e.target === pressedBackdrop && !dismissChatModals())
+            closeModalReturning(pressedBackdrop.id);
         pressedBackdrop = null;
     });
 

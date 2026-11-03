@@ -230,6 +230,7 @@ html:has(.modal[open]) {
 }
 
 .modal-content {
+    --modal-padding: var(--space-6);
     background: var(--surface-overlay);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -238,7 +239,7 @@ html:has(.modal[open]) {
     max-width: 600px;
     max-height: 90vh;
     max-height: 90svh;
-    padding: var(--space-6);
+    padding: var(--modal-padding);
     position: relative;
     overflow-y: auto;
     /* Scrolled to its end, a swipe stops here instead of passing on to the page */
@@ -253,13 +254,26 @@ html:has(.modal[open]) {
     padding-right: var(--space-8);
 }
 
+.modal-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.modal-title-row + .modal-sub {
+    padding-inline-start: calc(var(--space-8) + var(--space-2));
+}
+
+.modal-back[hidden],
+.modal-x[hidden] {
+    display: none;
+}
+
 /* Close (×) in the top-right corner */
-.modal-x {
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
-    width: 32px;
-    height: 32px;
+.modal-x,
+.modal-back {
+    width: var(--space-8);
+    height: var(--space-8);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -270,12 +284,31 @@ html:has(.modal[open]) {
     cursor: pointer;
 }
 
-.modal-x:hover {
+.modal-x {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+}
+
+.modal-title-row:has(.modal-back:not([hidden])) ~ .modal-x,
+.modal-stats .modal-x {
+    top: var(--modal-padding);
+}
+
+.modal-back {
+    position: relative;
+    flex: none;
+}
+
+.modal-x:hover,
+.modal-back:hover,
+.modal-back:focus-visible {
     background: var(--surface-3);
     color: var(--text);
 }
 
-.modal-x .icon {
+.modal-x .icon,
+.modal-back .icon {
     width: 16px;
     height: 16px;
 }
@@ -466,9 +499,10 @@ html:has(.modal[open]) {
     }
 }
 
-/* The close button is 32px; a finger gets 44 */
+/* Header buttons are 32px; a finger gets 44. */
 @media (pointer: coarse) {
-    .modal-x::after {
+    .modal-x::after,
+    .modal-back::after {
         content: '';
         position: absolute;
         inset: -6px;

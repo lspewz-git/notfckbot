@@ -2044,7 +2044,7 @@
         </dialog>
 
         <!-- Direct Message Modal -->
-        <dialog id="dm-modal" class="modal" aria-labelledby="dm-modal-title">
+        <dialog id="dm-modal" class="modal" data-dismiss-stack aria-labelledby="dm-modal-title">
             <div class="modal-content">
                 <h3 id="dm-modal-title">Direct Message</h3>
                 <p id="dm-target-info">To: @username</p>
@@ -2053,6 +2053,9 @@
                     <button id="confirm-dm" class="btn btn-primary btn-grow">Send Message</button>
                     <button data-close-return="dm-modal" class="btn btn-ghost">Cancel</button>
                 </div>
+                <button data-close="dm-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
+                </button>
             </div>
         </dialog>
 
@@ -2132,7 +2135,7 @@
             </div>
         </dialog>
 
-        <dialog id="chat-actions-modal" class="modal" aria-labelledby="chat-actions-title">
+        <dialog id="chat-actions-modal" class="modal" data-dismiss-stack aria-labelledby="chat-actions-title">
             <div class="modal-content modal-narrow">
                 <h3 id="chat-actions-title">Manage chat</h3>
                 <p class="modal-sub" id="chat-actions-sub"></p>
@@ -2218,16 +2221,30 @@
         <dialog id="add-content-modal" class="modal" aria-labelledby="add-content-modal-title">
             <div class="modal-content">
                 <!-- "Add for alice" from a chat's menu; "Add serial" / "Add movie" from those sections -->
-                <h3 id="add-content-modal-title">
-                    <span id="add-content-heading">Add for</span> <span id="add-content-target"></span>
-                </h3>
+                <div class="modal-title-row">
+                    <button
+                        id="add-content-back"
+                        hidden
+                        data-close-return="add-content-modal"
+                        class="modal-back"
+                        aria-label="Back to chat actions"
+                        title="Back to chat actions"
+                    >
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#arrow-left" />
+                        </svg>
+                    </button>
+                    <h3 id="add-content-modal-title">
+                        <span id="add-content-heading">Add for</span> <span id="add-content-target"></span>
+                    </h3>
+                </div>
                 <!-- Only when opened from Serials or Movies: there the chat isn't known yet -->
                 <div class="mt-md" id="content-chat-field" hidden></div>
                 <div id="content-search-form" class="mt-md"></div>
                 <div id="content-search-results" class="search-results"></div>
                 <!-- A corner ×, not a Cancel button under everything: on a phone that one sat below the
                      fold, past the results and the Add button -->
-                <button data-close-return="add-content-modal" class="modal-x" aria-label="Close">
+                <button data-close="add-content-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
             </div>
@@ -2237,29 +2254,53 @@
 
         <!-- A chat's bot settings: the same as its ⚙️ Settings screen in Telegram -->
         <!-- A chat's change log (changes.js): search and pages, filled when opened -->
-        <dialog id="changes-modal" class="modal" aria-labelledby="changes-title">
+        <dialog id="changes-modal" class="modal" data-dismiss-stack aria-labelledby="changes-title">
             <div class="modal-content modal-medium">
-                <h3 id="changes-title">Changes</h3>
+                <div class="modal-title-row">
+                    <button
+                        data-close-return="changes-modal"
+                        class="modal-back"
+                        aria-label="Back to chat actions"
+                        title="Back to chat actions"
+                    >
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#arrow-left" />
+                        </svg>
+                    </button>
+                    <h3 id="changes-title">Changes</h3>
+                </div>
                 <p class="modal-sub" id="changes-sub"></p>
                 <div id="changes-root" class="changes mt-md"></div>
-                <button data-close-return="changes-modal" class="modal-x" aria-label="Close">
+                <button data-close="changes-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
             </div>
         </dialog>
 
         <!-- A chat's statistics (chat-stats.js): the body is filled for the period picked -->
-        <dialog id="chat-stats-modal" class="modal" aria-labelledby="chat-stats-title">
+        <dialog id="chat-stats-modal" class="modal" data-dismiss-stack aria-labelledby="chat-stats-title">
             <div class="modal-content modal-stats">
                 <div class="stats-head">
                     <div class="stats-heading">
-                        <h3 id="chat-stats-title">Statistics</h3>
+                        <div class="modal-title-row">
+                            <button
+                                data-close-return="chat-stats-modal"
+                                class="modal-back"
+                                aria-label="Back to chat actions"
+                                title="Back to chat actions"
+                            >
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#arrow-left" />
+                                </svg>
+                            </button>
+                            <h3 id="chat-stats-title">Statistics</h3>
+                        </div>
                         <p class="modal-sub" id="chat-stats-sub"></p>
                     </div>
                     <div id="chat-stats-periods" class="tab-filters" role="group" aria-label="Period"></div>
                 </div>
                 <div id="chat-stats-body" aria-live="polite"></div>
-                <button data-close-return="chat-stats-modal" class="modal-x" aria-label="Close">
+                <button data-close="chat-stats-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
             </div>
@@ -2324,9 +2365,21 @@
             </div>
         </dialog>
 
-        <dialog id="chat-settings-modal" class="modal" aria-labelledby="chat-settings-title">
+        <dialog id="chat-settings-modal" class="modal" data-dismiss-stack aria-labelledby="chat-settings-title">
             <div class="modal-content modal-medium">
-                <h3 id="chat-settings-title">Settings</h3>
+                <div class="modal-title-row">
+                    <button
+                        data-close-return="chat-settings-modal"
+                        class="modal-back"
+                        aria-label="Back to chat actions"
+                        title="Back to chat actions"
+                    >
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#arrow-left" />
+                        </svg>
+                    </button>
+                    <h3 id="chat-settings-title">Settings</h3>
+                </div>
                 <p class="modal-sub" id="chat-settings-sub"></p>
                 <!-- Groups only: a private chat has one person to press anything -->
                 <div class="field-block" id="chat-settings-buttons-field">
@@ -2338,39 +2391,71 @@
                     <p class="field-hint">A search or the subscriptions menu called up by one member.</p>
                 </div>
                 <div class="field-block">
-                    <label class="field-label" for="chat-settings-menu">Bottom menu</label>
-                    <select id="chat-settings-menu" class="select-field">
-                        <option value="on">On</option>
-                        <option value="off">Off</option>
-                    </select>
+                    <div class="settings-switch-heading">
+                        <span class="field-label" id="chat-settings-menu-label">Bottom menu</span>
+                        <button
+                            type="button"
+                            id="chat-settings-menu"
+                            class="switch"
+                            role="switch"
+                            aria-checked="true"
+                            aria-labelledby="chat-settings-menu-label"
+                        >
+                            <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                        </button>
+                    </div>
                     <p class="field-hint">Shows up in the chat with the bot's next reply there.</p>
                 </div>
                 <!-- Hours filled by chats.js; the zones are src/quiet.js ZONES (a unit test keeps them equal) -->
                 <div class="field-block">
-                    <span class="field-label" id="chat-settings-quiet-label">Quiet hours</span>
-                    <div class="settings-pair" role="group" aria-labelledby="chat-settings-quiet-label">
-                        <select
-                            id="chat-settings-quiet-start"
-                            class="select-field"
-                            aria-label="Quiet hours from"
-                        ></select>
-                        <select id="chat-settings-quiet-end" class="select-field" aria-label="Quiet hours to"></select>
+                    <div class="settings-switch-heading">
+                        <span class="field-label" id="chat-settings-quiet-label">Quiet hours</span>
+                        <button
+                            type="button"
+                            id="chat-settings-quiet-toggle"
+                            class="switch"
+                            role="switch"
+                            aria-checked="false"
+                            aria-labelledby="chat-settings-quiet-label"
+                            aria-controls="chat-settings-quiet-fields"
+                        >
+                            <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                        </button>
                     </div>
-                    <div class="mt-sm">
-                        <select id="chat-settings-timezone" class="select-field" aria-label="Time zone">
-                            <option value="Europe/Kaliningrad">Kaliningrad (UTC+2)</option>
-                            <option value="Europe/Moscow">Moscow (UTC+3)</option>
-                            <option value="Europe/Samara">Samara (UTC+4)</option>
-                            <option value="Asia/Yekaterinburg">Yekaterinburg (UTC+5)</option>
-                            <option value="Asia/Omsk">Omsk (UTC+6)</option>
-                            <option value="Asia/Novosibirsk">Novosibirsk (UTC+7)</option>
-                            <option value="Asia/Irkutsk">Irkutsk (UTC+8)</option>
-                            <option value="Asia/Yakutsk">Yakutsk (UTC+9)</option>
-                            <option value="Asia/Vladivostok">Vladivostok (UTC+10)</option>
-                            <option value="Asia/Magadan">Magadan (UTC+11)</option>
-                            <option value="Asia/Kamchatka">Kamchatka (UTC+12)</option>
-                        </select>
-                    </div>
+                    <fieldset
+                        id="chat-settings-quiet-fields"
+                        class="quiet-hours-fields"
+                        disabled
+                        aria-labelledby="chat-settings-quiet-label"
+                    >
+                        <div class="settings-pair">
+                            <select
+                                id="chat-settings-quiet-start"
+                                class="select-field"
+                                aria-label="Quiet hours from"
+                            ></select>
+                            <select
+                                id="chat-settings-quiet-end"
+                                class="select-field"
+                                aria-label="Quiet hours to"
+                            ></select>
+                        </div>
+                        <div class="mt-sm">
+                            <select id="chat-settings-timezone" class="select-field" aria-label="Time zone">
+                                <option value="Europe/Kaliningrad">Kaliningrad (UTC+2)</option>
+                                <option value="Europe/Moscow">Moscow (UTC+3)</option>
+                                <option value="Europe/Samara">Samara (UTC+4)</option>
+                                <option value="Asia/Yekaterinburg">Yekaterinburg (UTC+5)</option>
+                                <option value="Asia/Omsk">Omsk (UTC+6)</option>
+                                <option value="Asia/Novosibirsk">Novosibirsk (UTC+7)</option>
+                                <option value="Asia/Irkutsk">Irkutsk (UTC+8)</option>
+                                <option value="Asia/Yakutsk">Yakutsk (UTC+9)</option>
+                                <option value="Asia/Vladivostok">Vladivostok (UTC+10)</option>
+                                <option value="Asia/Magadan">Magadan (UTC+11)</option>
+                                <option value="Asia/Kamchatka">Kamchatka (UTC+12)</option>
+                            </select>
+                        </div>
+                    </fieldset>
                     <p class="field-hint">Notifications in these hours come in one message when they end.</p>
                 </div>
                 <div class="field-block">
@@ -2429,7 +2514,7 @@
                         ></span>
                     </button>
                 </div>
-                <button data-close-return="chat-settings-modal" class="modal-x" aria-label="Close">
+                <button data-close="chat-settings-modal" class="modal-x" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
             </div>
@@ -2787,6 +2872,9 @@
                     <button id="modal-confirm-btn" class="btn btn-danger-quiet btn-grow">Yes</button>
                     <button id="modal-cancel-btn" class="btn btn-primary btn-grow-2">No, cancel</button>
                 </div>
+                <button id="modal-confirm-close" hidden data-close="confirm-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
+                </button>
             </div>
         </dialog>
 
@@ -2811,7 +2899,7 @@
         </dialog>
 
         <!-- Block duration (replaces window.prompt) -->
-        <dialog id="block-modal" class="modal" aria-labelledby="block-modal-title">
+        <dialog id="block-modal" class="modal" data-dismiss-stack aria-labelledby="block-modal-title">
             <div class="modal-content modal-narrow">
                 <h3 id="block-modal-title">🚫 Block chat</h3>
                 <p class="modal-sub" id="block-target"></p>
@@ -2823,6 +2911,9 @@
                     <button id="confirm-block" class="btn btn-danger btn-grow">Block</button>
                     <button data-close-return="block-modal" class="btn btn-ghost">Cancel</button>
                 </div>
+                <button data-close="block-modal" class="modal-x" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
+                </button>
             </div>
         </dialog>
 

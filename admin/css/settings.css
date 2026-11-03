@@ -77,6 +77,30 @@
     flex: 0 0 6.5rem;
 }
 
+.settings-switch-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+}
+
+.settings-switch-heading .field-label {
+    margin: 0;
+}
+
+.quiet-hours-fields {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.quiet-hours-fields:disabled .select-field {
+    opacity: 0.5;
+    cursor: default;
+    border-color: var(--border-strong);
+}
+
 .settings-interval {
     max-width: 12rem;
 }

@@ -31,7 +31,7 @@ test('a group: choose who presses the buttons and the menu, then save', async ({
     );
 
     await pick(page, 'chat-settings-buttons', 'Everyone in the chat');
-    await pick(page, 'chat-settings-menu', 'Off');
+    await page.getByRole('switch', { name: 'Bottom menu' }).click();
     await page.locator('#chat-settings-save').click();
     await expect(page.locator('.toast', { hasText: 'Settings saved' })).toBeVisible();
     await expect(page.locator('#chat-settings-modal')).toBeHidden();
@@ -68,31 +68,43 @@ test('a private chat has no "who presses" choice: only the menu is sent', async 
     });
 });
 
-test('× goes back to the chat menu', async ({ page }) => {
+test('Back returns to the chat menu', async ({ page }) => {
     await mockPanel(page);
     await openSettings(page, 101);
-    await page.locator('#chat-settings-modal .modal-x').click();
+    await page.locator('#chat-settings-modal .modal-back').click();
     await expect(page.locator('#chat-actions-modal')).toBeVisible();
 });
 
 test('quiet hours: from, to and the time zone go with Save; Off sends none', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSettings(page, 101);
-    // Off: there is no end to pick
-    await expect(page.locator('.custom-select:has(#chat-settings-quiet-end)')).toBeHidden();
+    const toggle = page.getByRole('switch', { name: 'Quiet hours' });
+    const lists = page.locator('#chat-settings-quiet-fields .custom-select-trigger');
+    await expect(toggle).not.toBeChecked();
+    await expect(lists).toHaveCount(3);
+    for (const list of await lists.all()) {
+        await expect(list).toBeVisible();
+        await expect(list).toBeDisabled();
+    }
 
+    await page.locator('#chat-settings-save').click();
+    await expect(page.locator('#chat-settings-modal')).toBeHidden();
+    expect(panel.lastSettings.body).toMatchObject({ quiet_start: null, quiet_end: null });
+
+    await openSettings(page, 101);
+    await toggle.click();
     await pick(page, 'chat-settings-quiet-start', '23:00');
-    await expect(page.locator('.custom-select:has(#chat-settings-quiet-end)')).toBeVisible();
     await pick(page, 'chat-settings-quiet-end', '08:00');
     await pick(page, 'chat-settings-timezone', 'Vladivostok');
     await page.locator('#chat-settings-save').click();
-    await expect(page.locator('.toast', { hasText: 'Settings saved' })).toBeVisible();
+    await expect(page.locator('#chat-settings-modal')).toBeHidden();
     expect(panel.lastSettings.body).toMatchObject({ quiet_start: 23, quiet_end: 8, timezone: 'Asia/Vladivostok' });
 });
 
 test('quiet hours with the same start and end are not sent', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSettings(page, 101);
+    await page.getByRole('switch', { name: 'Quiet hours' }).click();
     await pick(page, 'chat-settings-quiet-start', '08:00');
     await pick(page, 'chat-settings-quiet-end', '08:00');
     await page.locator('#chat-settings-save').click();

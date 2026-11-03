@@ -46,13 +46,6 @@ select {
         box-shadow 0.15s;
 }
 
-input[type='text']:focus,
-textarea:focus,
-select:focus {
-    border-color: var(--primary-text);
-    box-shadow: 0 0 0 3px var(--primary-soft);
-}
-
 ::placeholder {
     color: var(--text-dim);
     opacity: 0.7;

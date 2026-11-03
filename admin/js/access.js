@@ -78,6 +78,7 @@ function removePassword(id) {
         title: 'Remove the password?',
         text: `${name} is signed out everywhere and will sign in with Telegram only. They can set a new password on their account page.`,
         confirmLabel: 'Remove',
+        dismissStack: true,
         onConfirm: async () => {
             await mutate(
                 `/access/${encodeURIComponent(id)}/password`,
