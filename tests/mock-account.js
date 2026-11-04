@@ -102,6 +102,9 @@ function accountState(options) {
         // /api/account/chats fails (Telegram down)
         chatsDown: Boolean(options.chatsDown),
         chatsWait: options.chatsWait,
+        // Called before each Mini App sign-in answer (its try number from 1): a promise holds that answer
+        miniAppWait: options.miniAppWait,
+        miniAppTries: 0,
         // Signed in as the system account (not a Telegram user)
         system: Boolean(options.system),
         role: options.role || 'admin',

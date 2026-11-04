@@ -86,8 +86,8 @@ let miniApp = null;
 
 const failedMiniApp = (err) => {
     const retry = !err.status || err.status === 429 || err.status >= 500;
-    if (!retry) miniApp.initData = null;
-    // 409: another account's session is in this window; signing it out lets the next launch in
+    // 409 comes before the launch data is spent: after signing the other account out it signs in here
+    if (!retry && err.status !== 409) miniApp.initData = null;
     miniApp.next = retry ? 'retry' : err.status === 401 ? 'reopen' : err.status === 409 ? 'signout' : null;
 };
 
@@ -111,7 +111,7 @@ const statusLine = (err) =>
 // The deep link to the bot and the QR code would close this window and lose the confirmation:
 // here the panel signs in again with Telegram's launch data, or with a password
 function miniAppScreen(error, restoreFocus, status = '') {
-    const next = miniApp.initData ? 'retry' : (miniApp.next ?? 'reopen');
+    const next = miniApp.next ?? (miniApp.initData ? 'retry' : 'reopen');
     gate(
         `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
             (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
@@ -121,7 +121,7 @@ function miniAppScreen(error, restoreFocus, status = '') {
                   ? '<button type="button" class="btn btn-primary btn-block" data-action="miniapp-close">Close the app</button>' +
                     '<p class="login-hint">Open it again from the bot: Telegram signs you in.</p>'
                   : next === 'signout'
-                    ? '<button type="button" class="btn btn-primary btn-block" data-action="logout">Sign out</button>'
+                    ? '<button type="button" class="btn btn-primary btn-block" data-action="miniapp-signout">Sign out</button>'
                     : '') +
             '<p class="login-or">Or</p>' +
             `<button type="button" class="btn btn-outline btn-block" data-action="login-password">${KEY_ICON}Password</button>`
@@ -170,9 +170,13 @@ const linkScreen = () =>
 
 /**
  * Shows the panel for this session, or the sign-in screen.
+ * @param {string | null} [preferredChat]
+ * @param {{ current?: () => boolean, focus?: boolean }} [retry] a retry from the Mini App screen: whether
+ *   that screen is still the one shown (a late failure doesn't redraw the password form), and whether
+ *   focus was in it before its button was disabled
  * @returns {Promise<'admin' | 'user' | null>}
  */
-export async function startSession(preferredChat = null) {
+export async function startSession(preferredChat = null, { current = () => true, focus } = {}) {
     if (location.pathname.startsWith('/login/')) {
         linkScreen();
         return null;
@@ -202,9 +206,10 @@ export async function startSession(preferredChat = null) {
         if (initData) {
             // Also when the sign-in went through and /account/me failed: a 5xx there is retried
             failedMiniApp(err);
+            if (!current()) return null;
             discardChallenges();
             const message = err.status ? err.message : "Can't reach the panel. Check the connection.";
-            miniAppScreen(message, $('login-body').contains(document.activeElement), statusLine(err));
+            miniAppScreen(message, focus ?? $('login-body').contains(document.activeElement), statusLine(err));
         } else if (err.status === 401) signInScreen();
         else
             gate(
@@ -273,7 +278,11 @@ function stopPolling() {
 export function sessionActions(onSignedIn) {
     const signedIn = async (chatId = null) => {
         // Signed in another way: the kept launch data must not sign in again (another account → 409)
-        if (miniApp) miniApp.initData = null;
+        if (miniApp) {
+            miniApp.initData = null;
+            // A later sign-in screen here (the session ended) offers to reopen the app for new launch data
+            miniApp.next = null;
+        }
         // The section in the address stays: signing in again lands on the tab that was open
         window.history.replaceState(null, '', `/${location.hash}`);
         const role = await startSession(chatId);
@@ -314,6 +323,18 @@ export function sessionActions(onSignedIn) {
         };
         pollTimer = window.setTimeout(poll, POLL_MS);
     };
+    // One try at a time: Telegram's launch data signs in only once. Choosing Password meanwhile
+    // (a new attempt) leaves its form alone when this try fails late
+    const retryFrom = async (el, before = async () => {}) => {
+        const focus = $('login-body').contains(document.activeElement);
+        /** @type {HTMLButtonElement} */ (el).disabled = true;
+        stopPolling();
+        const mine = attempt;
+        await before();
+        if (mine !== attempt) return;
+        const role = await startSession(null, { current: () => mine === attempt, focus });
+        if (role) onSignedIn(role);
+    };
     $('login-gate').addEventListener('submit', async (event) => {
         const form = /** @type {HTMLFormElement} */ (event.target);
         if (form.dataset.login !== 'password') return;
@@ -352,12 +373,9 @@ export function sessionActions(onSignedIn) {
             signInScreen('', true);
         },
         'miniapp-close': () => miniApp?.bridge.postEvent('web_app_close', '{}'),
-        'login-retry': async (el) => {
-            // One try at a time: Telegram's launch data signs in only once
-            /** @type {HTMLButtonElement} */ (el).disabled = true;
-            const role = await startSession();
-            if (role) onSignedIn(role);
-        },
+        'login-retry': (el) => retryFrom(el),
+        // Another account's session in this window (409): end it, then the kept launch data signs in
+        'miniapp-signout': (el) => retryFrom(el, () => api('/logout', { method: 'POST' }).catch(() => {})),
         'login-link': async (el) => {
             const button = /** @type {HTMLButtonElement} */ (el);
             button.disabled = true;

@@ -4,9 +4,9 @@ const { watchConsole, isNarrow, pickChat, openProfilePage, profileButton } = req
 const { mockPanel } = require('./mock-panel');
 
 // A 401 is the answer the panel expects before sign-in (and to a wrong password, a 429 to too many
-// tries, a 503 to the chats while Telegram is down): the browser logs it as a failed load,
-// and the refresh that met it logs its error
-watchConsole({ ignore: /status of (4(01|29)|503)|Sign in: \/login in the bot/ });
+// tries, a 503 to the chats while Telegram is down, a 409 to a Mini App launch over another account):
+// the browser logs it as a failed load, and the refresh that met it logs its error
+watchConsole({ ignore: /status of (4(01|09|29)|503)|Sign in: \/login in the bot/ });
 
 for (const [native, query] of [
     [true, '?miniapp=1'],
@@ -69,6 +69,55 @@ test('a password sign-in after a failed Mini App try does not send the kept laun
     await page.locator('#login-pass').press('Enter');
     await expect(page.locator('#login-gate')).toBeHidden();
     expect(panel.account.sent.filter((request) => request.path === '/api/login/miniapp')).toHaveLength(1);
+});
+
+test('a late failed retry leaves the password form being filled alone', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    let answer;
+    const held = new Promise((resolve) => (answer = resolve));
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, {
+        path,
+        signedOut: true,
+        role: 'user',
+        miniAppFails: [503, 503],
+        miniAppWait: (n) => (n === 2 ? held : undefined)
+    });
+    await page.locator('#login-body [data-action="login-retry"]').click();
+    await page.locator('#login-body [data-action="login-password"]').click();
+    await page.locator('#login-name').fill('@me');
+    answer();
+    // The retry's 503 has landed by the time the next request is answered
+    await expect.poll(() => page.evaluate(() => document.querySelector('#login-name')?.value)).toBe('@me');
+    await page.waitForTimeout(300);
+    await expect(page.locator('#login-name')).toHaveValue('@me');
+    await expect(page.locator('#login-code')).toHaveCount(0);
+});
+
+test('a failed retry keeps focus on the sign-in screen', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, { path, signedOut: true, role: 'user', miniAppFails: [503, 503] });
+    await page.locator('#login-body [data-action="login-retry"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#login-title')).toBeFocused();
+    await expect(page.locator('#login-body [data-action="login-retry"]')).toBeEnabled();
+});
+
+test('another account in the Mini App window: Sign out, then the same launch signs in', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    const initData = 'auth_date=123&hash=test';
+    const path = `/#${new URLSearchParams({ tgWebAppData: initData })}`;
+    const panel = await mockPanel(page, { path, signedOut: true, role: 'user', miniAppFails: [409] });
+    await expect(page.locator('#login-code')).toHaveText('409 · Conflict');
+    await page.locator('#login-body [data-action="miniapp-signout"]').click();
+    await expect(page.locator('body')).toHaveClass(/role-user/);
+    const sent = panel.account.sent.map((request) => request.path);
+    expect(sent.filter((p) => p === '/api/logout')).toHaveLength(1);
+    expect(panel.account.sent.filter((request) => request.path === '/api/login/miniapp').map((r) => r.body)).toEqual([
+        { initData },
+        { initData }
+    ]);
 });
 
 test('Mini App launch data that cannot be used again offers to reopen the app', async ({ page }) => {

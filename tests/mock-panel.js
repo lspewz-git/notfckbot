@@ -992,6 +992,8 @@ async function mockPanel(page, options = {}) {
                 else if (route.request().method() === 'GET' && options.recapScheduleWait) await options.recapScheduleWait;
             }
             if (url.pathname === '/api/account/chats' && panel.account.chatsWait) await panel.account.chatsWait;
+            if (url.pathname === '/api/login/miniapp' && panel.account.miniAppWait)
+                await panel.account.miniAppWait(++panel.account.miniAppTries);
             if (url.pathname.endsWith('/visibility') && panel.account.visibilityWait)
                 await panel.account.visibilityWait;
             const mine = await accountAnswer(panel.account, route.request(), url);
