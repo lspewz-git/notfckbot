@@ -368,3 +368,57 @@ test("the list prefetches every film's Kinopoisk ID, out or not: its card needs 
     assert.ok(kinopoiskAsked.includes('movie_1'), 'the film not out yet too');
     assert.ok(!kinopoiskAsked.includes('tv_3'), 'not for a series');
 });
+
+test('a group prompt: Cancel under it, the menu kept, only the asker can cancel, nothing posted', async () => {
+    const bot = fakeBot();
+    const chat = fakeChat();
+    const { recordOwner } = require('../../src/bot/access');
+    const { askForQuery } = require('../../src/bot/search');
+    const group = { id: 555, type: 'group' };
+    const asker = chat.ctxFor(null, { chat: group });
+    // What access.js does for every reply in a group: the message is the asker's
+    const reply = asker.reply;
+    asker.reply = async (...args) => {
+        const m = await reply(...args);
+        recordOwner(group.id, m.message_id, 777);
+        return m;
+    };
+    let markup = null;
+    const sent = asker.reply;
+    asker.reply = async (text, extra) => {
+        markup = extra.reply_markup;
+        return sent(text, extra);
+    };
+    await askForQuery(asker, { reply_markup: { keyboard: [['❌ Отмена']] } });
+    assert.equal(asker.session.state, 'waiting_for_search');
+    assert.ok(!markup.keyboard, 'the shared reply keyboard is left alone');
+    const prompt = only(chat);
+    assert.deepEqual(
+        prompt.buttons.map((b) => b.callback_data),
+        ['cancel_prompt']
+    );
+
+    // Someone else: a pop-up, the prompt stays
+    await press(bot, chat, prompt.id, 'cancel_prompt', 888);
+    assert.match(chat.alerts.at(-1), /другой участник/);
+    assert.equal(chat.screen.size, 1);
+
+    // The asker: the prompt goes, nothing new in the chat, the search state ends
+    const message = { message_id: prompt.id };
+    const ctx = { ...chat.ctxFor(message), session: asker.session };
+    const [, cancel] = bot.actions.find(([t]) => t === 'cancel_prompt');
+    await cancel(ctx);
+    assert.equal(chat.screen.size, 0);
+    assert.equal(ctx.session.state, 'idle');
+});
+
+test('a private prompt keeps the reply keyboard it is given', async () => {
+    const chat = fakeChat();
+    const { askForQuery } = require('../../src/bot/search');
+    const ctx = chat.ctxFor(null, { chat: { id: 1, type: 'private' } });
+    let extra = null;
+    ctx.reply = async (text, e) => (extra = e);
+    const keyboard = { reply_markup: { keyboard: [['❌ Отмена']] } };
+    await askForQuery(ctx, keyboard);
+    assert.equal(extra, keyboard);
+});

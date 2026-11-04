@@ -10,7 +10,7 @@ const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = requ
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
-const { recordOwner } = require('./access');
+const { recordOwner, ownerOf } = require('./access');
 const events = require('../chat-events');
 const { lruCache } = require('../lru');
 const { log } = require('../log');
@@ -164,7 +164,36 @@ function endSearch(ctx) {
     if (session && session.starter === ctx.from.id) setState(ctx, { state: 'idle' });
 }
 
+const PROMPT = 'Введите название фильма или сериала для поиска:';
+
+/**
+ * Asks for a title. In a group the reply keyboard is the whole chat's: a "❌ Отмена" there would
+ * show to everyone, and pressing it posts the text to the chat. So a group's prompt carries its own
+ * inline Cancel, for whoever asked, and the reply keyboard stays the menu.
+ */
+function askForQuery(ctx, privateKeyboard) {
+    setState(ctx, { state: 'waiting_for_search', results: [], currentPage: 0 });
+    if (ctx.chat && ctx.chat.type !== 'private') {
+        return ctx.reply(PROMPT, Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_prompt')]]));
+    }
+    return ctx.reply(PROMPT, privateKeyboard);
+}
+
 function register(bot) {
+    // Cancel under a group's prompt: it goes quietly, nothing new is posted to the chat
+    bot.action('cancel_prompt', async (ctx) => {
+        const owner = ownerOf(ctx.chat.id, ctx.callbackQuery.message.message_id);
+        // In a chat whose buttons are open to all (access.js lets the press through) it stays the asker's
+        if (owner !== null && owner !== ctx.from.id) {
+            return ctx.answerCbQuery('Этот поиск начал другой участник.', { show_alert: true });
+        }
+        // Pressed after the title was sent: the search is on screen and stays; only the prompt goes
+        const waiting = getState(ctx).state === 'waiting_for_search';
+        if (waiting) setState(ctx, { state: 'idle' });
+        await ctx.deleteMessage().catch(() => {});
+        await ctx.answerCbQuery(waiting ? 'Поиск отменён' : undefined).catch(() => {});
+    });
+
     bot.action('cancel_search', async (ctx) => {
         // ✖️ on a list or card ends that search (whoever started it); "main menu" under a
         // confirmation has none, and ends whatever this user still has open
@@ -379,4 +408,4 @@ function register(bot) {
     });
 }
 
-module.exports = { register, clearLastMessages };
+module.exports = { register, clearLastMessages, askForQuery };

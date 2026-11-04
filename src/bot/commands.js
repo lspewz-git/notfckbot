@@ -1,7 +1,7 @@
 /** Slash commands and the reply-keyboard buttons. */
 const { setState, clearState } = require('./state');
 const { mainMenu, getCancelMenu } = require('./keyboards');
-const { clearLastMessages } = require('./search');
+const { clearLastMessages, askForQuery } = require('./search');
 const { sendSubscriptionList } = require('./subscriptions');
 const { log } = require('../log');
 
@@ -59,15 +59,8 @@ function register(bot) {
     bot.hears('ℹ️ Помощь', sendHelp);
     bot.hears('❓ Помощь', sendHelp);
 
-    bot.hears('🔍 Поиск', (ctx) => {
-        setState(ctx, { state: 'waiting_for_search', results: [], currentPage: 0 });
-        ctx.reply('Введите название фильма или сериала для поиска:', getCancelMenu(ctx));
-    });
-
-    bot.command('search', async (ctx) => {
-        setState(ctx, { state: 'waiting_for_search', results: [], currentPage: 0 });
-        await ctx.reply('Введите название фильма или сериала для поиска:', mainMenu(ctx));
-    });
+    bot.hears('🔍 Поиск', (ctx) => askForQuery(ctx, getCancelMenu(ctx)));
+    bot.command('search', (ctx) => askForQuery(ctx, mainMenu(ctx)));
 
     // FIX: Single handler, no duplication
     bot.command('subs', sendSubscriptionList);
