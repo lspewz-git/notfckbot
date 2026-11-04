@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('node:fs');
 const http = require('node:http');
 const https = require('node:https');
+const { isIP } = require('node:net');
 const { panelOnly } = require('./panel-only');
 const { guard } = require('../account/guard');
 const { panelUrl } = require('../account/auth');
@@ -20,6 +21,18 @@ const { log } = require('../log');
 const app = express();
 const PORT = 3000;
 const REDIRECT_PORT = 3001;
+
+// The public origin is available through Caddy. Local HTTPS clients can still use the LAN address.
+app.use((req, res, next) => {
+    const origin = app.get('panel proxy origin');
+    if (!origin) return next();
+    const publicHost = `https://${req.headers.host}` === origin;
+    const trustedPeer = app.get('trust proxy fn')(req.socket.remoteAddress, 0);
+    if (!trustedPeer && !publicHost && !app.get('panel proxy only')) return next();
+    if (!trustedPeer || !publicHost || !req.secure) return res.sendStatus(403);
+    req.panelProxyOrigin = origin;
+    next();
+});
 
 // Brotli (light, level 4) or gzip, whichever the browser takes, for the page, its modules, styles
 // and the API's JSON: 685 KB of panel files go as ~200 KB (measured 25.10). Pictures (posters,
@@ -70,9 +83,20 @@ app.use('/api', (err, req, res, next) => {
 function startAdminServer(bot) {
     app.set('bot', bot);
     useBot(bot);
-    const { PANEL_TLS_CERT: cert, PANEL_TLS_KEY: key } = process.env;
+    const { PANEL_PROXY_IP: proxyIp, PANEL_TLS_CERT: cert, PANEL_TLS_KEY: key } = process.env;
+    if (proxyIp) {
+        const origin = panelUrl();
+        if (!isIP(proxyIp) || !origin) {
+            log.error('[Admin] Proxy mode requires a valid PANEL_PROXY_IP and HTTPS PANEL_URL');
+            return;
+        }
+        app.set('trust proxy', proxyIp);
+        app.set('panel proxy origin', origin);
+        app.set('panel proxy only', !cert && !key);
+    }
     if (!cert && !key) {
-        app.listen(PORT, '127.0.0.1', () => log.info(`Admin panel listening on loopback HTTP port ${PORT}`));
+        const bindAddress = proxyIp ? '0.0.0.0' : '127.0.0.1';
+        app.listen(PORT, bindAddress, () => log.info(`Admin panel listening on HTTP ${bindAddress}:${PORT}`));
     } else {
         try {
             const server = https.createServer({ cert: fs.readFileSync(cert), key: fs.readFileSync(key) }, app);

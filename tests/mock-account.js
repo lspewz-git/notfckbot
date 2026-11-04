@@ -268,6 +268,12 @@ function accountAnswer(state, req, url) {
         return { state: 'in' };
     }
     if (p === '/api/login/telegram/cancel') return { success: true };
+    if (p === '/api/login/miniapp') {
+        if (body?.initData !== 'auth_date=123&hash=test')
+            return { status: 401, body: { error: 'Invalid Telegram launch data' } };
+        state.signedIn = true;
+        return { success: true };
+    }
     if (!state.signedIn) return { status: 401, body: { error: 'Sign in: /login in the bot' } };
     if (p === '/api/account/activity') return { success: true };
     if (p === '/api/logout') {

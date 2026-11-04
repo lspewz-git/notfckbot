@@ -15,9 +15,9 @@
  * signs that person out everywhere. Only hashes of tokens are stored.
  */
 const crypto = require('crypto');
-const { Op, Transaction } = require('sequelize');
+const { Op, Transaction, UniqueConstraintError } = require('sequelize');
 const sequelize = require('../database');
-const { AccountSession, LoginLink, AccountPassword } = require('../db');
+const { AccountSession, LoginLink, MiniAppLaunch, AccountPassword } = require('../db');
 const { lruCache } = require('../lru');
 const { roleOf, isAllowed, isSystem, systemHash } = require('./roles');
 const { log } = require('../log');
@@ -73,6 +73,26 @@ async function startSession({ userId, userName = null }, now = Date.now(), crede
 
 const insertSession = (id, userId, userName, now, transaction) =>
     AccountSession.create({ id, userId, userName, expiresAt: new Date(now + SESSION_TTL_MS) }, { transaction });
+
+async function redeemMiniAppLaunch(user, existing, now = Date.now()) {
+    if (user.expiresAt.getTime() <= now) return null;
+    const id = tokenId('miniapp', user.launchId);
+    const token = existing ? null : newToken();
+    try {
+        await sequelize.transaction(async (transaction) => {
+            await MiniAppLaunch.create({ id, expiresAt: user.expiresAt }, { transaction });
+            if (token) await insertSession(tokenId('session', token), user.userId, user.userName, now, transaction);
+        });
+    } catch (err) {
+        if (!(err instanceof UniqueConstraintError)) throw err;
+        return existing ? { token: null } : null;
+    }
+    MiniAppLaunch.destroy({ where: { expiresAt: { [Op.lt]: new Date(now - LINK_TTL_MS) } } }).catch((err) =>
+        log.warn(`[Account] Removing expired Mini App launches failed: ${err.message}`)
+    );
+    if (token) signedIn(user.userId, now);
+    return { token };
+}
 
 function signedIn(userId, now) {
     // Old sessions and links go now and then, not by a timer of their own
@@ -296,6 +316,7 @@ module.exports = {
     isAllowed,
     panelUrl,
     startSession,
+    redeemMiniAppLaunch,
     cookieToken,
     sessionOf,
     endSession,

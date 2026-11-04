@@ -8,6 +8,20 @@ const { mockPanel } = require('./mock-panel');
 // and the refresh that met it logs its error
 watchConsole({ ignore: /status of (4(01|29)|503)|Sign in: \/login in the bot/ });
 
+for (const native of [true, false]) {
+    test(`Mini App launch data only signs in through the native Telegram bridge (${native})`, async ({ page }) => {
+        if (native) await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+        const initData = 'auth_date=123&hash=test';
+        const path = `/?miniapp=1#${new URLSearchParams({ tgWebAppData: initData })}`;
+        const panel = await mockPanel(page, { path, signedOut: true, role: 'user' });
+        if (native) await expect(page.locator('body')).toHaveClass(/role-user/);
+        else await expect(page.locator('#login-tg')).toBeVisible();
+        const requests = panel.account.sent.filter((request) => request.path === '/api/login/miniapp');
+        expect(requests.map((request) => request.body)).toEqual(native ? [{ initData }] : []);
+        expect(page.url()).not.toContain('tgWebAppData');
+    });
+}
+
 /** The visible rail or tab-bar items, by section (or action, for the way back to the admin panel) */
 const visibleNav = (page, selector) =>
     page

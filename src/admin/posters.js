@@ -7,6 +7,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { finished } = require('node:stream');
 const axios = require('axios');
 const { getProxyAgent } = require('../proxy');
 
@@ -14,6 +15,8 @@ const SIZES = new Set(['w92', 'w185', 'w342', 'w500']);
 const FILE = /^[A-Za-z0-9]+\.(jpg|png)$/;
 const TYPES = { jpg: 'image/jpeg', png: 'image/png' };
 const MAX_AGE_DAYS = 90;
+const MAX_DOWNLOADS = 24;
+let downloads = 0;
 // axios's timeout covers the answer starting, not the image arriving: a TMDB that goes quiet
 // halfway would hold the request open for good. Overridable for tests.
 const bodyTimeout = () => Number(process.env.POSTER_BODY_TIMEOUT_MS) || 30000;
@@ -34,7 +37,8 @@ async function servePoster(size, file, res) {
     const target = path.join(cacheDir(), size, file);
     res.set('Content-Type', type);
     // Poster files never change under the same name
-    res.set('Cache-Control', 'public, max-age=604800, immutable');
+    res.set('Cache-Control', 'private, max-age=604800, immutable');
+    res.set('X-Content-Type-Options', 'nosniff');
 
     const stored = await fs.promises.stat(target).catch(() => null);
     if (stored && stored.size > 0) {
@@ -49,36 +53,45 @@ async function servePoster(size, file, res) {
         return disk.pipe(res);
     }
 
+    if (downloads >= MAX_DOWNLOADS) {
+        res.removeHeader('Cache-Control');
+        return res.status(503).end();
+    }
+    downloads += 1;
     let upstream;
     try {
         upstream = await axios.get(`https://image.tmdb.org/t/p/${size}/${file}`, {
             responseType: 'stream',
             timeout: 10000,
+            signal: AbortSignal.timeout(10000 + bodyTimeout()),
             httpsAgent: getProxyAgent(),
             proxy: false
         });
     } catch (err) {
+        err.response?.data?.destroy?.();
+        downloads -= 1;
         res.removeHeader('Cache-Control');
         return res.status(err.response ? err.response.status : 502).end();
     }
+    finished(upstream.data, () => {
+        downloads -= 1;
+    });
 
     // Only an image is kept: a proxy's or a captive network's page answering 200 would otherwise
     // be served as this poster for months
     const upstreamType = String((upstream.headers && upstream.headers['content-type']) || '');
-    const keep = upstreamType.startsWith('image/');
-    if (!keep) {
+    if (upstreamType.split(';')[0].trim().toLowerCase() !== type) {
+        upstream.data.destroy();
         res.removeHeader('Cache-Control');
-        if (upstreamType) res.set('Content-Type', upstreamType);
+        return res.status(502).end();
     }
 
     // A unique temporary name: two browsers asking at once each write their own copy
     const temp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.part`;
     let copy = null;
     try {
-        if (keep) {
-            await fs.promises.mkdir(path.dirname(target), { recursive: true });
-            copy = fs.createWriteStream(temp);
-        }
+        await fs.promises.mkdir(path.dirname(target), { recursive: true });
+        copy = fs.createWriteStream(temp);
     } catch {
         // No room or no rights: the poster still goes to the browser, just not to disk
     }

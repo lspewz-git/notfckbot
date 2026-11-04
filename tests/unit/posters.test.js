@@ -108,6 +108,41 @@ test('only TMDB-shaped names and known sizes: nothing outside the folder is reac
     assert.equal(asked, 0);
 });
 
+test('an upstream HTML page is never served from the panel origin', async () => {
+    upstream = () => ({ headers: { 'content-type': 'text/html' }, data: Readable.from(['<script>example</script>']) });
+    const response = await fetch(`${base}/w185/upstream.jpg`);
+    assert.equal(response.status, 502);
+    assert.equal(await response.text(), '');
+    assert.equal(response.headers.get('cache-control'), null);
+});
+
+test('concurrent poster cache misses have a shared download limit', async () => {
+    const streams = [];
+    let filled;
+    const slotsFilled = new Promise((resolve) => {
+        filled = resolve;
+    });
+    upstream = () => {
+        const data = new PassThrough();
+        streams.push(data);
+        if (streams.length === 24) filled();
+        if (streams.length > 24) data.end(IMAGE);
+        return { headers: JPEG, data };
+    };
+    const pending = Array.from({ length: 24 }, (_, i) =>
+        fetch(`${base}/w342/parallel${i}.jpg`).then((res) => res.arrayBuffer())
+    );
+    try {
+        await slotsFilled;
+        assert.equal((await fetch(`${base}/w342/overflow.jpg`)).status, 503);
+        assert.equal(asked, 24);
+    } finally {
+        streams.forEach((stream) => stream.end(IMAGE));
+        await Promise.all(pending);
+        await settle();
+    }
+});
+
 test('the sweep drops posters unopened for months and broken downloads, and keeps the rest', async () => {
     const dir = path.join(DIR, 'w92');
     fs.mkdirSync(dir, { recursive: true });

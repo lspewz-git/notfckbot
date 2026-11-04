@@ -1,0 +1,34 @@
+{
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+	servers :41812 {
+		protocols h1 h2
+		listener_wrappers {
+			http_redirect
+			tls
+		}
+	}
+}
+
+http://{$PANEL_DOMAIN} {
+	@navigation method GET HEAD
+	redir @navigation https://{$PANEL_DOMAIN}:41812{uri} 308
+	respond 405
+}
+
+https://{$PANEL_DOMAIN}:41812 {
+	tls {
+		issuer acme {
+			disable_tlsalpn_challenge
+		}
+	}
+	reverse_proxy {$PANEL_UPSTREAM} {
+		header_up Host {hostport}
+		transport http {
+			tls_server_name {$PANEL_UPSTREAM_TLS_NAME}
+			tls_trust_pool file /etc/caddy/panel-upstream.pem
+		}
+	}
+}

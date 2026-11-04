@@ -1,3 +1,6 @@
 # Posters cached on the server (src/admin/posters.js): the folder is mounted, not baked in
 data/
 panel-tls/
+# Compose mounts the live configuration. Keep credentials and its backups out of image layers.
+.env
+.env.*

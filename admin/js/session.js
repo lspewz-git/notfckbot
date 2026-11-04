@@ -127,17 +127,32 @@ export async function startSession(preferredChat = null) {
         linkScreen();
         return null;
     }
+    // Telegram sends its signed launch data in the fragment. A regular browser can open a link
+    // containing someone else's launch data, so only the native Mini App bridge enables auto-login.
+    const url = new URL(location.href);
+    const launchData =
+        url.searchParams.get('miniapp') === '1' && new URLSearchParams(url.hash.slice(1)).get('tgWebAppData');
+    if (launchData) window.history.replaceState(null, '', '/');
+    const nativeWindow = /** @type {Window & { TelegramWebviewProxy?: {
+        postEvent?: (event: string, data: string) => void
+    } }} */ (window);
+    const bridge = nativeWindow.TelegramWebviewProxy;
+    const initData = typeof bridge?.postEvent === 'function' && launchData;
     let me;
     try {
+        if (initData) await api('/login/miniapp', { method: 'POST', body: { initData } });
         me = await api('/account/me');
     } catch (err) {
-        if (err.status === 401) signInScreen();
+        if (initData) signInScreen(err.message);
+        else if (err.status === 401) signInScreen();
         else
             gate(
                 `<p class="login-error" role="alert">The panel isn't answering: ${escapeHtml(err.message)}</p>` +
                     '<button type="button" class="btn btn-outline btn-block" data-action="login-retry">Retry</button>'
             );
         return null;
+    } finally {
+        if (initData) bridge.postEvent('web_app_ready', '{}');
     }
     started = true;
     setMe(me.user);

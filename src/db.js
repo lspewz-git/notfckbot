@@ -14,6 +14,7 @@ const AlertLog = require('./models/AlertLog');
 const SendFailure = require('./models/SendFailure');
 const AccountSession = require('./models/AccountSession');
 const LoginLink = require('./models/LoginLink');
+const MiniAppLaunch = require('./models/MiniAppLaunch');
 const AccountPassword = require('./models/AccountPassword');
 const PanelRole = require('./models/PanelRole');
 const HiddenChat = require('./models/HiddenChat');
@@ -51,6 +52,7 @@ module.exports = {
     SendFailure,
     AccountSession,
     LoginLink,
+    MiniAppLaunch,
     AccountPassword,
     PanelRole,
     HiddenChat

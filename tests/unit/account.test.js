@@ -6,12 +6,15 @@
  */
 const { test, mock, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
+const { createHmac } = require('node:crypto');
 const express = require('express');
 const sequelize = require('../../src/database');
-const { Op } = require('sequelize');
+const { Op, UniqueConstraintError } = require('sequelize');
 const {
     AccountSession,
     LoginLink,
+    MiniAppLaunch,
     AccountPassword,
     PanelRole,
     HiddenChat,
@@ -470,16 +473,18 @@ async function serve(bot, { trustLoopback = false } = {}) {
     app.use(express.json());
     app.use(require('../../src/account/routes').router);
     app.get('/api/stats', (req, res) => res.json({ admin: true }));
+    app.get('/api/poster/w185/test.jpg', (req, res) => res.sendStatus(204));
     // eslint-disable-next-line no-unused-vars
     app.use('/api', (err, req, res, next) => res.status(err.status || 500).json({ error: 'Bad request' }));
     const server = app.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const call = (method, path, { body, cookie, raw, address } = {}) =>
+    const call = (method, path, { body, cookie, raw, address, https } = {}) =>
         fetch(`${base}${path}`, {
             method,
             headers: {
                 'X-Requested-By': 'notfckbot-panel',
+                ...(https ? { 'X-Forwarded-Proto': 'https' } : {}),
                 ...(address ? { 'X-Forwarded-For': address } : {}),
                 ...(cookie ? { Cookie: `nfb_session=${cookie}` } : {}),
                 ...(body || raw ? { 'Content-Type': 'application/json' } : {})
@@ -502,6 +507,62 @@ async function signIn(call, userId) {
     assert.match(cookie, /SameSite=Lax/);
     return /nfb_session=([^;]+)/.exec(cookie)[1];
 }
+
+test('Mini App sign-in checks HTTPS, signature, freshness and the panel role', async (t) => {
+    const used = new Set();
+    t.mock.method(MiniAppLaunch, 'create', async ({ id }) => {
+        if (used.has(id)) throw new UniqueConstraintError();
+        used.add(id);
+    });
+    t.mock.method(MiniAppLaunch, 'destroy', async () => 0);
+    const token = 'miniapp-test-token';
+    const { server, call } = await serve({ telegram: { token } }, { trustLoopback: true });
+    t.after(() => server.close());
+    const data = (id, authDate = Math.floor(Date.now() / 1000)) => {
+        const user = JSON.stringify({ id, first_name: 'Test' });
+        const key = createHmac('sha256', 'WebAppData').update(token).digest();
+        const hash = createHmac('sha256', key).update(`auth_date=${authDate}\nuser=${user}`).digest('hex');
+        return new URLSearchParams({ user, auth_date: String(authDate), hash }).toString();
+    };
+    const login = (initData, options = { https: true }) =>
+        call('POST', '/api/login/miniapp', { body: { initData }, ...options });
+    const valid = data(7);
+    assert.equal((await login(valid, {})).status, 403);
+    assert.equal((await login(valid.replace('%3A7', '%3A42'))).status, 401);
+    assert.equal((await login(`${valid}&auth_date=0`)).status, 401);
+    assert.equal((await login(data(7, 1))).status, 401);
+    assert.equal((await login(data(0))).status, 401);
+    assert.equal((await login(data(123))).status, 403);
+    const concurrent = await Promise.all([login(valid), login(valid)]);
+    assert.deepEqual(concurrent.map((r) => r.status).sort(), [200, 401]);
+    const response = concurrent.find((r) => r.status === 200);
+    assert.equal(response.status, 200);
+    const cookieHeader = response.headers.get('set-cookie');
+    assert.match(cookieHeader, /HttpOnly.*Secure/);
+    const cookie = /nfb_session=([^;]+)/.exec(cookieHeader)[1];
+    assert.equal((await call('GET', '/api/stats', { cookie })).status, 403);
+    const mismatch = await login(data(42), { https: true, cookie });
+    assert.equal(mismatch.status, 409);
+    assert.equal(mismatch.headers.get('set-cookie'), null);
+    const same = await login(valid, { https: true, cookie });
+    assert.equal(same.status, 200);
+    assert.equal(same.headers.get('set-cookie'), null);
+    await call('POST', '/api/logout', { cookie });
+    assert.equal((await login(valid)).status, 401);
+    const known = data(7, Math.floor(Date.now() / 1000) - 10);
+    const otherCookie = await signIn(call, '7');
+    assert.equal((await login(known, { https: true, cookie: otherCookie })).status, 200);
+    assert.equal((await login(known)).status, 401);
+});
+
+test('poster images need a session and work for users without the request marker', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const url = `http://127.0.0.1:${server.address().port}/api/poster/w185/test.jpg`;
+    assert.equal((await fetch(url)).status, 401);
+    const cookie = await signIn(call, '7');
+    assert.equal((await fetch(url, { headers: { Cookie: `nfb_session=${cookie}` } })).status, 204);
+});
 
 test('the API: a session for everything but signing in; the panel itself for admins only', async (t) => {
     const { server, call } = await serve(fakeBot({}));
@@ -531,6 +592,69 @@ test('the API: a session for everything but signing in; the panel itself for adm
     assert.equal((await call('GET', '/api/stats', { cookie: admin })).status, 200);
     assert.equal((await call('POST', '/api/logout', { cookie: admin })).status, 200);
     assert.equal((await call('GET', '/api/stats', { cookie: admin })).status, 401, 'signed out');
+});
+
+test('the public panel trusts HTTPS and client IP only from its configured proxy', async (t) => {
+    t.mock.method(require('../../src/admin/posters'), 'sweepPosters', async () => 0);
+    t.mock.method(require('../../src/chat-changes'), 'sweepChanges', async () => 0);
+    const { app, startAdminServer } = require('../../src/admin');
+    const listen = app.listen.bind(app);
+    const server = listen(0, '127.0.0.1');
+    t.after(() => server.close());
+    t.mock.method(app, 'listen', () => server);
+    const proxyIp = process.env.PANEL_PROXY_IP;
+    t.after(() => {
+        if (proxyIp === undefined) delete process.env.PANEL_PROXY_IP;
+        else process.env.PANEL_PROXY_IP = proxyIp;
+    });
+    process.env.PANEL_PROXY_IP = '127.0.0.1';
+    process.env.PANEL_URL = 'https://panel.example.com';
+    startAdminServer(fakeBot({}));
+    await new Promise((resolve) => server.once('listening', resolve));
+    const { resetLimits } = require('../../src/account/routes');
+    resetLimits();
+    t.after(resetLimits);
+
+    const post = (route, body, headers = {}) =>
+        new Promise((resolve, reject) => {
+            const request = http.request(
+                `http://127.0.0.1:${server.address().port}/api/login${route}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Host: 'panel.example.com',
+                        Origin: 'https://panel.example.com',
+                        'Content-Type': 'application/json',
+                        'X-Requested-By': 'notfckbot-panel',
+                        'X-Forwarded-Proto': 'https',
+                        'X-Forwarded-For': '203.0.113.10',
+                        ...headers
+                    }
+                },
+                (res) => {
+                    res.resume();
+                    res.on('error', reject);
+                    res.on('end', () => resolve({ status: res.statusCode, cookie: res.headers['set-cookie']?.[0] }));
+                }
+            );
+            request.on('error', reject);
+            request.end(JSON.stringify(body));
+        });
+
+    const token = tokenOf(await auth.createLink({ id: 7 }));
+    assert.equal((await post('', { token }, { Host: 'other.example.com' })).status, 403);
+    assert.equal((await post('', { token }, { Origin: 'http://panel.example.com' })).status, 403);
+    app.set('trust proxy', '127.0.0.2');
+    assert.equal((await post('', { token })).status, 403);
+    app.set('trust proxy', '127.0.0.1');
+    const login = await post('', { token });
+    assert.equal(login.status, 200);
+    assert.match(login.cookie, /; Secure\b/);
+
+    const body = { login: '7', password: 'wrong-one' };
+    for (let i = 0; i < 5; i++) assert.equal((await post('/password', body)).status, 401);
+    assert.equal((await post('/password', body)).status, 429);
+    assert.equal((await post('/password', body, { 'X-Forwarded-For': '203.0.113.11' })).status, 401);
 });
 
 test('the API: the Telegram code goes with the bot link; the poll lets in the confirmed page', async (t) => {

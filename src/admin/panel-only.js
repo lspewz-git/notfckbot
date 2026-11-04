@@ -7,10 +7,10 @@
  *   can't add a custom header to a request here: the browser would first ask the server
  *   (a CORS preflight), and the server allows no other origin. An address typed into the
  *   browser's address bar has no such header either.
- * - The Host must be the server's own address (an IP, or a local name like "cinema-bot"). This
+ * - The Host must match the configured proxy origin or be a local address in direct mode. This
  *   stops DNS rebinding, where a site points its own domain at this server's IP to pass for it.
  *
- * Posters are left open: <img> can't send headers, and they are TMDB's public images.
+ * Posters skip the request marker because <img> can't send it. The session guard still applies.
  */
 const { log } = require('../log');
 const PANEL_HEADER = 'x-requested-by';
@@ -36,16 +36,22 @@ function isLocalHost(host) {
 
 /** @returns {string | null} why the request is refused, or null */
 function refusal(req) {
-    if (!isLocalHost(req.headers.host)) return 'Unknown host';
+    const proxyOrigin = req.panelProxyOrigin;
+    const host = req.headers.host;
+    if (proxyOrigin ? `https://${host}` !== proxyOrigin : !isLocalHost(host)) return 'Unknown host';
     const origin = req.headers.origin;
     if (origin) {
-        let originHost = null;
-        try {
-            originHost = new URL(origin).host;
-        } catch {
-            // "null" (a sandboxed frame) and anything malformed
+        if (proxyOrigin) {
+            if (origin !== proxyOrigin) return 'Cross-origin request';
+        } else {
+            let originHost = null;
+            try {
+                originHost = new URL(origin).host;
+            } catch {
+                // "null" (a sandboxed frame) and anything malformed
+            }
+            if (originHost !== host) return 'Cross-origin request';
         }
-        if (originHost !== req.headers.host) return 'Cross-origin request';
     }
     // Mounted at /api, so req.path alone lacks it
     if (OPEN_PATHS.test((req.baseUrl || '') + req.path)) return null;

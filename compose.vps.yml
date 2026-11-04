@@ -1,0 +1,19 @@
+# Standalone public edge. The bot and database run on the VM.
+services:
+  caddy:
+    image: caddy:2
+    restart: always
+    network_mode: host
+    environment:
+      PANEL_DOMAIN: ${PANEL_DOMAIN:?Set PANEL_DOMAIN to the public DNS name}
+      PANEL_UPSTREAM: ${PANEL_UPSTREAM:?Set PANEL_UPSTREAM to the forwarded HTTPS endpoint of the VM}
+      PANEL_UPSTREAM_TLS_NAME: ${PANEL_UPSTREAM_TLS_NAME:?Set PANEL_UPSTREAM_TLS_NAME to the name or IP on the VM certificate}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./panel-upstream.pem:/etc/caddy/panel-upstream.pem:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -16,6 +16,7 @@ const { deliver } = require('../delivery');
 const { z, valid, idOf, chatId, text } = require('../admin/validate');
 const { rateLimit, MemoryStore } = require('express-rate-limit');
 const auth = require('./auth');
+const { miniAppUser } = require('./miniapp');
 const password = require('./password');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
@@ -59,6 +60,32 @@ async function botUsername(bot) {
 // "Войти через Telegram": a code for this page, and the bot's link that carries it
 const challengeLimit = rateLimit({ windowMs: 60000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false });
 const pollLimit = rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false });
+
+router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.secure) return res.status(403).json({ error: 'Telegram Mini App sign-in requires HTTPS.' });
+    const body = valid(z.object({ initData: z.string().min(1).max(8192) }), req.body, res);
+    if (!body) return;
+    const user = miniAppUser(body.initData, req.app.get('bot')?.telegram?.token);
+    if (!user)
+        return res.status(401).json({ error: 'Telegram sign-in could not be verified. Reopen the app in Telegram.' });
+    try {
+        const existing = await auth.sessionOf(req);
+        if (existing && existing.userId !== String(user.userId))
+            return res
+                .status(409)
+                .json({ error: 'Another account is signed in. Sign it out before opening the Mini App.' });
+        if (!existing && !(await auth.isAllowed(user.userId)))
+            return res.status(403).json({ error: 'No access to the panel.' });
+        const result = await auth.redeemMiniAppLaunch(user, existing);
+        if (!result)
+            return res.status(401).json({ error: 'This sign-in was already used. Reopen the app in Telegram.' });
+        if (result.token) auth.setCookie(req, res, result.token);
+        res.json({ success: true });
+    } catch (err) {
+        fail(res, err);
+    }
+});
 
 router.post('/api/login/telegram', challengeLimit, async (req, res) => {
     try {
