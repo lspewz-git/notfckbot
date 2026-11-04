@@ -144,6 +144,14 @@ body.signed-out .tabbar {
     gap: var(--space-3);
 }
 
+.login-primary-method {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: calc(var(--space-8) - var(--space-1));
+    text-align: center;
+}
+
 #login-tg[aria-disabled='true'] {
     opacity: 0.6;
     pointer-events: none;
@@ -207,12 +215,27 @@ body.signed-out .tabbar {
     text-align: center;
 }
 
-/* "or with a password": a rule on both sides of the words */
+.login-card :is(a, button):focus-visible {
+    background-color: var(--surface-3);
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.login-card .btn-primary:focus-visible {
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.login-card .input-field:focus-visible {
+    border-color: var(--accent);
+}
+
+/* A rule on both sides of the alternate methods label. */
 .login-or {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-top: var(--space-2);
+    margin-top: var(--space-1);
     color: var(--text-dim);
     font-size: var(--text-sm);
 }

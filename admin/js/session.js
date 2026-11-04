@@ -20,7 +20,7 @@ const QR_ICON =
 const KEY_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#key-round" /></svg>';
 const backButton =
-    '<button type="button" class="btn btn-ghost login-back" data-action="login-cancel"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-left" /></svg>All sign-in methods</button>';
+    '<button type="button" id="login-back" class="btn btn-ghost login-back" data-action="login-cancel"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-left" /></svg>All sign-in methods</button>';
 
 let pollTimer = 0;
 // Each "Continue with Telegram" press: an older attempt's poll still on its way stops when it lands
@@ -80,17 +80,19 @@ async function prepareCode() {
     }
 }
 
-function signInScreen(error = '') {
+function signInScreen(error = '', restoreFocus = $('login-body').contains(document.activeElement)) {
     discardChallenges();
     gate(
         // A first time in signs up too: the bot is started on the way (with sign-up open)
-        `<a id="login-tg" class="btn btn-primary btn-block" target="_blank" rel="noopener noreferrer" aria-disabled="true" data-action="login-telegram">${TG_ICON}Continue with Telegram</a>` +
+        '<div class="login-primary-method">' +
+            `<a id="login-tg" class="btn btn-primary btn-block" target="_blank" rel="noopener noreferrer" aria-disabled="true" aria-describedby="login-tg-hint" data-action="login-telegram">${TG_ICON}Continue with Telegram</a>` +
+            '<p class="login-hint" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p></div>' +
             `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
-            '<p class="login-or">or sign in with</p>' +
-            `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>QR code</span></button>` +
-            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div>` +
-            '<p class="login-hint">New sign-ins are confirmed in the bot.</p>'
+            '<p class="login-or">Other ways to sign in</p>' +
+            `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>Scan a QR code</span></button>` +
+            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div>`
     );
+    if (restoreFocus) $('login-title').focus();
     prepareCode();
 }
 
@@ -104,7 +106,7 @@ const waitingScreen = (start, qr = false) =>
                 : '') +
             `<p class="login-check"><b>${escapeHtml(start.check)}</b><br /><span class="login-hint">The bot shows the same one</span></p>` +
             (start.url
-                ? `<a class="btn btn-outline btn-block" href="${escapeHtml(start.url)}" target="_blank" rel="noopener noreferrer">Open the bot again</a>`
+                ? `<a class="btn btn-outline btn-block" href="${escapeHtml(start.url)}" target="_blank" rel="noopener noreferrer">${qr ? 'Open Telegram on this device' : 'Open the bot again'}</a>`
                 : '') +
             '<p class="login-hint" id="login-wait">Waiting for the confirmation…</p>' +
             '<p class="login-hint">Only confirm a sign-in you started.</p>'
@@ -204,6 +206,7 @@ export function sessionActions(onSignedIn) {
         activeChallenge = start;
         const mine = attempt;
         waitingScreen(start, qr);
+        $('login-back').focus();
         const until = start.deadline ?? performance.now() + (start.expiresIn ?? POLL_FOR_MS);
         const poll = async () => {
             if (attempt !== mine) return;
@@ -264,10 +267,11 @@ export function sessionActions(onSignedIn) {
         'login-password': () => {
             discardChallenges();
             gate(backButton + '<h2>Sign in with a password</h2>' + signInForm());
+            $('login-back').focus();
         },
         'login-cancel': () => {
             stopPolling();
-            signInScreen();
+            signInScreen('', true);
         },
         'login-retry': async () => {
             const role = await startSession();

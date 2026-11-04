@@ -64,7 +64,8 @@ for (const options of [{ signedOut: true }, { role: 'user' }, {}]) {
 }
 
 test('without a session the sign-in screen covers the panel; the Telegram button is a link to the bot', async ({
-    page
+    page,
+    isMobile
 }) => {
     const panel = await mockPanel(page, { signedOut: true });
     const gate = page.locator('#login-gate');
@@ -72,7 +73,11 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     await expect(page.locator('#login-tg')).toHaveAttribute('href', 'https://t.me/notfckbot?start=Lcode');
     await expect(page.locator('#login-tg')).toHaveText('Continue with Telegram');
     await expect(page.locator('#login-tg svg')).toBeVisible();
-    await expect(page.locator('[data-action="login-qr"]')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Continue with Telegram' })).toHaveAccessibleDescription(
+        'You’ll confirm the sign-in in the NotFckBot chat.'
+    );
+    await expect(page.getByRole('button', { name: 'Scan a QR code' })).toBeVisible();
+    await expect(page.locator('.login-or')).toHaveText('Other ways to sign in');
     await expect(page.locator('[data-action="login-password"]')).toBeVisible();
     await expect(page.locator('#login-name')).toHaveCount(0);
     const tiles = await page
@@ -89,6 +94,16 @@ test('without a session the sign-in screen covers the panel; the Telegram button
         return Boolean(el && el.closest('#login-gate'));
     });
     expect(hit).toBe(true);
+    const telegram = page.locator('#login-tg');
+    if (isMobile) {
+        expect((await telegram.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    } else {
+        await page.keyboard.press('Tab');
+        await expect(telegram).toBeFocused();
+        await expect(telegram).toHaveCSS('text-decoration-line', 'underline');
+        await page.keyboard.press('Tab');
+        await expect(page.getByRole('button', { name: 'Scan a QR code' })).toBeFocused();
+    }
 });
 
 test('"Continue with Telegram": the page waits for the answer in the bot, then opens the panel', async ({
@@ -129,6 +144,7 @@ test('sign-in branding and confirmation fit without mixed-language instructions'
     expect(await back.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
     await back.click();
     await expect(page.locator('#login-tg')).toBeVisible();
+    await expect(page.locator('#login-title')).toBeFocused();
 });
 
 test('confirmation stays usable when the browser clock is ahead of the server', async ({ page }) => {
@@ -139,6 +155,8 @@ test('confirmation stays usable when the browser clock is ahead of the server', 
     const panel = await mockPanel(page, { signedOut: true });
     panel.account.confirmationState = 'waiting';
     await page.locator('[data-action="login-qr"]:enabled').click();
+    await expect(page.locator('.login-back')).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Open Telegram on this device' })).toHaveAttribute('href', /t\.me/);
     await expect(page.locator('#login-wait')).toContainText('4:', { timeout: 5000 });
     expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
     panel.account.confirmationState = 'in';
@@ -600,7 +618,6 @@ test('settings are rows; a row opens its choices and saves the one picked', asyn
 
 test('a password signs in from the sign-in screen; a wrong one or too many tries say so', async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true });
-    await expect(page.locator('.login-or')).toHaveText('or sign in with');
     await page.locator('[data-action="login-password"]').click();
     const submit = page.locator('.login-password [type="submit"]');
     await expect(submit).toHaveText('Log In');
