@@ -1244,6 +1244,7 @@
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-aired-search" class="mine-filter mine-search" hidden>
                             <input
                                 id="my-aired-filter"
@@ -1286,6 +1287,7 @@
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-subs-search" class="mine-filter mine-search" hidden>
                             <input
                                 id="my-subs-filter"
@@ -1329,6 +1331,7 @@
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-calendar-search" class="mine-filter mine-search" hidden>
                             <input
                                 id="my-calendar-filter"
@@ -1367,6 +1370,7 @@
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
+                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-settings-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1817,7 +1821,9 @@
                 aria-haspopup="dialog"
                 data-tab-sections="my-settings my-account"
             >
-                <span data-profile-avatar></span><span>Account</span><span class="sr-only" data-profile-chat></span>
+                <span data-profile-avatar></span><span data-tab-chat-avatar hidden></span
+                ><span class="tab-profile-label" data-tab-label>Account</span
+                ><span class="sr-only" data-profile-chat></span>
             </button>
         </nav>
 

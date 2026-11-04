@@ -48,7 +48,7 @@ import { triggerCheck, openBroadcastModal, sendBroadcast } from './maintenance.j
 import { openAbout, loadAbout } from './about.js';
 import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 import { accountActions, setupAccount, searchAccount } from './account.js';
-import { startSession, watchSession, sessionActions } from './session.js';
+import { startSession, watchSession, sessionActions, launchedInChat } from './session.js';
 import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions } from './pick-sheet.js';
@@ -315,7 +315,9 @@ function sectionFromHash(role) {
  * on the dashboard and a user's on their subscriptions.
  */
 function afterSignIn(role) {
-    switchSection(sectionFromHash(role) || (role === 'admin' ? activeSection : 'my-subs'));
+    // Opened from a group (a Mini App or a group's sign-in link): that chat's subscriptions
+    const start = launchedInChat() ? 'my-subs' : role === 'admin' ? activeSection : 'my-subs';
+    switchSection(sectionFromHash(role) || start);
 }
 
 async function init() {

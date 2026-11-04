@@ -39,7 +39,7 @@ router.post('/api/login', async (req, res) => {
     if (!body) return;
     try {
         const session = await auth.redeemLink(body.token);
-        if (!session) return res.status(401).json({ error: 'This link has expired. Send /login to the bot again.' });
+        if (!session) return res.status(401).json({ error: 'This link has expired. Sign in again.' });
         auth.setCookie(req, res, session.token);
         res.json({ chatId: session.chatId });
     } catch (err) {
@@ -61,6 +61,22 @@ async function botUsername(bot) {
 const challengeLimit = rateLimit({ windowMs: 60000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false });
 const pollLimit = rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false });
 
+/**
+ * The chat the Mini App was opened from, for the panel to open first; null for the user's own. Only a
+ * choice: the chat list (src/account/members.js) still decides whether this user may open it.
+ */
+async function launchChat(user) {
+    if (user.startChat) return user.startChat;
+    if (!user.chatInstance) return null;
+    try {
+        const chat = await Chat.findOne({ where: { chat_instance: user.chatInstance }, attributes: ['id'] });
+        return chat ? String(chat.id) : null;
+    } catch (err) {
+        log.warn(`[Account] Mini App chat lookup failed: ${err.message}`);
+        return null;
+    }
+}
+
 router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     if (!req.secure) return res.status(403).json({ error: 'Telegram Mini App sign-in requires HTTPS.' });
@@ -81,7 +97,7 @@ router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
         if (!result)
             return res.status(401).json({ error: 'This sign-in was already used. Reopen the app in Telegram.' });
         if (result.token) auth.setCookie(req, res, result.token);
-        res.json({ success: true });
+        res.json({ success: true, chatId: await launchChat(user) });
     } catch (err) {
         fail(res, err);
     }

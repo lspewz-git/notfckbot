@@ -131,7 +131,8 @@ function menuHtml() {
           '</div>'
         : '';
     const choices = chatRows(
-        chats.filter((c) => !c.hidden).map((c) => ({ ...c, hint: chatHint(c) })),
+        // The open chat stays listed even when hidden (opened from its group's Mini App link)
+        chats.filter((c) => !c.hidden || c.id === chatId).map((c) => ({ ...c, hint: chatHint(c) })),
         chatId,
         'profile-chat'
     );

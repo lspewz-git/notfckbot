@@ -8,7 +8,7 @@ import { createHistory } from './history.js';
 import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal } from './ui.js';
-import { pickFrom } from './pick-sheet.js';
+import { pickFrom, avatar } from './pick-sheet.js';
 import { chatChip } from './chat-picker.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
@@ -99,12 +99,14 @@ const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${
 
 /**
  * The chats from /api/account/chats. Opens on the user's own account (first in the list), not on
- * the chat picked last time; only a sign-in link made in a group (`preferred`) opens that group.
+ * the chat picked last time; only a Mini App opened from a group (`preferred`) opens that group.
  */
 export function setChats(chats, preferred = null) {
     state.chats = chats;
     const ids = chats.filter((c) => !c.hidden).map((c) => c.id);
-    state.chatId = preferred && ids.includes(String(preferred)) ? String(preferred) : ids[0] || null;
+    // A named chat opens even when hidden from the menu: hiding only tidies the list, access stays
+    const named = preferred && chats.some((c) => c.id === String(preferred));
+    state.chatId = named ? String(preferred) : ids[0] || null;
     state.chatsError = null;
     state.list = null;
     state.cal = null;
@@ -166,6 +168,33 @@ function showChatChips() {
     });
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
     for (const holder of all('[data-profile-chat]')) holder.textContent = name;
+    showChatContext(chat);
+}
+
+const ICON = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+
+/**
+ * Where the user is, for information only (switching stays in the profile menu): a line under each
+ * section's title, and on phones the Account tab shows the open group instead of the user
+ */
+function showChatContext(chat) {
+    const group = Boolean(chat && chat.type !== 'private');
+    for (const line of all('[data-chat-context]')) {
+        line.hidden = !chat;
+        line.classList.toggle('is-group', group);
+        line.innerHTML = !chat
+            ? ''
+            : group
+              ? `${ICON('users')}<span>Group <b>${escapeHtml(chat.title)}</b> · shared with everyone in it</span>`
+              : `${ICON('user-round')}<span>Your personal account</span>`;
+    }
+    for (const el of all('[data-tab-chat-avatar]')) {
+        el.hidden = !group;
+        el.innerHTML = group ? avatar(chat.title) : '';
+    }
+    for (const el of all('.tab-profile [data-profile-avatar]')) el.hidden = group;
+    for (const el of all('[data-tab-label]')) el.textContent = group ? chat.title : 'Account';
 }
 
 /** Another chat picked: every section shows it, and the open one loads it */

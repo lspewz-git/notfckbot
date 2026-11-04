@@ -2,8 +2,8 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../database');
 
 /**
- * A one-time sign-in link not used yet (src/account/auth.js): from /login in the bot, or from
- * login-link.js on the server when Telegram is out of reach. Kept in the database so the script,
+ * A one-time sign-in link not used yet (src/account/auth.js): from login-link.js on the server
+ * when Telegram is out of reach. Kept in the database so the script,
  * a process of its own, can make one, and a restart doesn't void it. The id is a SHA-256 digest.
  */
 const LoginLink = sequelize.define(
@@ -12,7 +12,7 @@ const LoginLink = sequelize.define(
         id: { type: DataTypes.STRING(64), primaryKey: true },
         userId: { type: DataTypes.BIGINT, allowNull: false },
         userName: { type: DataTypes.STRING, allowNull: true },
-        // The chat /login was sent from: the panel opens it first
+        // A chat for the panel to open first (links from the bot's old /login had one)
         chatId: { type: DataTypes.BIGINT, allowNull: true },
         expiresAt: { type: DataTypes.DATE, allowNull: false }
     },

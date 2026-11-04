@@ -15,7 +15,7 @@ async function guard(req, res, next) {
         const session = await auth.sessionOf(req);
         if (!session) {
             auth.clearCookie(res);
-            return res.status(401).json({ error: 'Sign in: /login in the bot' });
+            return res.status(401).json({ error: 'Sign in to the panel.' });
         }
         req.user = session;
         if (!req.path.startsWith('/poster/')) auth.setCookie(req, res, auth.cookieToken(req.headers.cookie));

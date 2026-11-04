@@ -4,7 +4,7 @@ const { watchConsole } = require('./helpers');
 const fs = require('fs');
 const path = require('path');
 
-watchConsole({ ignore: /status of 401|Sign in: \/login in the bot/ });
+watchConsole({ ignore: /status of 401|Sign in to the panel\./ });
 
 test('local icons render without external services, including on sign-in links', async ({ page }) => {
     const external = [];

@@ -6,7 +6,7 @@ const { mockPanel } = require('./mock-panel');
 // A 401 is the answer the panel expects before sign-in (and to a wrong password, a 429 to too many
 // tries, a 503 to the chats while Telegram is down, a 409 to a Mini App launch over another account):
 // the browser logs it as a failed load, and the refresh that met it logs its error
-watchConsole({ ignore: /status of (4(01|09|29)|503)|Sign in: \/login in the bot/ });
+watchConsole({ ignore: /status of (4(01|09|29)|503)|Sign in to the panel\./ });
 
 for (const [native, query] of [
     [true, '?miniapp=1'],
@@ -27,6 +27,67 @@ for (const [native, query] of [
         expect(page.url()).not.toContain('tgWebAppData');
     });
 }
+
+for (const role of ['user', 'admin']) {
+    test(`a Mini App opened from a group opens that group's subscriptions (${role})`, async ({ page }) => {
+        await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+        const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+        const panel = await mockPanel(page, { path, signedOut: true, role, miniAppChat: '-100' });
+        await expect(page.locator('#my-subs-section')).toBeVisible();
+        await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
+        await expect
+            .poll(() => panel.account.sent.some((r) => r.path.startsWith('/api/account/chats/-100/')))
+            .toBe(true);
+        expect(panel.account.sent.some((r) => r.path.startsWith('/api/account/chats/42/'))).toBe(false);
+    });
+}
+
+test('a retry after a failed account check still opens the group the Mini App came from', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, { path, signedOut: true, role: 'user', miniAppChat: '-100', meFails: [503] });
+    await page.locator('#login-body [data-action="login-retry"]').click();
+    await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
+});
+
+test('a Mini App opened from a group hidden in the menu still opens that group', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, { path, signedOut: true, role: 'user', miniAppChat: '-100', groupHidden: true });
+    await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
+    await profileButton(page, 'my-subs').click();
+    await expect(page.locator('#profile-modal .pick-row.selected')).toContainText('Киноклуб');
+});
+
+test('each account page says whether it shows the personal account or a group, and the tab names the group', async ({
+    page
+}) => {
+    await mockPanel(page, { role: 'user', path: '/#my-subs' });
+    const line = page.locator('#my-subs-section [data-chat-context]');
+    await expect(line).toHaveText('Your personal account');
+    await expect(line).not.toHaveClass(/is-group/);
+    await expect(line.locator('button, a')).toHaveCount(0);
+    await expect(page.locator('[data-tab-label]')).toHaveText('Account');
+    await pickChat(page, 'my-subs', 'Киноклуб');
+    await expect(line).toHaveText('Group Киноклуб · shared with everyone in it');
+    await expect(line).toHaveClass(/is-group/);
+    for (const id of ['my-aired', 'my-calendar', 'my-settings'])
+        await expect(page.locator(`#${id}-section [data-chat-context]`)).toHaveText(/Group Киноклуб/);
+    await expect(page.locator('[data-tab-label]')).toHaveText('Киноклуб');
+    await expect(page.locator('[data-tab-chat-avatar]')).toHaveText('К');
+    if (isNarrow(page)) {
+        await expect(page.locator('.tab-profile [data-profile-avatar]')).toBeHidden();
+        await expect(page.locator('[data-tab-chat-avatar]')).toBeVisible();
+        await expect(page.locator('#my-subs-section .mine-chat')).toBeHidden();
+    }
+});
+
+test('a Mini App launch naming a chat the user cannot open falls back to their own', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, { path, signedOut: true, role: 'user', miniAppChat: '-999' });
+    await expect(profileButton(page, 'my-subs')).toContainText('My account');
+});
 
 test('a failed Mini App sign-in offers a retry and a password, not the bot link that closes the app', async ({
     page
@@ -289,7 +350,7 @@ test('confirmation stays usable when the browser clock is ahead of the server', 
     await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
 });
 
-test('the link from /login signs in only after a press and opens the chat it came from', async ({ page }) => {
+test('a one-time sign-in link signs in only after a press and opens the chat it came from', async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true, role: 'user', path: '/login/good-token' });
     // Opening the link spends nothing: a link preview only GETs
     expect(panel.account.sent.filter((r) => r.path === '/api/login')).toEqual([]);

@@ -1006,7 +1006,7 @@ async function mockPanel(page, options = {}) {
             // As src/account/guard.js: the rest of the API is for a signed-in admin (posters are open)
             if (!url.pathname.startsWith('/api/poster/')) {
                 if (!panel.account.signedIn)
-                    return route.fulfill({ status: 401, json: { error: 'Sign in: /login in the bot' } });
+                    return route.fulfill({ status: 401, json: { error: 'Sign in to the panel.' } });
                 if (panel.account.role !== 'admin')
                     return route.fulfill({ status: 403, json: { error: 'Only for the panel admins' } });
             }

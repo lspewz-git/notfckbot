@@ -105,6 +105,10 @@ function accountState(options) {
         // Called before each Mini App sign-in answer (its try number from 1): a promise holds that answer
         miniAppWait: options.miniAppWait,
         miniAppTries: 0,
+        // The chat the Mini App sign-in names (opened from a group)
+        miniAppChat: options.miniAppChat || null,
+        // Statuses /api/account/me answers with first, one per request
+        meFails: /** @type {number[]} */ ([...(options.meFails || [])]),
         // Signed in as the system account (not a Telegram user)
         system: Boolean(options.system),
         role: options.role || 'admin',
@@ -115,7 +119,13 @@ function accountState(options) {
         confirmationState: 'in',
         chats: [
             { id: '42', type: 'private', title: 'My account', settings: true },
-            { id: '-100', type: 'supergroup', title: 'Киноклуб', settings: Boolean(options.groupAdmin) }
+            {
+                id: '-100',
+                type: 'supergroup',
+                title: 'Киноклуб',
+                settings: Boolean(options.groupAdmin),
+                ...(options.groupHidden ? { hidden: true } : {})
+            }
         ],
         series: series(),
         films: films(),
@@ -232,7 +242,7 @@ function accountAnswer(state, req, url) {
             state.signedIn = true;
             return { chatId: '-100' };
         }
-        return { status: 401, body: { error: 'This link has expired. Send /login to the bot again.' } };
+        return { status: 401, body: { error: 'This link has expired. Sign in again.' } };
     }
     if (p === '/api/login/password') {
         if (body.password === 'too-many')
@@ -279,13 +289,17 @@ function accountAnswer(state, req, url) {
         const fail = state.miniAppFails.shift();
         if (fail) return { status: fail, body: { error: `Mini App sign-in failed (${fail})` } };
         state.signedIn = true;
-        return { success: true };
+        return { success: true, chatId: state.miniAppChat };
     }
-    if (!state.signedIn) return { status: 401, body: { error: 'Sign in: /login in the bot' } };
+    if (!state.signedIn) return { status: 401, body: { error: 'Sign in to the panel.' } };
     if (p === '/api/account/activity') return { success: true };
     if (p === '/api/logout') {
         state.signedIn = false;
         return { success: true };
+    }
+    if (p === '/api/account/me' && state.meFails.length) {
+        const fail = state.meFails.shift();
+        return { status: fail, body: { error: `Account check failed (${fail})` } };
     }
     if (p === '/api/account/me')
         return {

@@ -1,7 +1,7 @@
 /**
  * Who is using the panel (src/account/auth.js). Without a session the sign-in screen covers it:
  * "Continue with Telegram" (the bot asks to confirm, this page waits for the answer), or the link
- * from /login in the bot (/login/<token>, spent only by the press of "Sign in"), or a password the user
+ * from login-link.js on the server (/login/<token>, spent only by the press of "Sign in"), or a password the user
  * set on their account page (password.js). With one, an admin
  * gets the whole panel and a user (body.role-user) only their own chats.
  */
@@ -75,7 +75,7 @@ async function prepareCode() {
     } catch (err) {
         if (!button.isConnected) return;
         const error = document.getElementById('login-error');
-        error.textContent = `${err.message} Signing in with /login in the bot still works.`;
+        error.textContent = `${err.message} A password still works if you have set one.`;
         error.hidden = false;
     }
 }
@@ -168,6 +168,12 @@ const linkScreen = () =>
             '<button type="button" class="btn btn-primary btn-block" data-action="login-link">Sign in</button>'
     );
 
+/** @type {string | null} the chat this sign-in opens on (a group link or a Mini App opened from a group) */
+let openedChat = null;
+
+/** Whether the last sign-in named a chat to open: the panel then starts on its subscriptions. */
+export const launchedInChat = () => openedChat !== null;
+
 /**
  * Shows the panel for this session, or the sign-in screen.
  * @param {string | null} [preferredChat]
@@ -191,17 +197,26 @@ export async function startSession(preferredChat = null, { current = () => true,
     } }} */ (window);
     const bridge = nativeWindow.TelegramWebviewProxy;
     if (typeof bridge?.postEvent === 'function')
-        miniApp = { bridge, initData: launchData || miniApp?.initData || null, next: miniApp?.next ?? null };
+        miniApp = {
+            bridge,
+            initData: launchData || miniApp?.initData || null,
+            next: miniApp?.next ?? null,
+            chat: miniApp?.chat ?? null
+        };
     const initData = miniApp?.initData;
     let me;
     try {
         if (initData) {
-            await api('/login/miniapp', { method: 'POST', body: { initData } });
+            const launch = await api('/login/miniapp', { method: 'POST', body: { initData } });
+            // Opened from a group: its page first (the chat list still decides whether it may be opened)
+            // Kept on miniApp: a retry after a failed /account/me no longer has the launch data
+            miniApp.chat = launch?.chatId ? String(launch.chatId) : null;
             // Spent: a later sign-in screen here offers to reopen the app for new launch data
             miniApp.initData = null;
             miniApp.next = 'reopen';
         }
         me = await api('/account/me');
+        if (!preferredChat && miniApp?.chat) preferredChat = miniApp.chat;
     } catch (err) {
         if (initData) {
             // Also when the sign-in went through and /account/me failed: a 5xx there is retried
@@ -221,6 +236,8 @@ export async function startSession(preferredChat = null, { current = () => true,
         if (initData) bridge.postEvent('web_app_ready', '{}');
     }
     started = true;
+    openedChat = me.user.system ? null : preferredChat;
+    if (miniApp) miniApp.chat = null;
     setMe(me.user);
     setProfile(me.user);
     resetChatChoice();
@@ -282,6 +299,7 @@ export function sessionActions(onSignedIn) {
             miniApp.initData = null;
             // A later sign-in screen here (the session ended) offers to reopen the app for new launch data
             miniApp.next = null;
+            miniApp.chat = null;
         }
         // The section in the address stays: signing in again lands on the tab that was open
         window.history.replaceState(null, '', `/${location.hash}`);

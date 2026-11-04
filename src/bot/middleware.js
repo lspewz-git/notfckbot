@@ -105,6 +105,21 @@ function register(bot) {
                     await chatData.update({ username: chatTitle });
                 }
 
+                // A button press tells which chat_instance is this group's: a Mini App opened from the
+                // group carries only that, so the panel can open the group's page (src/account/routes.js)
+                const instance = ctx.callbackQuery?.chat_instance;
+                if (
+                    instance &&
+                    /^-?\d{1,30}$/.test(instance) &&
+                    chatData.chat_instance !== instance &&
+                    (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')
+                ) {
+                    // Only a convenience for the panel: a failed write must not break the button
+                    await chatData
+                        .update({ chat_instance: instance })
+                        .catch((err) => log.warn(`[Bot] chat_instance for ${ctx.chat.id} not saved: ${err.message}`));
+                }
+
                 ctx.state.chatData = chatData;
             } else {
                 ctx.state.chatData = userData; // In private chats, user == chat

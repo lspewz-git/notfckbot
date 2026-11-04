@@ -555,6 +555,44 @@ test('Mini App sign-in checks HTTPS, signature, freshness and the panel role', a
     assert.equal((await login(known)).status, 401);
 });
 
+test('Mini App sign-in names the chat it was opened from', async (t) => {
+    t.mock.method(MiniAppLaunch, 'create', async () => {});
+    t.mock.method(MiniAppLaunch, 'destroy', async () => 0);
+    const lookups = [];
+    t.mock.method(Chat, 'findOne', async ({ where }) => {
+        lookups.push(where);
+        return where.chat_instance === '-555' ? { id: -100123 } : null;
+    });
+    const token = 'miniapp-test-token';
+    const { server, call } = await serve({ telegram: { token } }, { trustLoopback: true });
+    t.after(() => server.close());
+    const data = (extra) => {
+        const fields = {
+            auth_date: String(Math.floor(Date.now() / 1000)),
+            user: '{"id":7,"first_name":"T"}',
+            ...extra
+        };
+        const check = Object.keys(fields)
+            .sort()
+            .map((k) => `${k}=${fields[k]}`)
+            .join('\n');
+        const key = createHmac('sha256', 'WebAppData').update(token).digest();
+        const hash = createHmac('sha256', key).update(check).digest('hex');
+        return new URLSearchParams({ ...fields, hash }).toString();
+    };
+    const chatOf = async (extra) => {
+        const res = await call('POST', '/api/login/miniapp', { body: { initData: data(extra) }, https: true });
+        assert.equal(res.status, 200);
+        return res.body.chatId;
+    };
+    assert.equal(await chatOf({ start_param: 'c-100777', chat_instance: '-555' }), '-100777');
+    assert.equal(await chatOf({ chat_type: 'supergroup', chat_instance: '-555' }), '-100123');
+    assert.equal(await chatOf({ chat_type: 'group', chat_instance: '-999' }), null);
+    assert.equal(await chatOf({ start_param: 'other', chat_instance: 'x' }), null);
+    assert.equal(await chatOf({}), null);
+    assert.deepEqual(lookups, [{ chat_instance: '-555' }, { chat_instance: '-999' }]);
+});
+
 test('poster images need a session and work for users without the request marker', async (t) => {
     const { server, call } = await serve(fakeBot({}));
     t.after(() => server.close());
@@ -957,25 +995,27 @@ function botHandlers() {
     return handlers;
 }
 
-test('/login: refused to users not on the lists; in a group the link goes to the private chat', async () => {
+test('/login is gone from the bot; /app opens a group on its own page, a private chat on the user’s', async () => {
     const { commands } = botHandlers();
+    assert.equal(commands.login, undefined);
     const replies = [];
-    const sent = [];
-    const ctx = (from, chat) => ({
-        from,
+    const ctx = (chat, botInfo = { username: 'nfb', has_main_web_app: true }) => ({
+        from: { id: 7 },
         chat,
-        reply: async (text) => replies.push(text),
-        telegram: fakeBot({}, sent).telegram
+        botInfo,
+        reply: async (text, extra) => replies.push({ text, extra })
     });
-    await commands.login(ctx({ id: 99 }, { id: 99, type: 'private' }));
-    assert.match(replies.pop(), /закрытом тесте/);
-    assert.equal(sent.length, 0);
-
-    await commands.login(ctx({ id: 42, username: 'me' }, { id: -1, type: 'supergroup', title: 'Кино <b>' }));
-    assert.equal(sent[0].chatId, '42');
-    assert.match(sent[0].text, /https:\/\/box\/login\//);
-    assert.match(sent[0].text, /Кино &lt;b&gt;/);
-    assert.match(replies.pop(), /личные сообщения/);
+    const urlOf = (reply) => reply.extra.reply_markup.inline_keyboard[0][0].url;
+    await commands.app(ctx({ id: -100123, type: 'supergroup', title: 'Кино <b>' }));
+    let reply = replies.pop();
+    assert.equal(urlOf(reply), 'https://t.me/nfb?startapp=c-100123');
+    assert.match(reply.text, /Кино &lt;b&gt;/);
+    await commands.app(ctx({ id: 7, type: 'private' }));
+    assert.equal(urlOf(replies.pop()), 'https://t.me/nfb?startapp');
+    await commands.app(ctx({ id: -1, type: 'group' }, { username: 'nfb' }));
+    reply = replies.pop();
+    assert.equal(reply.extra, undefined);
+    assert.match(reply.text, /не настроено/);
 });
 
 test('/start L<code>: the bot asks first, and only "Да, это я" lets the page in', async () => {

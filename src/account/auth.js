@@ -6,9 +6,10 @@
  *   it (t.me/<bot>?start=L<code>). The bot asks the user to confirm, and only then the page that
  *   holds the code's secret is let in. The question stops a planted link: someone who sends you
  *   their code can't get in as you without your "Да, это я".
- * - /login in the bot: a one-time link. The page behind it asks for a press before it spends the
- *   token (a POST): link previews and prefetchers only GET, so they can't use it up.
- * - login-link.js on the server makes such a link when Telegram itself is out of reach.
+ * - login-link.js on the server: a one-time link, when Telegram itself is out of reach. The page
+ *   behind it asks for a press before it spends the token (a POST): link previews and prefetchers
+ *   only GET, so they can't use it up.
+ * - The Mini App: Telegram's signed launch data (src/account/miniapp.js).
  * - A password the user set on their account page (src/account/password.js).
  *
  * Who may sign in and as what: src/account/roles.js, read on every request, so a role taken away
@@ -165,7 +166,7 @@ function clearCookie(res) {
 /**
  * A one-time sign-in link, or null when the user isn't allowed in or PANEL_URL is unset.
  * @param {{ id: number | string, name?: string | null }} user
- * @param {number | string | null} chatId the chat /login was sent from, opened first
+ * @param {number | string | null} chatId a chat to open first (none from login-link.js)
  */
 async function createLink(user, chatId = null, now = Date.now()) {
     const origin = panelUrl();

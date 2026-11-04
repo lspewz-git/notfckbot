@@ -64,6 +64,12 @@ const Chat = sequelize.define('Chat', {
         type: DataTypes.STRING(7),
         allowNull: true
     },
+    // Telegram's chat_instance for a group, learned from a button press (src/bot/middleware.js): a Mini
+    // App opened from the group has only this, not the chat id
+    chat_instance: {
+        type: DataTypes.STRING(32),
+        allowNull: true
+    },
     blockedUntil: {
         type: DataTypes.DATE,
         allowNull: true

@@ -2,9 +2,8 @@
  * Signing in to the panel from the bot (src/account/auth.js):
  * - "Войти через Telegram" on the sign-in page opens the bot with /start L<code>: the bot asks
  *   "Войти в панель?" and the page lets the user in only after "Да, это я".
- * - /login: a one-time link, always in the user's private chat: in a group, the link would let any
- *   member in under their name.
- * Neither is in /help. Who may sign in: src/account/roles.js (with sign-up open, everyone who
+ * - /app: the Mini App button; in a group it opens on that group's page (in /help).
+ * One-time sign-in links come only from login-link.js on the server now. Who may sign in: src/account/roles.js (with sign-up open, everyone who
  * started the bot).
  */
 const auth = require('../account/auth');
@@ -13,12 +12,24 @@ const { escapeHtml } = require('../constants');
 const { log } = require('../log');
 
 const CLOSED = 'Вход в панель пока в закрытом тесте.';
-const MINUTES = auth.LINK_TTL_MS / 60000;
 const GONE = 'Этот вход устарел. Нажмите «Continue with Telegram» на странице ещё раз.';
 
 const nameOf = (from) =>
     from.username ? `@${from.username}` : [from.first_name, from.last_name].filter(Boolean).join(' ') || null;
 const userOf = (from) => ({ id: from.id, name: nameOf(from) });
+
+/**
+ * In a group: the bot's Mini App opened on this group's page (`startapp`, signed into the launch data:
+ * src/account/miniapp.js). Not a sign-in link: whoever opens it signs in as themselves, and the panel
+ * opens the group only for its members. Needs the bot's Main Mini App set in BotFather.
+ */
+function appButton(ctx) {
+    const username = ctx.botInfo?.username;
+    if (!username || !ctx.botInfo?.has_main_web_app) return {};
+    const inGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+    const url = `https://t.me/${username}?startapp${inGroup ? `=c${ctx.chat.id}` : ''}`;
+    return { reply_markup: { inline_keyboard: [[{ text: '📱 Открыть в приложении', url }]] } };
+}
 
 function register(bot) {
     // Before the usual /start (src/bot/commands.js): only "/start L<code>" is ours
@@ -42,41 +53,16 @@ function register(bot) {
         if (answered) log.info(`[Account] Telegram sign-in ${yes ? 'confirmed' : 'refused'} by ${ctx.from.id}`);
     });
 
-    bot.command('login', async (ctx) => {
-        const from = ctx.from;
-        if (!from || !(await auth.isAllowed(from.id))) return ctx.reply(CLOSED);
-        const group = ctx.chat.type !== 'private';
-        let link;
-        try {
-            link = await auth.createLink(userOf(from), ctx.chat.id);
-        } catch (err) {
-            log.error(`[Account] Sign-in link failed: ${err.message}`);
-            return ctx.reply('Не удалось создать ссылку. Попробуйте ещё раз.');
-        }
-        if (!link) {
-            log.warn('[Account] /login: PANEL_URL is not set');
-            return ctx.reply('Вход в панель ещё не настроен.');
-        }
-        const where = group ? `аккаунт группы «${escapeHtml(ctx.chat.title || '')}»` : 'панель';
-        const text =
-            `🔐 <a href="${link}">Открыть ${where}</a>\n\n` +
-            `Ссылка работает ${MINUTES} минут и открывается один раз. Никому её не пересылайте.`;
-        try {
-            // The private chat with the user: in a group that is a message of its own, not a reply
-            await ctx.telegram.sendMessage(from.id, text, {
-                parse_mode: 'HTML',
-                link_preview_options: { is_disabled: true }
-            });
-            if (group) await ctx.reply('Отправил ссылку вам в личные сообщения.');
-            log.info(`[Account] Sign-in link sent to ${from.id}${group ? ` for ${ctx.chat.id}` : ''}`);
-        } catch (err) {
-            log.warn(`[Account] Sign-in link to ${from.id} failed: ${err.message}`);
-            await ctx.reply(
-                group
-                    ? 'Не могу написать вам в личку: откройте чат со мной, нажмите «Старт» и повторите /login.'
-                    : 'Не удалось отправить ссылку. Попробуйте ещё раз.'
-            );
-        }
+    // /app: the Mini App button, in a group on that group's page. Anyone may call it: the panel itself
+    // decides who gets in and which chats they see
+    bot.command('app', async (ctx) => {
+        const button = appButton(ctx);
+        if (!button.reply_markup) return ctx.reply('Приложение пока не настроено.');
+        const group = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+        const text = group
+            ? `📱 Панель группы «${escapeHtml(ctx.chat.title || '')}»: подписки, календарь и настройки.`
+            : '📱 Панель: подписки, календарь и настройки.';
+        await ctx.reply(text, { parse_mode: 'HTML', ...button });
     });
 }
 

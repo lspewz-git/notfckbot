@@ -24,7 +24,17 @@ const { log } = require('./log');
 
 // The chat's own settings, carried over to the new id (its name and type come from Telegram, and
 // whether the bot is in it is the new chat's own: src/bot-status.js)
-const KEEP = ['id', 'type', 'username', 'createdAt', 'updatedAt', 'bot_status', 'bot_status_at', 'bot_status_by'];
+const KEEP = [
+    'id',
+    'type',
+    'username',
+    'createdAt',
+    'updatedAt',
+    'bot_status',
+    'bot_status_at',
+    'bot_status_by',
+    'chat_instance'
+];
 
 /**
  * Moves a chat's data from its old id to the new one. Rows the new chat already has for the same
