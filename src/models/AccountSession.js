@@ -12,6 +12,9 @@ const AccountSession = sequelize.define(
         // The Telegram user it belongs to
         userId: { type: DataTypes.BIGINT, allowNull: false },
         userName: { type: DataTypes.STRING, allowNull: true },
+        // false: signed in by /code digits nobody confirmed ("Это я"). Browsers this session marks are
+        // remembered as untrusted, whatever cookie they bring (src/account/devices.js)
+        trusted: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
         expiresAt: { type: DataTypes.DATE, allowNull: false }
     },
     { updatedAt: false, indexes: [{ fields: ['userId'] }, { fields: ['expiresAt'] }] }

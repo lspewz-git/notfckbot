@@ -1,11 +1,18 @@
 /** The same explicit confirmation for a Telegram link, QR or a verified password. */
 const { Markup } = require('telegraf');
-const { checkWord } = require('./auth');
+const { checkWord, deviceOf } = require('./auth');
+const { placeLine } = require('./devices');
+const { escapeHtml } = require('../constants');
 
 function confirmation(code) {
+    // Which browser asks, and where it is: like Apple's sign-in map, before the "Да"
+    const device = deviceOf(code);
+    const where = [device?.name, placeLine(device)].filter(Boolean).map(escapeHtml).join('\n');
     return {
         text:
-            `🔐 <b>Войти в панель NotFckBot?</b>\n\nПроверочный код: <b>${checkWord(code)}</b>. ` +
+            '🔐 <b>Войти в панель NotFckBot?</b>\n\n' +
+            (where ? `${where}\n\n` : '') +
+            `Проверочный код: <b>${checkWord(code)}</b>. ` +
             'Нажмите «Да», только если этот же код сейчас на вашей странице входа. ' +
             'Если вы не начинали вход, нажмите «Нет».',
         extra: {

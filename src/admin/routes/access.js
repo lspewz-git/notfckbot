@@ -9,6 +9,7 @@ const { Chat } = require('../../db');
 const roles = require('../../account/roles');
 const { endOtherSessions, setCookie, startSession } = require('../../account/auth');
 const password = require('../../account/password');
+const devices = require('../../account/devices');
 const { writeEnv } = require('../env');
 const { z, valid, idOf } = require('../validate');
 const { log } = require('../../log');
@@ -99,6 +100,9 @@ router.delete('/api/access/:userId/password', async (req, res) => {
     if (!params) return;
     try {
         const self = params.userId === String(req.user.userId);
+        // One's own, from a device just signed in: the same wait as in My account (src/account/devices.js)
+        const refusal = self ? await devices.freshRefusal(req) : null;
+        if (refusal) return res.status(403).json({ error: refusal });
         if (await password.removePassword(params.userId)) {
             await endOtherSessions(params.userId, self ? req.user.id : null);
             if (!self) password.notifyPassword(req.app.get('bot'), params.userId, 'removed-by-admin');

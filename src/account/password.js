@@ -90,7 +90,7 @@ async function userIdFor(login) {
  * @returns {Promise<object | null>} a system session, pending personal confirmation, or access denial;
  *   null for wrong credentials
  */
-async function signInWithPassword(login, password, now = Date.now()) {
+async function signInWithPassword(login, password, now = Date.now(), device = null) {
     const userId = await userIdFor(login);
     const system = userId !== null && roles.isSystem(userId);
     let hash = null;
@@ -113,7 +113,7 @@ async function signInWithPassword(login, password, now = Date.now()) {
     }
     if (!(await roles.isAllowed(userId))) return { noAccess: true };
     const chat = await Chat.findByPk(userId, { attributes: ['username'], raw: true });
-    return { ...startCode({ userId, userName: chat ? chat.username : null }, hash, now), userId };
+    return { ...startCode({ userId, userName: chat ? chat.username : null }, hash, now, device), userId };
 }
 
 async function setPassword(userId, password) {

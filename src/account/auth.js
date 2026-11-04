@@ -22,6 +22,7 @@ const sequelize = require('../database');
 const { AccountSession, LoginLink, MiniAppLaunch, AccountPassword } = require('../db');
 const { lruCache } = require('../lru');
 const { roleOf, isAllowed, isSystem, systemHash } = require('./roles');
+const devices = require('./devices');
 const { log } = require('../log');
 
 const LINK_TTL_MS = 5 * 60 * 1000;
@@ -59,12 +60,17 @@ function panelUrl() {
 
 // --- Sessions ---
 
-async function startSession({ userId, userName = null }, now = Date.now(), credential = systemHash()) {
+async function startSession(
+    { userId, userName = null },
+    now = Date.now(),
+    credential = systemHash(),
+    { trusted = true } = {}
+) {
     const token = newToken();
     const system = isSystem(userId);
     if (system && !credential) return null;
     const id = tokenId('session', token, system ? credential : '');
-    await insertSession(id, userId, userName, now);
+    await insertSession(id, userId, userName, now, undefined, trusted);
     if (system && credential !== systemHash()) {
         await endSession({ id });
         return null;
@@ -73,8 +79,11 @@ async function startSession({ userId, userName = null }, now = Date.now(), crede
     return token;
 }
 
-const insertSession = (id, userId, userName, now, transaction) =>
-    AccountSession.create({ id, userId, userName, expiresAt: new Date(now + SESSION_TTL_MS) }, { transaction });
+const insertSession = (id, userId, userName, now, transaction, trusted = true) =>
+    AccountSession.create(
+        { id, userId, userName, trusted, expiresAt: new Date(now + SESSION_TTL_MS) },
+        { transaction }
+    );
 
 async function redeemMiniAppLaunch(user, existing, now = Date.now()) {
     if (user.expiresAt.getTime() <= now) return null;
@@ -116,7 +125,7 @@ function cookieToken(header) {
 
 /**
  * @returns {Promise<{ id: string, userId: string, userName: string | null, role: 'admin' | 'user',
- *   system: boolean } | null>} system: the system account, not a Telegram user
+ *   system: boolean, since: Date }  | null>} system: the system account, not a Telegram user; since: when it started
  */
 async function sessionOf(req, now = Date.now()) {
     const token = cookieToken(req.headers.cookie);
@@ -126,7 +135,15 @@ async function sessionOf(req, now = Date.now()) {
     if (!row || new Date(row.expiresAt).getTime() <= now) return null;
     const role = await roleOf(row.userId);
     if (!role || (isSystem(row.userId) && credential !== systemHash())) return null;
-    return { id: row.id, userId: String(row.userId), userName: row.userName, role, system: isSystem(row.userId) };
+    return {
+        id: row.id,
+        userId: String(row.userId),
+        userName: row.userName,
+        role,
+        system: isSystem(row.userId),
+        since: row.createdAt,
+        trusted: row.trusted !== false
+    };
 }
 
 const endSession = (session) => AccountSession.destroy({ where: { id: session.id } });
@@ -152,14 +169,20 @@ const capSessionLifetimes = (now = Date.now()) =>
         { where: { expiresAt: { [Op.gt]: new Date(now + SESSION_TTL_MS) } } }
     );
 
+/** The session cookie, keeping any other cookie already set on the response (the device mark). */
+function putCookie(res, value) {
+    const others = [].concat(res.getHeader?.('Set-Cookie') || []).filter((c) => !c.startsWith(`${COOKIE}=`));
+    res.setHeader('Set-Cookie', others.length ? [...others, value] : value);
+}
+
 function setCookie(req, res, token) {
     const parts = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${COOKIE_TTL_MS / 1000}`];
     if (req.secure) parts.push('Secure');
-    res.setHeader('Set-Cookie', parts.join('; '));
+    putCookie(res, parts.join('; '));
 }
 
 function clearCookie(res) {
-    res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+    putCookie(res, `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
 // --- One-time links ---
@@ -259,7 +282,8 @@ function newCheck(now) {
 
 /**
  * A new code for the sign-in page, the secret only that page knows, and the number to compare.
- * @param {string | null} [device] the browser that asked, for the bot's reply to /code ("Safari, iPhone")
+ * @param {ReturnType<typeof devices.clientOf> | null} [device] the browser that asked (devices.clientOf), for
+ *   the bot's question and its reply to /code
  */
 function startCode(boundUser = null, passwordHash = null, now = Date.now(), device = null) {
     const check = newCheck(now);
@@ -305,6 +329,15 @@ function cancelCode(code, secret) {
     return codes.delete(code);
 }
 
+/** The live code whose page shows these digits. */
+function waitingWith(check, now) {
+    for (const entry of codes.values()) if (entry.check === check && entry.expiresAt > now) return entry;
+    return null;
+}
+
+/** The browser that asked for a code, while it waits (for the bot's question). */
+const deviceOf = (code) => codeOf(code)?.device || null;
+
 /** Whether a code is still waiting for the bot's question (it may be asked once). */
 const isWaiting = (code) => {
     const entry = codeOf(code);
@@ -329,20 +362,28 @@ async function answerCode(code, user, yes) {
  * without the "Да, это я" question (the user's choice, 04.11); the reply offers "Это не я" afterwards
  * (denyClaim). A sign-in bound to another account (a password) doesn't take them, and wrong digits
  * count towards a pause.
- * @returns {Promise<{ state: 'in', device: string | null, claim: string } | { state: 'wrong', left: number } |
+ * @returns {Promise<{ state: 'in', device: object | null, seen: 'known' | 'new' | 'odd', claim: string } |
+ *   { state: 'wrong', left: number } |
  *   { state: 'paused', minutes: number } | { state: 'closed' }>}
  */
 async function answerCheck(digits, user, now = Date.now()) {
     const key = String(user.id);
     let paused = pausedFor(codeMisses.get(key), now);
     if (paused) return { state: 'paused', minutes: paused };
-    if (!(await isAllowed(user.id))) return { state: 'closed' };
+    const wanted = String(digits || '');
+    // Whether the browser is new to this user, asked alongside the access: once the digits are taken
+    // below, the page signs in and remembers the browser, so asking later would always say 'known'
+    const candidate = /^\d{6}$/.test(wanted) ? waitingWith(wanted, now) : null;
+    const [allowed, seen] = await Promise.all([
+        isAllowed(user.id),
+        candidate ? devices.judge(user.id, candidate.device).catch(() => 'new') : 'new'
+    ]);
+    if (!allowed) return { state: 'closed' };
     // Read after the await: from here to the count below nothing waits, so tries sent at once each
     // see the misses of the ones before them and can't get past the limit together
     const misses = codeMisses.get(key) || { count: 0, until: 0 };
     paused = pausedFor(misses, now);
     if (paused) return { state: 'paused', minutes: paused };
-    const wanted = String(digits || '');
     let found = null;
     if (/^\d{6}$/.test(wanted)) {
         for (const [code, entry] of codes.entries()) {
@@ -364,9 +405,11 @@ async function answerCheck(digits, user, now = Date.now()) {
         const claim = crypto.randomBytes(16).toString('base64url');
         entry.user = { userId: user.id, userName: user.name || null };
         entry.claim = claim;
-        claims.set(claim, { code: found, userId: key, sessionId: null, check: wanted, at: now });
+        const device = entry.device || null;
+        claims.set(claim, { code: found, userId: key, sessionId: null, check: wanted, at: now, device });
         codeMisses.delete(key);
-        return { state: 'in', device: entry.device || null, claim };
+        // Judged for another code with the same digits (it ended during the await): ask as for a new one
+        return { state: 'in', device, seen: entry === candidate ? seen : 'new', claim };
     }
     const count = misses.count + 1;
     if (count < CODE_TRIES) {
@@ -376,6 +419,19 @@ async function answerCheck(digits, user, now = Date.now()) {
     const minutes = CODE_PAUSES_MIN[Math.min(count - CODE_TRIES, CODE_PAUSES_MIN.length - 1)];
     codeMisses.set(key, { count, until: now + minutes * 60000 });
     return { state: 'paused', minutes };
+}
+
+/**
+ * "✅ Это я" under the bot's reply: the browser those digits signed in becomes a trusted one.
+ * @returns {Promise<boolean>} false: not this person's sign-in
+ */
+async function confirmClaim(claimId, userId) {
+    const claim = claims.get(String(claimId || ''));
+    if (!claim || claim.userId !== String(userId)) return false;
+    claim.trusted = true;
+    if (claim.sessionId) await AccountSession.update({ trusted: true }, { where: { id: claim.sessionId } });
+    await devices.trust(userId, claim.device?.deviceId);
+    return true;
 }
 
 /**
@@ -396,13 +452,14 @@ async function denyClaim(claimId, userId) {
         entry.denied = true;
     }
     if (claim.sessionId) await endSession({ id: claim.sessionId });
+    await devices.forget(userId, claim.device?.deviceId);
     log.info(`[Account] Code sign-in denied by ${userId}`);
     return true;
 }
 
 /**
  * The sign-in page asking how its code stands; once confirmed, the session starts (once).
- * @returns {Promise<{ state: 'waiting' | 'refused' | 'gone' } | { state: 'in', token: string }>}
+ * @returns {Promise<{ state: 'waiting' | 'refused' | 'gone' } | { state: 'in', token: string, userId: string }>}
  */
 async function pollCode(code, secret, now = Date.now()) {
     const entry = codeOf(code, now);
@@ -424,15 +481,22 @@ async function pollCode(code, secret, now = Date.now()) {
         }
         if (entry.denied) return { state: 'refused' };
         if (codeOf(code) !== entry) return { state: 'gone' };
-        const token = await startSession(user, now);
+        // Digits nobody confirmed yet: the session is untrusted until "Это я" (confirmClaim)
+        const pending = entry.claim && claims.get(entry.claim);
+        const token = await startSession(user, now, undefined, { trusted: !pending || Boolean(pending.trusted) });
         if (codeOf(code) !== entry || entry.denied) {
             await endSession({ id: tokenId('session', token) });
             return { state: entry.denied ? 'refused' : 'gone' };
         }
         // Signed in with digits: "Это не я" in the bot can still end this session
         const claim = entry.claim && claims.get(entry.claim);
-        if (claim) claim.sessionId = tokenId('session', token);
-        return { state: 'in', token };
+        if (claim) {
+            claim.sessionId = tokenId('session', token);
+            // "Это я" pressed while the session was being written
+            if (claim.trusted) await AccountSession.update({ trusted: true }, { where: { id: claim.sessionId } });
+        }
+        // A browser signed in by digits is trusted only after "Это я" (devices.judge)
+        return { state: 'in', token, userId: user.userId, trusted: !claim || Boolean(claim.trusted) };
     } finally {
         codes.delete(code);
     }
@@ -463,8 +527,10 @@ module.exports = {
     cancelCode,
     checkWord,
     isWaiting,
+    deviceOf,
     answerCode,
     answerCheck,
+    confirmClaim,
     denyClaim,
     pollCode
 };

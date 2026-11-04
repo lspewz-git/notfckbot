@@ -4,6 +4,7 @@
  * user; the rest of the panel answers admins only.
  */
 const auth = require('./auth');
+const devices = require('./devices');
 const { log } = require('../log');
 
 const OPEN = /^\/login(\/telegram(\/poll|\/cancel)?|\/password|\/miniapp)?$/;
@@ -18,7 +19,14 @@ async function guard(req, res, next) {
             return res.status(401).json({ error: 'Sign in to the panel.' });
         }
         req.user = session;
-        if (!req.path.startsWith('/poster/')) auth.setCookie(req, res, auth.cookieToken(req.headers.cookie));
+        if (!req.path.startsWith('/poster/')) {
+            auth.setCookie(req, res, auth.cookieToken(req.headers.cookie));
+            // After setCookie: it replaces the Set-Cookie header, the device mark is appended to it
+            req.device = await devices.seen(req, res, session).catch((err) => {
+                log.warn(`[Account] Device check failed: ${err.message}`);
+                return null;
+            });
+        }
         if (session.role === 'admin' || ANY_ROLE.test(req.path)) return next();
         log.warn(`[Account] User ${session.userId} refused ${req.method} /api${req.path}: admins only`);
         res.status(403).json({ error: 'Only for the panel admins' });

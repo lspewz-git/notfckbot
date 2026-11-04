@@ -13,6 +13,7 @@ const AlertRecipient = require('./models/AlertRecipient');
 const AlertLog = require('./models/AlertLog');
 const SendFailure = require('./models/SendFailure');
 const AccountSession = require('./models/AccountSession');
+const AccountDevice = require('./models/AccountDevice');
 const LoginLink = require('./models/LoginLink');
 const MiniAppLaunch = require('./models/MiniAppLaunch');
 const AccountPassword = require('./models/AccountPassword');
@@ -51,6 +52,7 @@ module.exports = {
     AlertLog,
     SendFailure,
     AccountSession,
+    AccountDevice,
     LoginLink,
     MiniAppLaunch,
     AccountPassword,

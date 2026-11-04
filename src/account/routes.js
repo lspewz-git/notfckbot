@@ -18,6 +18,7 @@ const { rateLimit, MemoryStore } = require('express-rate-limit');
 const auth = require('./auth');
 const { miniAppUser } = require('./miniapp');
 const password = require('./password');
+const devices = require('./devices');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
 const QRCode = require('qrcode');
@@ -31,32 +32,6 @@ const fail = (res, err) => {
     log.error(`[Account] ${err.message}`);
     res.status(500).json({ error: 'Something went wrong. Try again.' });
 };
-
-const BROWSERS = [
-    [/YaBrowser\//, 'Яндекс Браузер'],
-    [/Edg(A|iOS)?\//, 'Edge'],
-    [/OPR\/|Opera/, 'Opera'],
-    [/Firefox\/|FxiOS\//, 'Firefox'],
-    [/Chrome\/|CriOS\//, 'Chrome'],
-    [/Safari\//, 'Safari']
-];
-const SYSTEMS = [
-    [/iPhone/, 'iPhone'],
-    [/iPad/, 'iPad'],
-    [/Android/, 'Android'],
-    [/Windows/, 'Windows'],
-    [/Macintosh|Mac OS X/, 'Mac'],
-    [/Linux/, 'Linux']
-];
-
-/**
- * "Safari, iPhone" for the bot's reply to /code: only a hint where the sign-in happened, so a few
- * well-known names are enough (no parser library for one line of text).
- */
-function deviceName(ua = '') {
-    const pick = (list) => list.find(([re]) => re.test(ua))?.[1];
-    return [pick(BROWSERS), pick(SYSTEMS)].filter(Boolean).join(', ') || null;
-}
 
 // --- Signing in and out (src/account/guard.js lets these through without a session) ---
 
@@ -133,7 +108,7 @@ router.post('/api/login/telegram', challengeLimit, async (req, res) => {
     try {
         const username = await botUsername(req.app.get('bot'));
         if (!username) throw new ops.OpError(503, "Telegram isn't answering. Try again later.");
-        const { expiresAt, ...start } = auth.startCode(null, null, Date.now(), deviceName(req.get('user-agent')));
+        const { expiresAt, ...start } = auth.startCode(null, null, Date.now(), devices.clientOf(req, res));
         const url = `https://t.me/${username}?start=L${start.code}`;
         const qr = await QRCode.toDataURL(url, { width: 232, margin: 4, errorCorrectionLevel: 'M' });
         res.set('Cache-Control', 'no-store').json({
@@ -152,7 +127,13 @@ router.post('/api/login/telegram/poll', pollLimit, async (req, res) => {
     if (!body) return;
     try {
         const result = await auth.pollCode(body.code, body.secret);
-        if (result.state === 'in') auth.setCookie(req, res, result.token);
+        if (result.state === 'in') {
+            auth.setCookie(req, res, result.token);
+            // Before the guard sees it: whether the bot asks "Это вы?" for this browser next time
+            await devices
+                .remember(req, res, result.userId, { trusted: result.trusted })
+                .catch((err) => log.warn(`[Account] Remembering the device failed: ${err.message}`));
+        }
         res.set('Cache-Control', 'no-store').json({ state: result.state });
     } catch (err) {
         fail(res, err);
@@ -201,7 +182,12 @@ router.post('/api/login/password', passwordLimit, async (req, res) => {
     );
     if (!body) return;
     try {
-        const session = await password.signInWithPassword(body.login, body.password);
+        const session = await password.signInWithPassword(
+            body.login,
+            body.password,
+            Date.now(),
+            devices.clientOf(req, res)
+        );
         if (!session) return res.status(401).json({ error: 'Wrong username or password.' });
         if (session.noAccess) return res.status(403).json({ error: 'No access to the panel.' });
         if (session.token) {
@@ -291,6 +277,8 @@ router.put('/api/account/password', async (req, res) => {
     if (!body) return;
     const { userId } = req.user;
     try {
+        const refusal = await devices.freshRefusal(req);
+        if (refusal) return res.status(403).json({ error: refusal });
         const had = await password.hasPassword(userId);
         await password.setPassword(userId, body.password);
         if (had) await auth.endOtherSessions(userId, req.user.id);
@@ -305,6 +293,8 @@ router.delete('/api/account/password', async (req, res) => {
     if (req.user.system) return res.status(400).json({ error: "The system account's password is in Settings" });
     const { userId } = req.user;
     try {
+        const refusal = await devices.freshRefusal(req);
+        if (refusal) return res.status(403).json({ error: refusal });
         if (await password.removePassword(userId)) {
             await auth.endOtherSessions(userId, req.user.id);
             password.notifyPassword(req.app.get('bot'), userId, 'removed');
@@ -318,6 +308,8 @@ router.delete('/api/account/password', async (req, res) => {
 // "Sign out on other devices" on the account page: this session stays
 router.post('/api/account/sessions/end-others', async (req, res) => {
     try {
+        const refusal = await devices.freshRefusal(req);
+        if (refusal) return res.status(403).json({ error: refusal });
         const ended = await auth.endOtherSessions(req.user.userId, req.user.id);
         res.json({ ended });
     } catch (err) {

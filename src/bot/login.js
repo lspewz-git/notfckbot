@@ -10,6 +10,7 @@
  */
 const auth = require('../account/auth');
 const { confirmation } = require('../account/confirmation');
+const { placeLine } = require('../account/devices');
 const { escapeHtml } = require('../constants');
 const { getState, setState } = require('./state');
 const { log } = require('../log');
@@ -32,14 +33,29 @@ function minutes(n) {
     return `${n} ${word}`;
 }
 
+const HEADS = {
+    known: '✅ <b>Вход выполнен</b>',
+    new: '✅ <b>Вход с нового устройства</b>',
+    odd: '⚠️ <b>Незнакомый вход</b>'
+};
+
+/**
+ * "✅ Вход выполнен" and where: a browser the user signed in from before gets one short line, a new
+ * one its address and the buttons too (see tryCheck), like Telegram's "Новый вход".
+ */
+function signedInText({ device, seen }) {
+    const name = device?.name ? escapeHtml(device.name) : '';
+    if (seen === 'known') {
+        const line = [name, escapeHtml(placeLine(device && { ...device, ip: null }))].filter(Boolean).join(' · ');
+        return HEADS.known + (line ? `\n${line}` : '');
+    }
+    const lines = [name, escapeHtml(placeLine(device))].filter(Boolean).join('\n');
+    return (HEADS[seen] || HEADS.new) + (lines ? `\n${lines}` : '') + (seen === 'odd' ? '' : '\n\nЭто были вы?');
+}
+
 /** The bot's answer to the digits (auth.answerCheck). */
 function checkReply(result) {
-    if (result.state === 'in')
-        return (
-            '✅ <b>Вход выполнен</b>' +
-            (result.device ? `\nПанель открыта: ${escapeHtml(result.device)}.` : '') +
-            '\n\nЭто были вы?'
-        );
+    if (result.state === 'in') return signedInText(result);
     if (result.state === 'closed') return CLOSED;
     if (result.state === 'again') return 'Этот код уже принят: вход выполнен.';
     if (result.state === 'empty') return 'Пришлите 6 цифр с экрана входа в панель.';
@@ -103,7 +119,8 @@ function register(bot) {
             setState(ctx, { state: 'idle' });
         if (result.state !== 'in') return ctx.replyWithHTML(checkReply(result));
         log.info(`[Account] Code sign-in by ${ctx.from.id}`);
-        // In already; "Это не я" ends that sign-in (auth.denyClaim)
+        // In already; from a new browser "Это не я" ends that sign-in (auth.denyClaim)
+        if (result.seen === 'known') return ctx.replyWithHTML(checkReply(result));
         await ctx.replyWithHTML(checkReply(result), {
             reply_markup: {
                 inline_keyboard: [
@@ -118,6 +135,7 @@ function register(bot) {
 
     bot.action(/^login_(me|notme)_([A-Za-z0-9_-]{22})$/, async (ctx) => {
         if (ctx.match[1] === 'me') {
+            await auth.confirmClaim(ctx.match[2], ctx.from.id);
             await ctx.answerCbQuery('Хорошо');
             await ctx.editMessageReplyMarkup(undefined).catch(() => {});
             return;

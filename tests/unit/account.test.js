@@ -13,6 +13,7 @@ const sequelize = require('../../src/database');
 const { Op, UniqueConstraintError } = require('sequelize');
 const {
     AccountSession,
+    AccountDevice,
     LoginLink,
     MiniAppLaunch,
     AccountPassword,
@@ -26,6 +27,7 @@ const auth = require('../../src/account/auth');
 const roles = require('../../src/account/roles');
 const password = require('../../src/account/password');
 const members = require('../../src/account/members');
+const devices = require('../../src/account/devices');
 const { guard } = require('../../src/account/guard');
 const { panelOnly } = require('../../src/admin/panel-only');
 
@@ -36,6 +38,21 @@ let links;
 let passwords;
 // PanelRole's rows: userId → role
 let panelRoles;
+// AccountDevice's rows
+let deviceRows;
+
+/** AccountDevice's where: the fields the code asks by, with Op.ne / Op.lte / Op.lt. */
+function deviceMatch(row, where) {
+    for (const [key, want] of Object.entries(where)) {
+        const value = row[key];
+        if (want && typeof want === 'object' && !(want instanceof Date)) {
+            if (Op.ne in want && String(value) === String(want[Op.ne])) return false;
+            if (Op.lte in want && !(new Date(value) <= want[Op.lte])) return false;
+            if (Op.lt in want && !(new Date(value) < want[Op.lt])) return false;
+        } else if (String(value) !== String(want)) return false;
+    }
+    return true;
+}
 
 beforeEach(() => {
     mock.method(sequelize, 'transaction', async (options, run = options) => run({ LOCK: { UPDATE: 'UPDATE' } }));
@@ -105,6 +122,24 @@ beforeEach(() => {
         for (const method of ['create', 'findByPk', 'destroy', 'update']) mock.method(model, method, fake[method]);
     }
     members.forget();
+    deviceRows = [];
+    devices.resetDevices();
+    const matching = (where) => deviceRows.filter((row) => deviceMatch(row, where));
+    mock.method(AccountDevice, 'findAll', async ({ where }) => matching(where).map((row) => ({ ...row })));
+    mock.method(AccountDevice, 'findOne', async ({ where }) => {
+        const row = matching(where)[0];
+        return row ? { ...row } : null;
+    });
+    mock.method(AccountDevice, 'count', async ({ where }) => matching(where).length);
+    mock.method(AccountDevice, 'create', async (row) => deviceRows.push({ ...row }));
+    mock.method(AccountDevice, 'update', async (values, { where }) => {
+        matching(where).forEach((row) => Object.assign(row, values));
+    });
+    mock.method(AccountDevice, 'destroy', async ({ where }) => {
+        const gone = matching(where);
+        deviceRows = deviceRows.filter((row) => !gone.includes(row));
+        return gone.length;
+    });
 });
 
 afterEach(() => {
@@ -472,6 +507,7 @@ async function serve(bot, { trustLoopback = false } = {}) {
     app.use('/api', guard);
     app.use(express.json());
     app.use(require('../../src/account/routes').router);
+    app.use(require('../../src/admin/routes/access'));
     app.get('/api/stats', (req, res) => res.json({ admin: true }));
     app.get('/api/poster/w185/test.jpg', (req, res) => res.sendStatus(204));
     // eslint-disable-next-line no-unused-vars
@@ -479,14 +515,20 @@ async function serve(bot, { trustLoopback = false } = {}) {
     const server = app.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const call = (method, path, { body, cookie, raw, address, https } = {}) =>
+    const call = (method, path, { body, cookie, device, raw, address, https } = {}) =>
         fetch(`${base}${path}`, {
             method,
             headers: {
                 'X-Requested-By': 'notfckbot-panel',
                 ...(https ? { 'X-Forwarded-Proto': 'https' } : {}),
                 ...(address ? { 'X-Forwarded-For': address } : {}),
-                ...(cookie ? { Cookie: `nfb_session=${cookie}` } : {}),
+                ...(cookie || device
+                    ? {
+                          Cookie: [cookie && `nfb_session=${cookie}`, device && `nfb_device=${device}`]
+                              .filter(Boolean)
+                              .join('; ')
+                      }
+                    : {}),
                 ...(body || raw ? { 'Content-Type': 'application/json' } : {})
             },
             body: raw || (body ? JSON.stringify(body) : undefined)
@@ -543,10 +585,10 @@ test('Mini App sign-in checks HTTPS, signature, freshness and the panel role', a
     assert.equal((await call('GET', '/api/stats', { cookie })).status, 403);
     const mismatch = await login(data(42), { https: true, cookie });
     assert.equal(mismatch.status, 409);
-    assert.equal(mismatch.headers.get('set-cookie'), null);
+    assert.doesNotMatch(String(mismatch.headers.get('set-cookie')), /nfb_session=/);
     const same = await login(valid, { https: true, cookie });
     assert.equal(same.status, 200);
-    assert.equal(same.headers.get('set-cookie'), null);
+    assert.doesNotMatch(String(same.headers.get('set-cookie')), /nfb_session=/);
     await call('POST', '/api/logout', { cookie });
     assert.equal((await login(valid)).status, 401);
     const known = data(7, Math.floor(Date.now() / 1000) - 10);
@@ -761,7 +803,7 @@ test('the API: undeliverable confirmation creates no session and repeated correc
     const login = () => call('POST', '/api/login/password', { body: { login: '7', password: 'secret-pass' } });
     const failed = await login();
     assert.equal(failed.status, 503);
-    assert.equal(failed.headers.get('set-cookie'), null);
+    assert.doesNotMatch(String(failed.headers.get('set-cookie')), /nfb_session=/);
     assert.equal(sessions.size, 0);
     assert.equal((await login()).status, 429);
     assert.equal(sends, 1);
@@ -1136,7 +1178,14 @@ test('sign-in digits: tries sent at once cannot get past the five-try limit toge
 
 test('/code in the bot: with the digits, or asked for; a group is sent to the private chat', async () => {
     const { commands, actions, on } = botHandlers();
-    const start = auth.startCode(null, null, Date.now(), 'Chrome, Windows');
+    const device = {
+        deviceId: 'd'.repeat(64),
+        name: 'Chrome, Windows',
+        ip: '95.24.17.80',
+        country: 'RU',
+        network: 'Vimpelcom'
+    };
+    const start = auth.startCode(null, null, Date.now(), device);
     const replies = [];
     const session = {};
     const ctx = (text, chat = { id: 7, type: 'private' }) => ({
@@ -1167,7 +1216,10 @@ test('/code in the bot: with the digits, or asked for; a group is sent to the pr
     assert.equal(passed, false, 'digits are a try');
     assert.match(replies.pop(), /Код не подошёл[\s\S]*Осталось попыток: 4/);
     await on.text(ctx(` ${start.check} `), () => (passed = true));
-    assert.match(replies.pop(), /Вход выполнен[\s\S]*Chrome, Windows[\s\S]*Это были вы\?/);
+    assert.equal(
+        replies.pop(),
+        '✅ <b>Вход с нового устройства</b>\nChrome, Windows\nРоссия, Vimpelcom · 95.24.17.80\n\nЭто были вы?'
+    );
     const buttons = extras.pop().reply_markup.inline_keyboard.flat();
     assert.deepEqual(
         buttons.map((b) => b.text),
@@ -1191,8 +1243,9 @@ test('/code in the bot: with the digits, or asked for; a group is sent to the pr
     const next = auth.startCode();
     await commands.code(ctx(`/code ${next.check}`));
     const plain = replies.pop();
-    assert.match(plain, /Вход выполнен/);
-    assert.doesNotMatch(plain, /Панель открыта/, 'no device known: no device line');
+    assert.equal(plain, '✅ <b>Вход с нового устройства</b>\n\nЭто были вы?', 'no device known: no device lines');
+    // "Это не я" forgot the denied browser
+    assert.equal(deviceRows.length, 0);
 
     // From ⚙️ Настройки → 🔑 Вход по коду
     const [, press] = actions.find(([name]) => name === 'login_code');
@@ -1342,7 +1395,7 @@ test('signing in with a password: by id or @username, only for people still on t
     for (const who of ['7', '@Kirill']) {
         const denied = await login(who);
         assert.deepEqual([denied.status, denied.body.error], [403, 'No access to the panel.']);
-        assert.equal(denied.headers.get('set-cookie'), null);
+        assert.doesNotMatch(String(denied.headers.get('set-cookie')), /nfb_session=/);
     }
     assert.equal((await login('999')).status, 401, 'unknown numeric ID');
     panelRoles.set('7', 'user');
@@ -1405,7 +1458,7 @@ test('the API: set, use and remove a password; wrong tries stop at the limit', a
     const login = (pass, who = '7') => call('POST', '/api/login/password', { body: { login: who, password: pass } });
     const ok = await login('long-enough');
     assert.equal(ok.status, 200);
-    assert.equal(ok.headers.get('set-cookie'), null, 'no session before bot confirmation');
+    assert.doesNotMatch(String(ok.headers.get('set-cookie')), /nfb_session=/, 'no session before bot confirmation');
     assert.equal(ok.body.confirmation, true);
     await auth.answerCode(ok.body.code, { id: 7 }, true);
     const approved = await call('POST', '/api/login/telegram/poll', {
@@ -1458,7 +1511,7 @@ test('password sign-in can repeat immediately after logout without bypassing pen
     const again = await login('7');
     assert.equal(again.status, 200, 'a completed sign-in and logout do not impose a one-minute lockout');
     assert.equal(again.body.confirmation, true, 'the next login still needs Telegram approval');
-    assert.equal(again.headers.get('set-cookie'), null);
+    assert.doesNotMatch(String(again.headers.get('set-cookie')), /nfb_session=/);
     assert.notEqual(again.body.code, first.body.code);
     assert.equal((await login('8')).status, 429, 'another account keeps its own cooldown');
     assert.equal(sent.length, 3);
@@ -1506,4 +1559,225 @@ test('the API: the system account has no chats and no own password here, its pas
 
 test('the system account cannot open chat 0', async () => {
     assert.equal(await members.accessTo('0', '0'), null);
+});
+
+// --- Known devices (src/account/devices.js) ---
+
+const DEVICE_A = 'a'.repeat(64);
+const DEVICE_B = 'b'.repeat(64);
+const deviceRow = (deviceId, userId, country, firstSeen = Date.now()) => ({
+    deviceId,
+    userId: String(userId),
+    name: 'Chrome, Windows',
+    country,
+    network: null,
+    firstSeen: new Date(firstSeen),
+    lastSeen: new Date(firstSeen)
+});
+
+test('the place of an IP comes from the local databases, and the line shows what is known', () => {
+    assert.deepEqual(devices.placeOf('8.8.8.8'), { country: 'US', network: 'Google' });
+    assert.equal(devices.placeOf('95.24.17.80').country, 'RU');
+    assert.deepEqual(devices.placeOf('192.168.2.1'), { country: null, network: null }, 'a home network');
+    assert.deepEqual(devices.placeOf('not an ip'), { country: null, network: null });
+    assert.equal(devices.countryName('NL'), 'Нидерланды');
+    assert.equal(
+        devices.placeLine({ country: 'RU', network: 'Vimpelcom', ip: '95.24.17.80' }),
+        'Россия, Vimpelcom · 95.24.17.80'
+    );
+    assert.equal(devices.placeLine({ country: null, network: null, ip: '192.168.2.1' }), '192.168.2.1');
+    assert.equal(devices.placeLine(null), '');
+    assert.equal(devices.deviceName('Mozilla/5.0 (iPhone) AppleWebKit Version/17 Safari/604.1'), 'Safari, iPhone');
+});
+
+test('/code from a known browser says so in one line; from another country it warns, with the buttons', async () => {
+    const { commands } = botHandlers();
+    const replies = [];
+    const ctx = (text) => ({
+        from: { id: 7, username: 'u7' },
+        chat: { id: 7, type: 'private' },
+        message: { text },
+        session: {},
+        replyWithHTML: async (body, extra) => replies.push({ body, extra })
+    });
+    deviceRows.push(deviceRow(DEVICE_A, 7, 'RU'));
+    const known = auth.startCode(null, null, Date.now(), {
+        deviceId: DEVICE_A,
+        name: 'Safari, iPhone',
+        ip: '95.24.17.80',
+        country: 'RU',
+        network: 'Vimpelcom'
+    });
+    await commands.code(ctx(`/code ${known.check}`));
+    assert.deepEqual(replies.pop(), {
+        body: '✅ <b>Вход выполнен</b>\nSafari, iPhone · Россия, Vimpelcom',
+        extra: undefined
+    });
+
+    const odd = auth.startCode(null, null, Date.now(), {
+        deviceId: DEVICE_B,
+        name: 'Chrome, Linux',
+        ip: '185.220.101.4',
+        country: 'DE',
+        network: 'Stiftung Erneuerbare Freiheit'
+    });
+    await commands.code(ctx(`/code ${odd.check}`));
+    const warned = replies.pop();
+    assert.equal(
+        warned.body,
+        '⚠️ <b>Незнакомый вход</b>\nChrome, Linux\nГермания, Stiftung Erneuerbare Freiheit · 185.220.101.4'
+    );
+    assert.deepEqual(
+        warned.extra.reply_markup.inline_keyboard.flat().map((b) => b.text),
+        ['✅ Это я', '🚫 Это не я']
+    );
+    // The same country as a known browser: only new
+    assert.equal(await devices.judge(7, { deviceId: DEVICE_B, country: 'RU' }), 'new');
+    assert.equal(await devices.judge(8, { deviceId: DEVICE_B, country: 'DE' }), 'new', 'nothing to compare with');
+});
+
+test('the bot question for Telegram and password sign-ins names the browser and its place', () => {
+    const start = auth.startCode(null, null, Date.now(), {
+        deviceId: DEVICE_A,
+        name: 'Firefox, Mac',
+        ip: '83.149.9.12',
+        country: 'RU',
+        network: 'MegaFon <b>'
+    });
+    const { text } = require('../../src/account/confirmation').confirmation(start.code);
+    assert.match(
+        text,
+        /Войти в панель NotFckBot\?<\/b>\n\nFirefox, Mac\nРоссия, MegaFon &lt;b&gt; · 83\.149\.9\.12\n\n/
+    );
+    assert.match(
+        require('../../src/account/confirmation').confirmation(auth.startCode().code).text,
+        /\?<\/b>\n\nПроверочный/
+    );
+});
+
+test('the guard marks and remembers the browser; a day-old device may end sessions, a new one waits', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => null);
+    const user = await signIn(call, 7);
+    const first = await call('GET', '/api/account/me', { cookie: user });
+    const mark = /nfb_device=([A-Za-z0-9_-]{43});[^,]*HttpOnly/.exec(first.headers.get('set-cookie'))[1];
+    assert.match(first.headers.get('set-cookie'), /nfb_session=/, 'the session cookie is still renewed');
+    assert.equal(deviceRows.length, 0, 'remembered only once it comes back with the mark');
+    await call('GET', '/api/account/me', { cookie: user });
+    assert.equal(deviceRows.length, 0, 'a client dropping cookies adds no rows');
+    const again = await call('GET', '/api/account/me', { cookie: user, device: mark });
+    assert.doesNotMatch(String(again.headers.get('set-cookie')), /nfb_device=/, 'a marked browser keeps its mark');
+    assert.equal(deviceRows.length, 1);
+    assert.equal(deviceRows[0].userId, '7');
+    assert.equal(deviceRows[0].trusted, true);
+
+    // The only device: nothing older to wait for
+    const alone = await call('POST', '/api/account/sessions/end-others', { cookie: user, device: mark });
+    assert.equal(alone.status, 200);
+
+    // With a device from last week, a browser first seen now can't lock it out
+    deviceRows.push(deviceRow(DEVICE_B, 7, 'RU', Date.now() - 7 * 24 * 3600 * 1000));
+    for (const [method, path, body] of [
+        ['POST', '/api/account/sessions/end-others'],
+        ['PUT', '/api/account/password', { password: 'long-enough' }],
+        ['DELETE', '/api/account/password']
+    ]) {
+        const refused = await call(method, path, { cookie: user, device: mark, body });
+        assert.equal(refused.status, 403, `${method} ${path}`);
+        assert.match(refused.body.error, /one day after its first sign-in/);
+    }
+    assert.equal(passwords.size, 0);
+    // An admin removing their own password from Users waits the same
+    panelRoles.set('7', 'admin');
+    const own = await call('DELETE', '/api/access/7/password', { cookie: user, device: mark });
+    assert.equal(own.status, 403);
+
+    // A day later it may
+    deviceRows[0].firstSeen = new Date(Date.now() - devices.FRESH_MS - 1000);
+    devices.resetDevices();
+    assert.equal((await call('POST', '/api/account/sessions/end-others', { cookie: user, device: mark })).status, 200);
+});
+
+test('a session from before devices were remembered counts from its own start', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => null);
+    const user = await signIn(call, 7);
+    for (const row of sessions.values()) row.createdAt = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    deviceRows.push(deviceRow(DEVICE_B, 7, 'RU', Date.now() - 7 * 24 * 3600 * 1000));
+    const mark = 'm'.repeat(43);
+    assert.equal((await call('POST', '/api/account/sessions/end-others', { cookie: user, device: mark })).status, 200);
+    assert.equal(deviceRows.length, 2);
+    assert.ok(deviceRows[1].firstSeen.getTime() < Date.now() - 29 * 24 * 3600 * 1000);
+});
+
+test('a browser signed in by digits stays new until "Это я"; "Это не я" keeps it forgotten', async (t) => {
+    const { server, call: plain } = await serve(fakeBot({}), { trustLoopback: true });
+    // An address of its own: the sign-in start limit is shared with the other tests
+    const call = (method, path, options) => plain(method, path, { ...options, address: '10.9.9.9' });
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => null);
+    const { actions } = botHandlers();
+    const mark = 'k'.repeat(43);
+    const signInByDigits = async () => {
+        const start = (await call('POST', '/api/login/telegram', { device: mark })).body;
+        const answer = await auth.answerCheck(start.check, { id: 7, name: '@u7' });
+        assert.equal(answer.state, 'in');
+        const poll = await call('POST', '/api/login/telegram/poll', {
+            device: mark,
+            body: { code: start.code, secret: start.secret }
+        });
+        assert.equal(poll.body.state, 'in');
+        return answer;
+    };
+    const first = await signInByDigits();
+    assert.equal(first.seen, 'new');
+    assert.equal(deviceRows.length, 1);
+    assert.equal(deviceRows[0].trusted, false, 'nobody pressed "Это я"');
+    const second = await signInByDigits();
+    assert.equal(second.seen, 'new', 'an unconfirmed browser is asked again');
+
+    const [re, press] = actions.find(([name]) => String(name).includes('notme'));
+    await press({
+        match: re.exec(`login_me_${second.claim}`),
+        from: { id: 7 },
+        answerCbQuery: async () => {},
+        editMessageReplyMarkup: async () => {}
+    });
+    assert.equal(deviceRows[0].trusted, true);
+    const third = await signInByDigits();
+    assert.equal(third.seen, 'known');
+
+    // Denied: a request still on its way can't write the browser back
+    await press({
+        match: re.exec(`login_notme_${third.claim}`),
+        from: { id: 7 },
+        answerCbQuery: async () => {},
+        editMessageText: async () => {}
+    });
+    assert.equal(deviceRows.length, 0);
+    const req = { headers: { cookie: `nfb_device=${mark}` }, get: () => '', ip: '127.0.0.1' };
+    await devices.remember(req, { append() {} }, 7, { trusted: true });
+    assert.equal(deviceRows.length, 0);
+});
+
+test('a digit sign-in polled under another cookie still leaves its browser untrusted', async (t) => {
+    const { server, call: plain } = await serve(fakeBot({}), { trustLoopback: true });
+    const call = (method, path, options) => plain(method, path, { ...options, address: '10.9.9.8' });
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => null);
+    // The page drops the mark it was given and polls without it: a new mark comes back
+    const start = (await call('POST', '/api/login/telegram', { device: 'p'.repeat(43) })).body;
+    assert.equal((await auth.answerCheck(start.check, { id: 7, name: '@u7' })).state, 'in');
+    const poll = await call('POST', '/api/login/telegram/poll', { body: { code: start.code, secret: start.secret } });
+    const cookies = poll.headers.get('set-cookie');
+    const session = /nfb_session=([^;]+)/.exec(cookies)[1];
+    const swapped = /nfb_device=([A-Za-z0-9_-]{43})/.exec(cookies)[1];
+    assert.equal(deviceRows.length, 0);
+    await call('GET', '/api/account/me', { cookie: session, device: swapped });
+    assert.equal(deviceRows.length, 1);
+    assert.equal(deviceRows[0].trusted, false, 'the session was never confirmed');
+    const next = auth.startCode(null, null, Date.now(), { deviceId: deviceRows[0].deviceId, country: null });
+    assert.equal((await auth.answerCheck(next.check, { id: 7, name: '@u7' })).seen, 'new');
 });
