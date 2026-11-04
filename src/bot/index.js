@@ -58,6 +58,7 @@ bot.telegram
         { command: 'history', description: 'Календарь: по годам' },
         { command: 'settings', description: 'Настройки чата' },
         { command: 'app', description: 'Открыть приложение' },
+        { command: 'code', description: 'Войти в панель по коду' },
         { command: 'cancel', description: 'Отменить текущее действие' },
         { command: 'menu_on', description: 'Включить нижнее меню' },
         { command: 'menu_off', description: 'ОТКЛЮЧИТЬ нижнее меню' }

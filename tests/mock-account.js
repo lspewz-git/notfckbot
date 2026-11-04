@@ -253,7 +253,7 @@ function accountAnswer(state, req, url) {
                 confirmation: true,
                 code: 'c'.repeat(32),
                 secret: 's'.repeat(43),
-                check: '0427',
+                check: '042719',
                 expiresIn: 300000
             };
         }
@@ -268,7 +268,7 @@ function accountAnswer(state, req, url) {
         return {
             code: 'c'.repeat(32),
             secret: 's'.repeat(43),
-            check: '0427',
+            check: '042719',
             expiresIn: 300000,
             qr: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+l8AAAAASUVORK5CYII=',
             url: 'https://t.me/notfckbot?start=Lcode'

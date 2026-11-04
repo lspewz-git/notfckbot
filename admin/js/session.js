@@ -17,6 +17,8 @@ const TG_ICON =
     '<svg class="icon login-telegram-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.7 3.3 18.4 21c-.2 1-1 1.2-1.8.7l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.3L5.8 14.2.9 12.7c-1-.3-1-1 .2-1.5L20.3 3c.9-.3 1.6.2 1.4.3Z" /></svg>';
 const QR_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#qr-code" /></svg>';
+const CODE_ICON =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#binary" /></svg>';
 const KEY_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#key-round" /></svg>';
 const backButton =
@@ -33,6 +35,28 @@ const gate = (html) => {
     $('login-gate').hidden = false;
     document.body.classList.add('signed-out');
 };
+
+// Saved to the iPhone home screen: iOS opens an https t.me link in an in-app Safari sheet that shows
+// t.me's "Start bot" page instead of the app, and the sheet stays over the panel afterwards. There the
+// link goes straight to the Telegram app with its own scheme, in the same window (no sheet).
+const homeScreenApp = () => /** @type {Navigator & { standalone?: boolean }} */ (navigator).standalone === true;
+
+/** The bot link for this device: `tg://resolve?domain=<bot>&start=<code>` in a home-screen app. */
+function botLink(url) {
+    if (!homeScreenApp()) return url;
+    try {
+        const link = new URL(url);
+        const domain = link.pathname.slice(1);
+        const start = link.searchParams.get('start');
+        if (link.hostname !== 't.me' || !domain || !start) return url;
+        return `tg://resolve?domain=${encodeURIComponent(domain)}&start=${encodeURIComponent(start)}`;
+    } catch {
+        return url;
+    }
+}
+
+/** Link attributes for the bot link: a new tab in a browser, the same window for the app's scheme. */
+const botTarget = () => (homeScreenApp() ? '' : ' target="_blank" rel="noopener noreferrer"');
 
 // The code for "Continue with Telegram", asked for when the screen shows: the button is then a plain
 // link to the bot, which a phone opens in Telegram without a pop-up or an empty tab left behind
@@ -66,10 +90,10 @@ async function prepareCode() {
             return;
         }
         pending = { ...start, deadline: performance.now() + (start.expiresIn ?? POLL_FOR_MS) };
-        button.href = start.url;
+        button.href = botLink(start.url);
         button.removeAttribute('aria-disabled');
-        const qr = document.querySelector('[data-action="login-qr"]');
-        if (qr) qr.removeAttribute('disabled');
+        for (const tile of document.querySelectorAll('[data-action="login-qr"], [data-action="login-code"]'))
+            tile.removeAttribute('disabled');
         // An idle sign-in screen must not keep a dead deep link forever.
         pollTimer = window.setTimeout(() => signInScreen(), Math.max(0, pending.deadline - performance.now()));
     } catch (err) {
@@ -135,32 +159,63 @@ function signInScreen(error = '', restoreFocus = $('login-body').contains(docume
     gate(
         // A first time in signs up too: the bot is started on the way (with sign-up open)
         '<div class="login-primary-method">' +
-            `<a id="login-tg" class="btn btn-primary btn-block" target="_blank" rel="noopener noreferrer" aria-disabled="true" aria-describedby="login-tg-hint" data-action="login-telegram">${TG_ICON}Continue with Telegram</a>` +
+            `<a id="login-tg" class="btn btn-primary btn-block"${botTarget()} aria-disabled="true" aria-describedby="login-tg-hint" data-action="login-telegram">${TG_ICON}Continue with Telegram</a>` +
             '<p class="login-hint" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p></div>' +
             `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
             '<p class="login-or">Other ways to sign in</p>' +
             `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>Scan a QR code</span></button>` +
+            `<button type="button" class="login-method" data-action="login-code" disabled>${CODE_ICON}<span>Code in the bot</span></button>` +
             `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div>`
     );
     if (restoreFocus) $('login-title').focus();
     prepareCode();
 }
 
-const waitingScreen = (start, qr = false) =>
+/** How to send the six digits to the bot from a device that has Telegram (src/bot/login.js). */
+function codeSteps(start) {
+    let bot = 'the bot';
+    try {
+        const name = new URL(start.url).pathname.slice(1);
+        if (name) bot = `@${name}`;
+    } catch {
+        // A password sign-in has no bot link: the steps name no bot
+    }
+    return (
+        `<div class="login-steps" id="login-steps"><ol><li>Open ${escapeHtml(bot)} on any device with Telegram.</li>` +
+        `<li>Send <b>/code ${escapeHtml(start.check)}</b>, or go to Настройки → Вход по коду and send the digits.</li></ol>` +
+        '<p>The bot replies whether you’re in. The code works for 5 minutes.</p></div>'
+    );
+}
+
+/**
+ * Waiting for the bot: after "Continue with Telegram" ('telegram'), the QR code ('qr') or "Code in the
+ * bot" ('code'). The first two offer the code as plain text that opens its steps in its place.
+ */
+const waitingScreen = (start, mode = 'telegram') => {
+    const qr = mode === 'qr';
+    const code = mode === 'code';
     gate(
         backButton +
-            `<h2>${qr ? 'Scan to sign in' : 'Confirm in Telegram'}</h2>` +
-            `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the Telegram bot.' : 'Check that the bot shows the same code, then confirm the sign-in.'}</p>` +
+            `<h2>${code ? 'Sign in with a code' : qr ? 'Scan to sign in' : 'Confirm in Telegram'}</h2>` +
+            (code
+                ? ''
+                : `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the Telegram bot.' : 'Check that the bot shows the same code, then confirm the sign-in.'}</p>`) +
             (qr
                 ? `<img class="login-qr" src="${escapeHtml(start.qr)}" alt="Scan to open the Telegram bot" width="232" height="232" />`
                 : '') +
-            `<p class="login-check"><b>${escapeHtml(start.check)}</b><br /><span class="login-hint">The bot shows the same one</span></p>` +
-            (start.url
-                ? `<a class="btn btn-outline btn-block" href="${escapeHtml(start.url)}" target="_blank" rel="noopener noreferrer">${qr ? 'Open Telegram on this device' : 'Open the bot again'}</a>`
+            `<p class="login-check"><b>${escapeHtml(start.check)}</b>` +
+            (code ? '' : '<br /><span class="login-hint">The bot shows the same one</span>') +
+            '</p>' +
+            (code
+                ? codeSteps(start)
+                : `<button type="button" class="login-code-link" data-action="login-code-steps">Sign in with a code</button>`) +
+            (start.url && !code
+                ? `<a class="btn btn-outline btn-block" href="${escapeHtml(botLink(start.url))}"${botTarget()}>${qr ? 'Open Telegram on this device' : 'Open the bot again'}</a>`
                 : '') +
-            '<p class="login-hint" id="login-wait">Waiting for the confirmation…</p>' +
-            '<p class="login-hint">Only confirm a sign-in you started.</p>'
+            `<p class="login-hint" id="login-wait">Waiting for the ${code ? 'bot' : 'confirmation'}…</p>` +
+            `<p class="login-hint">${code ? 'Only send a code from your own screen.' : 'Only confirm a sign-in you started.'}</p>`
     );
+};
 
 const linkScreen = () =>
     gate(
@@ -197,8 +252,13 @@ export async function startSession(preferredChat = null, { current = () => true,
     } }} */ (window);
     const bridge = nativeWindow.TelegramWebviewProxy;
     if (typeof bridge?.postEvent === 'function') {
-        // Telegram's swipe-down closes the app; turned off so pull-refresh.js gets the pull
-        if (!miniApp) bridge.postEvent('web_app_setup_swipe_behavior', '{"allow_vertical_swipe":false}');
+        if (!miniApp) {
+            try {
+                bridge.postEvent('web_app_setup_swipe_behavior', '{"allow_vertical_swipe":false}');
+            } catch {
+                // Sign-in can continue when the bridge rejects the optional swipe setting.
+            }
+        }
         miniApp = {
             bridge,
             initData: launchData || miniApp?.initData || null,
@@ -309,19 +369,35 @@ export function sessionActions(onSignedIn) {
         const role = await startSession(chatId);
         if (role) onSignedIn(role);
     };
-    const waitForConfirmation = (start, qr = false) => {
+    const waitForConfirmation = (start, mode = 'telegram') => {
         stopPolling();
         activeChallenge = start;
         const mine = attempt;
-        waitingScreen(start, qr);
+        waitingScreen(start, mode);
         $('login-back').focus();
         const until = start.deadline ?? performance.now() + (start.expiresIn ?? POLL_FOR_MS);
+        let asking = false;
         const poll = async () => {
-            if (attempt !== mine) return;
+            if (attempt !== mine || asking) return;
+            clearTimeout(pollTimer);
+            asking = true;
+            try {
+                await ask();
+            } finally {
+                asking = false;
+            }
+        };
+        // Back from Telegram: a phone held the timer while the page was hidden, so ask at once
+        const back = () => {
+            if (attempt !== mine) return document.removeEventListener('visibilitychange', back);
+            if (!document.hidden) poll();
+        };
+        document.addEventListener('visibilitychange', back);
+        const ask = async () => {
             const left = Math.max(0, Math.ceil((until - performance.now()) / 1000));
             const wait = $('login-wait');
             if (wait)
-                wait.textContent = `Waiting for confirmation · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+                wait.textContent = `Waiting for ${mode === 'code' ? 'the bot' : 'confirmation'} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
             if (!left) return signInScreen('The time to confirm has run out. Try again.');
             let answer;
             try {
@@ -382,7 +458,19 @@ export function sessionActions(onSignedIn) {
             const start = pending;
             if (!start) return;
             pending = null;
-            waitForConfirmation(start, true);
+            waitForConfirmation(start, 'qr');
+        },
+        'login-code': () => {
+            const start = pending;
+            if (!start) return;
+            pending = null;
+            waitForConfirmation(start, 'code');
+        },
+        // "Sign in with a code" under the digits: the steps take its place
+        'login-code-steps': (el) => {
+            const start = activeChallenge;
+            if (!start) return;
+            el.outerHTML = codeSteps(start);
         },
         'login-password': () => {
             discardChallenges();

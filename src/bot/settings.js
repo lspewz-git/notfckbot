@@ -5,6 +5,7 @@
 const { Markup } = require('telegraf');
 const { mainMenu } = require('./keyboards');
 const { ownerOf } = require('./access');
+const { getState, setState } = require('./state');
 const { ZONES, PRESETS, zoneOf, hasQuietHours, quietLabel, pad } = require('../quiet');
 const { sentMarkOnEnable } = require('../cron/digests');
 const { settingsOf } = require('../chat-ops');
@@ -74,11 +75,25 @@ function settingsView(chat, settings) {
             `settings_digest_month_${settings.digest_month ? 'off' : 'on'}`
         )
     ]);
-    rows.push([Markup.button.callback('✖️ Закрыть', 'settings_close')]);
+    // In a private chat this screen is a section of ⚙️ Настройки (rootView); a group has only it
+    rows.push([Markup.button.callback(group ? '✖️ Закрыть' : '⬅️ Назад', group ? 'settings_close' : 'settings_root')]);
 
     if (group) lines.push('', '<i>Менять настройки могут только админы группы.</i>');
     return { text: lines.join('\n'), keyboard: Markup.inlineKeyboard(rows) };
 }
+
+/** ⚙️ Настройки in a private chat: the chat's settings and signing in to the panel by code (src/bot/login.js). */
+const rootView = () => ({
+    text: '⚙️ <b>Настройки</b>',
+    keyboard: Markup.inlineKeyboard([
+        [Markup.button.callback('💬 Настройки чата', 'settings_open')],
+        [Markup.button.callback('🔑 Вход по коду', 'login_code')],
+        [Markup.button.callback('✖️ Закрыть', 'settings_close')]
+    ])
+});
+
+/** What ⚙️ Настройки opens: the sections in a private chat, the chat's settings in a group. */
+const firstView = (chat, settings) => (isGroup(chat) ? settingsView(chat, settings) : rootView());
 
 /** The quiet hours screen: on or off, a few common choices, the time zone. */
 function quietView(settings) {
@@ -148,9 +163,15 @@ const NOT_ADMIN = 'Менять настройки группы могут то�
 function register(bot) {
     const showSettings = async (ctx) => {
         if (!ctx.state.chatData) return;
-        const view = settingsView(ctx.chat, ctx.state.chatData);
+        const view = firstView(ctx.chat, ctx.state.chatData);
         await ctx.replyWithHTML(view.text, view.keyboard);
     };
+    // Back from a section; leaving the code screen this way stops waiting for the digits
+    bot.action('settings_root', async (ctx) => {
+        await ctx.answerCbQuery();
+        if (getState(ctx).state === 'waiting_for_login_code') setState(ctx, { state: 'idle' });
+        await showView(ctx, firstView(ctx.chat, ctx.state.chatData));
+    });
     bot.command('settings', showSettings);
     bot.hears('⚙️ Настройки', showSettings);
 

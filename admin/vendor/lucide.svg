@@ -92,6 +92,13 @@
   <path d="m15 5 4 4" /></symbol>
 <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14" />
   <path d="M12 5v14" /></symbol>
+<symbol id="binary" viewBox="0 0 24 24"><rect x="14" y="14" width="4" height="6" rx="2" />
+  <rect x="6" y="4" width="4" height="6" rx="2" />
+  <path d="M6 20h4" />
+  <path d="M14 10h4" />
+  <path d="M6 14h2v6" />
+  <path d="M14 4h2v6" />
+</symbol>
 <symbol id="qr-code" viewBox="0 0 24 24"><rect width="5" height="5" x="3" y="3" rx="1" />
   <rect width="5" height="5" x="16" y="3" rx="1" />
   <rect width="5" height="5" x="3" y="16" rx="1" />

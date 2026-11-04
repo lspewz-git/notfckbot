@@ -987,13 +987,245 @@ test('the API: calendar includes cached film metadata and tolerates a cache miss
 });
 
 function botHandlers() {
-    const handlers = { commands: {}, actions: [] };
+    const handlers = { commands: {}, actions: [], on: {} };
     require('../../src/bot/login').register({
         command: (name, fn) => (handlers.commands[name] = fn),
-        action: (re, fn) => handlers.actions.push([re, fn])
+        action: (re, fn) => handlers.actions.push([re, fn]),
+        on: (event, fn) => (handlers.on[event] = fn)
     });
     return handlers;
 }
+
+test('sign-in digits are unique among live codes and sign the page in from the bot without a question', async () => {
+    const starts = Array.from({ length: 300 }, () => auth.startCode());
+    assert.equal(new Set(starts.map((s) => s.check)).size, starts.length, 'no two live codes share the digits');
+    for (const s of starts) auth.cancelCode(s.code, s.secret);
+
+    // Digits of a page just closed aren't given out again: sent late, they can't sign a stranger's page in
+    const freed = new Set(starts.map((s) => s.check));
+    assert.equal(
+        Array.from({ length: 300 }, () => auth.startCode()).some((s) => freed.has(s.check)),
+        false
+    );
+
+    const start = auth.startCode(null, null, Date.now(), 'Safari, iPhone');
+    assert.match(start.check, /^\d{6}$/);
+    assert.equal(auth.checkWord(start.code), start.check, 'the bot question shows the same digits');
+    assert.deepEqual(await auth.answerCheck(start.check, { id: 99 }), { state: 'closed' });
+    const answer = await auth.answerCheck(start.check, { id: 7, name: '@u7' });
+    assert.equal(answer.state, 'in');
+    assert.equal(answer.device, 'Safari, iPhone');
+    assert.match(answer.claim, /^[A-Za-z0-9_-]{22}$/);
+    const result = await auth.pollCode(start.code, start.secret);
+    assert.equal(result.state, 'in');
+    const req = { headers: { cookie: `nfb_session=${result.token}` } };
+    assert.equal((await auth.sessionOf(req)).userId, '7');
+    assert.deepEqual(await auth.answerCheck(start.check, { id: 7 }), { state: 'again' }, 'sent twice: not a miss');
+    assert.equal((await auth.answerCheck(start.check, { id: 8 })).state, 'wrong', 'used up for anyone else');
+
+    // "Это не я": only the sender, and it ends the session the digits made
+    assert.equal(await auth.denyClaim(answer.claim, 8), false);
+    assert.equal(await auth.denyClaim(answer.claim, 7), true);
+    assert.equal(await auth.sessionOf(req), null);
+    assert.equal(await auth.denyClaim(answer.claim, 7), false, 'once');
+});
+
+test('"Это не я" before the page has its session: the page is told the sign-in was cancelled', async (t) => {
+    const start = auth.startCode();
+    const { claim } = await auth.answerCheck(start.check, { id: 7 });
+    assert.equal(await auth.denyClaim(claim, 7), true);
+    assert.deepEqual(await auth.pollCode(start.code, start.secret), { state: 'refused' });
+    assert.equal(sessions.size, 0);
+
+    // Pressed while the page's poll checks access (a password sign-in then reads the password too):
+    // the page is told it was cancelled, not an error
+    t.mock.method(Chat, 'findByPk', async () => null);
+    await password.setPassword('7', 'secret-pass');
+    const checking = await password.signInWithPassword('7', 'secret-pass');
+    const pending = await auth.answerCheck(checking.check, { id: 7 });
+    const findRole = PanelRole.findByPk;
+    PanelRole.findByPk = async (...args) => {
+        await auth.denyClaim(pending.claim, 7);
+        return findRole.apply(PanelRole, args);
+    };
+    try {
+        assert.deepEqual(await auth.pollCode(checking.code, checking.secret), { state: 'refused' });
+    } finally {
+        PanelRole.findByPk = findRole;
+    }
+    assert.equal(sessions.size, 0);
+
+    // Pressed while the page's poll is creating the session: that session is ended at once
+    const racing = auth.startCode();
+    const second = await auth.answerCheck(racing.check, { id: 7 });
+    const create = AccountSession.create;
+    AccountSession.create = async (row) => {
+        await auth.denyClaim(second.claim, 7);
+        return create.call(AccountSession, row);
+    };
+    try {
+        assert.deepEqual(await auth.pollCode(racing.code, racing.secret), { state: 'refused' });
+    } finally {
+        AccountSession.create = create;
+    }
+    assert.equal(sessions.size, 0);
+});
+
+test('sign-in digits: a password sign-in takes only its own account; wrong tries pause 1, 5, then 15 minutes', async (t) => {
+    t.mock.method(Chat, 'findByPk', async () => null);
+    await password.setPassword('7', 'secret-pass');
+    panelRoles.set('7', 'user');
+    panelRoles.set('8', 'user');
+    panelRoles.set('9', 'user');
+    const bound = await password.signInWithPassword('7', 'secret-pass');
+    assert.equal((await auth.answerCheck(bound.check, { id: 8 })).state, 'wrong', 'another account');
+    assert.equal(auth.isWaiting(bound.code), true);
+    assert.equal((await auth.answerCheck(bound.check, { id: 7 })).state, 'in');
+
+    let now = Date.now();
+    t.mock.method(Date, 'now', () => now);
+    const later = (min) => (now += min * 60000 + 1000);
+    const live = auth.startCode();
+    const other = live.check === '000000' ? '000001' : '000000';
+    const states = [];
+    for (let i = 0; i < 5; i += 1) states.push(await auth.answerCheck(other, { id: 9 }));
+    assert.deepEqual(states, [
+        { state: 'wrong', left: 4 },
+        { state: 'wrong', left: 3 },
+        { state: 'wrong', left: 2 },
+        { state: 'wrong', left: 1 },
+        { state: 'paused', minutes: 1 }
+    ]);
+    assert.deepEqual(
+        await auth.answerCheck(live.check, { id: 9 }),
+        { state: 'paused', minutes: 1 },
+        'even the right digits'
+    );
+    assert.equal(auth.isWaiting(live.code), true);
+    // Like an iPhone: each miss after the pause pauses longer, and 15 minutes stays the longest
+    later(1);
+    assert.deepEqual(await auth.answerCheck(other, { id: 9 }), { state: 'paused', minutes: 5 });
+    later(5);
+    assert.deepEqual(await auth.answerCheck(other, { id: 9 }), { state: 'paused', minutes: 15 });
+    now += 60000;
+    assert.deepEqual(await auth.answerCheck(other, { id: 9 }), { state: 'paused', minutes: 14 });
+    later(15);
+    assert.deepEqual(await auth.answerCheck(other, { id: 9 }), { state: 'paused', minutes: 15 });
+    later(15);
+    const fresh = auth.startCode();
+    assert.equal((await auth.answerCheck(fresh.check, { id: 9 })).state, 'in', 'the pause is over');
+    // A right code starts over: five tries again before a pause
+    assert.deepEqual(await auth.answerCheck(other, { id: 9 }), { state: 'wrong', left: 4 });
+});
+
+test('sign-in digits: tries sent at once cannot get past the five-try limit together', async () => {
+    panelRoles.set('10', 'user');
+    const live = auth.startCode();
+    const wrong = live.check === '000000' ? '000001' : '000000';
+    const results = await Promise.all(Array.from({ length: 20 }, () => auth.answerCheck(wrong, { id: 10 })));
+    assert.equal(results.filter((r) => r.state === 'wrong').length, 4);
+    assert.equal(results.filter((r) => r.state === 'paused').length, 16);
+    assert.deepEqual(await auth.answerCheck(live.check, { id: 10 }), { state: 'paused', minutes: 1 });
+});
+
+test('/code in the bot: with the digits, or asked for; a group is sent to the private chat', async () => {
+    const { commands, actions, on } = botHandlers();
+    const start = auth.startCode(null, null, Date.now(), 'Chrome, Windows');
+    const replies = [];
+    const session = {};
+    const ctx = (text, chat = { id: 7, type: 'private' }) => ({
+        from: { id: 7, username: 'u7' },
+        chat,
+        message: { text },
+        set session(v) {
+            session.value = v;
+        },
+        get session() {
+            return session.value;
+        },
+        reply: async (body) => replies.push(body),
+        replyWithHTML: async (body, extra) => {
+            replies.push(body);
+            extras.push(extra);
+        }
+    });
+    const extras = [];
+    await commands.code(ctx(`/code ${start.check}`, { id: -5, type: 'group' }));
+    assert.match(replies.pop(), /личном чате/);
+    assert.equal(auth.isWaiting(start.code), true);
+
+    await commands.code(ctx('/code'));
+    assert.match(replies.pop(), /Пришлите 6 цифр/);
+    let passed = false;
+    await on.text(ctx('12'), () => (passed = true));
+    assert.equal(passed, false, 'digits are a try');
+    assert.match(replies.pop(), /Код не подошёл[\s\S]*Осталось попыток: 4/);
+    await on.text(ctx(` ${start.check} `), () => (passed = true));
+    assert.match(replies.pop(), /Вход выполнен[\s\S]*Chrome, Windows[\s\S]*Это были вы\?/);
+    const buttons = extras.pop().reply_markup.inline_keyboard.flat();
+    assert.deepEqual(
+        buttons.map((b) => b.text),
+        ['✅ Это я', '🚫 Это не я']
+    );
+    assert.equal(session.value.state, 'idle');
+    // "Это не я": the sign-in is cancelled and the reply says so
+    const [re, deny] = actions.find(([name]) => String(name).includes('notme'));
+    const denied = [];
+    await deny({
+        match: re.exec(buttons[1].callback_data),
+        from: { id: 7 },
+        answerCbQuery: async () => {},
+        editMessageText: async (text) => denied.push(text)
+    });
+    assert.match(denied.pop(), /Вход отменён/);
+    assert.deepEqual(await auth.pollCode(start.code, start.secret), { state: 'refused' });
+    await on.text(ctx('Дюна'), () => (passed = true));
+    assert.equal(passed, true, 'not waiting any more: a search goes on');
+
+    const next = auth.startCode();
+    await commands.code(ctx(`/code ${next.check}`));
+    const plain = replies.pop();
+    assert.match(plain, /Вход выполнен/);
+    assert.doesNotMatch(plain, /Панель открыта/, 'no device known: no device line');
+
+    // From ⚙️ Настройки → 🔑 Вход по коду
+    const [, press] = actions.find(([name]) => name === 'login_code');
+    const edits = [];
+    await press(
+        Object.assign(ctx(''), { answerCbQuery: async () => {}, editMessageText: async (text) => edits.push(text) })
+    );
+    assert.match(edits.pop(), /Вход по коду/);
+    assert.equal(session.value.state, 'waiting_for_login_code');
+    await on.text(ctx('🔍 Поиск'), () => (passed = 'menu'));
+    assert.equal(passed, 'menu', 'a menu button leaves the code screen');
+    assert.equal(session.value.state, 'idle');
+});
+
+test('⚙️ Настройки: sections in a private chat, the chat settings straight away in a group', async () => {
+    const handlers = { commands: {}, hears: {}, actions: {} };
+    require('../../src/bot/settings').register({
+        command: (name, fn) => (handlers.commands[name] = fn),
+        hears: (text, fn) => (handlers.hears[text] = fn),
+        action: (name, fn) => (handlers.actions[String(name)] = fn)
+    });
+    const sent = [];
+    const ctx = (chat) => ({
+        chat,
+        from: { id: 7 },
+        state: { chatData: { menu_enabled: true } },
+        replyWithHTML: async (text, keyboard) => sent.push({ text, keyboard })
+    });
+    const buttons = (view) => view.keyboard.reply_markup.inline_keyboard.flat().map((b) => b.callback_data);
+    await handlers.commands.settings(ctx({ id: 7, type: 'private' }));
+    let view = sent.pop();
+    assert.match(view.text, /^⚙️ <b>Настройки<\/b>$/);
+    assert.deepEqual(buttons(view), ['settings_open', 'login_code', 'settings_close']);
+    await handlers.commands.settings(ctx({ id: -5, type: 'group' }));
+    view = sent.pop();
+    assert.match(view.text, /Настройки чата/);
+    assert.equal(buttons(view).includes('login_code'), false);
+    assert.equal(buttons(view).at(-1), 'settings_close');
+});
 
 test('/login is gone from the bot; /app opens a group on its own page, a private chat on the user’s', async () => {
     const { commands } = botHandlers();
@@ -1037,7 +1269,7 @@ test('/start L<code>: the bot asks first, and only "Да, это я" lets the pa
     await commands.start(message(`/start L${code}`), () => {});
     const ask = replies.pop();
     assert.match(ask.body, /Войти в панель/);
-    // The same four digits as the sign-in page shows: a link sent by someone else shows other digits
+    // The same six digits as the sign-in page shows: a link sent by someone else shows other digits
     assert.match(ask.body, new RegExp(`Проверочный код: <b>${auth.checkWord(code)}</b>`));
     const buttons = ask.extra.reply_markup.inline_keyboard.flat().map((b) => b.callback_data);
     assert.deepEqual(buttons, [`login_ok_${code}`, `login_no_${code}`]);

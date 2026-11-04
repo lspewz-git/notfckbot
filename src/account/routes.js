@@ -32,6 +32,32 @@ const fail = (res, err) => {
     res.status(500).json({ error: 'Something went wrong. Try again.' });
 };
 
+const BROWSERS = [
+    [/YaBrowser\//, 'Яндекс Браузер'],
+    [/Edg(A|iOS)?\//, 'Edge'],
+    [/OPR\/|Opera/, 'Opera'],
+    [/Firefox\/|FxiOS\//, 'Firefox'],
+    [/Chrome\/|CriOS\//, 'Chrome'],
+    [/Safari\//, 'Safari']
+];
+const SYSTEMS = [
+    [/iPhone/, 'iPhone'],
+    [/iPad/, 'iPad'],
+    [/Android/, 'Android'],
+    [/Windows/, 'Windows'],
+    [/Macintosh|Mac OS X/, 'Mac'],
+    [/Linux/, 'Linux']
+];
+
+/**
+ * "Safari, iPhone" for the bot's reply to /code: only a hint where the sign-in happened, so a few
+ * well-known names are enough (no parser library for one line of text).
+ */
+function deviceName(ua = '') {
+    const pick = (list) => list.find(([re]) => re.test(ua))?.[1];
+    return [pick(BROWSERS), pick(SYSTEMS)].filter(Boolean).join(', ') || null;
+}
+
 // --- Signing in and out (src/account/guard.js lets these through without a session) ---
 
 router.post('/api/login', async (req, res) => {
@@ -107,7 +133,7 @@ router.post('/api/login/telegram', challengeLimit, async (req, res) => {
     try {
         const username = await botUsername(req.app.get('bot'));
         if (!username) throw new ops.OpError(503, "Telegram isn't answering. Try again later.");
-        const { expiresAt, ...start } = auth.startCode();
+        const { expiresAt, ...start } = auth.startCode(null, null, Date.now(), deviceName(req.get('user-agent')));
         const url = `https://t.me/${username}?start=L${start.code}`;
         const qr = await QRCode.toDataURL(url, { width: 232, margin: 4, errorCorrectionLevel: 'M' });
         res.set('Cache-Control', 'no-store').json({

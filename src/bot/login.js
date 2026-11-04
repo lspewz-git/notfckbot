@@ -2,6 +2,8 @@
  * Signing in to the panel from the bot (src/account/auth.js):
  * - "Войти через Telegram" on the sign-in page opens the bot with /start L<code>: the bot asks
  *   "Войти в панель?" and the page lets the user in only after "Да, это я".
+ * - /code (or ⚙️ Настройки → 🔑 Вход по коду): the six digits from the sign-in page, for a device
+ *   without Telegram; they sign that page in at once, the bot only says whether it worked.
  * - /app: the Mini App button; in a group it opens on that group's page (in /help).
  * One-time sign-in links come only from login-link.js on the server now. Who may sign in: src/account/roles.js (with sign-up open, everyone who
  * started the bot).
@@ -9,10 +11,47 @@
 const auth = require('../account/auth');
 const { confirmation } = require('../account/confirmation');
 const { escapeHtml } = require('../constants');
+const { getState, setState } = require('./state');
 const { log } = require('../log');
 
 const CLOSED = 'Вход в панель пока в закрытом тесте.';
 const GONE = 'Этот вход устарел. Нажмите «Continue with Telegram» на странице ещё раз.';
+
+const CODE_STATE = 'waiting_for_login_code';
+const CODE_ASK = '🔑 <b>Вход по коду</b>\n\nПришлите 6 цифр с экрана входа в панель. Код действует 5 минут.';
+const CODE_PRIVATE = 'Вход по коду — в личном чате с ботом.';
+// Something that looks like the six digits (a typo included): taken as a try, anything else isn't
+const DIGITS_LIKE = /^[\d\s-]{1,16}$/;
+
+/** "1 минуту", "3 минуты", "5 минут". */
+function minutes(n) {
+    const tens = n % 100;
+    const ones = n % 10;
+    const word =
+        tens >= 11 && tens <= 14 ? 'минут' : ones === 1 ? 'минуту' : ones >= 2 && ones <= 4 ? 'минуты' : 'минут';
+    return `${n} ${word}`;
+}
+
+/** The bot's answer to the digits (auth.answerCheck). */
+function checkReply(result) {
+    if (result.state === 'in')
+        return (
+            '✅ <b>Вход выполнен</b>' +
+            (result.device ? `\nПанель открыта: ${escapeHtml(result.device)}.` : '') +
+            '\n\nЭто были вы?'
+        );
+    if (result.state === 'closed') return CLOSED;
+    if (result.state === 'again') return 'Этот код уже принят: вход выполнен.';
+    if (result.state === 'empty') return 'Пришлите 6 цифр с экрана входа в панель.';
+    if (result.state === 'paused')
+        return `⏸ <b>Слишком много неверных кодов.</b>\nПопробуйте через ${minutes(result.minutes)}.`;
+    return (
+        '❌ <b>Код не подошёл</b>\nТакого кода нет или его время вышло. Начните вход в панели заново.' +
+        `\n<i>Осталось попыток: ${result.left}</i>`
+    );
+}
+
+const codeBack = { reply_markup: { inline_keyboard: [[{ text: '⬅️ Назад', callback_data: 'settings_root' }]] } };
 
 const nameOf = (from) =>
     from.username ? `@${from.username}` : [from.first_name, from.last_name].filter(Boolean).join(' ') || null;
@@ -51,6 +90,73 @@ function register(bot) {
         const text = !answered ? GONE : yes ? '✅ Готово: вернитесь на страницу панели.' : 'Вход отменён.';
         await ctx.editMessageText(text).catch(() => {});
         if (answered) log.info(`[Account] Telegram sign-in ${yes ? 'confirmed' : 'refused'} by ${ctx.from.id}`);
+    });
+
+    // The digits from the sign-in page: "/code 042719", or /code and then the digits
+    const tryCheck = async (ctx, digits) => {
+        const clean = digits.replace(/[\s-]/g, '');
+        // Only spaces or dashes: not a try
+        const result = clean ? await auth.answerCheck(clean, userOf(ctx.from)) : { state: 'empty' };
+        // A wrong try keeps waiting for the digits; anything else ends that wait (and only that:
+        // "/code 042719" during a search leaves the search alone)
+        if (!['wrong', 'empty'].includes(result.state) && getState(ctx).state === CODE_STATE)
+            setState(ctx, { state: 'idle' });
+        if (result.state !== 'in') return ctx.replyWithHTML(checkReply(result));
+        log.info(`[Account] Code sign-in by ${ctx.from.id}`);
+        // In already; "Это не я" ends that sign-in (auth.denyClaim)
+        await ctx.replyWithHTML(checkReply(result), {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '✅ Это я', callback_data: `login_me_${result.claim}` },
+                        { text: '🚫 Это не я', callback_data: `login_notme_${result.claim}` }
+                    ]
+                ]
+            }
+        });
+    };
+
+    bot.action(/^login_(me|notme)_([A-Za-z0-9_-]{22})$/, async (ctx) => {
+        if (ctx.match[1] === 'me') {
+            await ctx.answerCbQuery('Хорошо');
+            await ctx.editMessageReplyMarkup(undefined).catch(() => {});
+            return;
+        }
+        const ended = await auth.denyClaim(ctx.match[2], ctx.from.id);
+        await ctx.answerCbQuery();
+        const text = ended
+            ? '🚫 <b>Вход отменён:</b> тот сеанс завершён.'
+            : 'Этот вход уже не отменить. Завершить сеансы можно в панели: My account → Devices.';
+        await ctx.editMessageText(text, { parse_mode: 'HTML' }).catch(() => {});
+    });
+    const askCode = (ctx) => setState(ctx, { state: CODE_STATE });
+
+    bot.command('code', async (ctx) => {
+        if (ctx.chat.type !== 'private') return ctx.reply(CODE_PRIVATE);
+        const digits = String(ctx.message.text || '')
+            .split(/\s+/)
+            .slice(1)
+            .join('');
+        if (digits) return tryCheck(ctx, digits);
+        askCode(ctx);
+        await ctx.replyWithHTML(CODE_ASK);
+    });
+    // From ⚙️ Настройки in a private chat (src/bot/settings.js)
+    bot.action('login_code', async (ctx) => {
+        await ctx.answerCbQuery();
+        if (ctx.chat.type !== 'private') return;
+        askCode(ctx);
+        await ctx.editMessageText(CODE_ASK, { parse_mode: 'HTML', ...codeBack }).catch(() => {});
+    });
+    bot.on('text', async (ctx, next) => {
+        if (ctx.chat.type !== 'private' || getState(ctx).state !== CODE_STATE) return next();
+        const text = ctx.message.text.trim();
+        if (!DIGITS_LIKE.test(text)) {
+            // A menu button or a search: the code screen is left
+            setState(ctx, { state: 'idle' });
+            return next();
+        }
+        await tryCheck(ctx, text);
     });
 
     // /app: the Mini App button, in a group on that group's page. Anyone may call it: the panel itself
