@@ -7,7 +7,7 @@
  */
 const { Chat } = require('../../db');
 const roles = require('../../account/roles');
-const { endOtherSessions } = require('../../account/auth');
+const { endOtherSessions, setCookie, startSession } = require('../../account/auth');
 const password = require('../../account/password');
 const { writeEnv } = require('../env');
 const { z, valid, idOf } = require('../validate');
@@ -77,7 +77,11 @@ router.put('/api/access/system-password', async (req, res) => {
         const hash = await password.hashPassword(body.password);
         writeEnv({ SYSTEM_PASSWORD_HASH: hash });
         process.env.SYSTEM_PASSWORD_HASH = hash;
-        await endOtherSessions(roles.SYSTEM_ID, req.user.system ? req.user.id : null);
+        // The new hash invalidates every system token, including links and in-flight inserts.
+        if (req.user.system && hash === roles.systemHash()) {
+            const token = await startSession(req.user, Date.now(), hash);
+            if (token) setCookie(req, res, token);
+        }
         log.info(`[Access] User ${req.user.userId} set the system account's password`);
         res.json(settings());
     } catch (err) {

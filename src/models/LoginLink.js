@@ -4,7 +4,7 @@ const sequelize = require('../database');
 /**
  * A one-time sign-in link not used yet (src/account/auth.js): from /login in the bot, or from
  * login-link.js on the server when Telegram is out of reach. Kept in the database so the script,
- * a process of its own, can make one, and a restart doesn't void it. The id is the token's SHA-256.
+ * a process of its own, can make one, and a restart doesn't void it. The id is a SHA-256 digest.
  */
 const LoginLink = sequelize.define(
     'LoginLink',
@@ -16,7 +16,7 @@ const LoginLink = sequelize.define(
         chatId: { type: DataTypes.BIGINT, allowNull: true },
         expiresAt: { type: DataTypes.DATE, allowNull: false }
     },
-    { updatedAt: false, indexes: [{ fields: ['expiresAt'] }] }
+    { updatedAt: false, indexes: [{ fields: ['userId'] }, { fields: ['expiresAt'] }] }
 );
 
 module.exports = LoginLink;

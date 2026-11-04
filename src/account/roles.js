@@ -23,18 +23,18 @@ const isSystem = (userId) => String(userId) === SYSTEM_ID;
 const openSignup = () => process.env.OPEN_SIGNUP === 'true';
 
 /** @returns {Promise<'admin' | 'user' | null>} */
-async function roleOf(userId) {
+async function roleOf(userId, options) {
     const id = String(userId);
     if (isSystem(id)) return systemHash() ? 'admin' : null;
     if (!/^[1-9]\d{0,19}$/.test(id)) return null;
-    const row = await PanelRole.findByPk(id, { attributes: ['role'], raw: true });
+    const row = await PanelRole.findByPk(id, { attributes: ['role'], raw: true, ...options });
     if (row) return row.role === 'none' ? null : row.role;
     if (!openSignup()) return null;
-    const chat = await Chat.findOne({ where: { id, type: 'private' }, attributes: ['id'], raw: true });
+    const chat = await Chat.findOne({ where: { id, type: 'private' }, attributes: ['id'], raw: true, ...options });
     return chat ? 'user' : null;
 }
 
-const isAllowed = async (userId) => (await roleOf(userId)) !== null;
+const isAllowed = async (userId, options) => (await roleOf(userId, options)) !== null;
 
 /**
  * The roles of private chats, for the Users list.

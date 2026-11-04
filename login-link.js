@@ -35,7 +35,7 @@ async function main() {
         writeEnv({ SYSTEM_PASSWORD_HASH: await hashPassword(password) });
         // A session started with the old (maybe leaked) password must not outlive it
         await sequelize.authenticate();
-        const ended = await sequelize.models.AccountSession.destroy({ where: { userId: roles.SYSTEM_ID } });
+        const ended = await auth.endOtherSessions(roles.SYSTEM_ID);
         console.log(
             `The system account's password is set, ${ended} session(s) ended. ` +
                 `Restart the app (docker compose restart app), then sign in as "${roles.systemLogin()}".`
@@ -53,12 +53,12 @@ async function main() {
         throw new Error('No such user: give them a role in the panel, or set --system-password');
     }
     if (session) {
-        console.log(
-            await auth.startSession({
-                userId,
-                userName: roles.isSystem(userId) ? roles.systemLogin() : 'login-link.js'
-            })
-        );
+        const token = await auth.startSession({
+            userId,
+            userName: roles.isSystem(userId) ? roles.systemLogin() : 'login-link.js'
+        });
+        if (!token) throw new Error('The system password changed during sign-in. Try again.');
+        console.log(token);
     } else {
         const link = await auth.createLink({ id: userId, name: 'login-link.js' });
         if (!link) throw new Error('PANEL_URL is not set in .env');

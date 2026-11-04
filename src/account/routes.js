@@ -14,10 +14,9 @@ const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
 const { deliver } = require('../delivery');
 const { z, valid, idOf, chatId, text } = require('../admin/validate');
-const { rateLimit, MemoryStore, ipKeyGenerator } = require('express-rate-limit');
+const { rateLimit, MemoryStore } = require('express-rate-limit');
 const auth = require('./auth');
 const password = require('./password');
-const roles = require('./roles');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
 const QRCode = require('qrcode');
@@ -98,53 +97,24 @@ router.post('/api/login/telegram/cancel', pollLimit, (req, res) => {
     res.json({ success: true });
 });
 
-// A password (src/account/password.js): wrong tries are limited per address and per login, so
-// guessing takes years and spreading it over many addresses still stops at one account's limit
-const LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const limitStores = [];
-const limitBy = (limit, keyGenerator) => {
-    const store = new MemoryStore();
-    limitStores.push(store);
-    return rateLimit({
-        windowMs: LIMIT_WINDOW_MS,
-        limit,
-        store,
-        skipSuccessfulRequests: true,
-        standardHeaders: 'draft-8',
-        legacyHeaders: false,
-        message: { error: 'Too many attempts. Try again in 15 minutes.' },
-        ...(keyGenerator ? { keyGenerator } : {})
-    });
-};
-/**
- * The account a login names: its id and its @username share one count. The system account's login
- * is known to all ("admin"): counted per address too, so tries from elsewhere can't lock out the
- * way back in
- */
-function loginLimitKey(req) {
-    const account = req.loginUserId || password.loginKey(req.body && req.body.login);
-    return account === roles.SYSTEM_ID ? `login:${account}:${ipKeyGenerator(req.ip)}` : `login:${account}`;
-}
-// The address first: the lookup behind the account's limit asks the database
-const passwordLimits = [
-    limitBy(5),
-    async (req, res, next) => {
-        try {
-            req.loginUserId = await password.userIdFor(req.body && req.body.login);
-            next();
-        } catch (err) {
-            fail(res, err);
-        }
-    },
-    limitBy(10, loginLimitKey)
-];
+// A login name alone cannot lock out another address. Personal logins also require Telegram approval.
+const passwordLimitStore = new MemoryStore();
+const passwordLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    store: passwordLimitStore,
+    skipSuccessfulRequests: true,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Too many attempts. Try again in 15 minutes.' }
+});
 /** For the tests: every limit starts again. */
 const resetLimits = () => {
-    limitStores.forEach((store) => store.resetAll());
+    passwordLimitStore.resetAll();
     confirmationCooldown.clear();
 };
 
-router.post('/api/login/password', passwordLimits, async (req, res) => {
+router.post('/api/login/password', passwordLimit, async (req, res) => {
     const body = valid(
         z.object({
             login: z
@@ -603,4 +573,4 @@ router.patch('/api/account/chats/:chatId/settings', openChat, async (req, res) =
     }
 });
 
-module.exports = { router, resetLimits, loginLimitKey };
+module.exports = { router, resetLimits };

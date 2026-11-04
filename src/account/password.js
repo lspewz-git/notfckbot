@@ -96,13 +96,8 @@ async function signInWithPassword(login, password, now = Date.now()) {
     let hash = null;
     if (system) hash = roles.systemHash() || null;
     else if (userId) {
-        if (await roles.isAllowed(userId)) {
-            const row = await AccountPassword.findByPk(userId);
-            hash = row ? row.hash : null;
-        } else {
-            const chat = await Chat.findOne({ where: { id: userId, type: 'private' }, attributes: ['id'], raw: true });
-            if (chat) return { noAccess: true };
-        }
+        const row = await AccountPassword.findByPk(userId);
+        hash = row ? row.hash : null;
     }
     if (!hash) {
         await matches(password, await dummyHash());
@@ -112,7 +107,11 @@ async function signInWithPassword(login, password, now = Date.now()) {
         log.warn(`[Account] Wrong password for ${system ? 'the system account' : `user ${userId}`}`);
         return null;
     }
-    if (system) return { token: await startSession({ userId, userName: roles.systemLogin() }, now) };
+    if (system) {
+        const token = await startSession({ userId, userName: roles.systemLogin() }, now, hash);
+        return token ? { token } : null;
+    }
+    if (!(await roles.isAllowed(userId))) return { noAccess: true };
     const chat = await Chat.findByPk(userId, { attributes: ['username'], raw: true });
     return { ...startCode({ userId, userName: chat ? chat.username : null }, hash, now), userId };
 }

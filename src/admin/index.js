@@ -6,8 +6,12 @@
 const express = require('express');
 const compression = require('compression');
 const path = require('path');
+const fs = require('node:fs');
+const http = require('node:http');
+const https = require('node:https');
 const { panelOnly } = require('./panel-only');
 const { guard } = require('../account/guard');
+const { panelUrl } = require('../account/auth');
 const { useBot } = require('../account/members');
 const { sweepPosters } = require('./posters');
 const { sweepChanges } = require('../chat-changes');
@@ -15,6 +19,7 @@ const { log } = require('../log');
 
 const app = express();
 const PORT = 3000;
+const REDIRECT_PORT = 3001;
 
 // Brotli (light, level 4) or gzip, whichever the browser takes, for the page, its modules, styles
 // and the API's JSON: 685 KB of panel files go as ~200 KB (measured 25.10). Pictures (posters,
@@ -30,7 +35,10 @@ app.use(express.json());
 // Serve static files from 'admin' directory
 app.use(express.static(path.join(__dirname, '../../admin')));
 // A sign-in link from the bot (/login/<token>): the panel's page, which reads the path
-app.get('/login/:token', (req, res) => res.sendFile(path.join(__dirname, '../../admin/index.html')));
+app.get('/login/:token', (req, res) => {
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    res.sendFile(path.join(__dirname, '../../admin/index.html'));
+});
 
 // Signing in and the users' own pages
 app.use(require('../account/routes').router);
@@ -62,9 +70,32 @@ app.use('/api', (err, req, res, next) => {
 function startAdminServer(bot) {
     app.set('bot', bot);
     useBot(bot);
-    app.listen(PORT, () => {
-        log.info(`🚀 Admin Panel running on http://localhost:${PORT}`);
-    });
+    const { PANEL_TLS_CERT: cert, PANEL_TLS_KEY: key } = process.env;
+    if (!cert && !key) {
+        app.listen(PORT, '127.0.0.1', () => log.info(`Admin panel listening on loopback HTTP port ${PORT}`));
+    } else {
+        try {
+            const server = https.createServer({ cert: fs.readFileSync(cert), key: fs.readFileSync(key) }, app);
+            server.listen(PORT, () => {
+                log.info(`Admin panel listening on HTTPS port ${PORT}`);
+                const origin = panelUrl();
+                if (origin) {
+                    const redirect = http.createServer((req, res) => {
+                        if (req.method !== 'GET' && req.method !== 'HEAD') {
+                            res.writeHead(405, { Allow: 'GET, HEAD' }).end();
+                            return;
+                        }
+                        const target = req.url?.startsWith('/') ? req.url : '/';
+                        res.writeHead(308, { Location: origin + target }).end();
+                    });
+                    redirect.on('error', (err) => log.error(`[Admin] HTTP redirect failed: ${err.message}`));
+                    redirect.listen(REDIRECT_PORT);
+                }
+            });
+        } catch (err) {
+            log.error(`[Admin] TLS configuration failed: ${err.message}`);
+        }
+    }
     // Posters on disk (./posters.js): what nobody opened for months goes, once a day
     const sweep = () =>
         sweepPosters()

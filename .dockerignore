@@ -1,2 +1,3 @@
 # Posters cached on the server (src/admin/posters.js): the folder is mounted, not baked in
 data/
+panel-tls/

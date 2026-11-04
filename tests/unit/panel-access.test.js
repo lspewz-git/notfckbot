@@ -1,6 +1,6 @@
 /**
  * Panel access (src/admin/routes/access.js): a role is saved in the database for a person who wrote
- * to the bot, including the admin themselves; "No access" ends sessions and removes the password;
+ * to the bot, including the admin themselves; "No access" ends sessions and revokes links;
  * sign-up and the system account's password go to .env and process.env at once; an admin removes
  * someone's password. The database is stubbed, .env a temporary file. Run: npm run test:unit
  */
@@ -17,7 +17,7 @@ const KEYS = ['OPEN_SIGNUP', 'SYSTEM_LOGIN', 'SYSTEM_PASSWORD_HASH', 'ENV_FILE']
 const savedEnv = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 process.env.ENV_FILE = path.join(DIR, '.env');
 
-const { Chat, AccountSession, AccountPassword, PanelRole } = require('../../src/db');
+const { Chat, AccountSession, AccountPassword, LoginLink, PanelRole } = require('../../src/db');
 const { matches } = require('../../src/account/password');
 
 const CHATS = ['1', '7', '9'];
@@ -35,8 +35,10 @@ const stubs = [
     mock.method(PanelRole, 'findAll', async () => [...panelRoles].map(([userId, role]) => ({ userId, role }))),
     mock.method(PanelRole, 'upsert', async (row) => panelRoles.set(String(row.userId), row.role)),
     mock.method(AccountSession, 'destroy', async ({ where }) => {
-        destroyed.push([String(where.userId), where.id ? where.id[Op.ne] : null]);
+        if (where.userId !== undefined) destroyed.push([String(where.userId), where.id ? where.id[Op.ne] : null]);
     }),
+    mock.method(AccountSession, 'create', async (row) => row),
+    mock.method(LoginLink, 'destroy', async () => 0),
     mock.method(AccountPassword, 'destroy', async ({ where }) => Number(passwords.delete(String(where.userId))))
 ];
 
@@ -87,7 +89,7 @@ describe('/api/access', () => {
             headers: { 'Content-Type': 'application/json' },
             body: body && JSON.stringify(body)
         });
-        return { status: res.status, body: await res.json() };
+        return { status: res.status, body: await res.json(), cookie: res.headers.get('set-cookie') };
     };
     const envFile = () => fs.readFileSync(process.env.ENV_FILE, 'utf8');
 
@@ -153,13 +155,15 @@ describe('/api/access', () => {
         assert.equal(hash.includes('$'), false, 'Compose would read "$" as a variable');
         assert.equal(await matches('system-pass', hash), true);
         assert.equal(process.env.SYSTEM_PASSWORD_HASH, hash);
-        assert.deepEqual(destroyed, [['0', null]]);
+        assert.deepEqual(destroyed, [], 'the new hash invalidates old system tokens');
 
-        // Changed by the system account itself: its own session stays
+        // Changed by the system account itself: its browser receives a fresh session
         destroyed.length = 0;
         user = { id: 'session-0', userId: '0', role: 'admin', system: true };
-        await call('PUT', { password: 'system-pass-2' }, '/api/access/system-password');
-        assert.deepEqual(destroyed, [['0', 'session-0']]);
+        const own = await call('PUT', { password: 'system-pass-2' }, '/api/access/system-password');
+        assert.equal(own.status, 200);
+        assert.match(own.cookie, /^nfb_session=[A-Za-z0-9_-]{43};/);
+        assert.deepEqual(destroyed, []);
     });
 
     test("an admin removes someone's password: their sessions end, the bot tells them, the role stays", async () => {

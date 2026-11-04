@@ -7,6 +7,7 @@
 const { test, mock, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
+const sequelize = require('../../src/database');
 const { Op } = require('sequelize');
 const {
     AccountSession,
@@ -34,10 +35,11 @@ let passwords;
 let panelRoles;
 
 beforeEach(() => {
+    mock.method(sequelize, 'transaction', async (options, run = options) => run({ LOCK: { UPDATE: 'UPDATE' } }));
     mock.method(require('../../src/api/kinopoisk'), 'knownKinopoiskId', () => null);
     savedEnv = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
     for (const k of ENV) delete process.env[k];
-    process.env.PANEL_URL = 'http://box/';
+    process.env.PANEL_URL = 'https://box/';
     panelRoles = new Map([
         ['42', 'admin'],
         ['7', 'user'],
@@ -170,7 +172,7 @@ test('roles from .env move into the database once, while it has none', async (t)
 test('a link: only for allowed users with PANEL_URL set; works once; only hashes are stored', async () => {
     assert.equal(await auth.createLink({ id: 99 }), null);
     const link = await auth.createLink({ id: 7, name: '@u7' }, -100);
-    assert.match(link, /^http:\/\/box\/login\/[A-Za-z0-9_-]{43}$/);
+    assert.match(link, /^https:\/\/box\/login\/[A-Za-z0-9_-]{43}$/);
     const token = tokenOf(link);
     assert.ok(![...links.keys()].includes(token), 'the token itself is not stored');
 
@@ -180,6 +182,8 @@ test('a link: only for allowed users with PANEL_URL set; works once; only hashes
     const session = await auth.sessionOf({ headers: { cookie: `x=1; nfb_session=${first.token}` } });
     assert.deepEqual([session.userId, session.role], ['7', 'user']);
 
+    process.env.PANEL_URL = 'http://box/';
+    assert.equal(await auth.createLink({ id: 7 }), null);
     delete process.env.PANEL_URL;
     assert.equal(await auth.createLink({ id: 7 }), null);
 });
@@ -196,6 +200,51 @@ test('a link expires after five minutes; a user taken off the list loses link an
     assert.equal(await auth.sessionOf(req, now), null);
     panelRoles.set('8', 'user');
     assert.equal(await auth.sessionOf(req, now + auth.SESSION_TTL_MS + 1), null, 'session expired');
+});
+
+test('links cannot outlive revocation, even if the role is restored or redemption was pending', async (t) => {
+    const old = tokenOf(await auth.createLink({ id: 42 }));
+    await roles.setRole('42', 'none');
+    await auth.endOtherSessions('42');
+    await roles.setRole('42', 'admin');
+    assert.equal(await auth.redeemLink(old), null);
+
+    const pending = tokenOf(await auth.createLink({ id: 42 }));
+    const find = LoginLink.findByPk;
+    t.mock.method(LoginLink, 'findByPk', async (id, options) => {
+        if (options?.lock) await auth.endOtherSessions('42');
+        return find(id);
+    });
+    assert.equal(await auth.redeemLink(pending), null);
+    assert.equal(sessions.size, 0);
+});
+
+test('sessions and links issued before HTTPS are rejected', async () => {
+    const crypto = require('node:crypto');
+    const legacy = 'x'.repeat(43);
+    const id = crypto.createHash('sha256').update(legacy).digest('hex');
+    const row = { id, userId: '42', expiresAt: new Date(Date.now() + 60_000) };
+    sessions.set(id, row);
+    links.set(id, row);
+    assert.equal(await auth.sessionOf({ headers: { cookie: `nfb_session=${legacy}` } }), null);
+    assert.equal(await auth.redeemLink(legacy), null);
+});
+
+test('a system password rotation invalidates old cookies and racing inserts', async (t) => {
+    process.env.SYSTEM_PASSWORD_HASH = await password.hashPassword('old-password');
+    const { token } = await password.signInWithPassword('admin', 'old-password');
+    const replacement = await password.hashPassword('new-password');
+    const create = AccountSession.create;
+    const stub = t.mock.method(AccountSession, 'create', async (row) => {
+        process.env.SYSTEM_PASSWORD_HASH = replacement;
+        return create(row);
+    });
+    assert.equal(await password.signInWithPassword('admin', 'old-password'), null);
+    const racingId = stub.mock.calls[0].arguments[0].id;
+    assert.equal(sessions.has(racingId), false);
+    assert.equal(await auth.sessionOf({ headers: { cookie: `nfb_session=${token}` } }), null);
+    stub.mock.restore();
+    assert.ok((await password.signInWithPassword('admin', 'new-password')).token);
 });
 
 test('"Войти через Telegram": in only after "Да" in the bot, only for the page with the secret, once', async () => {
@@ -411,9 +460,10 @@ test('chat visibility is personal, persists, requires membership and cannot hide
     assert.equal(hidden.size, 0);
 });
 
-async function serve(bot) {
+async function serve(bot, { trustLoopback = false } = {}) {
     members.useBot(bot);
     const app = express();
+    if (trustLoopback) app.set('trust proxy', 'loopback');
     app.set('bot', bot);
     app.use('/api', panelOnly);
     app.use('/api', guard);
@@ -425,11 +475,12 @@ async function serve(bot) {
     const server = app.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const call = (method, path, { body, cookie, raw } = {}) =>
+    const call = (method, path, { body, cookie, raw, address } = {}) =>
         fetch(`${base}${path}`, {
             method,
             headers: {
                 'X-Requested-By': 'notfckbot-panel',
+                ...(address ? { 'X-Forwarded-For': address } : {}),
                 ...(cookie ? { Cookie: `nfb_session=${cookie}` } : {}),
                 ...(body || raw ? { 'Content-Type': 'application/json' } : {})
             },
@@ -798,7 +849,7 @@ test('/login: refused to users not on the lists; in a group the link goes to the
 
     await commands.login(ctx({ id: 42, username: 'me' }, { id: -1, type: 'supergroup', title: 'Кино <b>' }));
     assert.equal(sent[0].chatId, '42');
-    assert.match(sent[0].text, /http:\/\/box\/login\//);
+    assert.match(sent[0].text, /https:\/\/box\/login\//);
     assert.match(sent[0].text, /Кино &lt;b&gt;/);
     assert.match(replies.pop(), /личные сообщения/);
 });
@@ -856,6 +907,9 @@ test('a password: only a salted scrypt hash is stored; the same password hashes 
 });
 
 test('signing in with a password: by id or @username, only for people still on the lists', async (t) => {
+    const { resetLimits } = require('../../src/account/routes');
+    resetLimits();
+    t.after(resetLimits);
     t.mock.method(Chat, 'findAll', async ({ where }) => (where.username === '@kirill' ? [{ id: 7 }] : []));
     t.mock.method(Chat, 'findByPk', async () => ({ username: '@Kirill' }));
     await password.setPassword('7', 'secret-pass');
@@ -880,7 +934,9 @@ test('signing in with a password: by id or @username, only for people still on t
     );
     const { server, call } = await serve(fakeBot());
     t.after(() => server.close());
-    const login = (who) => call('POST', '/api/login/password', { body: { login: who, password: 'secret-pass' } });
+    const login = (who, pass = 'secret-pass') =>
+        call('POST', '/api/login/password', { body: { login: who, password: pass } });
+    assert.deepEqual((await login('7', 'wrong-pass')).body, (await login('999')).body);
     for (const who of ['7', '@Kirill']) {
         const denied = await login(who);
         assert.deepEqual([denied.status, denied.body.error], [403, 'No access to the panel.']);
@@ -1006,12 +1062,24 @@ test('password sign-in can repeat immediately after logout without bypassing pen
     assert.equal(sent.length, 3);
 });
 
-test('the per-account limit: an id and its @username count as one account', async (t) => {
+test('failed attempts from other addresses cannot lock out a personal password', async (t) => {
     t.mock.method(Chat, 'findAll', async ({ where }) => (where.username === '@kirill' ? [{ id: 7 }] : []));
-    const { loginLimitKey } = require('../../src/account/routes');
-    const keyFor = async (login) => loginLimitKey({ body: { login }, loginUserId: await password.userIdFor(login) });
-    assert.equal(await keyFor('@Kirill'), await keyFor('7'));
-    assert.notEqual(await keyFor('@nobody'), await keyFor('7'));
+    t.mock.method(Chat, 'findByPk', async () => null);
+    const { resetLimits } = require('../../src/account/routes');
+    resetLimits();
+    t.after(resetLimits);
+    await password.setPassword('7', 'right-password');
+    const { server, call } = await serve(fakeBot(), { trustLoopback: true });
+    t.after(() => server.close());
+    const login = (address, name, pass) =>
+        call('POST', '/api/login/password', { address, body: { login: name, password: pass } });
+    for (const address of ['10.0.0.1', '10.0.0.2']) {
+        for (let attempt = 0; attempt < 5; attempt++) {
+            assert.equal((await login(address, '7', 'wrong-password')).status, 401);
+        }
+        assert.equal((await login(address, '@kirill', 'wrong-password')).status, 429);
+    }
+    assert.equal((await login('10.0.0.3', '@kirill', 'right-password')).body.confirmation, true);
 });
 
 test('the API: the system account has no chats and no own password here, its password is in Settings', async (t) => {
@@ -1034,10 +1102,6 @@ test('the API: the system account has no chats and no own password here, its pas
     assert.equal((await call('DELETE', '/api/account/password', { cookie: token })).status, 400);
 });
 
-test('the system account: its tries count per address (the login is public), and it opens no chat', async () => {
-    const { loginLimitKey } = require('../../src/account/routes');
-    const key = (ip) => loginLimitKey({ body: { login: 'admin' }, loginUserId: '0', ip });
-    assert.notEqual(key('10.0.0.1'), key('10.0.0.2'));
-    assert.equal(loginLimitKey({ body: { login: '7' }, loginUserId: '7', ip: '10.0.0.1' }), 'login:7');
+test('the system account cannot open chat 0', async () => {
     assert.equal(await members.accessTo('0', '0'), null);
 });

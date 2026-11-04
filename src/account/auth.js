@@ -15,10 +15,11 @@
  * signs that person out everywhere. Only hashes of tokens are stored.
  */
 const crypto = require('crypto');
-const { Op } = require('sequelize');
+const { Op, Transaction } = require('sequelize');
+const sequelize = require('../database');
 const { AccountSession, LoginLink, AccountPassword } = require('../db');
 const { lruCache } = require('../lru');
-const { roleOf, isAllowed, isSystem } = require('./roles');
+const { roleOf, isAllowed, isSystem, systemHash } = require('./roles');
 const { log } = require('../log');
 
 const LINK_TTL_MS = 5 * 60 * 1000;
@@ -31,27 +32,55 @@ const CODE = /^[A-Za-z0-9_-]{32}$/;
 
 const hash = (token) => crypto.createHash('sha256').update(token).digest('hex');
 const newToken = () => crypto.randomBytes(32).toString('base64url');
+// A new namespace rejects tokens that could have been exposed on the old HTTP panel.
+const tokenId = (kind, token, credential = '') => hash(`https:${kind}:${token}:${credential}`);
 
-/** Where the panel is, for the link: PANEL_URL in .env, like http://192.168.2.112 */
-const panelUrl = () => String(process.env.PANEL_URL || '').replace(/\/+$/, '');
+async function tokenRow(model, kind, token, credential) {
+    const row = await model.findByPk(tokenId(kind, token));
+    if (row && !isSystem(row.userId)) return row;
+    if (!credential) return null;
+    const systemRow = await model.findByPk(tokenId(kind, token, credential));
+    return systemRow && isSystem(systemRow.userId) ? systemRow : null;
+}
+
+/** The HTTPS origin used in one-time links. */
+function panelUrl() {
+    try {
+        const url = new URL(process.env.PANEL_URL || '');
+        if (url.protocol === 'https:' && !url.username && !url.password && url.href === `${url.origin}/`)
+            return url.origin;
+    } catch {
+        // No usable panel origin configured
+    }
+    return '';
+}
 
 // --- Sessions ---
 
-async function startSession({ userId, userName = null }, now = Date.now()) {
+async function startSession({ userId, userName = null }, now = Date.now(), credential = systemHash()) {
     const token = newToken();
-    await AccountSession.create({
-        id: hash(token),
-        userId,
-        userName,
-        expiresAt: new Date(now + SESSION_TTL_MS)
-    });
+    const system = isSystem(userId);
+    if (system && !credential) return null;
+    const id = tokenId('session', token, system ? credential : '');
+    await insertSession(id, userId, userName, now);
+    if (system && credential !== systemHash()) {
+        await endSession({ id });
+        return null;
+    }
+    signedIn(userId, now);
+    return token;
+}
+
+const insertSession = (id, userId, userName, now, transaction) =>
+    AccountSession.create({ id, userId, userName, expiresAt: new Date(now + SESSION_TTL_MS) }, { transaction });
+
+function signedIn(userId, now) {
     // Old sessions and links go now and then, not by a timer of their own
     const old = { where: { expiresAt: { [Op.lt]: new Date(now) } } };
     Promise.all([AccountSession.destroy(old), LoginLink.destroy(old)]).catch((err) =>
         log.warn(`[Account] Removing expired sessions failed: ${err.message}`)
     );
     log.info(`[Account] User ${userId} signed in`);
-    return token;
 }
 
 /** The cookie's value from a Cookie header. */
@@ -70,18 +99,20 @@ function cookieToken(header) {
 async function sessionOf(req, now = Date.now()) {
     const token = cookieToken(req.headers.cookie);
     if (!TOKEN.test(String(token || ''))) return null;
-    const row = await AccountSession.findByPk(hash(token));
+    const credential = systemHash();
+    const row = await tokenRow(AccountSession, 'session', token, credential);
     if (!row || new Date(row.expiresAt).getTime() <= now) return null;
     const role = await roleOf(row.userId);
-    if (!role) return null;
+    if (!role || (isSystem(row.userId) && credential !== systemHash())) return null;
     return { id: row.id, userId: String(row.userId), userName: row.userName, role, system: isSystem(row.userId) };
 }
 
 const endSession = (session) => AccountSession.destroy({ where: { id: session.id } });
 
 /** Signs the user out everywhere but the session `keepId` (null: everywhere). */
-function endOtherSessions(userId, keepId = null) {
+async function endOtherSessions(userId, keepId = null) {
     invalidateCodes(userId);
+    await LoginLink.destroy({ where: { userId } });
     return AccountSession.destroy({ where: keepId ? { userId, id: { [Op.ne]: keepId } } : { userId } });
 }
 
@@ -99,12 +130,9 @@ const capSessionLifetimes = (now = Date.now()) =>
         { where: { expiresAt: { [Op.gt]: new Date(now + SESSION_TTL_MS) } } }
     );
 
-/** Over HTTPS (directly, or behind a proxy that says so) the cookie is Secure too. */
-const isHttps = (req) => req.secure || req.headers['x-forwarded-proto'] === 'https';
-
 function setCookie(req, res, token) {
     const parts = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${COOKIE_TTL_MS / 1000}`];
-    if (isHttps(req)) parts.push('Secure');
+    if (req.secure) parts.push('Secure');
     res.setHeader('Set-Cookie', parts.join('; '));
 }
 
@@ -120,16 +148,28 @@ function clearCookie(res) {
  * @param {number | string | null} chatId the chat /login was sent from, opened first
  */
 async function createLink(user, chatId = null, now = Date.now()) {
-    if (!panelUrl() || !(await isAllowed(user.id))) return null;
+    const origin = panelUrl();
+    if (!origin) return null;
     const token = newToken();
-    await LoginLink.create({
-        id: hash(token),
-        userId: user.id,
-        userName: user.name || null,
-        chatId,
-        expiresAt: new Date(now + LINK_TTL_MS)
-    });
-    return `${panelUrl()}/login/${token}`;
+    const credential = isSystem(user.id) ? systemHash() : '';
+    return sequelize.transaction(
+        { isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ },
+        async (transaction) => {
+            // Hold the role row until the link exists so role removal can revoke it.
+            if (!(await isAllowed(user.id, { transaction, lock: transaction.LOCK.UPDATE }))) return null;
+            await LoginLink.create(
+                {
+                    id: tokenId('link', token, credential),
+                    userId: user.id,
+                    userName: user.name || null,
+                    chatId,
+                    expiresAt: new Date(now + LINK_TTL_MS)
+                },
+                { transaction }
+            );
+            return `${origin}/login/${token}`;
+        }
+    );
 }
 
 /**
@@ -139,14 +179,24 @@ async function createLink(user, chatId = null, now = Date.now()) {
  */
 async function redeemLink(token, now = Date.now()) {
     if (!TOKEN.test(String(token || ''))) return null;
-    const id = hash(token);
-    const link = await LoginLink.findByPk(id);
-    if (!link) return null;
-    // Whoever removes the row spends it: two presses at once can't both get in
-    if (!(await LoginLink.destroy({ where: { id } }))) return null;
-    if (new Date(link.expiresAt).getTime() <= now || !(await isAllowed(link.userId))) return null;
-    const session = await startSession({ userId: link.userId, userName: link.userName }, now);
-    return { token: session, chatId: link.chatId === null ? null : String(link.chatId) };
+    const credential = systemHash();
+    const candidate = await tokenRow(LoginLink, 'link', token, credential);
+    if (!candidate) return null;
+    const session = await sequelize.transaction(async (transaction) => {
+        const id = candidate.id;
+        const link = await LoginLink.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!link || new Date(link.expiresAt).getTime() <= now || !(await isAllowed(link.userId, { transaction })))
+            return null;
+        const system = isSystem(link.userId);
+        if (system && credential !== systemHash()) return null;
+        if (!(await LoginLink.destroy({ where: { id }, transaction }))) return null;
+        const sessionToken = newToken();
+        const sessionId = tokenId('session', sessionToken, system ? credential : '');
+        await insertSession(sessionId, link.userId, link.userName, now, transaction);
+        return { token: sessionToken, chatId: link.chatId === null ? null : String(link.chatId) };
+    });
+    if (session) signedIn(candidate.userId, now);
+    return session;
 }
 
 // --- "Войти через Telegram": a code the bot confirms ---
@@ -228,7 +278,7 @@ async function pollCode(code, secret, now = Date.now()) {
         if (codeOf(code) !== entry) return { state: 'gone' };
         const token = await startSession(entry.user, now);
         if (codeOf(code) !== entry) {
-            await endSession({ id: hash(token) });
+            await endSession({ id: tokenId('session', token) });
             return { state: 'gone' };
         }
         return { state: 'in', token };
