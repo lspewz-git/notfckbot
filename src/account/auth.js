@@ -422,19 +422,6 @@ async function answerCheck(digits, user, now = Date.now()) {
 }
 
 /**
- * "✅ Это я" under the bot's reply: the browser those digits signed in becomes a trusted one.
- * @returns {Promise<boolean>} false: not this person's sign-in
- */
-async function confirmClaim(claimId, userId) {
-    const claim = claims.get(String(claimId || ''));
-    if (!claim || claim.userId !== String(userId)) return false;
-    claim.trusted = true;
-    if (claim.sessionId) await AccountSession.update({ trusted: true }, { where: { id: claim.sessionId } });
-    await devices.trust(userId, claim.device?.deviceId);
-    return true;
-}
-
-/**
  * "🚫 Это не я" under the bot's "Вход выполнен": the sign-in those digits made ends, whether the page
  * already has its session (it is ended) or not yet (the page is told it was cancelled).
  * @returns {Promise<boolean>} false: not this person's sign-in, or nothing left to end
@@ -481,22 +468,17 @@ async function pollCode(code, secret, now = Date.now()) {
         }
         if (entry.denied) return { state: 'refused' };
         if (codeOf(code) !== entry) return { state: 'gone' };
-        // Digits nobody confirmed yet: the session is untrusted until "Это я" (confirmClaim)
-        const pending = entry.claim && claims.get(entry.claim);
-        const token = await startSession(user, now, undefined, { trusted: !pending || Boolean(pending.trusted) });
+        // Signed in by digits: the session and its browsers stay untrusted (devices.judge); a sign-in
+        // confirmed in Telegram trusts them
+        const token = await startSession(user, now, undefined, { trusted: !entry.claim });
         if (codeOf(code) !== entry || entry.denied) {
             await endSession({ id: tokenId('session', token) });
             return { state: entry.denied ? 'refused' : 'gone' };
         }
         // Signed in with digits: "Это не я" in the bot can still end this session
         const claim = entry.claim && claims.get(entry.claim);
-        if (claim) {
-            claim.sessionId = tokenId('session', token);
-            // "Это я" pressed while the session was being written
-            if (claim.trusted) await AccountSession.update({ trusted: true }, { where: { id: claim.sessionId } });
-        }
-        // A browser signed in by digits is trusted only after "Это я" (devices.judge)
-        return { state: 'in', token, userId: user.userId, trusted: !claim || Boolean(claim.trusted) };
+        if (claim) claim.sessionId = tokenId('session', token);
+        return { state: 'in', token, userId: user.userId, trusted: !entry.claim };
     } finally {
         codes.delete(code);
     }
@@ -530,7 +512,6 @@ module.exports = {
     deviceOf,
     answerCode,
     answerCheck,
-    confirmClaim,
     denyClaim,
     pollCode
 };

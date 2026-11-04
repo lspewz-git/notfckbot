@@ -1218,19 +1218,19 @@ test('/code in the bot: with the digits, or asked for; a group is sent to the pr
     await on.text(ctx(` ${start.check} `), () => (passed = true));
     assert.equal(
         replies.pop(),
-        '✅ <b>Вход с нового устройства</b>\nChrome, Windows\nРоссия, Vimpelcom · 95.24.17.80\n\nЭто были вы?'
+        '✅ <b>Вход выполнен на новом устройстве</b>\nChrome, Windows\nРоссия, Vimpelcom · 95.24.17.80'
     );
     const buttons = extras.pop().reply_markup.inline_keyboard.flat();
     assert.deepEqual(
         buttons.map((b) => b.text),
-        ['✅ Это я', '🚫 Это не я']
+        ['🚫 Не моё устройство — отменить вход']
     );
     assert.equal(session.value.state, 'idle');
     // "Это не я": the sign-in is cancelled and the reply says so
     const [re, deny] = actions.find(([name]) => String(name).includes('notme'));
     const denied = [];
     await deny({
-        match: re.exec(buttons[1].callback_data),
+        match: re.exec(buttons[0].callback_data),
         from: { id: 7 },
         answerCbQuery: async () => {},
         editMessageText: async (text) => denied.push(text)
@@ -1243,7 +1243,7 @@ test('/code in the bot: with the digits, or asked for; a group is sent to the pr
     const next = auth.startCode();
     await commands.code(ctx(`/code ${next.check}`));
     const plain = replies.pop();
-    assert.equal(plain, '✅ <b>Вход с нового устройства</b>\n\nЭто были вы?', 'no device known: no device lines');
+    assert.equal(plain, '✅ <b>Вход выполнен на новом устройстве</b>', 'no device known: no device lines');
     // "Это не я" forgot the denied browser
     assert.equal(deviceRows.length, 0);
 
@@ -1629,7 +1629,7 @@ test('/code from a known browser says so in one line; from another country it wa
     );
     assert.deepEqual(
         warned.extra.reply_markup.inline_keyboard.flat().map((b) => b.text),
-        ['✅ Это я', '🚫 Это не я']
+        ['🚫 Не моё устройство — отменить вход']
     );
     // The same country as a known browser: only new
     assert.equal(await devices.judge(7, { deviceId: DEVICE_B, country: 'RU' }), 'new');
@@ -1712,7 +1712,7 @@ test('a session from before devices were remembered counts from its own start', 
     assert.ok(deviceRows[1].firstSeen.getTime() < Date.now() - 29 * 24 * 3600 * 1000);
 });
 
-test('a browser signed in by digits stays new until "Это я"; "Это не я" keeps it forgotten', async (t) => {
+test('a browser signed in only by digits stays new; a Telegram-confirmed sign-in makes it known; a denied one stays forgotten', async (t) => {
     const { server, call: plain } = await serve(fakeBot({}), { trustLoopback: true });
     // An address of its own: the sign-in start limit is shared with the other tests
     const call = (method, path, options) => plain(method, path, { ...options, address: '10.9.9.9' });
@@ -1734,9 +1734,9 @@ test('a browser signed in by digits stays new until "Это я"; "Это не я
     const first = await signInByDigits();
     assert.equal(first.seen, 'new');
     assert.equal(deviceRows.length, 1);
-    assert.equal(deviceRows[0].trusted, false, 'nobody pressed "Это я"');
+    assert.equal(deviceRows[0].trusted, false, 'signed in by digits only');
     const second = await signInByDigits();
-    assert.equal(second.seen, 'new', 'an unconfirmed browser is asked again');
+    assert.equal(second.seen, 'new', 'an unconfirmed browser gets the cancel button again');
 
     const [re, press] = actions.find(([name]) => String(name).includes('notme'));
     await press({
@@ -1745,6 +1745,16 @@ test('a browser signed in by digits stays new until "Это я"; "Это не я
         answerCbQuery: async () => {},
         editMessageReplyMarkup: async () => {}
     });
+    assert.equal(deviceRows[0].trusted, false, 'an old "Это я" button trusts nothing: only Telegram does');
+
+    // Confirmed in Telegram ("Да, это я"): now a known browser
+    const start = (await call('POST', '/api/login/telegram', { device: mark })).body;
+    assert.equal(await auth.answerCode(start.code, { id: 7, name: '@u7' }, true), true);
+    const poll = await call('POST', '/api/login/telegram/poll', {
+        device: mark,
+        body: { code: start.code, secret: start.secret }
+    });
+    assert.equal(poll.body.state, 'in');
     assert.equal(deviceRows[0].trusted, true);
     const third = await signInByDigits();
     assert.equal(third.seen, 'known');

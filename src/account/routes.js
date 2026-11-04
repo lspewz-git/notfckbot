@@ -98,6 +98,10 @@ router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
         if (!result)
             return res.status(401).json({ error: 'This sign-in was already used. Reopen the app in Telegram.' });
         if (result.token) auth.setCookie(req, res, result.token);
+        // Signed by Telegram: this browser becomes a known one
+        await devices
+            .remember(req, res, user.userId, { trusted: true })
+            .catch((err) => log.warn(`[Account] Remembering the device failed: ${err.message}`));
         res.json({ success: true, chatId: await launchChat(user) });
     } catch (err) {
         fail(res, err);

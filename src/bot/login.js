@@ -35,13 +35,14 @@ function minutes(n) {
 
 const HEADS = {
     known: '✅ <b>Вход выполнен</b>',
-    new: '✅ <b>Вход с нового устройства</b>',
+    new: '✅ <b>Вход выполнен на новом устройстве</b>',
     odd: '⚠️ <b>Незнакомый вход</b>'
 };
 
 /**
  * "✅ Вход выполнен" and where: a browser the user signed in from before gets one short line, a new
- * one its address and the buttons too (see tryCheck), like Telegram's "Новый вход".
+ * one its address too and a button to cancel (see tryCheck), like Telegram's "Новый вход". No
+ * question: the user has just sent the digits themselves (05.11).
  */
 function signedInText({ device, seen }) {
     const name = device?.name ? escapeHtml(device.name) : '';
@@ -50,7 +51,7 @@ function signedInText({ device, seen }) {
         return HEADS.known + (line ? `\n${line}` : '');
     }
     const lines = [name, escapeHtml(placeLine(device))].filter(Boolean).join('\n');
-    return (HEADS[seen] || HEADS.new) + (lines ? `\n${lines}` : '') + (seen === 'odd' ? '' : '\n\nЭто были вы?');
+    return (HEADS[seen] || HEADS.new) + (lines ? `\n${lines}` : '');
 }
 
 /** The bot's answer to the digits (auth.answerCheck). */
@@ -119,23 +120,21 @@ function register(bot) {
             setState(ctx, { state: 'idle' });
         if (result.state !== 'in') return ctx.replyWithHTML(checkReply(result));
         log.info(`[Account] Code sign-in by ${ctx.from.id}`);
-        // In already; from a new browser "Это не я" ends that sign-in (auth.denyClaim)
+        // In already; from a new browser the button ends that sign-in (auth.denyClaim)
         if (result.seen === 'known') return ctx.replyWithHTML(checkReply(result));
         await ctx.replyWithHTML(checkReply(result), {
             reply_markup: {
                 inline_keyboard: [
-                    [
-                        { text: '✅ Это я', callback_data: `login_me_${result.claim}` },
-                        { text: '🚫 Это не я', callback_data: `login_notme_${result.claim}` }
-                    ]
+                    [{ text: '🚫 Не моё устройство — отменить вход', callback_data: `login_notme_${result.claim}` }]
                 ]
             }
         });
     };
 
     bot.action(/^login_(me|notme)_([A-Za-z0-9_-]{22})$/, async (ctx) => {
+        // "✅ Это я" under replies sent before 05.11: only the buttons go (a browser becomes known by a
+        // sign-in confirmed in Telegram, not by digits)
         if (ctx.match[1] === 'me') {
-            await auth.confirmClaim(ctx.match[2], ctx.from.id);
             await ctx.answerCbQuery('Хорошо');
             await ctx.editMessageReplyMarkup(undefined).catch(() => {});
             return;

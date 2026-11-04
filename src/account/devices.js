@@ -161,9 +161,9 @@ function placeLine(client) {
 
 /**
  * How a sign-in from this browser looks for this user: 'known' (a trusted browser: signed in with a
- * Telegram confirmation, or "Это я" pressed), 'new', or 'odd': new and from a country none of the
- * user's trusted browsers was in. A browser signed in by digits nobody confirmed stays 'new': a second
- * phished code from it still gets "Это не я".
+ * confirmation in Telegram or from the Mini App), 'new', or 'odd': new and from a country none of the
+ * user's trusted browsers was in. A browser signed in only by digits stays 'new' (the strict choice,
+ * 05.11): a phished code from it still gets the cancel button.
  */
 async function judge(userId, client) {
     if (!client?.deviceId) return 'new';
@@ -176,9 +176,8 @@ async function judge(userId, client) {
 
 // Recently seen devices: the guard doesn't ask the database on every request
 const seenDevices = lruCache({ max: 5000, ttl: 60 * 60 * 1000 });
-// "Это не я" and "Это я" for a browser whose row may not be written yet (its sign-in still on the way)
+// "Это не я" for a browser whose row may not be written yet (its sign-in still on the way)
 const denied = lruCache({ max: 5000, ttl: 60 * 60 * 1000 });
-const trusting = lruCache({ max: 5000, ttl: 60 * 60 * 1000 });
 const seenKey = (userId, deviceId) => `${userId}:${deviceId}`;
 let lastSweep = 0;
 
@@ -194,7 +193,7 @@ async function remember(req, res, userId, { since = Date.now(), trusted, now = D
     if (!req.deviceMarked) return { firstSeen: since };
     const key = seenKey(userId, client.deviceId);
     if (denied.has(key)) return { firstSeen: now };
-    const trust = trusted === true || trusting.has(key);
+    const trust = trusted === true;
     const where = { deviceId: client.deviceId, userId: String(userId) };
     const fields = { name: client.name, country: client.country, network: client.network, lastSeen: new Date(now) };
     const row = await AccountDevice.findOne({ where, raw: true });
@@ -244,18 +243,8 @@ async function forget(userId, deviceId) {
     if (!deviceId) return;
     const key = seenKey(userId, deviceId);
     denied.set(key, true);
-    trusting.delete(key);
     seenDevices.delete(key);
     await AccountDevice.destroy({ where: { deviceId, userId: String(userId) } });
-}
-
-/** "Это я": the browser signed in by digits is the user's own. */
-async function trust(userId, deviceId) {
-    if (!deviceId) return;
-    const key = seenKey(userId, deviceId);
-    if (denied.has(key)) return;
-    trusting.set(key, true);
-    await AccountDevice.update({ trusted: true }, { where: { deviceId, userId: String(userId) } });
 }
 
 const FRESH_ERROR =
@@ -281,7 +270,7 @@ async function freshRefusal(req, now = Date.now()) {
 
 /** For the tests: everything is looked up again. */
 const resetDevices = () => {
-    for (const cache of [seenDevices, denied, trusting]) cache.clear();
+    for (const cache of [seenDevices, denied]) cache.clear();
     lastSweep = 0;
 };
 
@@ -297,7 +286,6 @@ module.exports = {
     remember,
     seen,
     forget,
-    trust,
     freshRefusal,
     resetDevices
 };
