@@ -8,7 +8,9 @@ test.describe('shared cards and calendar unfollow', () => {
     test('a pending mode save blocks unfollow even after reopening the calendar card', async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });
         let release;
-        panel.account.modeHold = new Promise(resolve => { release = resolve; });
+        panel.account.modeHold = new Promise((resolve) => {
+            release = resolve;
+        });
         await openSection(page, 'my-subs');
         await page.locator('#my-subs-body .mine-row').first().click();
         const card = page.locator('#mine-card-modal');
@@ -23,14 +25,16 @@ test.describe('shared cards and calendar unfollow', () => {
             await card.getByRole('button', { name: 'Close', exact: true }).click();
             await episode.click();
             await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeDisabled();
-            expect(panel.account.sent.filter(r => r.method === 'DELETE')).toHaveLength(0);
-        } finally { release(); }
+            expect(panel.account.sent.filter((r) => r.method === 'DELETE')).toHaveLength(0);
+        } finally {
+            release();
+        }
         await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeEnabled();
         await expect(card.locator('.mine-modes')).toHaveCount(0);
         await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
         await card.getByRole('button', { name: 'Yes, unfollow', exact: true }).click();
         await expect(card).toBeHidden();
-        expect(panel.account.series.some(item => item.id === 'tv_100')).toBe(false);
+        expect(panel.account.series.some((item) => item.id === 'tv_100')).toBe(false);
     });
 
     test('notification mode can be changed in Following and is absent from Calendar', async ({ page }) => {
@@ -39,7 +43,7 @@ test.describe('shared cards and calendar unfollow', () => {
         await page.locator('#my-calendar-body .mine-cal-row').first().click();
         const card = page.locator('#mine-card-modal');
         await expect(card.locator('.mine-modes')).toHaveCount(0);
-        expect(panel.account.sent.filter(r => r.method === 'POST' && r.path.endsWith('/series'))).toHaveLength(0);
+        expect(panel.account.sent.filter((r) => r.method === 'POST' && r.path.endsWith('/series'))).toHaveLength(0);
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-subs');
         await page.locator('#my-subs-body .mine-row').first().click();

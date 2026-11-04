@@ -26,9 +26,15 @@ https://{$PANEL_DOMAIN}:41812 {
 	}
 	reverse_proxy {$PANEL_UPSTREAM} {
 		header_up Host {hostport}
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up -Forwarded
 		transport http {
 			tls_server_name {$PANEL_UPSTREAM_TLS_NAME}
 			tls_trust_pool file /etc/caddy/panel-upstream.pem
 		}
 	}
+}
+
+https://:41812 {
+	respond 421
 }

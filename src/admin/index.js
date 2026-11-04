@@ -22,6 +22,14 @@ const app = express();
 const PORT = 3000;
 const REDIRECT_PORT = 3001;
 
+app.use((req, res, next) => {
+    res.set({
+        'Content-Security-Policy': "frame-ancestors 'self' https://web.telegram.org",
+        'X-Content-Type-Options': 'nosniff'
+    });
+    next();
+});
+
 // The public origin is available through Caddy. Local HTTPS clients can still use the LAN address.
 app.use((req, res, next) => {
     const origin = app.get('panel proxy origin');

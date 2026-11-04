@@ -653,12 +653,12 @@ test('the public panel trusts HTTPS and client IP only from its configured proxy
     resetLimits();
     t.after(resetLimits);
 
-    const post = (route, body, headers = {}) =>
+    const send = (method, route, body, headers = {}) =>
         new Promise((resolve, reject) => {
             const request = http.request(
-                `http://127.0.0.1:${server.address().port}/api/login${route}`,
+                `http://127.0.0.1:${server.address().port}${route}`,
                 {
-                    method: 'POST',
+                    method,
                     headers: {
                         Host: 'panel.example.com',
                         Origin: 'https://panel.example.com',
@@ -672,12 +672,18 @@ test('the public panel trusts HTTPS and client IP only from its configured proxy
                 (res) => {
                     res.resume();
                     res.on('error', reject);
-                    res.on('end', () => resolve({ status: res.statusCode, cookie: res.headers['set-cookie']?.[0] }));
+                    res.on('end', () => resolve({ status: res.statusCode, headers: res.headers }));
                 }
             );
             request.on('error', reject);
             request.end(JSON.stringify(body));
         });
+    const post = (route, body, headers) => send('POST', `/api/login${route}`, body, headers);
+
+    const landing = await send('GET', '/');
+    assert.equal(landing.status, 200);
+    assert.equal(landing.headers['content-security-policy'], "frame-ancestors 'self' https://web.telegram.org");
+    assert.equal(landing.headers['x-content-type-options'], 'nosniff');
 
     const token = tokenOf(await auth.createLink({ id: 7 }));
     assert.equal((await post('', { token }, { Host: 'other.example.com' })).status, 403);
@@ -687,7 +693,7 @@ test('the public panel trusts HTTPS and client IP only from its configured proxy
     app.set('trust proxy', '127.0.0.1');
     const login = await post('', { token });
     assert.equal(login.status, 200);
-    assert.match(login.cookie, /; Secure\b/);
+    assert.match(login.headers['set-cookie'][0], /; Secure\b/);
 
     const body = { login: '7', password: 'wrong-one' };
     for (let i = 0; i < 5; i++) assert.equal((await post('/password', body)).status, 401);
