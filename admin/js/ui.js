@@ -228,3 +228,34 @@ export function showConfirm({
     // Land on the safe choice, not the destructive one (for the keyboard: no ring on a touch screen)
     if (!isTouch()) cancelBtn.focus();
 }
+
+// --- On-screen keyboard ---
+// How much shorter the visible area must get with a text field focused to count as a keyboard
+const KEYBOARD_MIN = 120;
+const TEXT_FIELD = 'input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"]), textarea';
+
+/**
+ * Marks `html.keyboard-open` while an on-screen keyboard covers the page: a text field has focus and
+ * the visible height dropped well below the tallest seen at this width. The fixed tab bar hides then
+ * (responsive.css), instead of riding on top of the keyboard. Focus alone is not enough: a tablet
+ * with a hardware keyboard keeps its full height and its tab bar.
+ */
+export function setupKeyboardWatch() {
+    const viewport = window.visualViewport;
+    let width = 0;
+    let tallest = 0;
+    const update = () => {
+        const height = viewport ? viewport.height : window.innerHeight;
+        if (window.innerWidth !== width) {
+            width = window.innerWidth;
+            tallest = height;
+        }
+        tallest = Math.max(tallest, height);
+        const typing = document.activeElement?.matches(TEXT_FIELD) ?? false;
+        document.documentElement.classList.toggle('keyboard-open', typing && height < tallest - KEYBOARD_MIN);
+    };
+    (viewport || window).addEventListener('resize', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', () => window.requestAnimationFrame(update));
+    update();
+}

@@ -21,16 +21,17 @@ body.view-mine .tabbar .tab-mine {
 }
 
 body.view-mine .tabbar {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 @media (max-width: 1024px) {
     .mine-section .mine-chat {
         display: none;
     }
+    /* The tab icons' size, so the Account label lines up with the others */
     .tab-profile .pick-avatar {
-        width: var(--space-6);
-        height: var(--space-6);
+        width: 22px;
+        height: 22px;
         font-size: var(--text-xs);
     }
 }
@@ -767,18 +768,182 @@ button.search-result-open:hover .mine-row-title {
     flex: none;
 }
 
-.mine-filter[hidden],
-.mine-section:has(#mine-q) [data-action='mine-filter-toggle'] {
-    display: none;
+/* Title search (approved mockups 04.11): a round filled button; the field grows out of it, covers it, and
+   a cross inside the field, where the magnifier was, closes it. Phones: the button sits at the right edge
+   and the field grows left over the title; wider screens: the button follows the title, the field grows
+   right from it. */
+.mine-heading {
+    position: relative;
+    --search-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.mine-filter .input-field {
-    flex: 1;
-    min-width: 0;
+.mine-heading h1 {
+    transition:
+        opacity 0.2s,
+        transform 0.3s var(--search-ease);
+}
+
+.mine-heading [data-action='mine-filter-toggle'] {
+    border-color: transparent;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-secondary);
+}
+
+.mine-heading [data-action='mine-filter-toggle']:hover {
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+/* Under the open field, which starts as exactly its circle */
+.mine-heading.is-searching [data-action='mine-filter-toggle'] {
+    visibility: hidden;
 }
 
 .mine-filter {
-    margin-bottom: var(--space-4);
+    position: absolute;
+    top: 50%;
+    left: calc(100% - var(--control-h));
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 22rem;
+    height: var(--control-h);
+    margin-top: calc(var(--control-h) / -2);
+    padding: 0 var(--space-1) 0 var(--space-4);
+    border-radius: 999px;
+    background: var(--surface-3);
+    color: var(--text-dim);
+    visibility: hidden;
+    /* Closed: only the button's circle */
+    clip-path: inset(0 calc(100% - var(--control-h)) 0 0 round 999px);
+    transition:
+        clip-path 0.2s var(--search-ease),
+        visibility 0s 0.2s;
+}
+
+.mine-filter input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+    outline: none;
+}
+
+/* The cross inside closes and clears; the browser's own clear cross would be a second one */
+.mine-filter input::-webkit-search-cancel-button {
+    appearance: none;
+    display: none;
+}
+
+.mine-filter input::placeholder {
+    color: var(--text-dim);
+}
+
+.mine-filter-close {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: calc(var(--control-h) - 2 * var(--space-1));
+    height: calc(var(--control-h) - 2 * var(--space-1));
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+/* 36px drawn inside the 44px field; the tap reaches the field's edge */
+@media (pointer: coarse) {
+    .mine-filter-close {
+        position: relative;
+    }
+
+    .mine-filter-close::after {
+        content: '';
+        position: absolute;
+        inset: calc(-1 * var(--space-1));
+    }
+}
+
+/* Mouse only: after a tap on the magnifier the finger rests where the cross appears */
+@media (hover: hover) {
+    .mine-filter-close:hover {
+        background: var(--fill-active);
+    }
+}
+
+.mine-filter-close .icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.5;
+}
+
+.mine-filter > * {
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.mine-heading.is-searching .mine-filter {
+    visibility: visible;
+    clip-path: inset(0 round 999px);
+    transition:
+        clip-path 0.3s var(--search-ease),
+        visibility 0s;
+}
+
+.mine-heading.is-searching .mine-filter > * {
+    opacity: 1;
+    transition: opacity 0.15s 0.12s;
+}
+
+@media (max-width: 1024px) {
+    .mine-section .header-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .mine-heading {
+        justify-content: space-between;
+    }
+
+    .mine-filter {
+        left: 0;
+        right: 0;
+        width: auto;
+        clip-path: inset(0 0 0 calc(100% - var(--control-h)) round 999px);
+    }
+
+    .mine-heading.is-searching h1 {
+        opacity: 0;
+        transform: translateX(calc(-1 * var(--space-6)));
+    }
+}
+
+@media (min-width: 1025px) {
+    .mine-heading {
+        width: fit-content;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mine-heading *,
+    .mine-heading.is-searching * {
+        transition-duration: 0s;
+        transition-delay: 0s;
+    }
+}
+
+.mine-section:has(#mine-q) [data-action='mine-filter-toggle'],
+.mine-section:has(#mine-q) .mine-filter {
+    display: none;
 }
 
 /* --- Settings: grouped rows, a choice opens a list --- */

@@ -185,6 +185,11 @@ select {
     margin-bottom: var(--space-3);
 }
 
+/* Phones turn the strip into a flex row; a hidden one (no years yet) must stay hidden */
+.tab-filters[hidden] {
+    display: none;
+}
+
 /* A segment is 6px shorter than the track; with a finger it reaches the track's edge (44px) */
 @media (pointer: coarse) {
     .log-filters .btn,

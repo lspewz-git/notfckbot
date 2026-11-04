@@ -84,14 +84,23 @@ function renderFiltered(section) {
     if (section === 'my-aired') airedHistory?.filter(filters['my-aired']);
 }
 
+const filterToggle = (section) =>
+    /** @type {HTMLElement} */ (document.querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`));
+
+/** The title search grows out of its round button and covers it; the cross inside closes it */
+function showFilter(section, open) {
+    const toggle = filterToggle(section);
+    toggle.closest('.mine-heading').classList.toggle('is-searching', open);
+    toggle.setAttribute('aria-expanded', String(open));
+}
+
+const filterOpen = (section) => filterToggle(section).getAttribute('aria-expanded') === 'true';
+
 function closeFilter(section) {
     filters[section] = '';
     const input = /** @type {HTMLInputElement} */ ($(`${section}-filter`));
     input.value = '';
-    $(`${section}-search`).hidden = true;
-    document
-        .querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`)
-        .setAttribute('aria-expanded', 'false');
+    showFilter(section, false);
     renderFiltered(section);
 }
 
@@ -740,18 +749,14 @@ export const accountActions = {
     'mine-filter-toggle': (el) => {
         const section = el.dataset.page;
         if (!Object.hasOwn(filters, section)) return;
-        const holder = $(`${section}-search`);
-        if (!holder.hidden) return closeFilter(section);
-        holder.hidden = false;
-        el.setAttribute('aria-expanded', 'true');
+        if (filterOpen(section)) return closeFilter(section);
+        showFilter(section, true);
         $(`${section}-filter`).focus();
     },
     'mine-filter-close': (el) => {
         const section = el.dataset.page;
         closeFilter(section);
-        /** @type {HTMLElement} */ (
-            document.querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`)
-        ).focus();
+        filterToggle(section).focus();
     },
     'mine-reload': () => {
         state.list = null;

@@ -196,13 +196,16 @@ export async function startSession(preferredChat = null, { current = () => true,
         postEvent?: (event: string, data: string) => void
     } }} */ (window);
     const bridge = nativeWindow.TelegramWebviewProxy;
-    if (typeof bridge?.postEvent === 'function')
+    if (typeof bridge?.postEvent === 'function') {
+        // Telegram's swipe-down closes the app; turned off so pull-refresh.js gets the pull
+        if (!miniApp) bridge.postEvent('web_app_setup_swipe_behavior', '{"allow_vertical_swipe":false}');
         miniApp = {
             bridge,
             initData: launchData || miniApp?.initData || null,
             next: miniApp?.next ?? null,
             chat: miniApp?.chat ?? null
         };
+    }
     const initData = miniApp?.initData;
     let me;
     try {

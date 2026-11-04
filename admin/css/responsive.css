@@ -10,7 +10,7 @@
 
     .tabbar {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: var(--space-1);
         position: fixed;
         left: 0;
@@ -37,6 +37,14 @@
     }
     .toast-container {
         bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* Typing on a phone: the on-screen keyboard shrinks the viewport (Telegram's Mini App webview too) and
+   the fixed tab bar would ride on top of it. ui.js setupKeyboardWatch() sets the class. */
+@media (max-width: 1024px) {
+    html.keyboard-open .tabbar {
+        display: none;
     }
 }
 

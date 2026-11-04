@@ -1,6 +1,6 @@
 // Signing in to the panel and the user's own chats in it, on the API mock (tests/mock-account.js)
 const { test, expect } = require('@playwright/test');
-const { watchConsole, isNarrow, pickChat, openProfilePage, profileButton } = require('./helpers');
+const { watchConsole, isNarrow, pickChat, openProfilePage, profileButton, openSection } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 // A 401 is the answer the panel expects before sign-in (and to a wrong password, a 429 to too many
@@ -947,4 +947,125 @@ test('the account page sets, changes and removes the password', async ({ page })
     await expect(row).toContainText('Not set');
     await expect(remove).toHaveCount(0);
     expect(panel.account.sent.some((r) => r.method === 'DELETE' && r.path === '/api/account/password')).toBe(true);
+});
+
+test('the Mini App turns off Telegram swipe-to-close once so pull to refresh works', async ({ page }) => {
+    const events = [];
+    await page.exposeFunction('telegramEvent', (event, data) => events.push([event, data]));
+    await page.addInitScript(
+        () => (window.TelegramWebviewProxy = { postEvent: (event, data) => window['telegramEvent'](event, data) })
+    );
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, { path, signedOut: true, role: 'user' });
+    await expect(page.locator('body')).toHaveClass(/role-user/);
+    await expect.poll(() => events.map(([event]) => event)).toContain('web_app_ready');
+    const swipes = events.filter(([event]) => event === 'web_app_setup_swipe_behavior');
+    expect(swipes).toEqual([['web_app_setup_swipe_behavior', '{"allow_vertical_swipe":false}']]);
+});
+
+test('an on-screen keyboard hides the tab bar; focus alone (hardware keyboard) keeps it', async ({ page }) => {
+    test.skip(!isNarrow(page), 'tab bar layout');
+    await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
+    const tabbar = page.locator('.tabbar');
+    const size = page.viewportSize();
+    await page.locator('#my-subs-section [data-action="mine-search-open"]').first().click();
+    await page.locator('#mine-q').focus();
+    await expect(tabbar).toBeVisible();
+    // The keyboard comes up: the visible area gets much shorter, as in Telegram's webview
+    await page.setViewportSize({ width: size.width, height: size.height - 300 });
+    await expect(tabbar).toBeHidden();
+    await page.locator('#mine-q').blur();
+    await expect(tabbar).toBeVisible();
+    await page.setViewportSize(size);
+});
+
+test('phone tabs mark the open one with a top bar and the title search sits round at the right edge', async ({
+    page
+}) => {
+    await mockPanel(page, { role: 'user', path: '/#my-subs' });
+    await expect(page.locator('#my-subs-section h1')).toBeVisible();
+    await expect(page.locator('[data-section="my-aired"] use').first()).toHaveAttribute(
+        'href',
+        '/vendor/lucide.svg#clapperboard'
+    );
+    const search = page.locator('#my-subs-section [data-action="mine-filter-toggle"]');
+    const box = await search.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const h = el.closest('header').getBoundingClientRect();
+        return { right: h.right - r.right, round: getComputedStyle(el).borderRadius, w: r.width, h: r.height };
+    });
+    expect(box.round).toBe('50%');
+    expect(box.w).toBe(box.h);
+    if (!isNarrow(page)) return;
+    expect(Math.abs(box.right)).toBeLessThan(2);
+    const tab = page.locator('.tabbar .tab-item.active');
+    await expect(tab).toHaveAttribute('data-section', 'my-subs');
+    const marks = await tab.evaluate((el) => ({
+        bar: getComputedStyle(el, '::before').height,
+        pill: getComputedStyle(el.querySelector('.icon')).backgroundColor
+    }));
+    expect(marks.bar).toBe('3px');
+    expect(marks.pill).toBe('rgba(0, 0, 0, 0)');
+});
+
+test('a long group name on the Account tab ends in an ellipsis and keeps the four tabs equal', async ({ page }) => {
+    test.skip(!isNarrow(page), 'tab bar layout');
+    const long = 'Очень длинное название киноклуба для проверки вёрстки';
+    await mockPanel(page, { role: 'user', path: '/#my-subs' });
+    await page.evaluate((title) => {
+        const label = document.querySelector('[data-tab-label]');
+        if (label) label.textContent = title;
+    }, long);
+    const sizes = await page.locator('.tabbar').evaluate((bar) => {
+        const tabs = [...bar.querySelectorAll('.tab-mine')].map((el) => el.getBoundingClientRect().width);
+        const label = bar.querySelector('[data-tab-label]');
+        return {
+            tabs,
+            barRight: bar.getBoundingClientRect().right,
+            right: bar.querySelector('.tab-profile').getBoundingClientRect().right,
+            clipped: label.scrollWidth > label.clientWidth,
+            ellipsis: getComputedStyle(label).textOverflow
+        };
+    });
+    expect(Math.max(...sizes.tabs) - Math.min(...sizes.tabs)).toBeLessThan(1);
+    expect(sizes.right).toBeLessThanOrEqual(sizes.barRight);
+    expect(sizes.clipped).toBe(true);
+    expect(sizes.ellipsis).toBe('ellipsis');
+});
+
+test('the title search grows out of its button, covers it, and the cross inside closes it', async ({ page }) => {
+    await mockPanel(page, { role: 'user', path: '/#my-subs' });
+    const area = page.locator('#my-subs-section');
+    const toggle = area.locator('[data-action="mine-filter-toggle"]');
+    const field = area.locator('.mine-filter');
+    const close = field.getByRole('button', { name: 'Close search', exact: true });
+    await expect(field).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(area.locator('#my-subs-filter')).toBeFocused();
+    await expect.poll(() => field.evaluate((el) => getComputedStyle(el).clipPath)).toMatch(/^inset\(0(px)? round/);
+    const boxes = await page.evaluate(() => {
+        const box = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const f = box('#my-subs-section .mine-filter');
+        const b = box('#my-subs-section [data-action="mine-filter-toggle"]');
+        const c = box('#my-subs-section .mine-filter-close');
+        const t = box('#my-subs-section .header-info');
+        const hit = (x, y) => document.elementFromPoint(x, y)?.closest('button')?.dataset.action;
+        return { f, b, c, t, hit: hit(c.x + c.width / 2, c.y + c.height / 2) };
+    });
+    expect(boxes.hit).toBe('mine-filter-close');
+    expect(Math.abs(boxes.f.y + boxes.f.height / 2 - (boxes.b.y + boxes.b.height / 2))).toBeLessThan(1);
+    expect(boxes.f.left).toBeLessThanOrEqual(boxes.b.left + 1);
+    if (isNarrow(page)) {
+        // Over the title, and the cross where the magnifier was
+        expect(boxes.f.left).toBeLessThanOrEqual(boxes.t.left + 1);
+        expect(Math.abs(boxes.f.right - boxes.b.right)).toBeLessThan(1);
+        expect(Math.abs(boxes.c.x + boxes.c.width / 2 - (boxes.b.x + boxes.b.width / 2))).toBeLessThan(2);
+        await expect(area.locator('h1')).toHaveCSS('opacity', '0');
+    } else await expect(area.locator('h1')).toHaveCSS('opacity', '1');
+    await close.click();
+    await expect(field).toBeHidden();
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 });

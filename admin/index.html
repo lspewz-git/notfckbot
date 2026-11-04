@@ -189,7 +189,7 @@
                     <span class="rail-divider nav-mine" aria-hidden="true"></span>
                     <button class="nav-item nav-mine" data-section="my-aired" aria-label="Released">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#calendar" />
+                            <use href="/vendor/lucide.svg#clapperboard" />
                         </svg>
                         <span class="nav-label" aria-hidden="true">Released</span>
                     </button>
@@ -767,7 +767,7 @@
                                                     aria-controls="settings-token-telegram"
                                                     title="Replace"
                                                 >
-                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                                         <use href="/vendor/lucide.svg#pencil" />
                                                     </svg>
                                                     <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
@@ -804,7 +804,7 @@
                                                     aria-controls="settings-token-tmdb"
                                                     title="Replace"
                                                 >
-                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                                         <use href="/vendor/lucide.svg#pencil" />
                                                     </svg>
                                                     <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
@@ -843,7 +843,7 @@
                                                     aria-controls="settings-token-kinopoisk"
                                                     title="Replace"
                                                 >
-                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                                         <use href="/vendor/lucide.svg#pencil" />
                                                     </svg>
                                                     <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
@@ -1239,29 +1239,34 @@
                                             <use href="/vendor/lucide.svg#search" />
                                         </svg>
                                     </button>
+                                    <div id="my-aired-search" class="mine-filter">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#search" />
+                                        </svg>
+                                        <input
+                                            id="my-aired-filter"
+                                            type="search"
+                                            data-mine-filter="my-aired"
+                                            aria-label="Search released titles"
+                                            placeholder="Search titles…"
+                                        /><button
+                                            type="button"
+                                            class="mine-filter-close"
+                                            data-action="mine-filter-close"
+                                            data-page="my-aired"
+                                            aria-label="Close search"
+                                        >
+                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                <use href="/vendor/lucide.svg#x" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                                 <p>Series and films already released among the chosen chat's subscriptions.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
                         <p class="mine-context" data-chat-context hidden></p>
-                        <div id="my-aired-search" class="mine-filter mine-search" hidden>
-                            <input
-                                id="my-aired-filter"
-                                class="input-field"
-                                type="search"
-                                data-mine-filter="my-aired"
-                                aria-label="Search released titles"
-                                placeholder="Search titles…"
-                            /><button
-                                type="button"
-                                class="btn btn-ghost"
-                                data-action="mine-filter-close"
-                                data-page="my-aired"
-                            >
-                                Cancel
-                            </button>
-                        </div>
                         <div id="my-aired-body" aria-live="polite"></div>
                     </section>
                     <section id="my-subs-section" class="section mine-section">
@@ -1282,29 +1287,34 @@
                                             <use href="/vendor/lucide.svg#search" />
                                         </svg>
                                     </button>
+                                    <div id="my-subs-search" class="mine-filter">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#search" />
+                                        </svg>
+                                        <input
+                                            id="my-subs-filter"
+                                            type="search"
+                                            data-mine-filter="my-subs"
+                                            aria-label="Search followed titles"
+                                            placeholder="Search titles…"
+                                        /><button
+                                            type="button"
+                                            class="mine-filter-close"
+                                            data-action="mine-filter-close"
+                                            data-page="my-subs"
+                                            aria-label="Close search"
+                                        >
+                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                <use href="/vendor/lucide.svg#x" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                                 <p>Series and films the bot writes about in the chosen chat.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
                         <p class="mine-context" data-chat-context hidden></p>
-                        <div id="my-subs-search" class="mine-filter mine-search" hidden>
-                            <input
-                                id="my-subs-filter"
-                                class="input-field"
-                                type="search"
-                                data-mine-filter="my-subs"
-                                aria-label="Search followed titles"
-                                placeholder="Search titles…"
-                            /><button
-                                type="button"
-                                class="btn btn-ghost"
-                                data-action="mine-filter-close"
-                                data-page="my-subs"
-                            >
-                                Cancel
-                            </button>
-                        </div>
                         <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1326,29 +1336,34 @@
                                             <use href="/vendor/lucide.svg#search" />
                                         </svg>
                                     </button>
+                                    <div id="my-calendar-search" class="mine-filter">
+                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#search" />
+                                        </svg>
+                                        <input
+                                            id="my-calendar-filter"
+                                            type="search"
+                                            data-mine-filter="my-calendar"
+                                            aria-label="Search calendar titles"
+                                            placeholder="Search titles…"
+                                        /><button
+                                            type="button"
+                                            class="mine-filter-close"
+                                            data-action="mine-filter-close"
+                                            data-page="my-calendar"
+                                            aria-label="Close search"
+                                        >
+                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                <use href="/vendor/lucide.svg#x" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                                 <p>What comes out among the chosen chat's subscriptions.</p>
                             </div>
                             <div class="mine-chat" data-chat-picker></div>
                         </header>
                         <p class="mine-context" data-chat-context hidden></p>
-                        <div id="my-calendar-search" class="mine-filter mine-search" hidden>
-                            <input
-                                id="my-calendar-filter"
-                                class="input-field"
-                                type="search"
-                                data-mine-filter="my-calendar"
-                                aria-label="Search calendar titles"
-                                placeholder="Search titles…"
-                            /><button
-                                type="button"
-                                class="btn btn-ghost"
-                                data-action="mine-filter-close"
-                                data-page="my-calendar"
-                            >
-                                Cancel
-                            </button>
-                        </div>
                         <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1802,7 +1817,8 @@
                 ><span>More</span>
             </button>
             <button class="tab-item tab-mine" data-section="my-aired">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#calendar" /></svg
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <use href="/vendor/lucide.svg#clapperboard" /></svg
                 ><span>Released</span>
             </button>
             <button class="tab-item tab-mine" data-section="my-subs">

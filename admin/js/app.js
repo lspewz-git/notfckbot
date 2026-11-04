@@ -22,7 +22,8 @@ import {
     dismissChatModals,
     topmostModal,
     setReturnTo,
-    showConfirm
+    showConfirm,
+    setupKeyboardWatch
 } from './ui.js';
 import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
@@ -280,6 +281,7 @@ function setupControls() {
 
     $('refresh-btn').onclick = refreshNow;
     setupPullRefresh(refreshNow);
+    setupKeyboardWatch();
 
     $('actions-btn').onclick = () => openModal('actions-modal');
     $('about-btn').onclick = openAbout;

@@ -143,3 +143,11 @@ test('the bottom avatar opens reachable account actions on tablets',async({page,
     const box=await admin.boundingBox();expect(box.y+box.height).toBeLessThanOrEqual(900);
     await admin.click();await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
 });
+
+test('a Released view with no years hides the empty year strip on every width',async({page})=>{
+    const panel=await mockPanel(page,{role:'user'});
+    panel.account.aired=()=>({years:[],year:null,series:[],films:[]});
+    await openSection(page,'my-aired');
+    await expect(page.locator('#my-aired-films .history-empty')).toContainText('Nothing yet');
+    await expect(page.locator('#my-aired-years')).toBeHidden();
+});

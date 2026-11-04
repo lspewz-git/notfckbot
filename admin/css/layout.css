@@ -236,12 +236,21 @@ h3 {
     color: var(--text);
 }
 
-/* The selected tab's icon sits on a soft pill, as in Material 3 / iOS 18 */
-.tab-item.active .icon {
-    box-sizing: content-box;
-    padding: 2px 14px;
-    border-radius: 999px;
-    background: var(--surface-3);
+/* The selected tab: brighter, with a short bar on the tab bar's top edge (approved mockup A, 04.11) */
+.tab-item {
+    position: relative;
+}
+
+.tab-item.active::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    width: var(--space-5);
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--text);
+    transform: translateX(-50%);
 }
 
 /* --- Pull to refresh (pull-refresh.js) --- */

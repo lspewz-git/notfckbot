@@ -132,7 +132,7 @@ test.describe('unfollow service outage', () => {
 
 test.describe('local title search', () => {
     watchConsole();
-    test('quiet search filters each user page, clears with Cancel/Escape, and Released is renamed', async ({
+    test('quiet search filters each user page, closes with its cross/Escape, and Released is renamed', async ({
         page
     }) => {
         const panel = await mockPanel(page, { role: 'user' });
@@ -153,7 +153,9 @@ test.describe('local title search', () => {
             await input.fill('no-such-title');
             await expect(area).toContainText('No matching titles');
             expect(panel.account.sent.slice(sentBeforeTyping).some((r) => r.path.includes('/search'))).toBe(false);
-            await area.getByRole('button', { name: 'Cancel', exact: true }).click();
+            // The field covers the magnifier; its own cross closes it
+            await expect(toggle).toBeHidden();
+            await area.getByRole('button', { name: 'Close search', exact: true }).click();
             await expect(input).toBeHidden();
             await expect(rows).toHaveCount(2);
             await toggle.click();
