@@ -107,6 +107,8 @@ function accountState(options) {
         role: options.role || 'admin',
         sent: /** @type {{ method: string, path: string, body: any }[]} */ ([]),
         polls: 0,
+        // Statuses the Mini App sign-in answers with, one per try, before it lets the user in
+        miniAppFails: /** @type {number[]} */ ([...(options.miniAppFails || [])]),
         confirmationState: 'in',
         chats: [
             { id: '42', type: 'private', title: 'My account', settings: true },
@@ -271,6 +273,8 @@ function accountAnswer(state, req, url) {
     if (p === '/api/login/miniapp') {
         if (body?.initData !== 'auth_date=123&hash=test')
             return { status: 401, body: { error: 'Invalid Telegram launch data' } };
+        const fail = state.miniAppFails.shift();
+        if (fail) return { status: fail, body: { error: `Mini App sign-in failed (${fail})` } };
         state.signedIn = true;
         return { success: true };
     }

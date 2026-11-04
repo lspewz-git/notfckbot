@@ -8,11 +8,17 @@ const { mockPanel } = require('./mock-panel');
 // and the refresh that met it logs its error
 watchConsole({ ignore: /status of (4(01|29)|503)|Sign in: \/login in the bot/ });
 
-for (const native of [true, false]) {
-    test(`Mini App launch data only signs in through the native Telegram bridge (${native})`, async ({ page }) => {
+for (const [native, query] of [
+    [true, '?miniapp=1'],
+    [true, ''],
+    [false, '?miniapp=1']
+]) {
+    test(`Mini App launch data only signs in through the native Telegram bridge (${native}, "${query}")`, async ({
+        page
+    }) => {
         if (native) await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
         const initData = 'auth_date=123&hash=test';
-        const path = `/?miniapp=1#${new URLSearchParams({ tgWebAppData: initData })}`;
+        const path = `/${query}#${new URLSearchParams({ tgWebAppData: initData })}`;
         const panel = await mockPanel(page, { path, signedOut: true, role: 'user' });
         if (native) await expect(page.locator('body')).toHaveClass(/role-user/);
         else await expect(page.locator('#login-tg')).toBeVisible();
@@ -21,6 +27,63 @@ for (const native of [true, false]) {
         expect(page.url()).not.toContain('tgWebAppData');
     });
 }
+
+test('a failed Mini App sign-in offers a retry and a password, not the bot link that closes the app', async ({
+    page
+}) => {
+    const events = [];
+    await page.exposeFunction('telegramEvent', (event) => events.push(event));
+    await page.addInitScript(
+        () => (window.TelegramWebviewProxy = { postEvent: (event) => window['telegramEvent'](event) })
+    );
+    const initData = 'auth_date=123&hash=test';
+    const path = `/#${new URLSearchParams({ tgWebAppData: initData })}`;
+    const panel = await mockPanel(page, { path, signedOut: true, role: 'user', miniAppFails: [503] });
+    const retry = page.locator('#login-body [data-action="login-retry"]');
+    await expect(retry).toBeVisible();
+    await expect(page.locator('#login-error')).toHaveText('Mini App sign-in failed (503)');
+    await expect(page.locator('#login-code')).toHaveText('503 · Service Unavailable');
+    const password = page.locator('#login-body [data-action="login-password"]');
+    await expect(password).toBeVisible();
+    // The outline button keeps the primary one's height (44px touch target on a phone)
+    const heights = await Promise.all([retry, password].map((el) => el.evaluate((b) => b.offsetHeight)));
+    expect(heights[1]).toBe(heights[0]);
+    await expect(page.locator('#login-tg, [data-action="login-qr"]')).toHaveCount(0);
+    // The password form's way back returns to this screen, not the bot link
+    await page.locator('#login-body [data-action="login-password"]').click();
+    await page.locator('#login-back').click();
+    await retry.click();
+    await expect(page.locator('body')).toHaveClass(/role-user/);
+    const tries = panel.account.sent.filter((request) => request.path === '/api/login/miniapp');
+    expect(tries.map((request) => request.body)).toEqual([{ initData }, { initData }]);
+    await expect.poll(() => events).toContain('web_app_ready');
+});
+
+test('a password sign-in after a failed Mini App try does not send the kept launch data again', async ({ page }) => {
+    await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    const panel = await mockPanel(page, { path, signedOut: true, miniAppFails: [503] });
+    await page.locator('#login-body [data-action="login-password"]').click();
+    await page.locator('#login-name').fill('admin');
+    await page.locator('#login-pass').fill('good-password');
+    await page.locator('#login-pass').press('Enter');
+    await expect(page.locator('#login-gate')).toBeHidden();
+    expect(panel.account.sent.filter((request) => request.path === '/api/login/miniapp')).toHaveLength(1);
+});
+
+test('Mini App launch data that cannot be used again offers to reopen the app', async ({ page }) => {
+    const events = [];
+    await page.exposeFunction('telegramEvent', (event) => events.push(event));
+    await page.addInitScript(
+        () => (window.TelegramWebviewProxy = { postEvent: (event) => window['telegramEvent'](event) })
+    );
+    const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
+    await mockPanel(page, { path, signedOut: true, role: 'user', miniAppFails: [401] });
+    await expect(page.locator('#login-code')).toHaveText('401 · Unauthorized');
+    await page.locator('#login-body [data-action="miniapp-close"]').click();
+    await expect(page.locator('#login-body [data-action="login-retry"]')).toHaveCount(0);
+    await expect.poll(() => events).toContain('web_app_close');
+});
 
 /** The visible rail or tab-bar items, by section (or action, for the way back to the admin panel) */
 const visibleNav = (page, selector) =>

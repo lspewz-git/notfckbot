@@ -80,8 +80,58 @@ async function prepareCode() {
     }
 }
 
+// Inside Telegram's own Mini App window: its bridge, the launch data while it may still sign in, and
+// what the sign-in screen offers after a failed try ('retry' with the same data, 'reopen' for new data)
+let miniApp = null;
+
+const failedMiniApp = (err) => {
+    const retry = !err.status || err.status === 429 || err.status >= 500;
+    if (!retry) miniApp.initData = null;
+    // 409: another account's session is in this window; signing it out lets the next launch in
+    miniApp.next = retry ? 'retry' : err.status === 401 ? 'reopen' : err.status === 409 ? 'signout' : null;
+};
+
+const STATUS_TEXT = {
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'Not Found',
+    409: 'Conflict',
+    429: 'Too Many Requests',
+    500: 'Internal Server Error',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+    504: 'Gateway Timeout'
+};
+
+/** The status line under a failed Mini App sign-in: "503 · Service Unavailable", or no answer at all. */
+const statusLine = (err) =>
+    err.status ? [err.status, STATUS_TEXT[err.status]].filter(Boolean).join(' · ') : 'No connection';
+
+// The deep link to the bot and the QR code would close this window and lose the confirmation:
+// here the panel signs in again with Telegram's launch data, or with a password
+function miniAppScreen(error, restoreFocus, status = '') {
+    const next = miniApp.initData ? 'retry' : (miniApp.next ?? 'reopen');
+    gate(
+        `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
+            (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
+            (next === 'retry'
+                ? '<button type="button" class="btn btn-primary btn-block" data-action="login-retry">Try again</button>'
+                : next === 'reopen'
+                  ? '<button type="button" class="btn btn-primary btn-block" data-action="miniapp-close">Close the app</button>' +
+                    '<p class="login-hint">Open it again from the bot: Telegram signs you in.</p>'
+                  : next === 'signout'
+                    ? '<button type="button" class="btn btn-primary btn-block" data-action="logout">Sign out</button>'
+                    : '') +
+            '<p class="login-or">Or</p>' +
+            `<button type="button" class="btn btn-outline btn-block" data-action="login-password">${KEY_ICON}Password</button>`
+    );
+    if (restoreFocus) $('login-title').focus();
+}
+
 function signInScreen(error = '', restoreFocus = $('login-body').contains(document.activeElement)) {
     discardChallenges();
+    if (miniApp) return miniAppScreen(error, restoreFocus);
     gate(
         // A first time in signs up too: the bot is started on the way (with sign-up open)
         '<div class="login-primary-method">' +
@@ -127,24 +177,35 @@ export async function startSession(preferredChat = null) {
         linkScreen();
         return null;
     }
-    // Telegram sends its signed launch data in the fragment. A regular browser can open a link
-    // containing someone else's launch data, so only the native Mini App bridge enables auto-login.
-    const url = new URL(location.href);
-    const launchData =
-        url.searchParams.get('miniapp') === '1' && new URLSearchParams(url.hash.slice(1)).get('tgWebAppData');
+    // Telegram sends its signed launch data in the fragment, whatever launch URL BotFather has. A regular
+    // browser can open a link containing someone else's launch data, so only the native Mini App bridge
+    // enables auto-login.
+    const launchData = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData');
     if (launchData) window.history.replaceState(null, '', '/');
     const nativeWindow = /** @type {Window & { TelegramWebviewProxy?: {
         postEvent?: (event: string, data: string) => void
     } }} */ (window);
     const bridge = nativeWindow.TelegramWebviewProxy;
-    const initData = typeof bridge?.postEvent === 'function' && launchData;
+    if (typeof bridge?.postEvent === 'function')
+        miniApp = { bridge, initData: launchData || miniApp?.initData || null, next: miniApp?.next ?? null };
+    const initData = miniApp?.initData;
     let me;
     try {
-        if (initData) await api('/login/miniapp', { method: 'POST', body: { initData } });
+        if (initData) {
+            await api('/login/miniapp', { method: 'POST', body: { initData } });
+            // Spent: a later sign-in screen here offers to reopen the app for new launch data
+            miniApp.initData = null;
+            miniApp.next = 'reopen';
+        }
         me = await api('/account/me');
     } catch (err) {
-        if (initData) signInScreen(err.message);
-        else if (err.status === 401) signInScreen();
+        if (initData) {
+            // Also when the sign-in went through and /account/me failed: a 5xx there is retried
+            failedMiniApp(err);
+            discardChallenges();
+            const message = err.status ? err.message : "Can't reach the panel. Check the connection.";
+            miniAppScreen(message, $('login-body').contains(document.activeElement), statusLine(err));
+        } else if (err.status === 401) signInScreen();
         else
             gate(
                 `<p class="login-error" role="alert">The panel isn't answering: ${escapeHtml(err.message)}</p>` +
@@ -211,6 +272,8 @@ function stopPolling() {
 /** @param {(role: string) => void} onSignedIn what the panel does once in (app.js) */
 export function sessionActions(onSignedIn) {
     const signedIn = async (chatId = null) => {
+        // Signed in another way: the kept launch data must not sign in again (another account → 409)
+        if (miniApp) miniApp.initData = null;
         // The section in the address stays: signing in again lands on the tab that was open
         window.history.replaceState(null, '', `/${location.hash}`);
         const role = await startSession(chatId);
@@ -288,7 +351,10 @@ export function sessionActions(onSignedIn) {
             stopPolling();
             signInScreen('', true);
         },
-        'login-retry': async () => {
+        'miniapp-close': () => miniApp?.bridge.postEvent('web_app_close', '{}'),
+        'login-retry': async (el) => {
+            // One try at a time: Telegram's launch data signs in only once
+            /** @type {HTMLButtonElement} */ (el).disabled = true;
             const role = await startSession();
             if (role) onSignedIn(role);
         },

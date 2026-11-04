@@ -230,6 +230,19 @@ body.signed-out .tabbar {
     border-color: var(--accent);
 }
 
+/* Outline buttons here stand next to the primary one at its height (and the 44px touch target) */
+.login-card .btn-outline {
+    min-height: var(--control-h);
+}
+
+/* The HTTP status under a failed sign-in: what to quote when reporting it */
+.login-code {
+    margin-top: calc(-1 * var(--space-1));
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
 /* A rule on both sides of the alternate methods label. */
 .login-or {
     display: flex;
