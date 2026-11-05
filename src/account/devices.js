@@ -13,6 +13,7 @@ const { Op } = require('sequelize');
 const { AccountDevice } = require('../db');
 const { lruCache } = require('../lru');
 const { log } = require('../log');
+const { cookieValue } = require('./cookies');
 
 const COOKIE = 'nfb_device';
 const COOKIE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -123,17 +124,6 @@ const ipOf = (req) => String(req.ip || req.socket?.remoteAddress || '').replace(
 
 const hash = (token) => crypto.createHash('sha256').update(`device:${token}`).digest('hex');
 
-function cookieToken(header) {
-    for (const part of String(header || '').split(';')) {
-        const [name, ...rest] = part.trim().split('=');
-        if (name === COOKIE) {
-            const value = rest.join('=');
-            return TOKEN.test(value) ? value : null;
-        }
-    }
-    return null;
-}
-
 /**
  * The browser's device id, marking it first when it has no mark (or an unreadable one): then
  * req.deviceMarked stays false, and nothing is remembered for it until it comes back with the mark (a
@@ -141,7 +131,8 @@ function cookieToken(header) {
  */
 function markOf(req, res) {
     if (req.deviceId) return req.deviceId;
-    let token = cookieToken(req.headers.cookie);
+    const value = cookieValue(req.headers.cookie, COOKIE);
+    let token = TOKEN.test(value || '') ? value : null;
     req.deviceMarked = Boolean(token);
     if (!token) {
         token = crypto.randomBytes(32).toString('base64url');

@@ -7,8 +7,8 @@
  * season its episodes and their minutes.
  */
 const { Series } = require('../db');
-const { getDetailsCached, getSeasonDetails, titleFacts } = require('../api/tmdb');
-const { log } = require('../log');
+const { getSeasonDetails, titleFacts } = require('../api/tmdb');
+const { backfillSeries } = require('./series-backfill');
 
 /** "2026-03:2=4/180" → Map { "2026-03" → Map { 2 → { count: 4, minutes: 180 } } } */
 function parseAired(value) {
@@ -110,20 +110,10 @@ async function ensureAiredEpisodes(series, details, seasons = [], now = new Date
  */
 async function backfillAiredEpisodes() {
     const pending = await Series.findAll({ where: { aired_episodes: null } });
-    let failed = 0;
-    for (const series of pending) {
-        try {
-            const details = await getDetailsCached(String(series.tmdb_id).replace('tv_', ''), 'tv');
-            if (!series.genres) await series.update(titleFacts(details, 'tv'));
-            await ensureAiredEpisodes(series, details);
-        } catch (err) {
-            failed += 1;
-            log.error(`[Stats] Aired episodes for ${series.tmdb_id} failed: ${err.message}`);
-        }
-    }
-    if (pending.length) {
-        log.info(`[Stats] Aired episodes filled for ${pending.length - failed} of ${pending.length} series`);
-    }
+    await backfillSeries(pending, '[Stats] Aired episodes', async (series, details) => {
+        if (!series.genres) await series.update(titleFacts(details, 'tv'));
+        await ensureAiredEpisodes(series, details);
+    });
 }
 
 module.exports = { ensureAiredEpisodes, seasonsToRescan, backfillAiredEpisodes, parseAired, formatAired, seasonMonths };

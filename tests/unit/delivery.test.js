@@ -318,6 +318,10 @@ describe('the outbox', () => {
             ]
         );
         assert.equal(failures[1].day, '2026-10-14');
+        assert.deepEqual(
+            failures.map((f) => f.since),
+            rows.slice(0, 2).map((r) => r.createdAt)
+        );
         // The one still failing keeps its latest reason for the queue's list
         assert.equal(rows[3].error, 'connect ETIMEDOUT 149.154.167.220:443');
     });
@@ -422,6 +426,28 @@ describe('the outbox', () => {
             failures.map((f) => [f.chatId, f.about, f.status, f.tries]),
             [[10, 'Severance', 'gone', 2]]
         );
+    });
+
+    test('a rejected queued message keeps its title, attempts and original date exactly once', async () => {
+        const now = new Date('2026-10-14T12:00:00Z');
+        const createdAt = new Date('2026-10-13T12:00:00Z');
+        const message = row({ chatId: 10, text: '<b>', about: 'Severance', attempts: 2, createdAt });
+        mock.method(PendingMessage, 'findAll', async () => [message]);
+        const bot = scriptedBot([telegramError(400, "Bad Request: can't parse entities")]);
+        await flushPending(bot, now);
+        assert.equal(bot.calls.length, 1);
+        assert.equal(message.destroyed, true);
+        assert.equal(failures.length, 1);
+        assert.deepEqual(failures[0], {
+            day: '2026-10-14',
+            chatId: 10,
+            about: 'Severance',
+            status: 'rejected',
+            error: "400: Bad Request: can't parse entities",
+            count: 1,
+            tries: 2,
+            since: createdAt
+        });
     });
 
     test('Telegram down: after the first failure the rest of the check queues without trying', async () => {

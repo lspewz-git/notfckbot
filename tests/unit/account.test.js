@@ -1742,6 +1742,27 @@ test('the bot question for Telegram and password sign-ins names the browser and 
     );
 });
 
+test('session and device cookies preserve first-match, raw-value and token-validation rules', () => {
+    const token = 'm'.repeat(43);
+    for (const [value, expected] of [
+        [token, token],
+        ['', ''],
+        ['bad=token', 'bad=token'],
+        ['%6D'.repeat(43), '%6D'.repeat(43)],
+        ['"' + token + '"', '"' + token + '"']
+    ]) {
+        const cookie = `other=x; nfb_session=${value}; nfb_device=${value}; nfb_session=${token}; nfb_device=${token}`;
+        assert.equal(auth.cookieToken(cookie), expected, 'the first raw value wins, even when invalid');
+        const req = { headers: { cookie }, get: () => '', ip: '127.0.0.1' };
+        const issued = [];
+        devices.clientOf(req, { append: (...args) => issued.push(args) });
+        assert.equal(req.deviceMarked, value === token, 'only a valid device token is reused');
+        assert.equal(issued.length, value === token ? 0 : 1);
+    }
+    assert.equal(auth.cookieToken(undefined), null);
+    assert.equal(auth.cookieToken(`nfb_session_extra=${token}; NFB_SESSION=${token}`), null);
+});
+
 test('the guard marks and remembers the browser; a day-old device may end sessions, a new one waits', async (t) => {
     const { server, call } = await serve(fakeBot({}));
     t.after(() => server.close());

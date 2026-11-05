@@ -6,8 +6,8 @@
  * Stored on the series as "2023:1;2024:2;2025:3": year, then the qualifying seasons.
  */
 const { Series } = require('../db');
-const { getDetailsCached, getSeasonDetails } = require('../api/tmdb');
-const { log } = require('../log');
+const { getSeasonDetails } = require('../api/tmdb');
+const { backfillSeries } = require('./series-backfill');
 const { parseAired } = require('./aired-episodes');
 
 /** "2024:2;2025:2,3" → Map { 2024 → [2], 2025 → [2, 3] } */
@@ -120,19 +120,7 @@ async function ensureReleaseSeasons(series, details, now = new Date()) {
 /** After a start, rebuild all derived years, including values stored under an older rule. */
 async function backfillReleaseSeasons() {
     const pending = await Series.findAll();
-    let failed = 0;
-    for (const series of pending) {
-        try {
-            const details = await getDetailsCached(String(series.tmdb_id).replace('tv_', ''), 'tv');
-            await ensureReleaseSeasons(series, details);
-        } catch (err) {
-            failed += 1;
-            log.error(`[History] Release seasons for ${series.tmdb_id} failed: ${err.message}`);
-        }
-    }
-    if (pending.length) {
-        log.info(`[History] Release seasons filled for ${pending.length - failed} of ${pending.length} series`);
-    }
+    await backfillSeries(pending, '[History] Release seasons', ensureReleaseSeasons);
 }
 
 module.exports = { ensureReleaseSeasons, backfillReleaseSeasons, parseSeasons, formatSeasons, airedYear };

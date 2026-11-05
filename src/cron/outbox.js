@@ -138,6 +138,21 @@ async function send(bot, chatId, text, { photo, about, line, label }) {
     return result;
 }
 
+/** Keep the original queue context for every final failure, including a migrated chat's new id. */
+function recordPendingFailure(message, result, now) {
+    recordFailure(
+        {
+            chatId: result.chatId || message.chatId,
+            about: message.about,
+            status: result.status,
+            error: result.error,
+            tries: message.attempts,
+            since: message.createdAt
+        },
+        now
+    );
+}
+
 /** Starts a check: sends what earlier checks couldn't, oldest first, before the check's own news. */
 async function flushPending(bot, now = new Date()) {
     unreachable = false;
@@ -152,17 +167,7 @@ async function flushPending(bot, now = new Date()) {
             // Out of tries, or stale news (it waited out quiet hours or outages untried)
             const status = message.attempts >= MAX_ATTEMPTS ? 'gave_up' : 'too_old';
             log.error(`[Cron] Gave up on a message to chat ${message.chatId} after ${message.attempts} retries`);
-            recordFailure(
-                {
-                    chatId: message.chatId,
-                    about: message.about,
-                    status,
-                    error: message.error,
-                    tries: message.attempts,
-                    since: message.createdAt
-                },
-                now
-            );
+            recordPendingFailure(message, { status, error: message.error }, now);
             await message.destroy();
             continue;
         }
@@ -171,14 +176,11 @@ async function flushPending(bot, now = new Date()) {
         const chat = await chatSettings(message.chatId);
         // Lost to a chat that blocked the bot meanwhile, as a new one would be
         if (isLeft(chat)) {
-            recordFailure(
+            recordPendingFailure(
+                message,
                 {
-                    chatId: message.chatId,
-                    about: message.about,
                     status: 'gone',
-                    error: 'The chat blocked or removed the bot while it waited',
-                    tries: message.attempts,
-                    since: message.createdAt
+                    error: 'The chat blocked or removed the bot while it waited'
                 },
                 now
             );
@@ -201,17 +203,7 @@ async function flushPending(bot, now = new Date()) {
             stats.count('sent');
             sent += 1;
         } else {
-            recordFailure(
-                {
-                    chatId: result.chatId || message.chatId,
-                    about: message.about,
-                    status: result.status,
-                    error: result.error,
-                    tries: message.attempts,
-                    since: message.createdAt
-                },
-                now
-            );
+            recordPendingFailure(message, result, now);
             log.error(`[Cron] Queued message to chat ${message.chatId} dropped (${result.status}): ${result.error}`);
         }
         await message.destroy();

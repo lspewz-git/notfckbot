@@ -23,6 +23,7 @@ const { AccountSession, LoginLink, MiniAppLaunch, AccountPassword } = require('.
 const { lruCache } = require('../lru');
 const { roleOf, isAllowed, isSystem, systemHash } = require('./roles');
 const devices = require('./devices');
+const { cookieValue } = require('./cookies');
 const { log } = require('../log');
 
 const LINK_TTL_MS = 5 * 60 * 1000;
@@ -125,13 +126,7 @@ function signedIn(userId, now) {
 }
 
 /** The cookie's value from a Cookie header. */
-function cookieToken(header) {
-    for (const part of String(header || '').split(';')) {
-        const [name, ...rest] = part.trim().split('=');
-        if (name === COOKIE) return rest.join('=');
-    }
-    return null;
-}
+const cookieToken = (header) => cookieValue(header, COOKIE);
 
 /**
  * @returns {Promise<{ id: string, userId: string, userName: string | null, role: 'admin' | 'user',
