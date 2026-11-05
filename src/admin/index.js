@@ -11,6 +11,7 @@ const http = require('node:http');
 const https = require('node:https');
 const { isIP } = require('node:net');
 const { panelOnly } = require('./panel-only');
+const { localHttpsRedirect } = require('./http-redirect');
 const { guard } = require('../account/guard');
 const { panelUrl } = require('../account/auth');
 const { useBot } = require('../account/members');
@@ -112,14 +113,7 @@ function startAdminServer(bot) {
                 log.info(`Admin panel listening on HTTPS port ${PORT}`);
                 const origin = panelUrl();
                 if (origin) {
-                    const redirect = http.createServer((req, res) => {
-                        if (req.method !== 'GET' && req.method !== 'HEAD') {
-                            res.writeHead(405, { Allow: 'GET, HEAD' }).end();
-                            return;
-                        }
-                        const target = req.url?.startsWith('/') ? req.url : '/';
-                        res.writeHead(308, { Location: origin + target }).end();
-                    });
+                    const redirect = http.createServer(localHttpsRedirect);
                     redirect.on('error', (err) => log.error(`[Admin] HTTP redirect failed: ${err.message}`));
                     redirect.listen(REDIRECT_PORT);
                 }

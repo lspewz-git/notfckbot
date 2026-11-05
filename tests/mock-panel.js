@@ -436,6 +436,7 @@ async function mockPanel(page, options = {}) {
                 kinopoisk: { configured: false, masked: '' }
             },
             proxy: { url: '', hasPassword: false },
+            panelProxyIp: '144.31.82.190',
             interval: { hours: 3, active: 3, choices: [1, 2, 3, 4, 6, 8, 12, 24] },
             changes: { days: 30, choices: [7, 30, 90, 365] },
             database: { host: 'db', name: 'series_bot', user: 'bot_user' },
@@ -528,6 +529,10 @@ async function mockPanel(page, options = {}) {
             panel.lastSettingsSave = body;
             if (options.settingsSave) return options.settingsSave(body);
             const saved = [];
+            if (body.panelProxyIp !== undefined) {
+                panel.settings.panelProxyIp = body.panelProxyIp;
+                saved.push('PANEL_PROXY_IP');
+            }
             if (body.intervalHours !== undefined) {
                 panel.settings.interval.hours = body.intervalHours;
                 panel.settings.restart.pending = ['interval'];
@@ -988,8 +993,10 @@ async function mockPanel(page, options = {}) {
             return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
         if (url.pathname.startsWith('/api/')) {
             if (url.pathname === '/api/recap/schedule') {
-                if (route.request().method() === 'PUT' && options.recapScheduleSaveWait) await options.recapScheduleSaveWait;
-                else if (route.request().method() === 'GET' && options.recapScheduleWait) await options.recapScheduleWait;
+                if (route.request().method() === 'PUT' && options.recapScheduleSaveWait)
+                    await options.recapScheduleSaveWait;
+                else if (route.request().method() === 'GET' && options.recapScheduleWait)
+                    await options.recapScheduleWait;
             }
             if (url.pathname === '/api/account/chats' && panel.account.chatsWait) await panel.account.chatsWait;
             if (url.pathname === '/api/login/miniapp' && panel.account.miniAppWait)

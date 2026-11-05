@@ -806,6 +806,59 @@
                                 </div>
                             </div>
                             <div class="settings-col">
+                                <div class="glass-card settings-card" data-card="panel">
+                                    <h2 class="settings-title">Panel connection</h2>
+                                    <p class="settings-desc">
+                                        Trusted VPS for public access. Applies at once, no restart.
+                                    </p>
+                                    <div class="settings-row">
+                                        <label class="settings-label" for="settings-token-panelProxyIp">VPS IP</label>
+                                        <div class="settings-field">
+                                            <div class="token-row">
+                                                <code class="token-masked" id="settings-masked-panelProxyIp">—</code>
+                                                <input
+                                                    type="text"
+                                                    id="settings-token-panelProxyIp"
+                                                    class="input-field mono"
+                                                    data-setting="panelProxyIp"
+                                                    autocomplete="off"
+                                                    spellcheck="false"
+                                                    placeholder="IPv4 or IPv6 address"
+                                                    hidden
+                                                />
+                                                <button
+                                                    class="btn btn-ghost btn-icon-square settings-replace"
+                                                    data-action="settings-replace"
+                                                    data-service="panelProxyIp"
+                                                    aria-label="Replace"
+                                                    aria-expanded="false"
+                                                    aria-controls="settings-token-panelProxyIp"
+                                                    title="Replace"
+                                                >
+                                                    <svg class="icon icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <use href="/vendor/lucide.svg#pencil" />
+                                                    </svg>
+                                                    <svg class="icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <use href="/vendor/lucide.svg#x" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <p class="field-error" id="settings-error-panelProxyIp" hidden></p>
+                                        </div>
+                                    </div>
+                                    <p class="settings-desc">
+                                        Update the router firewall separately. Local access keeps the VM address.
+                                    </p>
+                                    <div class="settings-foot" id="settings-foot-panel" hidden>
+                                        <span class="settings-foot-text"></span>
+                                        <button class="btn btn-ghost" data-action="settings-discard" data-card="panel">
+                                            Discard
+                                        </button>
+                                        <button class="btn btn-primary" data-action="settings-save" data-card="panel">
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="glass-card settings-card" data-card="proxy">
                                     <h2 class="settings-title">Proxy</h2>
                                     <p class="settings-desc">For TMDB and Telegram. Applies at once, no restart.</p>

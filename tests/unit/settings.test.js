@@ -106,10 +106,12 @@ describe('restartBlock', () => {
 describe('POST /api/settings', () => {
     let base;
     let server;
+    let app;
+    const oldPanelProxyIp = process.env.PANEL_PROXY_IP;
     const bot = { telegram: { token: '123:old', options: {} } };
 
     before(async () => {
-        const app = express();
+        app = express();
         app.use(express.json());
         app.set('bot', bot);
         app.use(require('../../src/admin/routes/settings'));
@@ -118,12 +120,19 @@ describe('POST /api/settings', () => {
         });
         base = `http://127.0.0.1:${server.address().port}`;
     });
-    after(() => server.close());
+    after(() => {
+        server.close();
+        if (oldPanelProxyIp === undefined) delete process.env.PANEL_PROXY_IP;
+        else process.env.PANEL_PROXY_IP = oldPanelProxyIp;
+    });
 
     beforeEach(() => {
         fs.writeFileSync(ENV_FILE, ORIGINAL);
         process.env.BOT_TOKEN = '123:old';
         process.env.TMDB_PROXY_URL = '';
+        process.env.PANEL_PROXY_IP = '144.31.82.190';
+        app.set('panel proxy origin', 'https://panel.example.com');
+        app.set('trust proxy', process.env.PANEL_PROXY_IP);
         delete process.env.UPDATE_INTERVAL_HOURS;
         // The services answer from here, not over the network
         mock.method(services.SERVICES.tmdb, 'check', async (token) => {
@@ -139,6 +148,35 @@ describe('POST /api/settings', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         }).then(async (res) => ({ status: res.status, body: await res.json() }));
+
+    test('the VPS IP is saved and immediately replaces the trusted peer, including IPv6', async () => {
+        for (const ip of ['152.234.253.242', '2001:db8::1']) {
+            const { status, body } = await post({ panelProxyIp: ` ${ip} ` });
+            assert.equal(status, 200);
+            assert.equal(body.settings.panelProxyIp, ip);
+            assert.match(fs.readFileSync(ENV_FILE, 'utf8'), new RegExp(`^PANEL_PROXY_IP=${ip}$`, 'm'));
+            const trusted = app.get('trust proxy fn');
+            assert.equal(trusted(ip, 0), true);
+            assert.equal(trusted('144.31.82.190', 0), false);
+            assert.deepEqual(body.settings.restart.pending, []);
+        }
+    });
+
+    test('invalid VPS addresses reject the whole save without changing trust or the env file', async () => {
+        for (const panelProxyIp of ['', 'example.com', '10.0.0.1/8', '1.2.3.4\nEVIL=1', true, '999.1.1.1']) {
+            const { status, body } = await post({ panelProxyIp, intervalHours: 6 });
+            assert.equal(status, 400);
+            assert.ok(body.fields.panelProxyIp);
+            assert.equal(fs.readFileSync(ENV_FILE, 'utf8'), ORIGINAL);
+            assert.equal(app.get('trust proxy fn')('144.31.82.190', 0), true);
+        }
+    });
+
+    test('an IP cannot turn on an unconfigured public proxy mode', async () => {
+        app.set('panel proxy origin', null);
+        assert.equal((await post({ panelProxyIp: '152.234.253.242' })).status, 400);
+        assert.equal(fs.readFileSync(ENV_FILE, 'utf8'), ORIGINAL);
+    });
 
     test('valid values are written together and applied; the interval waits for a restart', async () => {
         const { status, body } = await post({

@@ -11,10 +11,11 @@ import { setSelectValue } from './select.js';
 import { composeProxyUrl, parseProxyUrl } from './proxy-url.js';
 
 const SERVICES = ['telegram', 'tmdb', 'kinopoisk'];
+const REPLACE_FIELDS = [...SERVICES, 'panelProxyIp'];
 const TABS = ['connections', 'bot', 'alerts'];
 const TAB_KEY = 'settings-tab';
 // Which fields' errors each card shows
-const CARD_ERRORS = { services: SERVICES, proxy: ['proxy'], interval: ['interval'], none: [] };
+const CARD_ERRORS = { services: SERVICES, panel: ['panelProxyIp'], proxy: ['proxy'], interval: ['interval'], none: [] };
 
 const PENDING_NAMES = { interval: 'the update interval', telegram: 'the new Telegram token' };
 
@@ -56,12 +57,13 @@ function readTab() {
 
 /**
  * The changes on the page, as the server takes them, per card.
- * @returns {{ cards: Record<'services' | 'proxy' | 'interval', { body: Record<string, any>, count: number }>,
+ * @returns {{ cards: Record<'services' | 'panel' | 'proxy' | 'interval', { body: Record<string, any>, count: number }>,
  *   count: number, dirty: Set<string>, proxyIncomplete: boolean }}
  */
 function collectChanges() {
     const cards = {
         services: { body: {}, count: 0 },
+        panel: { body: {}, count: 0 },
         proxy: { body: {}, count: 0 },
         interval: { body: {}, count: 0 }
     };
@@ -77,6 +79,12 @@ function collectChanges() {
         }
     }
     if (Object.keys(tokens).length) cards.services = { body: { tokens }, count: Object.keys(tokens).length };
+
+    const panelIp = tokenInput('panelProxyIp');
+    if (!panelIp.hidden && panelIp.value.trim() !== (saved.panelProxyIp || '')) {
+        cards.panel = { body: { panelProxyIp: panelIp.value.trim() }, count: 1 };
+        dirty.add('token-panelProxyIp');
+    }
 
     const parts = proxyParts();
     const pass = proxyField('pass').value;
@@ -98,21 +106,21 @@ function collectChanges() {
         dirty.add('interval');
     }
 
-    const count = cards.services.count + cards.proxy.count + cards.interval.count;
+    const count = cards.services.count + cards.panel.count + cards.proxy.count + cards.interval.count;
     return { cards, count, dirty, proxyIncomplete };
 }
 
 /** Marks the changed fields and says how many there are. */
 function refreshChanges() {
     const { cards, dirty } = collectChanges();
-    for (const name of SERVICES) tokenInput(name).dataset.dirty = String(dirty.has(`token-${name}`));
+    for (const name of REPLACE_FIELDS) tokenInput(name).dataset.dirty = String(dirty.has(`token-${name}`));
     for (const part of ['scheme', 'host', 'port', 'user', 'pass']) {
         proxyField(part).dataset.dirty = String(dirty.has(`proxy-${part}`));
     }
     $field('settings-interval').dataset.dirty = String(dirty.has('interval'));
     $('settings-proxy-fields').hidden = !proxyField('scheme').value;
 
-    for (const card of ['services', 'proxy']) {
+    for (const card of ['services', 'panel', 'proxy']) {
         const { count } = cards[card];
         const foot = $(`settings-foot-${card}`);
         foot.hidden = count === 0;
@@ -123,7 +131,7 @@ function refreshChanges() {
     const connections = /** @type {HTMLElement} */ (
         document.querySelector('[data-action="settings-tab"][data-tab="connections"]')
     );
-    const tabDirty = cards.services.count + cards.proxy.count > 0;
+    const tabDirty = cards.services.count + cards.panel.count + cards.proxy.count > 0;
     connections.dataset.dirty = String(tabDirty);
     // The dot says it to the eye; the hidden note, to a screen reader
     if (tabDirty) connections.setAttribute('aria-describedby', 'settings-unsaved-note');
@@ -133,11 +141,11 @@ function refreshChanges() {
 /** Changes the cards would lose. The interval saves itself, so it is never one of them. */
 export const hasUnsavedSettings = () => {
     const { cards } = collectChanges();
-    return cards.services.count + cards.proxy.count > 0;
+    return cards.services.count + cards.panel.count + cards.proxy.count > 0;
 };
 
 /** The fields' errors; only those of the given fields are touched (all by default). */
-function showErrors(fields = {}, names = [...SERVICES, 'proxy', 'interval']) {
+function showErrors(fields = {}, names = [...REPLACE_FIELDS, 'proxy', 'interval']) {
     for (const name of names) {
         const el = $(`settings-error-${name}`);
         el.textContent = fields[name] || '';
@@ -194,7 +202,7 @@ function renderChecks(res = null, at = null) {
  * Puts the saved values into the fields: on load, after a save, and on Discard. With a card, only
  * its fields: the other card's unsaved edits stay.
  * @param {any} settings
- * @param {'services' | 'proxy' | 'interval' | 'none' | null} [card] none: only what isn't a field
+ * @param {'services' | 'panel' | 'proxy' | 'interval' | 'none' | null} [card] none: only what isn't a field
  */
 function fill(settings, card = null) {
     filling = true;
@@ -211,6 +219,13 @@ const proxyOnScreen = () => composeProxyUrl({ ...proxyParts(), pass: proxyField(
 function fillFields(settings, card) {
     const proxyBefore = proxyOnScreen();
     if (!card || card === 'services') fillServices(settings);
+    if (!card || card === 'panel') {
+        $('settings-masked-panelProxyIp').textContent = settings.panelProxyIp || 'Not configured';
+        $('settings-masked-panelProxyIp').hidden = false;
+        tokenInput('panelProxyIp').hidden = true;
+        tokenInput('panelProxyIp').value = '';
+        setReplaceButton('panelProxyIp', false);
+    }
     if (!card || card === 'proxy') fillProxy(settings);
     if (!card || card === 'interval') fillInterval(settings);
     if (!card) fillChangesKeep(settings);
@@ -232,7 +247,8 @@ function setReplaceButton(name, open) {
     const button = /** @type {HTMLElement} */ (
         document.querySelector(`[data-action="settings-replace"][data-service="${name}"]`)
     );
-    const label = open ? 'Cancel' : saved && !saved.tokens[name].configured ? 'Set' : 'Replace';
+    const configured = name === 'panelProxyIp' ? saved?.panelProxyIp : saved?.tokens[name].configured;
+    const label = open ? 'Cancel' : configured ? 'Replace' : 'Set';
     button.setAttribute('aria-expanded', String(open));
     button.setAttribute('aria-label', label);
     button.title = label;
@@ -315,7 +331,7 @@ async function saveChangesKeep() {
 /** Changes made, a token field open for pasting, or the cursor in a field: the page is in use. */
 function isEditing() {
     if (hasUnsavedSettings()) return true;
-    if (SERVICES.some((name) => !tokenInput(name).hidden)) return true;
+    if (REPLACE_FIELDS.some((name) => !tokenInput(name).hidden)) return true;
     const focused = document.activeElement;
     return Boolean(focused && focused.closest('#settings-section') && focused.matches('input, select'));
 }
@@ -340,18 +356,23 @@ function toggleReplace(name) {
     const editing = input.hidden;
     input.hidden = !editing;
     $(`settings-masked-${name}`).hidden = editing;
-    input.value = '';
+    input.value = name === 'panelProxyIp' ? saved?.panelProxyIp || '' : '';
     setReplaceButton(name, editing);
     if (editing) input.focus();
     refreshChanges();
 }
 
-const SAVED_TEXT = { services: 'Token saved.', proxy: 'Proxy saved.', interval: 'Update interval saved.' };
+const SAVED_TEXT = {
+    services: 'Token saved.',
+    panel: 'VPS IP saved.',
+    proxy: 'Proxy saved.',
+    interval: 'Update interval saved.'
+};
 
 /**
  * Sends one card's changes. The answer has all the settings, but only this card's fields are
  * refilled: the other card's edits stay on the page.
- * @param {'services' | 'proxy' | 'interval'} card
+ * @param {'services' | 'panel' | 'proxy' | 'interval'} card
  */
 async function save(card) {
     // Only the cards there are: a stray data-card mustn't throw on cards[card]

@@ -19,6 +19,51 @@ const foot = (page, card) => page.locator(`#settings-foot-${card}`);
 const footText = (page, card) => foot(page, card).locator('.settings-foot-text');
 const saveCard = (page, card) => page.locator(`[data-action="settings-save"][data-card="${card}"]`);
 
+test('VPS IP uses Replace, Discard and Save without losing token edits or requesting a restart', async ({ page }) => {
+    const panel = await mockPanel(page);
+    await openSettings(page);
+    const replace = page.locator('[data-action="settings-replace"][data-service="panelProxyIp"]');
+    const input = page.locator('#settings-token-panelProxyIp');
+    await expect(page.locator('#settings-masked-panelProxyIp')).toHaveText('144.31.82.190');
+    await replace.click();
+    await expect(input).toHaveValue('144.31.82.190');
+    await expect(replace.locator('.icon:visible')).toHaveCount(1);
+    await input.fill('152.234.253.242');
+    await expect(footText(page, 'panel')).toHaveText('1 unsaved change');
+    await page.locator('[data-action="settings-discard"][data-card="panel"]').click();
+    await expect(input).toBeHidden();
+    await expect(foot(page, 'panel')).toBeHidden();
+    await page.locator('[data-action="settings-replace"][data-service="tmdb"]').click();
+    await page.locator('#settings-token-tmdb').fill('unsaved-token');
+    await replace.click();
+    await input.fill('152.234.253.242');
+    await saveCard(page, 'panel').click();
+    await expect(page.locator('#settings-masked-panelProxyIp')).toHaveText('152.234.253.242');
+    expect(panel.lastSettingsSave).toEqual({ panelProxyIp: '152.234.253.242' });
+    await expect(page.locator('#settings-token-tmdb')).toHaveValue('unsaved-token');
+    await expect(page.locator('.toast-success')).toHaveText('VPS IP saved.');
+    expect(panel.settings.restart.pending).toEqual([]);
+});
+
+test('an invalid VPS IP leaves the editor and field error visible', async ({ page }) => {
+    await mockPanel(page, {
+        settingsSave: () => ({
+            status: 400,
+            body: {
+                error: 'Nothing was saved: fix the marked fields',
+                fields: { panelProxyIp: 'Enter a valid IPv4 or IPv6 address' }
+            }
+        })
+    });
+    await openSettings(page);
+    await page.locator('[data-action="settings-replace"][data-service="panelProxyIp"]').click();
+    await page.locator('#settings-token-panelProxyIp').fill('bad-ip');
+    await saveCard(page, 'panel').click();
+    await expect(page.locator('#settings-error-panelProxyIp')).toHaveText('Enter a valid IPv4 or IPv6 address');
+    await expect(page.locator('#settings-token-panelProxyIp')).toHaveValue('bad-ip');
+    await expect(foot(page, 'panel')).toBeVisible();
+});
+
 /** Picks an option of a styled select, as a user would. */
 async function pick(page, selectId, text) {
     await page.locator(`.custom-select:has(#${selectId}) .custom-select-trigger`).click();
@@ -168,9 +213,7 @@ test('an interval being saved is not an unsaved change: leaving asks nothing', a
     release();
 });
 
-test('an interval picked back to the saved one while the first pick saves: the server ends on it', async ({
-    page
-}) => {
+test('an interval picked back to the saved one while the first pick saves: the server ends on it', async ({ page }) => {
     let release;
     const slow = new Promise((resolve) => {
         release = resolve;
@@ -386,7 +429,7 @@ test('each tab: two columns that end on one line', async ({ page }) => {
         );
     const [left, right] = await columns('connections');
     expect(left.titles).toEqual(['Services']);
-    expect(right.titles).toEqual(['Proxy']);
+    expect(right.titles).toEqual(['Panel connection', 'Proxy']);
     expect(left.bottom).toBe(right.bottom);
     // A proxy turned on makes the left column taller: the right one follows
     await pick(page, 'settings-proxy-scheme', 'SOCKS5h');

@@ -4,6 +4,7 @@
  * schedules that work), then all of them go to .env in one write. Restart from here too.
  */
 const { writeEnv, isSafeEnvValue, maskToken } = require('../env');
+const { isIP } = require('node:net');
 const {
     proxyUrlProblem,
     withSavedPassword,
@@ -46,6 +47,7 @@ function currentSettings(bot) {
             url: redactProxyUrl(process.env.TMDB_PROXY_URL),
             hasPassword: hasProxyPassword(process.env.TMDB_PROXY_URL)
         },
+        panelProxyIp: process.env.PANEL_PROXY_IP || '',
         interval: {
             hours: parseIntervalHours(process.env.UPDATE_INTERVAL_HOURS, { quiet: true }),
             active: UPDATE_INTERVAL_HOURS,
@@ -71,13 +73,20 @@ router.get('/api/settings', (req, res) => {
 });
 
 /**
- * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, proxyUrl?, intervalHours?, changesKeepDays? }; what is
+ * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, panelProxyIp?, proxyUrl?, intervalHours?, changesKeepDays? }; what is
  * left out stays as it is. On a problem nothing is written, and `fields` says which field it is.
  */
 router.post('/api/settings', async (req, res) => {
     const body = req.body || {};
     const changes = {};
     const fields = {};
+
+    if (body.panelProxyIp !== undefined) {
+        const ip = typeof body.panelProxyIp === 'string' ? body.panelProxyIp.trim() : '';
+        if (!isIP(ip)) fields.panelProxyIp = 'Enter a valid IPv4 or IPv6 address';
+        else if (!req.app.get('panel proxy origin')) fields.panelProxyIp = 'Public proxy access is not configured';
+        else changes.PANEL_PROXY_IP = ip;
+    }
 
     if (body.intervalHours !== undefined) {
         const hours = Number(body.intervalHours);
@@ -135,6 +144,8 @@ router.post('/api/settings', async (req, res) => {
         return res.status(500).json({ error: `Couldn't write .env: ${err.message}` });
     }
     Object.assign(process.env, changes);
+    // The current response finishes on the old connection; subsequent requests trust the new VPS.
+    if ('PANEL_PROXY_IP' in changes) req.app.set('trust proxy', changes.PANEL_PROXY_IP);
     // The proxy and the TMDB and Kinopoisk keys apply at once; the interval and the Telegram
     // token on the next start
     if ('TMDB_PROXY_URL' in changes) applyProxyToBot(req.app.get('bot'));
