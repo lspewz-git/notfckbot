@@ -2,6 +2,21 @@
 
 const API_URL = '/api';
 
+/** JSON responses and image failures share session expiry and structured errors. */
+async function jsonResponse(res) {
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) window.dispatchEvent(new Event('session-ended'));
+    if (!res.ok || data.error) {
+        const err = /** @type {Error & { status?: number, data?: any }} */ (
+            new Error(data.error || `HTTP ${res.status}`)
+        );
+        err.status = res.status;
+        err.data = data;
+        throw err;
+    }
+    return data;
+}
+
 /**
  * Throws on a non-2xx status or an { error } body, so callers only ever deal
  * with the success shape and can report `err.message` as-is.
@@ -20,19 +35,7 @@ export async function api(path, options = {}) {
         body: body === undefined ? undefined : JSON.stringify(body)
     });
 
-    const data = await res.json().catch(() => ({}));
-    // The session is over (or never was): session.js shows the sign-in screen
-    if (res.status === 401) window.dispatchEvent(new Event('session-ended'));
-    if (!res.ok || data.error) {
-        // The body goes along: some answers say more than the message (Settings: which field)
-        const err = /** @type {Error & { status?: number, data?: any }} */ (
-            new Error(data.error || `HTTP ${res.status}`)
-        );
-        err.status = res.status;
-        err.data = data;
-        throw err;
-    }
-    return data;
+    return jsonResponse(res);
 }
 
 /**
@@ -48,9 +51,7 @@ export async function apiUpload(path, form) {
         headers: { 'X-Requested-By': 'notfckbot-panel' },
         body: form
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
-    return data;
+    return jsonResponse(res);
 }
 
 /**
@@ -61,9 +62,6 @@ export async function apiUpload(path, form) {
  */
 export async function apiImage(path) {
     const res = await fetch(`${API_URL}${path}`, { headers: { 'X-Requested-By': 'notfckbot-panel' } });
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${res.status}`);
-    }
+    if (!res.ok) await jsonResponse(res);
     return res.blob();
 }

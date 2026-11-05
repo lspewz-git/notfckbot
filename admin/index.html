@@ -24,6 +24,7 @@
              importing it, a chain of round trips before the panel runs (tests/unit/panel-files.test.js
              keeps this list complete) -->
         <link rel="modulepreload" href="js/app.js" />
+        <link rel="modulepreload" href="js/navigation.js" />
         <link rel="modulepreload" href="js/about.js" />
         <link rel="modulepreload" href="js/access.js" />
         <link rel="modulepreload" href="js/account.js" />
@@ -136,77 +137,7 @@
                     </div>
                     <span>NotFckBot</span>
                 </div>
-                <nav class="rail-nav" aria-label="Sections">
-                    <button class="nav-item active" aria-current="page" data-section="dashboard" aria-label="Dashboard">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#layout-dashboard" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Dashboard</span>
-                    </button>
-                    <span class="rail-divider" aria-hidden="true"></span>
-                    <button class="nav-item" data-section="chats" aria-label="Users / Chats">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#users" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Chats</span>
-                    </button>
-                    <button class="nav-item" data-section="subs" aria-label="Serials">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#tv" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Serials</span>
-                    </button>
-                    <button class="nav-item" data-section="watchlist" aria-label="Movies">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#film" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Movies</span>
-                    </button>
-                    <button class="nav-item" data-section="history" aria-label="Released">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#calendar" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Released</span>
-                    </button>
-                    <span class="rail-divider" aria-hidden="true"></span>
-                    <button class="nav-item" data-section="tools" data-tab-sections="recap" aria-label="Tools">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#sliders-horizontal" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Tools</span>
-                    </button>
-                    <button class="nav-item" data-section="logs" aria-label="Activity Logs">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#file-text" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Logs</span>
-                    </button>
-                    <button class="nav-item" data-section="settings" aria-label="Settings">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#settings" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Settings</span>
-                    </button>
-                    <span class="rail-divider nav-mine" aria-hidden="true"></span>
-                    <button class="nav-item nav-mine" data-section="my-aired" aria-label="Released">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#clapperboard" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Released</span>
-                    </button>
-                    <button class="nav-item nav-mine" data-section="my-subs" aria-label="Following">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#bookmark" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Following</span>
-                    </button>
-                    <button class="nav-item nav-mine" data-section="my-calendar" aria-label="Calendar">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <use href="/vendor/lucide.svg#calendar-days" />
-                        </svg>
-                        <span class="nav-label" aria-hidden="true">Calendar</span>
-                    </button>
-                </nav>
+                <nav class="rail-nav" aria-label="Sections"></nav>
                 <div class="rail-bottom">
                     <button class="nav-item" id="actions-btn" aria-label="Actions">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1805,46 +1736,6 @@
 
         <!-- Phones and tablets: app-style tab bar instead of the sidebar -->
         <nav class="tabbar" aria-label="Sections">
-            <button class="tab-item active" data-section="dashboard" aria-current="page">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <use href="/vendor/lucide.svg#layout-dashboard" /></svg
-                ><span>Dashboard</span>
-            </button>
-            <button class="tab-item" data-section="chats">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#users" /></svg
-                ><span>Chats</span>
-            </button>
-            <button class="tab-item" data-section="subs">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#tv" /></svg
-                ><span>Serials</span>
-            </button>
-            <button class="tab-item" data-section="watchlist">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#film" /></svg
-                ><span>Movies</span>
-            </button>
-            <button
-                class="tab-item"
-                data-open="more-modal"
-                data-tab-sections="tools logs history recap settings"
-                aria-haspopup="dialog"
-            >
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#ellipsis" /></svg
-                ><span>More</span>
-            </button>
-            <button class="tab-item tab-mine" data-section="my-aired">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <use href="/vendor/lucide.svg#clapperboard" /></svg
-                ><span>Released</span>
-            </button>
-            <button class="tab-item tab-mine" data-section="my-subs">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#bookmark" /></svg
-                ><span>Following</span>
-            </button>
-            <button class="tab-item tab-mine" data-section="my-calendar">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <use href="/vendor/lucide.svg#calendar-days" /></svg
-                ><span>Calendar</span>
-            </button>
             <button
                 class="tab-item tab-mine tab-profile"
                 data-action="profile-open"
@@ -1949,76 +1840,6 @@
             <div class="modal-content modal-narrow">
                 <h3 id="more-title">More</h3>
                 <div class="action-list">
-                    <button class="action-row" data-section="my-subs" data-close="more-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#bookmark" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">My account</span>
-                            <span class="action-desc">Subscriptions, calendar and settings of your chats</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                    <button class="action-row" data-section="history" data-close="more-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#calendar" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Released</span>
-                            <span class="action-desc">What came out, year by year</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                    <button class="action-row" data-section="tools" data-close="more-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#sliders-horizontal" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Tools</span>
-                            <span class="action-desc">Year recap and occasional tasks</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                    <button class="action-row" data-section="logs" data-close="more-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#file-text" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Activity Logs</span>
-                            <span class="action-desc">What the bot has been doing</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                    <button class="action-row" data-section="settings" data-close="more-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#settings" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Settings</span>
-                            <span class="action-desc">Tokens, proxy, update check, restart</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
                     <button class="action-row" data-close="more-modal" data-open="actions-modal">
                         <span class="action-icon"
                             ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">

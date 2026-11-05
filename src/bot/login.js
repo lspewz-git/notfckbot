@@ -14,6 +14,7 @@ const { placeLine } = require('../account/devices');
 const { escapeHtml } = require('../constants');
 const { getState, setState } = require('./state');
 const { log } = require('../log');
+const { plural } = require('../words');
 
 const CLOSED = 'Вход в панель пока в закрытом тесте.';
 const GONE = 'Этот вход устарел. Нажмите «Continue with Telegram» на странице ещё раз.';
@@ -25,13 +26,7 @@ const CODE_PRIVATE = 'Вход по коду — в личном чате с б�
 const DIGITS_LIKE = /^[\d\s-]{1,16}$/;
 
 /** "1 минуту", "3 минуты", "5 минут". */
-function minutes(n) {
-    const tens = n % 100;
-    const ones = n % 10;
-    const word =
-        tens >= 11 && tens <= 14 ? 'минут' : ones === 1 ? 'минуту' : ones >= 2 && ones <= 4 ? 'минуты' : 'минут';
-    return `${n} ${word}`;
-}
+const minutes = (n) => plural(n, 'минуту', 'минуты', 'минут');
 
 const HEADS = {
     known: '✅ <b>Вход выполнен</b>',

@@ -4,7 +4,7 @@
  * satori (src/recap/render.js turns it into a PNG): plain objects, no JSX. A card with nothing to
  * say about its subject says so instead of showing zeros.
  */
-const { plural } = require('../calendar');
+const { plural } = require('../words');
 
 const { WIDTH, HEIGHT } = require('./size');
 const PAD = 80;

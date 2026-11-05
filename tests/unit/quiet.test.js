@@ -376,6 +376,9 @@ describe('the bot buttons', () => {
     const ctxFor = ({ status = 'creator', type = 'supergroup' } = {}) => {
         const chatData = {
             ...chat({ quiet_start: null, quiet_end: null }),
+            get() {
+                return { ...this };
+            },
             async update(changes) {
                 Object.assign(this, changes);
             }
@@ -420,6 +423,20 @@ describe('the bot buttons', () => {
         assert.equal(ctx.state.chatData.quiet_start, null);
         assert.equal(ctx.state.chatData.timezone, 'Europe/Moscow');
         assert.match(ctx.answers.at(-1), /только её админы/);
+    });
+
+    test('enabling a digest updates the loaded chat; a repeated callback keeps its sent mark', async () => {
+        const press = handlers();
+        const ctx = ctxFor();
+        await press('settings_digest_week_on', ctx);
+        assert.equal(ctx.state.chatData.digest_week, true);
+        assert.ok(Object.hasOwn(ctx.state.chatData, 'digest_week_sent'));
+        ctx.state.chatData.digest_week_sent = 'kept-mark';
+        await press('settings_digest_week_on', ctx);
+        assert.equal(ctx.state.chatData.digest_week_sent, 'kept-mark');
+        await press('settings_digest_week_off', ctx);
+        assert.equal(ctx.state.chatData.digest_week, false);
+        assert.equal(ctx.state.chatData.digest_week_sent, 'kept-mark');
     });
 
     test('made-up button data changes nothing', async () => {

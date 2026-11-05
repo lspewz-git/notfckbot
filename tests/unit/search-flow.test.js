@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 const tmdb = require('../../src/api/tmdb');
 const kinopoisk = require('../../src/api/kinopoisk');
-const { Series, Subscription, Watchlist } = require('../../src/db');
+const { Chat, Series, Subscription, Watchlist } = require('../../src/db');
 
 // --- TMDB and the database, stubbed ---
 const film = (id, title, date) => ({ media_type: 'movie', id, title, release_date: date });
@@ -47,6 +47,8 @@ let db;
 beforeEach(() => {
     db = { series: new Map(), subs: [], watchlist: [] };
 });
+mock.method(Chat, 'findByPk', async () => ({ id: 555 }));
+mock.method(Series, 'findByPk', async (id) => db.series.get(id) || null);
 mock.method(Series, 'findOrCreate', async ({ where, defaults }) => {
     if (!db.series.has(where.tmdb_id))
         db.series.set(where.tmdb_id, { tmdb_id: where.tmdb_id, ...defaults, update: async () => {} });
@@ -60,8 +62,9 @@ mock.method(Subscription, 'findOrCreate', async ({ where, defaults }) => {
 });
 mock.method(Watchlist, 'findOne', async () => null);
 mock.method(Watchlist, 'findOrCreate', async ({ where, defaults }) => {
-    db.watchlist.push({ ...where, ...defaults });
-    return [{}, true];
+    const entry = { ...where, ...defaults };
+    db.watchlist.push(entry);
+    return [entry, true];
 });
 
 // --- A fake bot that records handlers, and a fake chat that records what is on screen ---

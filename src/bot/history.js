@@ -6,7 +6,8 @@
 const { Markup } = require('telegraf');
 const { escapeHtml } = require('../constants');
 const { releaseHistory, upcomingHistory } = require('../history');
-const { todayIn, plural } = require('../calendar');
+const { todayIn } = require('../calendar');
+const { plural } = require('../words');
 const { viewRows, canGoBack, isDigest } = require('./calendar');
 
 // Telegram's limit is 4096 characters; the links make each line long, so stop well before it

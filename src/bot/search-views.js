@@ -5,6 +5,7 @@
 const { Markup } = require('telegraf');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates } = require('../constants');
 const { watchButtonRows } = require('./keyboards');
+const { pluralWord: plural } = require('../words');
 // The release check's own rule, so the card never says "out" before the notification does
 const { isMovieReleased } = require('../cron/films');
 
@@ -55,15 +56,6 @@ function resultsList(results, page, query) {
         text: `🔍 «${escapeHtml(query)}» — ${found}. Выберите:`,
         keyboard: Markup.inlineKeyboard(rows)
     };
-}
-
-/** 1 вариант, 2 варианта, 5 вариантов */
-function plural(n, one, few, many) {
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return one;
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-    return many;
 }
 
 /** The heading every card starts with: bold name and year, then a muted kind line. */

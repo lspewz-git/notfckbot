@@ -57,6 +57,7 @@ import { profileActions, setupProfile } from './profile.js';
 import { deviceActions } from './devices.js';
 import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
+import { setupNavigation } from './navigation.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -329,6 +330,7 @@ function afterSignIn(role) {
 }
 
 async function init() {
+    setupNavigation();
     // First: the selects inside are what setupFilters, setupHistory and enhanceSelects work on
     fillPagers();
     setupControls();

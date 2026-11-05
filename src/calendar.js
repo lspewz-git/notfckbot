@@ -10,6 +10,7 @@ const { parseSeasons } = require('./cron/release-seasons');
 const { parseAired } = require('./cron/aired-episodes');
 const { zoneOf } = require('./quiet');
 const { escapeHtml, isFinishedStatus } = require('./constants');
+const { plural } = require('./words');
 
 // --- Dates as "YYYY-MM-DD" strings: TMDB's air dates are days, not moments ---
 
@@ -89,14 +90,6 @@ const shortRange = (from, to) =>
           : `${dayNum(from)} ${MONTHS_SHORT[monthIdx(from)]} – ${dayNum(to)} ${MONTHS_SHORT[monthIdx(to)]}`;
 
 const dayTitle = (day) => `${WEEKDAYS[toUtc(day).getUTCDay()]}, ${dayNum(day)} ${MONTHS_SHORT[monthIdx(day)]}`;
-
-/** 1 серия, 2 серии, 5 серий */
-function plural(n, one, few, many) {
-    const t = n % 10;
-    const h = n % 100;
-    const word = t === 1 && h !== 11 ? one : t >= 2 && t <= 4 && (h < 12 || h > 14) ? few : many;
-    return `${n} ${word}`;
-}
 
 /**
  * The period `offset` weeks or months from the current one.

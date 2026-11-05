@@ -1,6 +1,6 @@
 /**
  * What can be changed about one chat's list and settings, shared by the panel (src/admin/routes/records.js)
- * and the users' account pages (src/account/). The bot's own buttons keep their handlers.
+ * and the users' account pages (src/account/). The bot's handlers use the same writes.
  */
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const tmdb = require('./api/tmdb');
@@ -25,14 +25,14 @@ const NOTIFY_TYPES = Object.keys(NOTIFY_LABELS);
  * Subscribes a chat to a series, or changes the mode of its subscription.
  * @param {{ userId?: number | string, userName?: string }} who for the chat's statistics; none from the panel
  */
-async function subscribe(chatId, tmdbId, notifyType, who = {}) {
+async function subscribe(chatId, tmdbId, notifyType, who = {}, details = null) {
     const fullId = String(tmdbId).startsWith('tv_') ? String(tmdbId) : `tv_${tmdbId}`;
     const chat = await Chat.findByPk(chatId);
     if (!chat) throw new OpError(404, 'Chat not found');
 
     let series = await Series.findByPk(fullId);
     if (!series) {
-        const details = await tmdb.getDetails(fullId.replace('tv_', ''), 'tv');
+        details ||= await tmdb.getDetails(fullId.replace('tv_', ''), 'tv');
         // From the latest aired episode, as the bot does: never announce what is already out
         [series] = await Series.findOrCreate({
             where: { tmdb_id: fullId },
@@ -52,11 +52,21 @@ async function subscribe(chatId, tmdbId, notifyType, who = {}) {
             title: series.title,
             ...who
         });
-    } else if (notifyType && subscription.notify_type !== notifyType) {
-        await subscription.update({ notify_type: notifyType });
-        events.record(chatId, { kind: 'mode', detail: notifyType, tmdb_id: fullId, title: series.title, ...who });
-    }
+    } else if (notifyType) await setSubscriptionMode(subscription, series, notifyType, who);
     return { subscription, created, series };
+}
+
+/** Changes an existing subscription only; a stale bot button must never recreate a deleted one. */
+async function setSubscriptionMode(subscription, series, notifyType, who = {}) {
+    if (subscription.notify_type === notifyType) return;
+    await subscription.update({ notify_type: notifyType });
+    events.record(subscription.chatId, {
+        kind: 'mode',
+        detail: notifyType,
+        tmdb_id: series.tmdb_id,
+        title: series.title,
+        ...who
+    });
 }
 
 /** @returns {Promise<boolean>} whether there was a subscription to remove */
@@ -70,17 +80,18 @@ async function unsubscribe(chatId, seriesId, who = {}) {
 }
 
 /** Puts a film on a chat's list: one still to come waits for its release, one already out goes to Released. */
-async function addFilm(chatId, tmdbId, who = {}) {
+async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly = false } = {}) {
     const chat = await Chat.findByPk(chatId);
     if (!chat) throw new OpError(404, 'Chat not found');
 
     // Rows are stored as "movie_<id>": the request may send either form
     const numericId = String(tmdbId).replace('movie_', '');
     const fullTmdbId = `movie_${numericId}`;
-    const rows = await Watchlist.findAll({ where: { chatId, tmdb_id: fullTmdbId } });
+    // The bot's waiting-list action keeps its findOrCreate semantics, even for an old card.
+    const rows = waitingOnly ? [] : await Watchlist.findAll({ where: { chatId, tmdb_id: fullTmdbId } });
     if (rows.some((r) => !r.notified)) throw new OpError(409, 'Film already in watchlist for this chat');
 
-    const details = await tmdb.getDetails(numericId, 'movie');
+    details ||= await tmdb.getDetails(numericId, 'movie');
     let isReleased = details.status === 'Released';
     if (!isReleased && details.release_date) {
         const releaseDate = new Date(details.release_date);
@@ -89,18 +100,19 @@ async function addFilm(chatId, tmdbId, who = {}) {
     // A released film is stored straight into Released; one record there is enough
     if (isReleased && rows.length) throw new OpError(409, "Film is already in this chat's Released list");
 
-    const entry = await Watchlist.create({
-        chatId,
-        tmdb_id: fullTmdbId,
-        title: details.title || details.original_title,
+    const fields = {
+        title: details.title || details.original_title || 'Без названия',
         poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
         year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
         premiere_digital: details.release_date || null,
         ...tmdb.titleFacts(details, 'movie'),
-        notified: isReleased // already out: the update check has nothing to announce
-    });
-    events.record(chatId, { kind: 'film_added', tmdb_id: fullTmdbId, title: entry.title, ...who });
-    return { entry, isReleased };
+        notified: waitingOnly ? false : isReleased
+    };
+    const [entry, created] = waitingOnly
+        ? await Watchlist.findOrCreate({ where: { chatId, tmdb_id: fullTmdbId, notified: false }, defaults: fields })
+        : [await Watchlist.create({ chatId, tmdb_id: fullTmdbId, ...fields }), true];
+    if (created) events.record(chatId, { kind: 'film_added', tmdb_id: fullTmdbId, title: entry.title, ...who });
+    return { entry, isReleased, created };
 }
 
 /**
@@ -163,10 +175,11 @@ const settingsOf = (chat) => Object.fromEntries(SETTING_FIELDS.map((field) => [f
  * @param {{ userId?: number | string, userName?: string, source?: string }} who
  * @returns {Promise<{ chat: any, lines: string[] }>} the changes in words, one per setting
  */
-async function updateSettings(chatId, body, who = {}) {
+async function updateSettings(chatId, body, who = {}, chat = null) {
     const changes = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
     if (!Object.keys(changes).length) throw new OpError(400, 'Nothing to change');
-    const chat = await Chat.findByPk(chatId);
+    // Bot middleware already loaded this row; update it in place for the next view.
+    chat ||= await Chat.findByPk(chatId);
     if (!chat) throw new OpError(404, 'Chat not found');
     const before = settingsOf(chat);
     // A digest turned on starts with the next one due, as in the bot (src/cron/digests.js)
@@ -186,6 +199,7 @@ module.exports = {
     OpError,
     NOTIFY_TYPES,
     subscribe,
+    setSubscriptionMode,
     unsubscribe,
     addFilm,
     removeFilm,

@@ -7,9 +7,7 @@ const { mainMenu } = require('./keyboards');
 const { ownerOf } = require('./access');
 const { getState, setState } = require('./state');
 const { ZONES, PRESETS, zoneOf, hasQuietHours, quietLabel, pad } = require('../quiet');
-const { sentMarkOnEnable } = require('../cron/digests');
-const { settingsOf } = require('../chat-ops');
-const { recordSettings } = require('../chat-changes');
+const { updateSettings } = require('../chat-ops');
 const events = require('../chat-events');
 
 const BUTTONS_LABEL = {
@@ -145,10 +143,7 @@ const showView = (ctx, view) =>
 
 /** Applies a change from the buttons and notes it in the chat's change log (src/chat-changes.js). */
 async function change(ctx, values) {
-    const chat = ctx.state.chatData;
-    const before = settingsOf(chat);
-    await chat.update(values);
-    recordSettings(ctx.chat.id, before, settingsOf(chat), events.actor(ctx));
+    await updateSettings(ctx.chat.id, values, events.actor(ctx), ctx.state.chatData);
 }
 
 /** Turns the bottom menu on or off; says so with a message, as only a message can carry a keyboard. */
@@ -228,10 +223,7 @@ function register(bot) {
         const [, which, state] = ctx.match;
         const on = state === 'on';
         const settings = ctx.state.chatData;
-        await change(ctx, {
-            [`digest_${which}`]: on,
-            ...(on ? { [`digest_${which}_sent`]: sentMarkOnEnable(which === 'week' ? 'w' : 'm', settings) } : {})
-        });
+        await change(ctx, { [`digest_${which}`]: on });
         const name = which === 'week' ? 'Сводка недели' : 'Сводка месяца';
         await ctx.answerCbQuery(`${name} ${on ? 'включена' : 'выключена'}`);
         await showView(ctx, settingsView(ctx.chat, settings));

@@ -3,9 +3,10 @@
  * adding a film. The views themselves are in search-views.js.
  */
 const { Markup } = require('telegraf');
-const { searchMulti, getDetails, getDetailsCached, newSeriesFields, titleFacts } = require('../api/tmdb');
+const { searchMulti, getDetails, getDetailsCached } = require('../api/tmdb');
 const { findKinopoiskId, kinopoiskQuick } = require('../api/kinopoisk');
-const { Series, Subscription, Watchlist } = require('../db');
+const { Subscription, Watchlist } = require('../db');
+const ops = require('../chat-ops');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
@@ -149,12 +150,6 @@ async function showCard(ctx, session, card) {
     // The list goes once the card is there, so the chat is never empty in between
     ctx.deleteMessage().catch(() => {});
     moveSession(session, msg);
-}
-
-/** A series row for the update check, created on the first subscription. */
-async function ensureSeries(tmdbId, data) {
-    const [series] = await Series.findOrCreate({ where: { tmdb_id: tmdbId }, defaults: newSeriesFields(data) });
-    return series;
 }
 
 /** The search is done (subscribed, added): its message is now a confirmation, not a search. */
@@ -307,20 +302,7 @@ function register(bot) {
             const data = await getDetails(filmId, mediaType);
             if (!data) return ctx.answerCbQuery('Сериал не найден.');
             // Saved now, not when the card was opened: a card looked at and left adds nothing
-            const series = await ensureSeries(tmdbId, data);
-
-            const [subscription, created] = await Subscription.findOrCreate({
-                where: { chatId, seriesId: tmdbId },
-                defaults: { notify_type: notifyType }
-            });
-            if (!created) await subscription.update({ notify_type: notifyType });
-            events.record(chatId, {
-                kind: created ? 'subscribed' : 'mode',
-                detail: notifyType,
-                tmdb_id: tmdbId,
-                title: series.title,
-                ...events.actor(ctx)
-            });
+            const { series, created } = await ops.subscribe(chatId, tmdbId, notifyType, events.actor(ctx), data);
 
             log.info(
                 `[Bot] ${created ? 'New subscription' : 'Subscription updated'} for User ${chatId}: ${tmdbId} (Mode: ${notifyType})`
@@ -364,27 +346,16 @@ function register(bot) {
             const data = await getDetails(filmId, mediaType);
             if (!data) return ctx.answerCbQuery('Данные не найдены.');
 
-            const title = data.title || data.original_title || 'Без названия';
-            const posterUrl = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
-            const digitalDate = data.release_date || null;
-            const year = data.release_date ? parseInt(data.release_date.substring(0, 4)) : null;
-
-            const [, created] = await Watchlist.findOrCreate({
-                where: { chatId: ctx.chat.id, tmdb_id: tmdbId, notified: false },
-                defaults: {
-                    title,
-                    poster_url: posterUrl,
-                    year,
-                    premiere_digital: digitalDate,
-                    ...titleFacts(data, 'movie')
-                }
+            const { entry, created } = await ops.addFilm(ctx.chat.id, tmdbId, events.actor(ctx), {
+                details: data,
+                waitingOnly: true
             });
+            const title = entry.title;
+            const digitalDate = data.release_date || null;
 
             if (!created) {
                 return ctx.answerCbQuery('Уже в списке ожидания! 📌', { show_alert: false });
             }
-            events.record(ctx.chat.id, { kind: 'film_added', tmdb_id: tmdbId, title, ...events.actor(ctx) });
-
             const dateLabel = formatRuDate(digitalDate) || 'пока не объявлена';
             const digitalLine = data.digital_release_date
                 ? `💻 Цифровой релиз: <b>${formatRuDate(data.digital_release_date)}</b>\n`
