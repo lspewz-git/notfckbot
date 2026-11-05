@@ -78,7 +78,9 @@ router.put('/api/access/system-password', async (req, res) => {
         const hash = await password.hashPassword(body.password);
         writeEnv({ SYSTEM_PASSWORD_HASH: hash });
         process.env.SYSTEM_PASSWORD_HASH = hash;
-        // The new hash invalidates every system token, including links and in-flight inserts.
+        // The new hash invalidates every system token, including links and in-flight inserts. Their rows
+        // go too: the Devices list would still show them as signed in
+        await endOtherSessions(roles.SYSTEM_ID);
         if (req.user.system && hash === roles.systemHash()) {
             const token = await startSession(req.user, Date.now(), hash);
             if (token) setCookie(req, res, token);

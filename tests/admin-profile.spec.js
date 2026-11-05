@@ -1,10 +1,10 @@
 const { test, expect } = require('@playwright/test');
-const { watchConsole, openSection, profileButton } = require('./helpers');
+const { watchConsole, openSection, profileButton, isNarrow } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 // The final logout can race an in-flight authenticated refresh, which correctly receives 401; the
-// chats test makes Telegram fail with 503.
-watchConsole({ ignore: /status of (401|503)/ });
+// chats test makes Telegram fail with 503, the Devices tests refuse a sign-out (403).
+watchConsole({ ignore: /status of (401|403|404|503)/ });
 
 const adminProfile = (page) => page.locator('.section.active [data-admin-profile] button');
 
@@ -28,7 +28,9 @@ test('every admin section has a profile instead of the rail view picker and sign
     }
 });
 
-test('admin profile chat selection opens personal pages and returns to the previous admin section', async ({ page }) => {
+test('admin profile chat selection opens personal pages and returns to the previous admin section', async ({
+    page
+}) => {
     await mockPanel(page);
     await openSection(page, 'logs');
     await adminProfile(page).click();
@@ -61,18 +63,303 @@ test('local admin has profile settings, password and devices, without Telegram c
     await page.locator('#password-form [type="submit"]').click();
     await expect(page.locator('#password-modal')).toBeHidden();
     expect(panel.systemPasswords).toEqual(['system-pass']);
-    await page.locator('[data-action="profile-end-others"]').click();
+    // The local account has the Devices page too
+    await page.locator('#my-devices [data-action="devices-open"]').click();
+    await expect(page.locator('#my-devices-section')).toHaveClass(/active/);
+    await page.locator('[data-action="devices-end-others"]').click();
     await page.locator('#modal-confirm-btn').click();
-    await expect(page.locator('.toast-success').last()).toContainText('2 other devices');
+    await expect(page.locator('.toast-success').last()).toContainText('Signed out of other sessions');
+    await page.locator('#my-devices-section .page-back').click();
     await page.reload();
     await expect(page.locator('#my-account-section')).toBeVisible();
-    await expect(adminProfile(page)).toBeVisible();
+    // Account settings has the round Back of the new pages, not the profile chip
+    await expect(page.locator('#my-account-section .page-back')).toBeVisible();
+    await expect(page.locator('#my-account-section [data-admin-profile]')).toHaveCount(0);
     await page.locator('#my-account-section .mine-back').click();
     await expect(page.locator('#dashboard-section')).toBeVisible();
     await adminProfile(page).click();
     await page.locator('#profile-modal [data-action="logout"]').click();
     await expect(page.locator('#login-gate')).toBeVisible();
     expect(panel.account.sent.some((r) => r.path === '/api/account/chats')).toBe(false);
+});
+
+const ago = (hours) => new Date(Date.now() - hours * 3600_000).toISOString();
+const DEVICES = [
+    { id: '1'.repeat(24), name: 'Chrome, Windows', country: 'RU', network: 'Beeline', current: true, seenAt: ago(0) },
+    { id: '2'.repeat(24), name: 'Safari, iPhone', country: 'RU', network: 'MTS', current: false, seenAt: ago(2) },
+    { id: '3'.repeat(24), name: 'Telegram, iPhone', country: 'RU', network: 'MTS', current: false, seenAt: ago(30) },
+    { id: '4'.repeat(24), name: 'Firefox, Mac', country: 'DE', network: 'Hetzner', current: false, seenAt: ago(80) },
+    { id: '5'.repeat(24), name: 'Edge, Windows', country: 'RU', network: null, current: false, seenAt: ago(90) },
+    { id: '6'.repeat(24), name: null, country: null, network: null, current: false, seenAt: ago(100) }
+];
+
+/** Account settings → the Devices row → its page */
+async function openDevices(page) {
+    await adminProfile(page).click();
+    await page.locator('#profile-modal [data-section="my-account"]').click();
+    const entry = page.locator('#my-devices [data-action="devices-open"]');
+    await expect(entry).toContainText('6 active');
+    // Its keyboard ring is drawn inside the clipped card, not outside it
+    expect(await entry.evaluate((el) => getComputedStyle(el).outlineOffset)).not.toBe('2px');
+    await entry.click();
+    await expect(page.locator('#my-devices-section')).toHaveClass(/active/);
+}
+
+test('Devices: this device on its own card, the others in a list with Show more and no Sign out per row', async ({
+    page
+}) => {
+    await mockPanel(page, { devices: DEVICES });
+    await openDevices(page);
+    const body = page.locator('#devices-body');
+    const card = body.locator('.group-card');
+    await expect(card).toContainText('Chrome, Windows');
+    // Back over the title, both at the start of the column, the button 44px round
+    const lefts = await page.evaluate(() => {
+        const left = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().left);
+        const back = document.querySelector('#my-devices-section .page-back').getBoundingClientRect();
+        return {
+            back: left('#my-devices-section .page-back'),
+            title: left('#my-devices-section h1'),
+            card: left('#devices-body .group-card'),
+            size: [back.width, back.height]
+        };
+    });
+    expect(lefts.back).toBe(lefts.card);
+    expect(Math.abs(lefts.title - lefts.card)).toBeLessThanOrEqual(3);
+    expect(lefts.size).toEqual([44, 44]);
+    // As wide as the other account pages: the column of the section, not a narrow strip
+    const widths = await page.evaluate(() => ({
+        card: document.querySelector('#devices-body .group-card').getBoundingClientRect().width,
+        section: document.querySelector('#my-devices-section').getBoundingClientRect().width
+    }));
+    expect(Math.round(widths.card)).toBe(Math.round(widths.section));
+    await expect(card).toContainText('This device · Active now');
+    await expect(card).toContainText('Russia, Beeline');
+    await expect(card.locator('button')).toHaveCount(0);
+    await expect(body.locator('[data-action="devices-end-others"]')).toHaveText('Sign out of other sessions');
+    await expect(body.locator('.group-title')).toHaveText('Other sessions · 5');
+
+    const rows = body.locator('.group-list [data-action="device-open"]');
+    await expect(rows).toHaveCount(4);
+    await expect(rows.nth(0)).toContainText('Safari, iPhone');
+    await expect(rows.nth(0)).toContainText('Russia, MTS · 2 hours ago');
+    await expect(rows.nth(1)).toContainText('yesterday');
+    await expect(rows.nth(2)).toContainText('Germany, Hetzner');
+    await expect(body.locator('.group-list')).not.toContainText('Sign out');
+    // Every row is one 64px-high button; no rule over the first one
+    const sizes = await rows.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(64);
+    const firstRule = await body
+        .locator('.group-list > li')
+        .first()
+        .evaluate((el) => getComputedStyle(el, '::before').content);
+    expect(firstRule).toBe('none');
+    // Sentence case, not capitals
+    expect(await body.locator('.group-title').evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
+
+    await body.locator('[data-action="devices-more"]').click();
+    await expect(rows).toHaveCount(5);
+    await expect(rows.last()).toContainText('Unknown browser');
+    await expect(body.locator('[data-action="devices-more"]')).toHaveCount(0);
+
+    // Back to Account settings
+    await page.locator('#my-devices-section .page-back').click();
+    await expect(page.locator('#my-account-section')).toHaveClass(/active/);
+});
+
+test('Devices: a row opens its sheet; Sign out this device keeps the sheet on an error and drops the row', async ({
+    page
+}) => {
+    const panel = await mockPanel(page, { devices: DEVICES, deviceEndFails: [403] });
+    await openDevices(page);
+    const rows = page.locator('#devices-body .group-list [data-action="device-open"]');
+    await rows.first().click();
+    const sheet = page.locator('#device-modal');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveAttribute('aria-modal', 'true');
+    await expect(sheet.locator('#device-title')).toHaveText('Safari, iPhone');
+    await expect(sheet.locator('.sheet-details')).toContainText('LocationRussia');
+    await expect(sheet.locator('.sheet-details')).toContainText('NetworkMTS');
+    await expect(sheet.locator('.sheet-details')).toContainText('Last active2 hours ago');
+
+    // Refused (a device signed in today): the sheet stays with the reason, the button is free again
+    const out = sheet.locator('[data-action="device-end"]');
+    await out.click();
+    await expect(sheet.locator('#device-error')).toContainText('one day after its first sign-in');
+    await expect(sheet).toBeVisible();
+    await expect(out).toBeEnabled();
+
+    await out.click();
+    await expect(sheet).toBeHidden();
+    await expect(page.locator('.toast-success').last()).toContainText('Signed out');
+    await expect(rows).toHaveCount(4);
+    await expect(page.locator('#devices-body .group-list')).not.toContainText('Safari, iPhone');
+    await expect(page.locator('#devices-body .group-title')).toHaveText('Other sessions · 4');
+    const ends = panel.account.sent.filter(
+        (r) => r.method === 'DELETE' && r.path === `/api/account/sessions/${'2'.repeat(24)}`
+    );
+    expect(ends).toHaveLength(2);
+
+    // Cancel just closes
+    await rows.first().click();
+    await sheet.locator('.sheet-btn-secondary').click();
+    await expect(sheet).toBeHidden();
+});
+
+test('Devices: the keyboard opens a sheet, Escape closes it and focus returns to the row', async ({ page }) => {
+    test.skip(isNarrow(page), 'a keyboard');
+    await mockPanel(page, { devices: DEVICES });
+    await openDevices(page);
+    const row = page.locator('#devices-body .group-list [data-action="device-open"]').nth(1);
+    await row.focus();
+    await page.keyboard.press('Enter');
+    const sheet = page.locator('#device-modal');
+    await expect(sheet).toBeVisible();
+    expect(await page.evaluate(() => document.getElementById('device-modal').contains(document.activeElement))).toBe(
+        true
+    );
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(row).toBeFocused();
+    // A keyboard ring on it, not on what was clicked
+    expect(await row.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+
+    // Signed out from the keyboard: focus moves to the row that took its place, not to the page
+    await page.keyboard.press('Enter');
+    await sheet.locator('[data-action="device-end"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(sheet).toBeHidden();
+    await expect(page.locator('#devices-body')).not.toContainText('Telegram, iPhone');
+    await expect(page.locator('#devices-body .group-list [data-action="device-open"]').nth(1)).toBeFocused();
+
+    // Signing out of the others leaves focus on the page's title
+    await page.locator('[data-action="devices-end-others"]').focus();
+    await page.keyboard.press('Enter');
+    await page.locator('#modal-confirm-btn').click();
+    await expect(page.locator('#devices-body')).toContainText('No other active sessions');
+    await expect(page.locator('#devices-heading')).toBeFocused();
+});
+
+test('Devices: a device already signed out elsewhere (404) is just dropped', async ({ page }) => {
+    await mockPanel(page, { devices: DEVICES, deviceEndFails: [404] });
+    await openDevices(page);
+    await page.locator('#devices-body .group-list [data-action="device-open"]').first().click();
+    await page.locator('#device-modal [data-action="device-end"]').click();
+    await expect(page.locator('#device-modal')).toBeHidden();
+    await expect(page.locator('.toast-success').last()).toContainText('Signed out');
+    await expect(page.locator('#devices-body .group-list')).not.toContainText('Safari, iPhone');
+});
+
+// A fresh page each: a second goto to the same page would only change the hash, not reload
+for (const [who, options] of [
+    ['a user', { role: 'user' }],
+    ['the local account', { system: true }]
+]) {
+    test(`Devices opens straight from the address after a reload, for ${who}`, async ({ page }) => {
+        await mockPanel(page, { ...options, devices: DEVICES, path: '/#my-devices' });
+        await expect(page.locator('#my-devices-section')).toHaveClass(/active/);
+        await expect(page.locator('#devices-body .group-card')).toContainText('Chrome, Windows');
+        await expect(page.locator('#devices-body .group-list [data-action="device-open"]')).toHaveCount(4);
+        await page.locator('#my-devices-section .page-back').click();
+        await expect(page.locator('#my-account-section')).toHaveClass(/active/);
+    });
+}
+
+test('Devices: no focus ring on a touch screen, even for focus the page moves itself', async ({ page }) => {
+    test.skip(!isNarrow(page), 'a touch screen');
+    await mockPanel(page, { devices: DEVICES });
+    await openDevices(page);
+    const row = page.locator('#devices-body .group-list [data-action="device-open"]').first();
+    await row.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#device-modal')).toBeVisible();
+    await page.locator('#device-modal .sheet-close').focus();
+    expect(
+        await page.evaluate(
+            () =>
+                [...document.querySelectorAll(':focus-visible')].filter(
+                    (el) => getComputedStyle(el).outlineStyle !== 'none'
+                ).length
+        )
+    ).toBe(0);
+    await page.keyboard.press('Escape');
+    await row.focus();
+    expect(await row.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');
+});
+
+test('Devices: Sign out of other sessions asks first, then leaves the empty state', async ({ page }) => {
+    const panel = await mockPanel(page, { devices: DEVICES });
+    await openDevices(page);
+    await page.locator('[data-action="devices-end-others"]').click();
+    await expect(page.locator('#confirm-title')).toHaveText('Sign out of 5 other sessions?');
+    await page.locator('#modal-confirm-btn').click();
+    await expect(page.locator('.toast-success').last()).toContainText('Signed out of other sessions');
+    expect(panel.account.sent.filter((r) => r.path === '/api/account/sessions/end-others')).toHaveLength(1);
+    await expect(page.locator('#devices-body')).toContainText('No other active sessions');
+    await expect(page.locator('#devices-body .group-title')).toHaveText('Other sessions · 0');
+    await expect(page.locator('[data-action="devices-end-others"]')).toHaveCount(0);
+    await expect(page.locator('#devices-body .group-card')).toContainText('Chrome, Windows');
+});
+
+test('Devices: a failed load says so and Try again loads it', async ({ page }) => {
+    await mockPanel(page, { devices: DEVICES, devicesFails: [503, 503] });
+    await adminProfile(page).click();
+    await page.locator('#profile-modal [data-section="my-account"]').click();
+    await page.locator('#my-devices [data-action="devices-open"]').click();
+    const body = page.locator('#devices-body');
+    await expect(body.locator('[role="alert"]')).toContainText('Devices failed (503)');
+    await body.locator('[data-action="devices-retry"]').click();
+    await expect(body.locator('.group-card')).toContainText('Chrome, Windows');
+    await expect(body.locator('.group-list [data-action="device-open"]')).toHaveCount(4);
+});
+
+test('every tab label fits inside the capsule on a 320px phone', async ({ page }) => {
+    test.skip(!isNarrow(page), 'the phone tab bar');
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const options of [{}, { role: 'user', path: '/#my-subs' }]) {
+        await mockPanel(page, options);
+        await expect(page.locator('.tabbar .tab-item:visible').first()).toBeVisible();
+        const tabs = await page.evaluate(() =>
+            [...document.querySelectorAll('.tabbar .tab-item')]
+                .filter((t) => t.offsetParent)
+                .map((t) => ({
+                    text: t.textContent.trim(),
+                    fits: [...t.querySelectorAll('span:not(.sr-only)')].every((s) => s.scrollWidth <= t.clientWidth)
+                }))
+        );
+        for (const tab of tabs) expect(tab.fits, tab.text).toBe(true);
+    }
+});
+
+test('the phone tab bar floats as a capsule and the page ends above it', async ({ page }) => {
+    test.skip(!isNarrow(page), 'the phone tab bar');
+    await mockPanel(page, { devices: DEVICES });
+    await openDevices(page);
+    await page.locator('#devices-body [data-action="devices-more"]').click();
+    const bar = await page.locator('.tabbar').evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const css = getComputedStyle(el);
+        return {
+            left: r.left,
+            right: innerWidth - r.right,
+            bottom: innerHeight - r.bottom,
+            height: r.height,
+            radius: css.borderRadius,
+            position: css.position
+        };
+    });
+    expect(bar).toEqual({ left: 16, right: 16, bottom: 16, height: 64, radius: '32px', position: 'fixed' });
+    const active = page.locator('.tabbar .tab-item.active');
+    await expect(active).toHaveAttribute('aria-current', 'page');
+
+    // Scrolled to the end, the last row and the hint still clear the bar
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const gap = await page.evaluate(() => {
+        const top = document.querySelector('.tabbar').getBoundingClientRect().top;
+        const last = document.querySelector('#devices-body .group-list').getBoundingClientRect().bottom;
+        return top - last;
+    });
+    expect(gap).toBeGreaterThanOrEqual(24);
 });
 
 test('the open profile menu draws the chats in when they arrive, from same-size skeleton rows', async ({ page }) => {

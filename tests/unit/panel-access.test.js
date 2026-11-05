@@ -155,7 +155,8 @@ describe('/api/access', () => {
         assert.equal(hash.includes('$'), false, 'Compose would read "$" as a variable');
         assert.equal(await matches('system-pass', hash), true);
         assert.equal(process.env.SYSTEM_PASSWORD_HASH, hash);
-        assert.deepEqual(destroyed, [], 'the new hash invalidates old system tokens');
+        // The new hash invalidates old system tokens; their rows go too, or Devices would list them
+        assert.deepEqual(destroyed, [['0', null]]);
 
         // Changed by the system account itself: its browser receives a fresh session
         destroyed.length = 0;
@@ -163,7 +164,8 @@ describe('/api/access', () => {
         const own = await call('PUT', { password: 'system-pass-2' }, '/api/access/system-password');
         assert.equal(own.status, 200);
         assert.match(own.cookie, /^nfb_session=[A-Za-z0-9_-]{43};/);
-        assert.deepEqual(destroyed, []);
+        // Before the fresh session is made, so it stays
+        assert.deepEqual(destroyed, [['0', null]]);
     });
 
     test("an admin removes someone's password: their sessions end, the bot tells them, the role stays", async () => {

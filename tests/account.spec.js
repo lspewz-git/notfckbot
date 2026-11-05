@@ -4,9 +4,9 @@ const { watchConsole, isNarrow, pickChat, openProfilePage, profileButton, openSe
 const { mockPanel } = require('./mock-panel');
 
 // A 401 is the answer the panel expects before sign-in (and to a wrong password, a 429 to too many
-// tries, a 503 to the chats while Telegram is down, a 409 to a Mini App launch over another account):
+// tries, a 503 to the chats while Telegram is down, a 409 to a Mini App launch over another account, a 403 to a password removal refused):
 // the browser logs it as a failed load, and the refresh that met it logs its error
-watchConsole({ ignore: /status of (4(01|09|29)|503)|Sign in to the panel\./ });
+watchConsole({ ignore: /status of (4(01|03|09|29)|503)|Sign in to the panel\./ });
 
 for (const [native, query] of [
     [true, '?miniapp=1'],
@@ -853,10 +853,19 @@ test('Account settings: who is signed in, the role, and signing out on other dev
     await expect(page.locator('#my-account-info')).toContainText('Telegram · ID 42');
     await expect(page.locator('#my-account-info')).toContainText('User');
     await expect(page.locator('#my-signin')).toContainText('Connected');
-    await page.locator('[data-action="profile-end-others"]').click();
+    // Devices is a page of its own: the row says how many are signed in
+    await expect(page.locator('#my-devices [data-action="devices-open"]')).toContainText('3 active');
+    await page.locator('#my-devices [data-action="devices-open"]').click();
+    await expect(page.locator('#my-devices-section')).toHaveClass(/active/);
+    await page.locator('[data-action="devices-end-others"]').click();
+    await expect(page.locator('#confirm-title')).toHaveText('Sign out of 2 other sessions?');
     await page.locator('#modal-confirm-btn').click();
-    await expect(page.locator('.toast').last()).toHaveText('Signed out on 2 other devices');
+    await expect(page.locator('.toast').last()).toHaveText('Signed out of other sessions');
     expect(panel.account.sent.some((r) => r.path === '/api/account/sessions/end-others')).toBe(true);
+    await expect(page.locator('#devices-body')).toContainText('No other active sessions');
+    await expect(page.locator('[data-action="devices-end-others"]')).toHaveCount(0);
+    await page.locator('#my-devices-section .page-back').click();
+    await expect(page.locator('#my-account-section')).toHaveClass(/active/);
     await page.locator('#my-account-section .mine-back').click();
     await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
 });
@@ -1029,17 +1038,48 @@ test('the system password bypasses Telegram; deliberate panel use renews activit
     expect(panel.account.sent.filter((r) => r.path === '/api/account/activity')).toHaveLength(1);
 });
 
-test('the account page sets, changes and removes the password', async ({ page }) => {
+test('Account settings: a profile card with the role as a chip, sign-in methods and Security, no Role row', async ({
+    page
+}) => {
+    await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-account');
+    const info = page.locator('#my-account-info .group-card');
+    await expect(info.locator('.profile-avatar')).toHaveText('M');
+    await expect(info.locator('.card-name')).toHaveText('@me');
+    await expect(info.locator('.role-chip')).toHaveText('User');
+    await expect(info.locator('.row-meta')).toHaveText('Telegram · ID 42');
+    await expect(info.locator('button, a, [tabindex]')).toHaveCount(0);
+    await expect(page.locator('#my-account-section')).not.toContainText('Role');
+    // Sentence-case titles, not capitals
+    await expect(page.locator('#my-account-section .group-title')).toHaveText(['Sign-in methods', 'Security']);
+    for (const title of await page.locator('#my-account-section .group-title').all())
+        expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
+    // Telegram only shows its state: not a control
+    const telegram = page.locator('#my-signin .group-row-static');
+    await expect(telegram).toContainText('Telegram');
+    await expect(telegram).toContainText('Connected');
+    expect(await telegram.evaluate((el) => el.tagName)).toBe('DIV');
+    await expect(page.locator('#my-signin')).toContainText(
+        'A password lets you sign in when Telegram isn’t responding.'
+    );
+    // Security → Devices opens the Devices page
+    const devices = page.locator('#my-devices [data-action="devices-open"]');
+    await expect(devices).toContainText('Devices');
+    await expect(devices).toContainText('3 active');
+    await devices.click();
+    await expect(page.locator('#my-devices-section')).toHaveClass(/active/);
+});
+
+test('the Password row: set it, then a sheet with Change and Remove; removal asks first', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-account');
-    const group = page.locator('#my-signin');
-    await expect(group).toContainText('Connected');
-    const row = group.locator('[data-action="password-open"]');
-    const remove = group.locator('[data-action="password-remove-own"]');
-    await expect(row).toContainText('Not set: Telegram sign-in only');
-    await expect(row).toContainText('Set up');
-    await expect(remove).toHaveCount(0);
+    const row = page.locator('#my-signin [data-action="password-open"]');
+    await expect(row).toContainText('Not set');
+    await expect(row.locator('.row-status')).toHaveText('Off');
+    // Removing is never on the page itself
+    await expect(page.locator('#my-account-section [data-action="password-remove-own"]')).toHaveCount(0);
 
+    // Not set: the row goes straight to setting one
     await row.click();
     await expect(page.locator('#password-title')).toHaveText('Set a password');
     await page.locator('#password-new').fill('short');
@@ -1053,21 +1093,85 @@ test('the account page sets, changes and removes the password', async ({ page })
     await page.locator('#password-form [type="submit"]').click();
     await expect(page.locator('#password-modal')).toBeHidden();
     await expect(page.locator('.toast').last()).toHaveText('Password set');
-    await expect(row.locator('.mine-set-sub')).toHaveText(/^Set · changed \d{1,2} [A-Z][a-z]{2}/);
-    await expect(row.locator('.mine-set-value')).toHaveText('OnChange');
+    await expect(row.locator('.row-meta')).toHaveText(/^Changed \d{1,2} [A-Z][a-z]{2}$/);
+    await expect(row.locator('.row-status')).toHaveText('On');
     expect(panel.account.sent.find((r) => r.method === 'PUT').body).toEqual({ password: 'long-enough' });
 
+    // Set: the row opens the sheet
     await row.click();
+    const sheet = page.locator('#password-sheet');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveAttribute('aria-modal', 'true');
+    await expect(sheet.locator('#password-sheet-title')).toHaveText('Password');
+    await expect(sheet.locator('.sheet-state')).toHaveText(/^On · changed \d{1,2} [A-Z][a-z]{2}$/);
+    await expect(sheet).toContainText('After removal you can only sign in with Telegram.');
+
+    // Change: the sheet gives way to the form
+    await sheet.locator('[data-action="password-change"]').click();
+    await expect(sheet).toBeHidden();
     await expect(page.locator('#password-title')).toHaveText('Change password');
     await expect(page.locator('#password-new')).toHaveValue('');
     await page.locator('#password-modal [data-close="password-modal"]').click();
-    await remove.click();
-    await expect(page.locator('#confirm-title')).toHaveText('Remove the password?');
+
+    // Remove: asked first; Cancel keeps it and the sheet
+    await row.click();
+    await sheet.locator('[data-action="password-remove-own"]').click();
+    await expect(page.locator('#confirm-title')).toHaveText('Remove password?');
+    await expect(page.locator('#confirm-text')).toHaveText('You’ll only be able to sign in with Telegram.');
+    await expect(page.locator('#modal-confirm-btn')).toHaveText('Remove');
+    await page.locator('#modal-cancel-btn').click();
+    await expect(sheet).toBeVisible();
+    expect(panel.account.sent.some((r) => r.method === 'DELETE')).toBe(false);
+
+    await sheet.locator('[data-action="password-remove-own"]').click();
     await page.locator('#modal-confirm-btn').click();
+    await expect(sheet).toBeHidden();
     await expect(page.locator('.toast').last()).toHaveText('Password removed');
     await expect(row).toContainText('Not set');
-    await expect(remove).toHaveCount(0);
-    expect(panel.account.sent.some((r) => r.method === 'DELETE' && r.path === '/api/account/password')).toBe(true);
+    await expect(row.locator('.row-status')).toHaveText('Off');
+    expect(panel.account.sent.filter((r) => r.method === 'DELETE' && r.path === '/api/account/password')).toHaveLength(
+        1
+    );
+});
+
+test('a refused password removal keeps the sheet open with the reason', async ({ page }) => {
+    await mockPanel(page, { role: 'user', hasPassword: true, passwordRemoveFails: [403] });
+    await openMine(page, 'my-account');
+    await page.locator('#my-signin [data-action="password-open"]').click();
+    const sheet = page.locator('#password-sheet');
+    const remove = sheet.locator('[data-action="password-remove-own"]');
+    await remove.click();
+    await page.locator('#modal-confirm-btn').click();
+    await expect(sheet.locator('#password-sheet-error')).toContainText('one day after its first sign-in');
+    await expect(sheet).toBeVisible();
+    await expect(remove).toBeEnabled();
+    await expect(remove).toHaveText('Remove password');
+    await expect(page.locator('#my-signin [data-action="password-open"] .row-status')).toHaveText('On');
+});
+
+test('the Password sheet works from the keyboard: Escape closes it and focus returns to the row', async ({ page }) => {
+    test.skip(isNarrow(page), 'a keyboard');
+    await mockPanel(page, { role: 'user', hasPassword: true });
+    await openMine(page, 'my-account');
+    const row = page.locator('#my-signin [data-action="password-open"]');
+    await row.focus();
+    await page.keyboard.press('Enter');
+    const sheet = page.locator('#password-sheet');
+    await expect(sheet).toBeVisible();
+    expect(await page.evaluate(() => document.getElementById('password-sheet').contains(document.activeElement))).toBe(
+        true
+    );
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(row).toBeFocused();
+    // Removed from the keyboard: the redrawn row keeps the focus, not the page
+    await page.keyboard.press('Enter');
+    await sheet.locator('[data-action="password-remove-own"]').focus();
+    await page.keyboard.press('Enter');
+    await page.locator('#modal-confirm-btn').click();
+    await expect(sheet).toBeHidden();
+    await expect(row.locator('.row-status')).toHaveText('Off');
+    await expect(row).toBeFocused();
 });
 
 test('the Mini App turns off Telegram swipe-to-close once so pull to refresh works', async ({ page }) => {
@@ -1101,9 +1205,7 @@ test('an on-screen keyboard hides the tab bar; focus alone (hardware keyboard) k
     await page.setViewportSize(size);
 });
 
-test('phone tabs mark the open one with a top bar and the title search sits round at the right edge', async ({
-    page
-}) => {
+test('phone tabs mark the open one with a pill and the title search sits round at the right edge', async ({ page }) => {
     await mockPanel(page, { role: 'user', path: '/#my-subs' });
     await expect(page.locator('#my-subs-section h1')).toBeVisible();
     await expect(page.locator('[data-section="my-aired"] use').first()).toHaveAttribute(
@@ -1122,12 +1224,15 @@ test('phone tabs mark the open one with a top bar and the title search sits roun
     expect(Math.abs(box.right)).toBeLessThan(2);
     const tab = page.locator('.tabbar .tab-item.active');
     await expect(tab).toHaveAttribute('data-section', 'my-subs');
+    // The capsule's own pill behind the whole tab, not a bar on its edge or a fill behind the icon
     const marks = await tab.evaluate((el) => ({
-        bar: getComputedStyle(el, '::before').height,
-        pill: getComputedStyle(el.querySelector('.icon')).backgroundColor
+        bar: getComputedStyle(el, '::before').content,
+        tab: getComputedStyle(el).backgroundColor,
+        icon: getComputedStyle(el.querySelector('.icon')).backgroundColor
     }));
-    expect(marks.bar).toBe('3px');
-    expect(marks.pill).toBe('rgba(0, 0, 0, 0)');
+    expect(marks.bar).toBe('none');
+    expect(marks.tab).toBe('rgba(255, 255, 255, 0.08)');
+    expect(marks.icon).toBe('rgba(0, 0, 0, 0)');
 });
 
 test('a long group name on the Account tab ends in an ellipsis and keeps the four tabs equal', async ({ page }) => {

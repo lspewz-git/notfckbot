@@ -245,7 +245,12 @@ export async function startSession(preferredChat = null, { current = () => true,
     // Telegram sends its signed launch data in the fragment, whatever launch URL BotFather has. A regular
     // browser can open a link containing someone else's launch data, so only the native Mini App bridge
     // enables auto-login.
-    const launchData = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData');
+    const launch = new URLSearchParams(location.hash.slice(1));
+    const launchData = launch.get('tgWebAppData');
+    // Only names the device in Account settings ("Telegram, iPhone")
+    const platform = /^[a-z_]{1,16}$/.test(launch.get('tgWebAppPlatform') || '')
+        ? launch.get('tgWebAppPlatform')
+        : null;
     if (launchData) window.history.replaceState(null, '', '/');
     const nativeWindow = /** @type {Window & { TelegramWebviewProxy?: {
         postEvent?: (event: string, data: string) => void
@@ -262,6 +267,7 @@ export async function startSession(preferredChat = null, { current = () => true,
         miniApp = {
             bridge,
             initData: launchData || miniApp?.initData || null,
+            platform: platform || miniApp?.platform || null,
             next: miniApp?.next ?? null,
             chat: miniApp?.chat ?? null
         };
@@ -270,10 +276,11 @@ export async function startSession(preferredChat = null, { current = () => true,
     let me;
     try {
         if (initData) {
-            const launch = await api('/login/miniapp', { method: 'POST', body: { initData } });
+            const body = miniApp.platform ? { initData, platform: miniApp.platform } : { initData };
+            const signedIn = await api('/login/miniapp', { method: 'POST', body });
             // Opened from a group: its page first (the chat list still decides whether it may be opened)
             // Kept on miniApp: a retry after a failed /account/me no longer has the launch data
-            miniApp.chat = launch?.chatId ? String(launch.chatId) : null;
+            miniApp.chat = signedIn?.chatId ? String(signedIn.chatId) : null;
             // Spent: a later sign-in screen here offers to reopen the app for new launch data
             miniApp.initData = null;
             miniApp.next = 'reopen';

@@ -50,6 +50,7 @@
         <link rel="modulepreload" href="js/password.js" />
         <link rel="modulepreload" href="js/pick-sheet.js" />
         <link rel="modulepreload" href="js/profile.js" />
+        <link rel="modulepreload" href="js/devices.js" />
         <link rel="modulepreload" href="js/recap.js" />
         <link rel="modulepreload" href="js/recap-cards.js" />
         <link rel="modulepreload" href="js/recap-schedule.js" />
@@ -1390,26 +1391,40 @@
                     </section>
 
                     <!-- The person's own settings, not a chat's: who they are, sign-in, devices -->
-                    <section id="my-account-section" class="section mine-section mine-page">
-                        <header>
-                            <div class="header-info mine-page-title">
-                                <button
-                                    type="button"
-                                    class="btn btn-ghost btn-icon-square mine-back"
-                                    data-section="my-subs"
-                                    aria-label="Back"
-                                >
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <use href="/vendor/lucide.svg#arrow-left" />
-                                    </svg>
-                                </button>
-                                <h1>Account settings</h1>
-                            </div>
+                    <section id="my-account-section" class="section mine-section mine-page app-page">
+                        <!-- Back returns to the section the profile menu was opened from (profile.js) -->
+                        <header class="page-nav">
+                            <button type="button" class="page-back mine-back" data-section="my-subs" aria-label="Back">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#chevron-left" />
+                                </svg>
+                            </button>
+                            <h1>Account settings</h1>
                         </header>
-                        <div id="my-account-info" class="mine-body"></div>
-                        <!-- The password (password.js) -->
-                        <div id="my-signin" class="mine-body"></div>
-                        <div id="my-devices" class="mine-body"></div>
+                        <!-- Who is signed in (profile.js) -->
+                        <div id="my-account-info"></div>
+                        <!-- Sign-in methods: Telegram and the password (password.js) -->
+                        <div id="my-signin"></div>
+                        <!-- Security: the Devices row (devices.js) -->
+                        <div id="my-devices"></div>
+                    </section>
+
+                    <!-- Account settings → Devices (devices.js): this browser, then the other sessions -->
+                    <section id="my-devices-section" class="section mine-section mine-page app-page">
+                        <header class="page-nav">
+                            <button
+                                type="button"
+                                class="page-back"
+                                data-section="my-account"
+                                aria-label="Back to Account"
+                            >
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#chevron-left" />
+                                </svg>
+                            </button>
+                            <h1 id="devices-heading" tabindex="-1">Devices</h1>
+                        </header>
+                        <div id="devices-body" class="devices-body"></div>
                     </section>
 
                     <section id="history-section" class="section">
@@ -1835,7 +1850,7 @@
                 data-action="profile-open"
                 aria-label="Account"
                 aria-haspopup="dialog"
-                data-tab-sections="my-settings my-account"
+                data-tab-sections="my-settings my-account my-devices"
             >
                 <span data-profile-avatar></span><span data-tab-chat-avatar hidden></span
                 ><span class="tab-profile-label" data-tab-label>Account</span
@@ -1865,6 +1880,15 @@
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
             </form>
+        </dialog>
+        <!-- The own password (password.js): its state, Change and Remove. A sheet from the bottom on phones -->
+        <dialog
+            id="password-sheet"
+            class="modal modal-sheet app-sheet"
+            aria-modal="true"
+            aria-labelledby="password-sheet-title"
+        >
+            <div class="modal-content modal-narrow sheet-content" id="password-sheet-body"></div>
         </dialog>
         <dialog id="pick-modal" class="modal modal-sheet" aria-labelledby="pick-title">
             <div class="modal-content modal-narrow">
@@ -2891,6 +2915,11 @@
         </dialog>
 
         <!-- Confirmation Modal -->
+        <!-- One of the other sessions (devices.js): a sheet from the bottom on phones -->
+        <dialog id="device-modal" class="modal modal-sheet app-sheet" aria-modal="true" aria-labelledby="device-title">
+            <div class="modal-content modal-narrow sheet-content" id="device-body"></div>
+        </dialog>
+
         <dialog id="confirm-modal" class="modal" aria-labelledby="confirm-title">
             <div class="modal-content modal-medium">
                 <h3 id="confirm-title">Are you sure?</h3>

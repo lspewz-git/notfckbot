@@ -54,6 +54,7 @@ import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions } from './pick-sheet.js';
 import { profileActions, setupProfile } from './profile.js';
+import { deviceActions } from './devices.js';
 import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
 
@@ -67,6 +68,10 @@ let activeSection = 'dashboard';
 // The open section sets the view; each view reopens on the section it was left on
 const viewOf = (id) => (id.startsWith('my-') && !document.body.classList.contains('system-account') ? 'mine' : 'admin');
 const lastSection = { admin: 'dashboard', mine: 'my-subs' };
+// Opened from the profile menu, not tabs of their own: a view never reopens on them
+const ACCOUNT_PAGES = ['my-account', 'my-settings', 'my-devices'];
+// The local account has profile settings, but no Telegram chat pages
+const SYSTEM_PAGES = ['my-account', 'my-devices'];
 
 function switchSection(id) {
     // Leaving Settings with changes not saved: ask, rather than lose them silently
@@ -84,7 +89,7 @@ function switchSection(id) {
         return;
     }
     activeSection = id;
-    if (id !== 'my-account' && id !== 'my-settings') lastSection[viewOf(id)] = id;
+    if (!ACCOUNT_PAGES.includes(id)) lastSection[viewOf(id)] = id;
     document.body.classList.toggle('view-mine', viewOf(id) === 'mine');
     setSection(id);
     // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
@@ -203,6 +208,7 @@ const CLICK_ACTIONS = {
     ...pickActions,
     ...chatPickerActions,
     ...profileActions,
+    ...deviceActions,
     ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'sends-recent': () => openRecentSends(),
@@ -308,7 +314,7 @@ function sectionFromHash(role) {
     if (!/^[a-z-]+$/.test(id) || !document.getElementById(`${id}-section`)) return null;
     // Local accounts have profile settings, but no Telegram chat pages.
     if (id.startsWith('my-'))
-        return document.body.classList.contains('system-account') && id !== 'my-account' ? null : id;
+        return document.body.classList.contains('system-account') && !SYSTEM_PAGES.includes(id) ? null : id;
     return role === 'admin' ? id : null;
 }
 

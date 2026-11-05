@@ -117,6 +117,20 @@ function accountState(options) {
         // Statuses the Mini App sign-in answers with, one per try, before it lets the user in
         miniAppFails: /** @type {number[]} */ ([...(options.miniAppFails || [])]),
         confirmationState: 'in',
+        // Statuses GET /api/account/sessions and DELETE /api/account/sessions/:id answer with first, one
+        // per request
+        devicesFails: /** @type {number[]} */ ([...(options.devicesFails || [])]),
+        deviceEndFails: /** @type {number[]} */ ([...(options.deviceEndFails || [])]),
+        // Statuses DELETE /api/account/password answers with first, one per request
+        passwordRemoveFails: /** @type {number[]} */ ([...(options.passwordRemoveFails || [])]),
+        // Account settings → Devices (/api/account/sessions): this browser first
+        devices:
+            options.devices ||
+            [
+                { id: 'a'.repeat(24), name: 'Chrome, Windows', country: 'RU', network: 'Beeline', current: true },
+                { id: 'b'.repeat(24), name: 'Safari, iPhone', country: 'RU', network: 'MTS' },
+                { id: 'c'.repeat(24), name: 'Telegram, iPhone', country: 'RU', network: 'MTS' }
+            ].map((d) => ({ current: false, seenAt: new Date(Date.now() - 2 * 3600_000).toISOString(), ...d })),
         chats: [
             { id: '42', type: 'private', title: 'My account', settings: true },
             {
@@ -312,6 +326,13 @@ function accountAnswer(state, req, url) {
                 system: state.system
             }
         };
+    if (p === '/api/account/password' && method === 'DELETE' && state.passwordRemoveFails.length) {
+        const fail = state.passwordRemoveFails.shift();
+        return {
+            status: fail,
+            body: { error: 'For your safety, a device can do this one day after its first sign-in.' }
+        };
+    }
     if (p === '/api/account/password') {
         if (method === 'PUT' && body.password.length < 8)
             return { status: 400, body: { error: 'At least 8 characters' } };
@@ -319,7 +340,31 @@ function accountAnswer(state, req, url) {
         state.passwordChangedAt = state.hasPassword ? new Date().toISOString() : null;
         return { hasPassword: state.hasPassword, passwordChangedAt: state.passwordChangedAt };
     }
-    if (p === '/api/account/sessions/end-others') return { ended: 2 };
+    if (p === '/api/account/sessions/end-others') {
+        const ended = state.devices.filter((d) => !d.current).length;
+        state.devices = state.devices.filter((d) => d.current);
+        return { ended };
+    }
+    if (p === '/api/account/sessions' && state.devicesFails.length) {
+        const fail = state.devicesFails.shift();
+        return { status: fail, body: { error: `Devices failed (${fail})` } };
+    }
+    if (p === '/api/account/sessions') return state.devices;
+    const device = /^\/api\/account\/sessions\/([0-9a-f]{24})$/.exec(p);
+    if (device && method === 'DELETE' && state.deviceEndFails.length) {
+        const fail = state.deviceEndFails.shift();
+        return {
+            status: fail,
+            body: { error: 'For your safety, a device can do this one day after its first sign-in.' }
+        };
+    }
+    if (device && method === 'DELETE') {
+        const before = state.devices.length;
+        state.devices = state.devices.filter((d) => d.id !== device[1] || d.current);
+        return before === state.devices.length
+            ? { status: 404, body: { error: 'This device is already signed out' } }
+            : { success: true };
+    }
     if (p === '/api/account/chats')
         return state.chatsDown ? { status: 503, body: { error: "Telegram isn't answering" } } : state.chats;
 

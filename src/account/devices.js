@@ -47,6 +47,19 @@ function deviceName(ua = '') {
     return [pick(BROWSERS), pick(SYSTEMS)].filter(Boolean).join(', ') || null;
 }
 
+// Telegram.WebApp.platform: the system when the web view's User-Agent doesn't tell it
+const PLATFORMS = { ios: 'iPhone', android: 'Android', android_x: 'Android', macos: 'Mac' };
+
+/**
+ * "Telegram, iPhone", "Telegram Desktop, Windows", "Telegram Web, Mac": the Mini App in the Devices
+ * list. platform is what the app's page reports (not signed, like the User-Agent): only for the name.
+ */
+function telegramName(platform = '', ua = '') {
+    const system = SYSTEMS.find(([re]) => re.test(ua))?.[1] || PLATFORMS[platform];
+    const app = platform === 'tdesktop' ? 'Telegram Desktop' : /^web/.test(platform) ? 'Telegram Web' : 'Telegram';
+    return [app, system].filter(Boolean).join(', ');
+}
+
 // --- Where an IP is ---
 
 let readers;
@@ -278,6 +291,8 @@ module.exports = {
     COOKIE,
     FRESH_MS,
     deviceName,
+    telegramName,
+    ipOf,
     placeOf,
     countryName,
     placeLine,

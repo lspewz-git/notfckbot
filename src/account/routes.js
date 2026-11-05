@@ -81,7 +81,18 @@ async function launchChat(user) {
 router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     if (!req.secure) return res.status(403).json({ error: 'Telegram Mini App sign-in requires HTTPS.' });
-    const body = valid(z.object({ initData: z.string().min(1).max(8192) }), req.body, res);
+    const body = valid(
+        z.object({
+            initData: z.string().min(1).max(8192),
+            // Telegram.WebApp.platform, only to name the device in Account settings
+            platform: z
+                .string()
+                .regex(/^[a-z_]{1,16}$/)
+                .optional()
+        }),
+        req.body,
+        res
+    );
     if (!body) return;
     const user = miniAppUser(body.initData, req.app.get('bot')?.telegram?.token);
     if (!user)
@@ -94,7 +105,8 @@ router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
                 .json({ error: 'Another account is signed in. Sign it out before opening the Mini App.' });
         if (!existing && !(await auth.isAllowed(user.userId)))
             return res.status(403).json({ error: 'No access to the panel.' });
-        const result = await auth.redeemMiniAppLaunch(user, existing);
+        const name = devices.telegramName(body.platform, req.get('user-agent'));
+        const result = await auth.redeemMiniAppLaunch(user, existing, Date.now(), name);
         if (!result)
             return res.status(401).json({ error: 'This sign-in was already used. Reopen the app in Telegram.' });
         if (result.token) auth.setCookie(req, res, result.token);
@@ -304,6 +316,31 @@ router.delete('/api/account/password', async (req, res) => {
             password.notifyPassword(req.app.get('bot'), userId, 'removed');
         }
         res.json({ hasPassword: false, passwordChangedAt: null });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+// The Devices list on the account page: the browsers signed in to this account, this one first
+router.get('/api/account/sessions', async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store').json(await auth.listSessions(req.user));
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+// "Sign out" on one row of the list. Like "Sign out on other devices", not from a device signed in today
+router.delete('/api/account/sessions/:id', async (req, res) => {
+    const params = valid(z.object({ id: z.string().regex(/^[0-9a-f]{24}$/) }), req.params, res);
+    if (!params) return;
+    try {
+        const refusal = await devices.freshRefusal(req);
+        if (refusal) return res.status(403).json({ error: refusal });
+        const result = await auth.endListedSession(req.user, params.id);
+        if (result === 'current') return res.status(400).json({ error: 'Use Sign out for this device' });
+        if (result === 'missing') return res.status(404).json({ error: 'This device is already signed out' });
+        res.json({ success: true });
     } catch (err) {
         fail(res, err);
     }

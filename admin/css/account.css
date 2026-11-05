@@ -28,10 +28,10 @@ body.view-mine .tabbar {
     .mine-section .mine-chat {
         display: none;
     }
-    /* The tab icons' size, so the Account label lines up with the others */
+    /* 24px: a round face reads smaller than the 22px line icons beside it */
     .tab-profile .pick-avatar {
-        width: 22px;
-        height: 22px;
+        width: 24px;
+        height: 24px;
         font-size: var(--text-xs);
     }
 }
@@ -82,8 +82,7 @@ body.view-mine .tabbar {
 }
 
 /* A shared profile on every admin page; page-specific tools stay below the title. */
-.section:not(.mine-section) > header,
-#my-account-section > header {
+.section:not(.mine-section) > header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
@@ -108,8 +107,7 @@ body.view-mine .tabbar {
 }
 
 @media (max-width: 560px) {
-    .section:not(.mine-section) > header,
-    #my-account-section > header {
+    .section:not(.mine-section) > header {
         column-gap: var(--space-2);
     }
 
@@ -1059,6 +1057,11 @@ button.search-result-open:hover .mine-row-title {
     background: var(--fill-hover);
 }
 
+/* The card clips what is outside it: the keyboard ring goes inside the row */
+.mine-set-pick:focus-visible {
+    outline-offset: -2px;
+}
+
 .mine-set-pick:disabled {
     cursor: default;
 }
@@ -1223,11 +1226,6 @@ button.search-result-open:hover .mine-row-title {
     border-color: transparent;
 }
 
-/* The account page's groups come from three holders: the same gap as between chat settings' groups */
-#my-account-section .mine-body + .mine-body {
-    margin-top: var(--space-4);
-}
-
 .mine-back .icon {
     width: 20px;
     height: 20px;
@@ -1236,16 +1234,6 @@ button.search-result-open:hover .mine-row-title {
 #my-signin:empty,
 #my-devices:empty {
     display: none;
-}
-
-.profile-who {
-    justify-content: flex-start;
-    gap: var(--space-3);
-}
-
-/* A row that ends or removes something: Sign out on other devices, Remove password */
-.mine-set-danger .mine-set-text {
-    color: var(--danger);
 }
 
 /* --- The profile menu --- */
@@ -1447,4 +1435,574 @@ button.search-result-open:hover .mine-row-title {
         overflow-y: auto;
         padding: var(--space-3) var(--space-2);
     }
+}
+
+/* --- Account → Devices (devices.js) --- */
+
+/* Outranks .mine-section header (aligned to the end, wrapping) */
+.app-page > .page-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.app-page > .page-nav h1 {
+    margin: 0;
+    font-size: 2.125rem;
+    line-height: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.page-back {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--text);
+    cursor: pointer;
+}
+
+/* Hover only with a mouse: on a touch screen it sticks to the row that was tapped */
+@media (hover: hover) {
+    .page-back:hover {
+        background: var(--surface-2);
+    }
+}
+
+.page-back .icon {
+    width: 22px;
+    height: 22px;
+}
+
+.devices-body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* The icon tiles: 40 in a row, 52 on the current card, 64 in the sheet */
+.row-tile {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-tile);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+}
+
+.row-tile .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.row-tile-lg {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-tile-lg);
+    color: var(--text);
+}
+
+.row-tile-lg .icon {
+    width: 24px;
+    height: 24px;
+}
+
+.row-tile-xl {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+.row-tile-xl .icon {
+    width: 30px;
+    height: 30px;
+}
+
+.row-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.group-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
+}
+
+.card-name {
+    font-size: 1.0625rem;
+    line-height: 1.375rem;
+    font-weight: 600;
+}
+
+.row-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--success);
+    font-size: 0.875rem;
+    line-height: 1.1875rem;
+    font-weight: 500;
+}
+
+.status-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+}
+
+.row-meta {
+    overflow: hidden;
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    line-height: 1.1875rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.devices-end-others {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 52px;
+    margin-top: var(--space-3);
+    border: none;
+    border-radius: var(--radius-btn);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Hover only with a mouse: on a touch screen it sticks to the row that was tapped */
+@media (hover: hover) {
+    .devices-end-others:hover:not(:disabled) {
+        background: var(--danger-tint-hover);
+    }
+}
+
+.devices-end-others:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.devices-end-others .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.group-help {
+    margin: var(--space-2) var(--space-1) 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    line-height: 1.125rem;
+}
+
+/* Sentence case, not the capitals of the older groups' titles */
+.group-title {
+    margin: 28px var(--space-1) var(--space-2);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    line-height: 1.125rem;
+    font-weight: 600;
+}
+
+.group-list {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
+    list-style: none;
+}
+
+.group-list > li {
+    position: relative;
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+}
+
+/* The rule between rows starts under the text, not under the tile */
+.group-list > li + li::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 70px;
+    height: 1px;
+    background: var(--border-row);
+}
+
+/* Signed out: slides away before the list is drawn without it */
+.group-list > li.row-leaving {
+    opacity: 0;
+    transform: translateX(-24px);
+}
+
+.group-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 64px;
+    padding: var(--space-3) 14px var(--space-3) var(--space-4);
+    border: none;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+/* Hover only with a mouse: on a touch screen it sticks to the row that was tapped */
+@media (hover: hover) {
+    .group-row:hover {
+        background: var(--fill-hover);
+    }
+}
+
+/* Inside the clipped card the ring is drawn inside the row */
+.group-row:focus-visible {
+    outline-offset: -2px;
+    border-radius: var(--radius-card);
+}
+
+.row-name {
+    overflow: hidden;
+    font-size: 1rem;
+    line-height: 1.3125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.row-chevron {
+    display: flex;
+    flex: none;
+    color: var(--text-faint);
+}
+
+.row-chevron .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.devices-more {
+    justify-content: space-between;
+}
+
+.group-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin: 0;
+    padding: var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
+    color: var(--text-dim);
+}
+
+.group-empty p {
+    margin: 0;
+}
+
+.row-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.row-skeleton .skeleton {
+    display: block;
+    width: 9rem;
+    height: 0.8rem;
+}
+
+.row-skeleton .skeleton + .skeleton {
+    width: 6rem;
+}
+
+.devices-body > .group-list[aria-hidden='true'] {
+    margin-top: var(--space-6);
+}
+
+/* --- One session's sheet (devices.js) --- */
+
+.sheet-content {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2) var(--space-5) var(--space-8);
+}
+
+.sheet-grabber {
+    display: none;
+    align-self: center;
+    width: 36px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--fill-strong);
+}
+
+.sheet-close {
+    display: grid;
+    place-items: center;
+    align-self: flex-end;
+    width: 44px;
+    height: 44px;
+    margin-top: var(--space-1);
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.sheet-close .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.sheet-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: calc(var(--space-3) * -1);
+    text-align: center;
+}
+
+.sheet-head h2 {
+    margin: 0;
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+}
+
+.sheet-details {
+    margin: var(--space-4) 0 0;
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+}
+
+.sheet-details > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: 48px;
+    padding: 0 var(--space-4);
+    font-size: 0.9375rem;
+}
+
+.sheet-details > div + div {
+    border-top: 1px solid var(--border-row);
+}
+
+.sheet-details dt {
+    color: var(--text-dim);
+}
+
+.sheet-details dd {
+    margin: 0;
+    overflow: hidden;
+    text-align: right;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.sheet-error {
+    margin: var(--space-4) 0 0;
+    color: var(--danger);
+    font-size: var(--text-sm);
+}
+
+.sheet-btn-primary,
+.sheet-btn-danger,
+.sheet-btn-danger-soft,
+.sheet-btn-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 52px;
+    border: none;
+    border-radius: var(--radius-btn);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.sheet-btn-danger {
+    margin-top: var(--space-5);
+    background: var(--danger-fill);
+    color: var(--on-danger);
+    font-weight: 700;
+}
+
+.sheet-btn-primary:disabled,
+.sheet-btn-danger:disabled,
+.sheet-btn-danger-soft:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+/* The sheet's main action: light on dark, like the panel's primary buttons */
+.sheet-btn-primary {
+    margin-top: var(--space-6);
+    background: var(--primary);
+    color: var(--on-primary);
+    font-weight: 700;
+}
+
+/* A removal that isn't the sheet's main action: quiet red */
+.sheet-btn-danger-soft {
+    margin-top: 10px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.sheet-btn-danger .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.sheet-btn-secondary {
+    margin-top: 10px;
+    background: var(--surface-3);
+    color: var(--text);
+    font-weight: 600;
+}
+
+@media (max-width: 640px) {
+    .app-sheet.modal-sheet .modal-content {
+        border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+        padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .sheet-grabber {
+        display: block;
+    }
+}
+
+/* --- Account settings (profile.js, password.js, devices.js) --- */
+
+.profile-avatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 1.375rem;
+    font-weight: 700;
+}
+
+.profile-name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.profile-name .card-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.role-chip {
+    flex: none;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    background: var(--fill-active);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    line-height: 1rem;
+    font-weight: 600;
+}
+
+/* A row that only shows something (Telegram: connected): not a control, no hover */
+.group-row-static {
+    cursor: default;
+}
+
+@media (hover: hover) {
+    .group-row-static:hover {
+        background: transparent;
+    }
+}
+
+/* What a row ends with before its chevron: a count, a state */
+.row-value {
+    flex: none;
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    line-height: 1.1875rem;
+}
+
+.group-row > .row-status {
+    flex: none;
+}
+
+.row-status-off {
+    color: var(--text-dim);
+}
+
+.sheet-head p {
+    margin: 0;
+}
+
+.sheet-state {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    line-height: 1.1875rem;
+}
+
+.sheet-state-on {
+    color: var(--success);
+    font-weight: 500;
+}
+
+.sheet-head .sheet-text {
+    margin: var(--space-1) var(--space-3) 0;
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.sheet-note {
+    margin: var(--space-2) var(--space-1) 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    line-height: 1.125rem;
+    text-align: center;
 }

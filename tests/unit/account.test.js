@@ -92,6 +92,11 @@ beforeEach(() => {
             return row;
         },
         findByPk: async (id) => rows.get(id) || null,
+        findAll: async ({ where }) =>
+            [...rows.values()]
+                .filter((row) => String(row.userId) === String(where.userId))
+                .filter((row) => !where.expiresAt?.[Op.gt] || new Date(row.expiresAt) > where.expiresAt[Op.gt])
+                .map((row) => ({ ...row })),
         update: async (values, { where }) => {
             let count = 0;
             for (const row of rows.values()) {
@@ -119,7 +124,8 @@ beforeEach(() => {
         [LoginLink, links]
     ]) {
         const fake = table(rows);
-        for (const method of ['create', 'findByPk', 'destroy', 'update']) mock.method(model, method, fake[method]);
+        for (const method of ['create', 'findByPk', 'findAll', 'destroy', 'update'])
+            mock.method(model, method, fake[method]);
     }
     members.forget();
     deviceRows = [];
@@ -515,11 +521,12 @@ async function serve(bot, { trustLoopback = false } = {}) {
     const server = app.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const call = (method, path, { body, cookie, device, raw, address, https } = {}) =>
+    const call = (method, path, { body, cookie, device, raw, address, https, ua } = {}) =>
         fetch(`${base}${path}`, {
             method,
             headers: {
                 'X-Requested-By': 'notfckbot-panel',
+                ...(ua ? { 'User-Agent': ua } : {}),
                 ...(https ? { 'X-Forwarded-Proto': 'https' } : {}),
                 ...(address ? { 'X-Forwarded-For': address } : {}),
                 ...(cookie || device
@@ -633,6 +640,86 @@ test('Mini App sign-in names the chat it was opened from', async (t) => {
     assert.equal(await chatOf({ start_param: 'other', chat_instance: 'x' }), null);
     assert.equal(await chatOf({}), null);
     assert.deepEqual(lookups, [{ chat_instance: '-555' }, { chat_instance: '-999' }]);
+
+    // The Devices list names the session by Telegram's platform and the web view's system
+    sessions.clear();
+    const named = await call('POST', '/api/login/miniapp', {
+        body: { initData: data({}), platform: 'ios' },
+        https: true,
+        address: '10.8.8.8',
+        ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
+    });
+    assert.equal(named.status, 200);
+    assert.deepEqual(
+        [...sessions.values()].map((s) => s.name),
+        ['Telegram, iPhone']
+    );
+    const odd = await call('POST', '/api/login/miniapp', {
+        body: { initData: data({ auth_date: String(Math.floor(Date.now() / 1000) - 1) }), platform: 'iOS <b>' },
+        https: true,
+        address: '10.8.8.8'
+    });
+    assert.equal(odd.status, 400, 'only a short lower-case platform name');
+});
+
+test('the Mini App names the device from the platform and the User-Agent', () => {
+    const windows = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36';
+    assert.equal(devices.telegramName('tdesktop', windows), 'Telegram Desktop, Windows');
+    assert.equal(
+        devices.telegramName('weba', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Firefox/131'),
+        'Telegram Web, Mac'
+    );
+    assert.equal(
+        devices.telegramName('android', 'Mozilla/5.0 (Linux; Android 14; wv) Chrome/130'),
+        'Telegram, Android'
+    );
+    assert.equal(devices.telegramName('ios', ''), 'Telegram, iPhone');
+    assert.equal(devices.telegramName(undefined, ''), 'Telegram');
+});
+
+test('the Devices list: this browser first, then the latest seen; one of them signed out by its row', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => null);
+    const iphone = 'Mozilla/5.0 (iPhone) AppleWebKit Version/17 Safari/604.1';
+    const user = await signIn(call, 8);
+    const other = await signIn(call, 8);
+    const stranger = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/account/sessions')).status, 401);
+    // Each browser's first request after signing in names it and notes its time
+    await call('GET', '/api/account/me', { cookie: other, ua: iphone });
+    await call('GET', '/api/account/me', {
+        cookie: user,
+        ua: 'Mozilla/5.0 (Windows NT 10.0) Chrome/130 Safari/537.36'
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (const row of sessions.values())
+        if (row.name === 'Safari, iPhone') row.seenAt = new Date(Date.now() - 3600_000);
+
+    const list = await call('GET', '/api/account/sessions', { cookie: user });
+    assert.equal(list.status, 200);
+    assert.deepEqual(
+        list.body.map((d) => [d.name, d.current]),
+        [
+            ['Chrome, Windows', true],
+            ['Safari, iPhone', false]
+        ]
+    );
+    assert.ok(list.body.every((d) => /^[0-9a-f]{24}$/.test(d.id)));
+    assert.ok(!list.body.some((d) => sessions.has(d.id)), 'not the table key');
+    const [mine, phone] = list.body.map((d) => d.id);
+    const strangers = (await call('GET', '/api/account/sessions', { cookie: stranger })).body;
+    assert.equal(strangers.length, 1);
+
+    const end = (id, cookie = user) => call('DELETE', `/api/account/sessions/${id}`, { cookie });
+    assert.equal((await end('nope')).status, 400);
+    assert.equal((await end(mine)).status, 400, 'this device signs out with Sign out');
+    assert.equal((await end(strangers[0].id)).status, 404, "someone else's isn't in the list");
+    assert.equal((await call('GET', '/api/account/me', { cookie: stranger })).status, 200);
+    assert.equal((await end(phone)).status, 200);
+    assert.equal((await call('GET', '/api/account/me', { cookie: other })).status, 401);
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).status, 200);
+    assert.equal((await end(phone)).status, 404);
 });
 
 test('poster images need a session and work for users without the request marker', async (t) => {
@@ -1680,6 +1767,7 @@ test('the guard marks and remembers the browser; a day-old device may end sessio
     deviceRows.push(deviceRow(DEVICE_B, 7, 'RU', Date.now() - 7 * 24 * 3600 * 1000));
     for (const [method, path, body] of [
         ['POST', '/api/account/sessions/end-others'],
+        ['DELETE', `/api/account/sessions/${'a'.repeat(24)}`],
         ['PUT', '/api/account/password', { password: 'long-enough' }],
         ['DELETE', '/api/account/password']
     ]) {

@@ -79,20 +79,30 @@ async function startSession(
     return token;
 }
 
-const insertSession = (id, userId, userName, now, transaction, trusted = true) =>
+const insertSession = (id, userId, userName, now, transaction, trusted = true, name = null) =>
     AccountSession.create(
-        { id, userId, userName, trusted, expiresAt: new Date(now + SESSION_TTL_MS) },
+        { id, userId, userName, trusted, name, expiresAt: new Date(now + SESSION_TTL_MS) },
         { transaction }
     );
 
-async function redeemMiniAppLaunch(user, existing, now = Date.now()) {
+/** name: what the Devices list calls the Mini App ("Telegram, iPhone"), from devices.telegramName(). */
+async function redeemMiniAppLaunch(user, existing, now = Date.now(), name = null) {
     if (user.expiresAt.getTime() <= now) return null;
     const id = tokenId('miniapp', user.launchId);
     const token = existing ? null : newToken();
     try {
         await sequelize.transaction(async (transaction) => {
             await MiniAppLaunch.create({ id, expiresAt: user.expiresAt }, { transaction });
-            if (token) await insertSession(tokenId('session', token), user.userId, user.userName, now, transaction);
+            if (token)
+                await insertSession(
+                    tokenId('session', token),
+                    user.userId,
+                    user.userName,
+                    now,
+                    transaction,
+                    true,
+                    name
+                );
         });
     } catch (err) {
         if (!(err instanceof UniqueConstraintError)) throw err;
@@ -142,8 +152,67 @@ async function sessionOf(req, now = Date.now()) {
         role,
         system: isSystem(row.userId),
         since: row.createdAt,
-        trusted: row.trusted !== false
+        trusted: row.trusted !== false,
+        name: row.name || null,
+        seenAt: row.seenAt || null
     };
+}
+
+// --- The Devices list ---
+
+// How often a signed-in browser's place and time are written: not on every request
+const NOTE_EVERY_MS = 5 * 60 * 1000;
+// Sessions noted lately: a page's parallel requests all read the old seenAt, only the first writes
+const noted = lruCache({ max: 5000, ttl: NOTE_EVERY_MS });
+
+/**
+ * The guard's note of a signed-in browser for the Devices list: its name once (a session started
+ * before the list existed, or by a page that didn't name it), its latest country and network, and when.
+ */
+async function noteSession(req, session, now = Date.now()) {
+    const seenAt = session.seenAt ? new Date(session.seenAt).getTime() : 0;
+    if ((seenAt <= now && now - seenAt < NOTE_EVERY_MS) || noted.has(session.id)) return;
+    noted.set(session.id, true);
+    const place = devices.placeOf(devices.ipOf(req));
+    const name = session.name || devices.deviceName(req.get('user-agent'));
+    await AccountSession.update({ name, ...place, seenAt: new Date(now) }, { where: { id: session.id } });
+}
+
+// What the page gets instead of a session's id: the id is a hash of the cookie, but still the table's key
+const publicId = (id) => hash(`device-list:${id}`).slice(0, 24);
+
+/**
+ * The user's signed-in browsers, this one first, then the latest seen.
+ * @returns {Promise<Array<{ id: string, name: string | null, country: string | null,
+ *   network: string | null, seenAt: Date, current: boolean }>>}
+ */
+async function listSessions(session, now = Date.now()) {
+    const rows = await AccountSession.findAll({
+        where: { userId: session.userId, expiresAt: { [Op.gt]: new Date(now) } },
+        raw: true
+    });
+    return rows
+        .map((row) => ({
+            id: publicId(row.id),
+            name: row.name || null,
+            country: row.country || null,
+            network: row.network || null,
+            seenAt: new Date(row.seenAt || row.createdAt || now),
+            current: row.id === session.id
+        }))
+        .sort((a, b) => Number(b.current) - Number(a.current) || b.seenAt.getTime() - a.seenAt.getTime());
+}
+
+/**
+ * Signs out one of the user's other browsers by its id in the list.
+ * @returns {Promise<'ended' | 'current' | 'missing'>}
+ */
+async function endListedSession(session, listedId) {
+    const rows = await AccountSession.findAll({ where: { userId: session.userId }, attributes: ['id'], raw: true });
+    const row = rows.find((r) => publicId(r.id) === listedId);
+    if (!row) return 'missing';
+    if (row.id === session.id) return 'current';
+    return (await AccountSession.destroy({ where: { id: row.id } })) ? 'ended' : 'missing';
 }
 
 const endSession = (session) => AccountSession.destroy({ where: { id: session.id } });
@@ -498,6 +567,9 @@ module.exports = {
     sessionOf,
     endSession,
     endOtherSessions,
+    noteSession,
+    listSessions,
+    endListedSession,
     touchSessions,
     capSessionLifetimes,
     setCookie,

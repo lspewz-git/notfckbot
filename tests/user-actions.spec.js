@@ -9,7 +9,11 @@ test('user actions end with Settings and keep access and blocking inside it', as
     await openSection(page, 'chats');
     await page.locator('[data-action="chat-actions"][data-id="101"]').click();
     await expect(page.locator('#chat-actions-modal .action-title')).toHaveText([
-        'Add serial or movie', 'Send message', 'Statistics', 'Changes', 'Settings'
+        'Add serial or movie',
+        'Send message',
+        'Statistics',
+        'Changes',
+        'Settings'
     ]);
     await expect(page.locator('#action-test-notify')).toHaveCount(0);
     await page.locator('#action-settings').click();
@@ -38,10 +42,9 @@ test('the backdrop and close button dismiss the chat action flow', async ({ page
     };
 
     await openSettings();
-    await trigger.focus();
-    await expect(trigger).toHaveCSS('outline-style', 'none');
-    await expect(trigger).toHaveCSS('box-shadow', 'none');
+    // A click draws no ring: only the keyboard does (:focus-visible)
     await trigger.click();
+    await expect(trigger).toHaveCSS('outline-style', 'none');
     await expect(trigger).toHaveCSS('box-shadow', 'none');
     await settings.click({ position: { x: 2, y: 2 } });
     await expect(page.locator('dialog[open]')).toHaveCount(0);

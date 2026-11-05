@@ -78,6 +78,8 @@
     --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55); /* dropdowns */
     --shadow-toast: 0 12px 32px rgba(0, 0, 0, 0.5);
     --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.5);
+    --shadow-tabbar: 0 8px 32px rgba(0, 0, 0, 0.45); /* the floating phone tab bar */
+    --focus-ring: var(--text); /* keyboard focus (:focus-visible) */
 
     /* Type */
     --font-sans: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -105,6 +107,17 @@
     --radius-md: 12px; /* rail items, logo */
     --radius-banner: 14px;
     --radius-lg: 20px; /* cards */
+    /* Account → Devices and the phone tab bar (devices redesign, 05.11) */
+    --radius-card: 24px; /* grouped cards */
+    --radius-btn: 16px; /* full-width buttons */
+    --radius-tile-lg: 16px; /* the current device's icon tile */
+    --radius-tile: 12px; /* a row's icon tile */
+    --radius-sheet: 32px; /* bottom sheet, tab bar capsule */
+    /* The floating phone tab bar: its height, the room the page leaves under its content (bar, 16px
+       gap, 40px of air) and where toasts sit above it */
+    --tabbar-h: 64px;
+    --tabbar-room: calc(var(--tabbar-h) + 24px + 40px + env(safe-area-inset-bottom, 0px));
+    --tabbar-toast: calc(var(--tabbar-h) + 16px + 12px + env(safe-area-inset-bottom, 0px));
 
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;
@@ -198,9 +211,27 @@ code {
     font-variant-numeric: tabular-nums;
 }
 
-/* Keep browser focus behaviour without drawing a ring on panel controls. */
-:focus,
+/* A ring only for the keyboard (:focus-visible): a tap or a click draws none (devices redesign, 05.11,
+   replaces "no rings anywhere" of 02.11) */
+:focus {
+    outline: none;
+}
+
 :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* Touch screens: no ring at all. Phones focus things on their own (a sheet's box, the row a closed
+   sheet hands back) and the ring there only looks broken (the user, 05.11) */
+@media (pointer: coarse) {
+    :focus-visible {
+        outline: none;
+    }
+}
+
+/* A dialog's own box takes focus to hold it, not to be acted on */
+.modal-content:focus-visible {
     outline: none;
 }
 

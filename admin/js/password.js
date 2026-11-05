@@ -1,20 +1,17 @@
 /**
  * Signing in with a password (src/account/password.js): the form on the sign-in screen, the
- * "Sign-in" group on the account's Settings page and the dialog that sets, changes or removes the
- * password. It is set after signing in with Telegram, so it always belongs to a Telegram account.
+ * "Sign-in methods" group on Account settings, the Password sheet (its state, Change, Remove) and the
+ * dialog that sets or changes the password. It is set after signing in with Telegram, so it always belongs to a Telegram account.
  */
 import { api } from './api.js';
 import { $, $field, setText } from './dom.js';
 import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
-import { shortDay } from './format.js';
 
 const MIN_LENGTH = 8;
 
 // Keep the eye mounted: replacing its external <use> can flicker while Safari resolves the sprite.
 const PASSWORD_EYE =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path class="password-eye-slash" pathLength="1" d="m3 3 18 18" /></svg>';
-const CHEVRON_RIGHT =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
 
 /** @type {{ id: string, name: string | null, hasPassword: boolean, changedAt: string | null, system: boolean } | null} */
 let me = null;
@@ -87,35 +84,109 @@ export function setMe(user) {
     renderSignIn();
 }
 
+const icon = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+
+// "3 Nov", or with the year when it isn't this one
+const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+const dayMonthYear = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const changedDay = (iso) => {
+    const at = new Date(iso);
+    if (Number.isNaN(at.getTime())) return '';
+    return (at.getFullYear() === new Date().getFullYear() ? dayMonth : dayMonthYear).format(at);
+};
+
+/** "● On" in green, or a quiet "Off": the password's one state signal */
+const passwordState = (on) =>
+    on
+        ? '<span class="row-status"><span class="status-dot" aria-hidden="true"></span>On</span>'
+        : '<span class="row-status row-status-off">Off</span>';
+
+/** Account settings → Sign-in methods: Telegram (always connected) and the password, which opens its sheet */
 function renderSignIn() {
     const holder = $('my-signin');
     if (!holder || !me) return;
     if (me.system) {
+        // The local account's password lives in Settings → Panel access: its dialog, no sheet
         holder.innerHTML =
-            '<section class="mine-group"><h3 class="mine-group-title">Sign-in</h3><ul class="glass-card mine-sets">' +
-            '<li><button type="button" class="mine-set mine-set-pick" data-action="access-system-password" aria-haspopup="dialog">' +
-            '<span class="mine-set-text">Password</span>' +
-            `<span class="mine-set-value">Change${CHEVRON_RIGHT}</span></button></li></ul></section>`;
+            '<h2 class="group-title">Sign-in methods</h2><ul class="group-list">' +
+            '<li><button type="button" class="group-row" data-action="access-system-password" aria-haspopup="dialog">' +
+            `<span class="row-tile">${icon('key-round')}</span>` +
+            '<span class="row-text"><span class="row-name">Password</span><span class="row-meta">Signs in the local account</span></span>' +
+            `${passwordState(true)}<span class="row-chevron">${icon('chevron-right')}</span></button></li></ul>`;
         return;
     }
-    // Who it is is shown in the Account group above (profile.js). The row says the state in words,
-    // its right side the action; removing is a row of its own (issue #16)
-    const changed = me.changedAt ? shortDay(me.changedAt) : '';
-    const state = me.hasPassword ? `Set${changed ? ` · changed ${changed}` : ''}` : 'Not set: Telegram sign-in only';
-    const action = me.hasPassword
-        ? '<span class="badge ok">On</span><span class="mine-set-action">Change</span>'
-        : '<span class="mine-set-action mine-set-accent">Set up</span>';
+    const changed = me.changedAt ? changedDay(me.changedAt) : '';
+    const meta = me.hasPassword ? (changed ? `Changed ${changed}` : 'Set') : 'Not set';
     holder.innerHTML =
-        '<section class="mine-group"><h3 class="mine-group-title">Sign-in</h3><ul class="glass-card mine-sets">' +
-        '<li class="mine-set"><span class="mine-set-text">Telegram</span><span class="mine-set-value">Connected</span></li>' +
-        '<li><button type="button" class="mine-set mine-set-pick" data-action="password-open" aria-haspopup="dialog">' +
-        `<span class="mine-set-text"><span>Password</span><span class="mine-set-sub">${state}</span></span>` +
-        `<span class="mine-set-value">${action}${CHEVRON_RIGHT}</span></button></li>` +
-        (me.hasPassword
-            ? '<li><button type="button" class="mine-set mine-set-pick mine-set-danger" data-action="password-remove-own" aria-haspopup="dialog">' +
-              '<span class="mine-set-text">Remove password</span></button></li>'
-            : '') +
-        '</ul><p class="mine-group-note">With a password you can sign in when Telegram isn\'t answering.</p></section>';
+        '<h2 class="group-title">Sign-in methods</h2><ul class="group-list">' +
+        `<li><div class="group-row group-row-static"><span class="row-tile">${icon('send')}</span>` +
+        '<span class="row-text"><span class="row-name">Telegram</span></span>' +
+        '<span class="row-status"><span class="status-dot" aria-hidden="true"></span>Connected</span></div></li>' +
+        `<li><button type="button" class="group-row" data-action="password-open" aria-haspopup="dialog">` +
+        `<span class="row-tile">${icon('key-round')}</span>` +
+        `<span class="row-text"><span class="row-name">Password</span><span class="row-meta">${meta}</span></span>` +
+        `${passwordState(me.hasPassword)}<span class="row-chevron">${icon('chevron-right')}</span></button></li></ul>` +
+        '<p class="group-help">A password lets you sign in when Telegram isn’t responding.</p>';
+}
+
+// --- The Password sheet: its state, Change, Remove (removal only here, never on the page) ---
+
+// A removal on its way: another press does nothing
+let removing = false;
+
+function sheetHtml() {
+    const changed = me.changedAt ? changedDay(me.changedAt) : '';
+    return (
+        '<span class="sheet-grabber" aria-hidden="true"></span>' +
+        `<button type="button" class="sheet-close" data-close="password-sheet" aria-label="Close">${icon('x')}</button>` +
+        `<div class="sheet-head"><span class="row-tile row-tile-xl">${icon('key-round')}</span>` +
+        '<h2 id="password-sheet-title">Password</h2>' +
+        '<p class="sheet-state"><span class="status-dot" aria-hidden="true"></span>' +
+        `<span><span class="sheet-state-on">On</span>${changed ? ` · changed ${changed}` : ''}</span></p>` +
+        '<p class="sheet-text">Use it to sign in when Telegram isn’t responding.</p></div>' +
+        '<p class="sheet-error" id="password-sheet-error" role="alert" hidden></p>' +
+        '<button type="button" class="sheet-btn-primary" data-action="password-change">Change password</button>' +
+        `<button type="button" class="sheet-btn-danger-soft" data-action="password-remove-own"${removing ? ' disabled aria-busy="true"' : ''}>${removing ? 'Removing…' : 'Remove password'}</button>` +
+        '<p class="sheet-note">After removal you can only sign in with Telegram.</p>'
+    );
+}
+
+/** The row: the sheet when there is a password, else straight to setting one */
+function openPasswordRow() {
+    if (!me) return;
+    if (!me.hasPassword) return openOwn();
+    $('password-sheet-body').innerHTML = sheetHtml();
+    openModal('password-sheet');
+}
+
+function setRemoving(on) {
+    removing = on;
+    // Change waits too: a form opened now would set a password the removal is about to take away
+    const change = /** @type {HTMLButtonElement | null} */ (
+        document.querySelector('#password-sheet [data-action="password-change"]')
+    );
+    if (change) change.disabled = on;
+    const button = /** @type {HTMLButtonElement | null} */ (
+        document.querySelector('#password-sheet [data-action="password-remove-own"]')
+    );
+    if (!button) return;
+    button.disabled = on;
+    button.toggleAttribute('aria-busy', on);
+    button.textContent = on ? 'Removing…' : 'Remove password';
+}
+
+/**
+ * The row is drawn anew after a change: focus that was on it (handed back by the closed dialog) would
+ * fall to the page, so it goes to the new Password row while that is on screen.
+ */
+function refocusRow() {
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const row = /** @type {HTMLElement | null} */ (
+        document.querySelector('#my-signin .group-row:not(.group-row-static)')
+    );
+    if (row?.offsetParent) row.focus();
 }
 
 /**
@@ -154,8 +225,11 @@ function openOwn() {
         sub: "For signing in when Telegram isn't answering, with your @username or ID.",
         hint: 'At least 8 characters. A change signs you out on your other devices; the bot tells you about it.',
         save: async (password) => {
+            const who = me;
             const changed = me.hasPassword;
             const result = await api('/account/password', { method: 'PUT', body: { password } });
+            // Someone else signed in meanwhile: their row isn't this answer's
+            if (me !== who) return;
             me.hasPassword = true;
             me.changedAt = result.passwordChangedAt || null;
             renderSignIn();
@@ -179,6 +253,7 @@ async function save(form) {
     try {
         await dialog.save(password);
         closeModal('password-modal');
+        refocusRow();
     } catch (err) {
         showError(err.message);
     } finally {
@@ -187,19 +262,35 @@ async function save(form) {
 }
 
 function removeOwn() {
+    if (removing || !me?.hasPassword) return;
     showConfirm({
-        title: 'Remove the password?',
-        text: 'You will sign in with Telegram only. You can set a new password at any time.',
+        title: 'Remove password?',
+        text: 'You’ll only be able to sign in with Telegram.',
         confirmLabel: 'Remove',
+        cancelLabel: 'Cancel',
         onConfirm: async () => {
+            if (removing) return;
+            const who = me;
+            setRemoving(true);
+            const error = $('password-sheet-error');
+            if (error) error.hidden = true;
             try {
                 await api('/account/password', { method: 'DELETE' });
+                setRemoving(false);
+                if (me !== who) return;
                 me.hasPassword = false;
                 me.changedAt = null;
+                closeModal('password-sheet');
                 renderSignIn();
+                refocusRow();
                 toast('Password removed', 'success');
             } catch (err) {
-                toast(err.message, 'error');
+                setRemoving(false);
+                // The sheet stays open with the reason (a device signed in today may not remove it)
+                if (error && /** @type {HTMLDialogElement} */ ($('password-sheet')).open) {
+                    error.textContent = err.message;
+                    error.hidden = false;
+                } else toast(err.message, 'error');
             }
         }
     });
@@ -207,7 +298,12 @@ function removeOwn() {
 
 /** Click handlers, merged into app.js's delegation */
 export const passwordActions = {
-    'password-open': () => openOwn(),
+    'password-open': () => openPasswordRow(),
+    // Change from the sheet: the sheet goes, the form takes its place
+    'password-change': () => {
+        closeModal('password-sheet');
+        openOwn();
+    },
     'password-remove-own': () => removeOwn(),
     'password-show': (el) => {
         const field = $field(el.dataset.for);

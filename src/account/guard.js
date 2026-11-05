@@ -26,6 +26,8 @@ async function guard(req, res, next) {
                 log.warn(`[Account] Device check failed: ${err.message}`);
                 return null;
             });
+            // For the Devices list: never in the way of the request
+            auth.noteSession(req, session).catch((err) => log.warn(`[Account] Session note failed: ${err.message}`));
         }
         if (session.role === 'admin' || ANY_ROLE.test(req.path)) return next();
         log.warn(`[Account] User ${session.userId} refused ${req.method} /api${req.path}: admins only`);

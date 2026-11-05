@@ -8,27 +8,48 @@
         padding: 0;
     }
 
+    /* A floating capsule over the page (devices redesign, 05.11): 16px from the edges and above the
+       home indicator; frosted where the browser can blur, solid where it can't or the user asked */
     .tabbar {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: var(--space-1);
+        align-items: center;
+        /* No gap: five tabs and "Dashboard" still fit a 320px phone; the pill marks the open one */
+        gap: 0;
         position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        left: var(--space-4);
+        right: var(--space-4);
+        bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
         z-index: 500;
-        padding: 6px var(--space-2) calc(6px + env(safe-area-inset-bottom, 0px));
+        height: var(--tabbar-h);
+        padding: 0 6px;
+        box-sizing: border-box;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sheet);
         background: var(--bar-glass);
-        backdrop-filter: blur(20px) saturate(160%);
-        -webkit-backdrop-filter: blur(20px) saturate(160%);
-        border-top: 1px solid var(--border);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        box-shadow: var(--shadow-tabbar);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .tabbar {
+            background: var(--surface-2);
+        }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+        .tabbar {
+            background: var(--surface-2);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
     }
 
     .main-content {
         margin-left: 0;
-        /* top: the notch / status bar; bottom: room for the tab bar */
-        padding: calc(var(--space-2) + env(safe-area-inset-top, 0px)) var(--space-2)
-            calc(4.5rem + env(safe-area-inset-bottom, 0px));
+        /* top: the notch / status bar; bottom: the tab bar, its 16px gap and 40px of air under the page */
+        padding: calc(var(--space-2) + env(safe-area-inset-top, 0px)) var(--space-2) var(--tabbar-room);
     }
 
     .main-inner {
@@ -36,7 +57,7 @@
         padding: var(--space-5);
     }
     .toast-container {
-        bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+        bottom: var(--tabbar-toast);
     }
 }
 
@@ -392,7 +413,7 @@
 @media (max-width: 640px) {
     /* The panel runs edge to edge; a frame around it would only eat width */
     .main-content {
-        padding: env(safe-area-inset-top, 0px) 0 calc(4.25rem + env(safe-area-inset-bottom, 0px));
+        padding: env(safe-area-inset-top, 0px) 0 var(--tabbar-room);
     }
 
     .main-inner {
@@ -434,7 +455,7 @@
         left: 1rem;
         right: 1rem;
         /* above the tab bar */
-        bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+        bottom: var(--tabbar-toast);
     }
 
     .toast {

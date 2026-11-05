@@ -1,16 +1,17 @@
 /**
  * The profile menu behind the chat chip on the account pages: the chats to switch between, Chat
  * settings, Account settings and Sign out (a sheet on phones, a menu under the chip elsewhere).
- * And the Account settings page's own groups: who is signed in, and signing out on other devices
- * (the password group between them is password.js).
+ * And the Account settings page's own group: who is signed in (the password group under it is
+ * password.js, the Devices row devices.js).
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
-import { toast, openModal, closeModal, showConfirm } from './ui.js';
+import { toast, openModal, closeModal } from './ui.js';
 import { avatar } from './pick-sheet.js';
 import { chatRows, chatChip } from './chat-picker.js';
 import { chatList, chatHint, selectChat, setChatHidden } from './account.js';
 import { openActionDropdown, closeDropdown } from './select.js';
+import { setDevicesOwner, loadDevices } from './devices.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -22,7 +23,7 @@ const SIGN_OUT = icon('log-out');
 const HIDDEN = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path d="m3 3 18 18" /></svg>`;
 
 /** The pages the menu opens: Back on them returns to the section the menu was opened from */
-const PAGES = ['my-settings', 'my-account'];
+const PAGES = ['my-settings', 'my-account', 'my-devices'];
 
 const ROLES = { admin: 'Admin', user: 'User' };
 
@@ -47,9 +48,7 @@ const nameOf = () => (me && (me.name || me.id)) || '';
 
 /** Every admin section shares the same profile entry, including the local account. */
 export function setupProfile() {
-    for (const header of document.querySelectorAll(
-        '.section:not(.mine-section) > header, #my-account-section > header'
-    )) {
+    for (const header of document.querySelectorAll('.section:not(.mine-section) > header')) {
         const holder = document.createElement('div');
         holder.className = 'admin-profile';
         holder.setAttribute('data-admin-profile', '');
@@ -259,29 +258,15 @@ async function toggleVisibility(button) {
 function renderAccount() {
     const info = $('my-account-info');
     if (!info || !me) return;
+    // Who it is, with the role as a chip beside the name: information, not a control
+    const letter = nameOf().replace(/^@/, '').charAt(0).toUpperCase();
     info.innerHTML =
-        '<section class="mine-group"><h3 class="mine-group-title">Account</h3><ul class="glass-card mine-sets">' +
-        `<li class="mine-set profile-who">${avatar(nameOf(), true)}<span class="mine-set-text"><span>${escapeHtml(nameOf())}</span>` +
-        `<span class="mine-dim">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span></li>` +
-        `<li class="mine-set"><span class="mine-set-text">Role</span><span class="mine-set-value">${escapeHtml(ROLES[me.role] || me.role)}</span></li>` +
-        '</ul></section>';
-    $('my-devices').innerHTML =
-        '<section class="mine-group"><h3 class="mine-group-title">Devices</h3><ul class="glass-card mine-sets">' +
-        '<li><button type="button" class="mine-set mine-set-pick mine-set-danger" data-action="profile-end-others">' +
-        '<span class="mine-set-text">Sign out on other devices</span></button></li>' +
-        '</ul><p class="mine-group-note">This device stays signed in.</p></section>';
-}
-
-async function endOthers() {
-    try {
-        const { ended } = await api('/account/sessions/end-others', { method: 'POST' });
-        toast(
-            ended ? `Signed out on ${ended} other device${ended === 1 ? '' : 's'}` : 'No other devices were signed in',
-            'success'
-        );
-    } catch (err) {
-        toast(err.message, 'error');
-    }
+        `<div class="group-card"><span class="profile-avatar" aria-hidden="true">${escapeHtml(letter)}</span>` +
+        `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(nameOf())}</span>` +
+        `<span class="role-chip">${escapeHtml(ROLES[me.role] || me.role)}</span></span>` +
+        `<span class="row-meta">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span></div>`;
+    setDevicesOwner(me.id);
+    loadDevices();
 }
 
 /** Click handlers, merged into app.js's delegation like the other modules' */
@@ -304,13 +289,5 @@ export const profileActions = {
     // Runs before the section switch (app.js): the page's Back is pointed at where the menu was opened
     'profile-page': () => {
         for (const back of document.querySelectorAll('.mine-back')) back.setAttribute('data-section', backTo);
-    },
-    'profile-end-others': () =>
-        showConfirm({
-            title: 'Sign out on other devices?',
-            text: 'Every other browser signed in to this account will need to sign in again.',
-            confirmLabel: 'Sign out',
-            cancelLabel: 'Cancel',
-            onConfirm: endOthers
-        })
+    }
 };

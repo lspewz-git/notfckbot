@@ -15,6 +15,12 @@ const AccountSession = sequelize.define(
         // false: signed in by /code digits nobody confirmed ("Это я"). Browsers this session marks are
         // remembered as untrusted, whatever cookie they bring (src/account/devices.js)
         trusted: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+        // For the Devices list in Account settings: "Safari, iPhone" (set once), and the country, network
+        // and time of the browser's latest request (src/account/auth.js noteSession)
+        name: { type: DataTypes.STRING(64), allowNull: true },
+        country: { type: DataTypes.STRING(2), allowNull: true },
+        network: { type: DataTypes.STRING(128), allowNull: true },
+        seenAt: { type: DataTypes.DATE, allowNull: true },
         expiresAt: { type: DataTypes.DATE, allowNull: false }
     },
     { updatedAt: false, indexes: [{ fields: ['userId'] }, { fields: ['expiresAt'] }] }
