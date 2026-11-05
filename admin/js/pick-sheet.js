@@ -42,6 +42,8 @@ let values = [];
 export function pickFrom({ title, options, value, onPick }) {
     $('pick-search').hidden = true;
     $('pick-modal').classList.remove('chat-picker');
+    // The choices are drawn as the redesign's sheet (05.11); the admin chat picker keeps its list
+    $('pick-modal').classList.add('app-sheet');
     $('pick-title').textContent = title;
     values = options.map((o) => String(o.value));
     $('pick-list').innerHTML = options

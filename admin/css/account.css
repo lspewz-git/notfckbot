@@ -611,13 +611,6 @@ button.search-result-open:hover .mine-row-title {
     font-weight: 600;
 }
 
-.mine-note {
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-banner);
-    background: var(--fill-faint);
-    color: var(--text-secondary);
-}
-
 /* --- Search --- */
 
 .mine-search {
@@ -981,122 +974,6 @@ button.search-result-open:hover .mine-row-title {
     display: none;
 }
 
-/* --- Settings: grouped rows, a choice opens a list --- */
-
-.mine-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.mine-group + .mine-group {
-    margin-top: var(--space-2);
-}
-
-.mine-group-title {
-    padding: 0 var(--space-1);
-    color: var(--text-dim);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-.mine-group-note {
-    padding: 0 var(--space-1);
-    color: var(--text-dim);
-    font-size: var(--text-xs);
-    line-height: 1.4;
-}
-
-/* The card's own padding is the rows' instead: a whole row is the button */
-.mine-sets {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    overflow: hidden;
-}
-
-.mine-set {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    width: 100%;
-    min-height: 3rem;
-    padding: var(--space-2) var(--space-4);
-}
-
-.mine-sets > li + li {
-    border-top: 1px solid var(--border-row);
-}
-
-.mine-set-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.mine-set-sub {
-    color: var(--text-dim);
-    font-size: var(--text-xs);
-}
-
-.mine-set-pick {
-    border: none;
-    border-radius: inherit;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-}
-
-.mine-set-pick:hover:not(:disabled) {
-    background: var(--fill-hover);
-}
-
-/* The card clips what is outside it: the keyboard ring goes inside the row */
-.mine-set-pick:focus-visible {
-    outline-offset: -2px;
-}
-
-.mine-set-pick:disabled {
-    cursor: default;
-}
-
-.mine-set-value {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    min-width: 0;
-    color: var(--text-dim);
-    white-space: nowrap;
-}
-
-.mine-set-action {
-    color: var(--text);
-}
-
-.mine-set-accent {
-    color: var(--accent);
-}
-
-.mine-set-value .badge {
-    margin-right: var(--space-1);
-}
-
-.mine-set-value .icon {
-    width: 16px;
-    height: 16px;
-    flex: none;
-}
-
-.mine-set-pick:disabled .mine-set-value .icon {
-    visibility: hidden;
-}
-
 /* --- Choosing one of a few (pick-sheet.js) --- */
 
 #pick-modal.chat-picker .modal-content {
@@ -1165,6 +1042,81 @@ button.search-result-open:hover .mine-row-title {
     background: var(--surface-2);
 }
 
+/* The choices as the redesign's sheet (pick-sheet.js adds .app-sheet): a centred title over one
+   rounded list, the current choice ticked in the accent; the admin chat picker keeps its list */
+#pick-modal:not(.app-sheet) .sheet-grabber {
+    display: none;
+}
+
+#pick-modal.app-sheet .modal-content {
+    display: flex;
+    flex-direction: column;
+}
+
+#pick-modal.app-sheet .sheet-grabber {
+    margin-bottom: var(--space-3);
+}
+
+#pick-modal.app-sheet h3 {
+    margin: var(--space-1) 0 0;
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    /* no close button here to clear: the title sits in the middle */
+    padding-right: 0;
+}
+
+#pick-modal.app-sheet #pick-list {
+    gap: 0;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: var(--surface-2);
+}
+
+#pick-modal.app-sheet .pick-row {
+    position: relative;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border: none;
+    border-radius: 0;
+}
+
+#pick-modal.app-sheet .pick-row + .pick-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: var(--space-4);
+    height: 1px;
+    background: var(--border-row);
+}
+
+#pick-modal.app-sheet .pick-row.selected,
+#pick-modal.app-sheet .pick-row:hover {
+    background: transparent;
+}
+
+@media (hover: hover) {
+    #pick-modal.app-sheet .pick-row:hover {
+        background: var(--surface-3);
+    }
+}
+
+#pick-modal.app-sheet .pick-row:focus-visible {
+    outline-offset: -2px;
+}
+
+#pick-modal.app-sheet .pick-row .action-text {
+    flex: 1;
+    min-width: 0;
+}
+
+#pick-modal.app-sheet .pick-check .icon {
+    width: 20px;
+    height: 20px;
+}
+
 .pick-check {
     display: inline-flex;
     color: var(--accent);
@@ -1213,23 +1165,6 @@ button.search-result-open:hover .mine-row-title {
 }
 
 /* --- Chat settings and Account settings: pages the profile menu opens (profile.js) --- */
-
-.mine-page-title {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-}
-
-/* A plain arrow, not a framed button: it sits inside the column, before the title */
-.mine-back {
-    border-color: transparent;
-}
-
-.mine-back .icon {
-    width: 20px;
-    height: 20px;
-}
 
 #my-signin:empty,
 #my-devices:empty {
@@ -2005,4 +1940,70 @@ button.search-result-open:hover .mine-row-title {
     font-size: var(--text-sm);
     line-height: 1.125rem;
     text-align: center;
+}
+
+/* --- Chat settings (account.js): the chat's card, then rows like Account settings' --- */
+
+/* The card is the way to the other chats: a button, drawn like the profile card */
+.chat-card {
+    width: 100%;
+    border: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .chat-card:hover {
+        background: var(--surface-2);
+    }
+}
+
+/* A group's letter is quiet; the accent is the user's own chat, as in the chat list */
+.profile-avatar-group {
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+.chat-settings-note {
+    margin-top: var(--space-3);
+}
+
+/* The groups space themselves (.group-title's margin), as on Account settings: no column gap on top */
+#my-settings-body {
+    gap: 0;
+}
+
+/* A long choice gives way to the setting's name */
+#my-settings-body .row-value {
+    flex: 0 1 auto;
+    max-width: 50%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.group-row-static > .switch {
+    flex: none;
+}
+
+/* Only looked at (a group member): no hover, no chevron, the switches dimmed */
+.group-row:disabled {
+    cursor: default;
+}
+
+@media (hover: hover) {
+    .group-row:disabled:hover {
+        background: transparent;
+    }
+}
+
+.group-row:disabled .row-chevron {
+    display: none;
+}
+
+.group-row-static > .switch:disabled {
+    cursor: default;
+    opacity: 0.5;
 }

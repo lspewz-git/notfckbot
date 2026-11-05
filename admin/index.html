@@ -1300,24 +1300,16 @@
                     </section>
 
                     <!-- Opened from the profile menu (profile.js); Back returns to the section it came from -->
-                    <section id="my-settings-section" class="section mine-section mine-page">
-                        <header>
-                            <div class="header-info mine-page-title">
-                                <button
-                                    type="button"
-                                    class="btn btn-ghost btn-icon-square mine-back"
-                                    data-section="my-subs"
-                                    aria-label="Back"
-                                >
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <use href="/vendor/lucide.svg#arrow-left" />
-                                    </svg>
-                                </button>
-                                <h1>Chat settings</h1>
-                            </div>
-                            <div class="mine-chat" data-chat-picker></div>
+                    <section id="my-settings-section" class="section mine-section mine-page app-page">
+                        <header class="page-nav">
+                            <button type="button" class="page-back mine-back" data-section="my-subs" aria-label="Back">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#chevron-left" />
+                                </svg>
+                            </button>
+                            <h1>Chat settings</h1>
                         </header>
-                        <p class="mine-context" data-chat-context hidden></p>
+                        <!-- The chat's card (it opens the chats), then its settings (account.js) -->
                         <div id="my-settings-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
@@ -1783,6 +1775,7 @@
         </dialog>
         <dialog id="pick-modal" class="modal modal-sheet" aria-labelledby="pick-title">
             <div class="modal-content modal-narrow">
+                <span class="sheet-grabber" aria-hidden="true"></span>
                 <h3 id="pick-title"></h3>
                 <div id="pick-search" class="pick-search" hidden>
                     <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">

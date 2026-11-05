@@ -59,7 +59,8 @@ async function openSettingsTab(page, tab) {
 }
 
 /** An account page's chat: its chip at the top, then the chat in the list it opens. */
-const profileButton = (page, section) => page.locator(isNarrow(page) ? '.tab-profile' : `#${section}-section .mine-chat-chip`);
+const profileButton = (page, section) =>
+    page.locator(isNarrow(page) ? '.tab-profile' : `#${section}-section [data-action="profile-open"]`);
 
 async function pickChat(page, section, title) {
     await profileButton(page, section).click();

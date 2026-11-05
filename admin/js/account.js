@@ -8,7 +8,7 @@ import { createHistory } from './history.js';
 import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal } from './ui.js';
-import { pickFrom, avatar } from './pick-sheet.js';
+import { pickFrom, avatar, initial } from './pick-sheet.js';
 import { chatChip } from './chat-picker.js';
 
 const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
@@ -223,7 +223,7 @@ export async function selectChat(id) {
     // The other chat's settings rows would save their choices to this one while it loads
     settings = null;
     const sets = $('my-settings-body');
-    if (sets && sets.querySelector('.mine-sets')) sets.innerHTML = loading();
+    if (sets && sets.querySelector('.group-list')) sets.innerHTML = loading();
     showChatChips();
     await reload();
 }
@@ -615,41 +615,63 @@ function settingsView(data) {
     const choices = settingChoices(data);
     const off = data.canChange ? '' : ' disabled';
     // A row showing the current choice; it opens the list (pick-sheet.js)
-    const pickRow = (name, label) => {
+    const pickRow = (name, tile, label) => {
         const c = choices[name];
         const current = c.options.find(([v]) => String(v) === String(c.value));
         return (
-            `<li><button type="button" class="mine-set mine-set-pick" data-action="mine-pick" data-name="${name}" aria-haspopup="dialog"${off}>` +
-            `<span class="mine-set-text">${label}</span>` +
-            `<span class="mine-set-value">${escapeHtml(current ? current[1] : '')}${CHEVRON_RIGHT}</span></button></li>`
+            `<li><button type="button" class="group-row" data-action="mine-pick" data-name="${name}" aria-haspopup="dialog"${off}>` +
+            `<span class="row-tile">${ICON(tile)}</span>` +
+            `<span class="row-text"><span class="row-name">${label}</span></span>` +
+            `<span class="row-value">${escapeHtml(current ? current[1] : '')}</span>` +
+            `<span class="row-chevron">${CHEVRON_RIGHT}</span></button></li>`
         );
     };
-    const toggleRow = (name, label, hint, on) =>
-        `<li class="mine-set"><span class="mine-set-text"><span>${label}</span>${hint ? `<span class="mine-dim">${hint}</span>` : ''}</span>` +
-        `<button type="button" class="switch" role="switch" aria-checked="${Boolean(on)}" aria-label="${label}" data-action="mine-toggle" data-name="${name}"${off}><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button></li>`;
-    const group = (title, rows, note = '') =>
-        `<section class="mine-group"><h3 class="mine-group-title">${title}</h3><ul class="glass-card mine-sets">${rows}</ul>` +
-        (note ? `<p class="mine-group-note">${note}</p>` : '') +
-        '</section>';
+    const toggleRow = (name, tile, label, hint, on) =>
+        `<li><div class="group-row group-row-static"><span class="row-tile">${ICON(tile)}</span>` +
+        `<span class="row-text"><span class="row-name">${label}</span>${hint ? `<span class="row-meta">${hint}</span>` : ''}</span>` +
+        `<button type="button" class="switch" role="switch" aria-checked="${Boolean(on)}" aria-label="${label}" data-action="mine-toggle" data-name="${name}"${off}><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button></div></li>`;
+    const group = (title, rows, help = '') =>
+        `<h2 class="group-title">${title}</h2><ul class="group-list">${rows}</ul>` +
+        (help ? `<p class="group-help">${help}</p>` : '');
     return (
+        chatCard(data) +
         (data.canChange
             ? ''
-            : '<p class="mine-note">Only the group\'s admins change its settings. You can look at them.</p>') +
+            : '<p class="group-help chat-settings-note">You can look at the settings; the group’s admins change them.</p>') +
         group(
             'Notifications',
-            pickRow('quiet', 'Quiet hours') + pickRow('timezone', 'Time zone'),
+            pickRow('quiet', 'moon', 'Quiet hours') + pickRow('timezone', 'globe', 'Time zone'),
             'In quiet hours notifications wait and come in the morning as one message.'
         ) +
         group(
             'Digests',
-            toggleRow('digest_week', 'Weekly', 'Mondays at 10:00', s.digest_week) +
-                toggleRow('digest_month', 'Monthly', 'On the 1st at 10:00', s.digest_month)
+            toggleRow('digest_week', 'calendar-days', 'Weekly', 'Mondays at 10:00', s.digest_week) +
+                toggleRow('digest_month', 'calendar', 'Monthly', 'On the 1st at 10:00', s.digest_month)
         ) +
         group(
             'Bot',
-            (data.group ? pickRow('buttons_mode', 'Buttons pressed by') : '') +
-                toggleRow('menu_enabled', 'Bottom menu in the chat', '', s.menu_enabled !== false)
+            (data.group ? pickRow('buttons_mode', 'users', 'Buttons pressed by') : '') +
+                toggleRow('menu_enabled', 'panel-bottom', 'Bottom menu in the chat', '', s.menu_enabled !== false)
         )
+    );
+}
+
+/**
+ * Whose settings these are: the chat's letter, name and kind, and whether the user may change them.
+ * A tap opens the profile menu with the chats, as the chip on the other sections does
+ */
+function chatCard(data) {
+    const chat = (state.chats || []).find((c) => c.id === state.chatId);
+    const title = chat ? chat.title : 'My account';
+    const group = Boolean(data.group);
+    const meta = !group ? 'Your personal chat' : data.canChange ? 'You’re an admin' : 'Only admins change settings';
+    return (
+        `<button type="button" class="group-card chat-card" data-action="profile-open" aria-haspopup="dialog" title="Switch chat">` +
+        `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(title))}</span>` +
+        `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(title)}</span>` +
+        `<span class="role-chip">${group ? 'Group' : 'Private'}</span></span>` +
+        `<span class="row-meta">${meta}</span></span>` +
+        `<span class="row-chevron">${ICON('chevrons-up-down')}</span></button>`
     );
 }
 
@@ -699,7 +721,7 @@ export async function loadMine(section) {
             state.cal = data;
             body.innerHTML = calendarView(data);
         } else if (section === 'my-settings') {
-            if (!body.querySelector('.mine-sets')) body.innerHTML = loading();
+            if (!body.querySelector('.group-list')) body.innerHTML = loading();
             const data = await api(chatPath('/settings'));
             if (stale()) return;
             body.innerHTML = settingsView(data);

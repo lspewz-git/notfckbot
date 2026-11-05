@@ -27,6 +27,7 @@ let choose = null;
 export function openChatPicker(chats, selected, onPick) {
     $('pick-title').textContent = 'Choose a chat';
     $('pick-modal').classList.add('chat-picker');
+    $('pick-modal').classList.remove('app-sheet');
     $('pick-search').hidden = false;
     $field('pick-query').value = '';
     const render = () => {

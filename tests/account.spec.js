@@ -84,8 +84,12 @@ test('each account page says whether it shows the personal account or a group, a
     await pickChat(page, 'my-subs', 'Киноклуб');
     await expect(line).toHaveText('Group Киноклуб · shared with everyone in it');
     await expect(line).toHaveClass(/is-group/);
-    for (const id of ['my-aired', 'my-calendar', 'my-settings'])
+    for (const id of ['my-aired', 'my-calendar'])
         await expect(page.locator(`#${id}-section [data-chat-context]`)).toHaveText(/Group Киноклуб/);
+    // Chat settings names the chat on its card instead
+    await openMine(page, 'my-settings');
+    await expect(page.locator('#my-settings-body .chat-card .card-name')).toHaveText('Киноклуб');
+    await openMine(page, 'my-subs');
     await expect(page.locator('[data-tab-label]')).toHaveText('Киноклуб');
     await expect(page.locator('[data-tab-chat-avatar]')).toHaveText('К');
     if (isNarrow(page)) {
@@ -740,15 +744,18 @@ test('the panel opens on the own account, not on the group picked last time', as
     await pickChat(page, 'my-settings', 'Киноклуб');
     await page.reload();
     await openMine(page, 'my-settings');
-    await expect(page.locator('#my-settings-section .mine-chat-chip')).toContainText(panel.account.chats[0].title);
+    await expect(page.locator('#my-settings-body .chat-card .card-name')).toHaveText(panel.account.chats[0].title);
 });
 
 test("a group's settings: a member sees them, unchangeable; an admin's change is saved", async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-settings');
     await pickChat(page, 'my-settings', 'Киноклуб');
-    await expect(page.locator('.mine-note')).toContainText("Only the group's admins");
+    await expect(page.locator('#my-settings-body .chat-settings-note')).toContainText('the group’s admins change them');
+    await expect(page.locator('#my-settings-body .chat-card .row-meta')).toHaveText('Only admins change settings');
+    await expect(page.locator('#my-settings-body .chat-card .role-chip')).toHaveText('Group');
     await expect(page.locator('#my-settings-body [data-action="mine-pick"]').first()).toBeDisabled();
+    await expect(page.locator('#my-settings-body [data-action="mine-pick"] .row-chevron').first()).toBeHidden();
     await expect(page.locator('[data-action="mine-pick"][data-name="buttons_mode"]')).toHaveCount(1);
     await expect(page.locator('[data-action="mine-toggle"]').first()).toBeDisabled();
 
@@ -824,7 +831,7 @@ test('the profile menu: chats, both settings pages and Sign out; nothing else si
     // Chat settings, and Back to the section the menu was opened from
     await menu.locator('[data-section="my-settings"]').click();
     await expect(page.locator('#my-settings-section')).toHaveClass(/active/);
-    await expect(page.locator('#my-settings-body .mine-group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
+    await expect(page.locator('#my-settings-body .group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
     await page.locator('#my-settings-section .mine-back').click();
     await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
 
@@ -898,12 +905,40 @@ test('the profile button opens the chats; the choice shows on every page', async
     expect(panel.account.sent.some((r) => r.path.startsWith('/api/account/chats/-100/'))).toBe(true);
 });
 
+test('Chat settings: the chat on a card that opens the chats, rows with icon tiles, the choices on a sheet', async ({
+    page
+}) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-settings');
+    const body = page.locator('#my-settings-body');
+    const card = body.locator('.chat-card');
+    await expect(card.locator('.card-name')).toHaveText(panel.account.chats[0].title);
+    await expect(card.locator('.role-chip')).toHaveText('Private');
+    await expect(card.locator('.row-meta')).toHaveText('Your personal chat');
+    // The header has no chip of its own any more: the card is the way to the chats
+    await expect(page.locator('#my-settings-section header .mine-chat-chip')).toHaveCount(0);
+    await expect(body.locator('.group-row .row-tile svg use').first()).toHaveAttribute('href', '/vendor/lucide.svg#moon');
+    await expect(body.locator('.group-row-static .row-meta')).toHaveText(['Mondays at 10:00', 'On the 1st at 10:00']);
+    for (const title of await body.locator('.group-title').all())
+        expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
+
+    await body.locator('[data-action="mine-pick"][data-name="quiet"]').click();
+    const sheet = page.locator('#pick-modal');
+    await expect(sheet).toHaveClass(/app-sheet/);
+    await expect(sheet.locator('.sheet-grabber')).toBeVisible({ visible: isNarrow(page) });
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+
+    await card.click();
+    await expect(page.locator('#profile-modal .pick-row', { hasText: 'Киноклуб' })).toBeVisible();
+});
+
 test('settings are rows; a row opens its choices and saves the one picked', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-settings');
     const quiet = page.locator('[data-action="mine-pick"][data-name="quiet"]');
     await expect(quiet).toContainText('23:00–09:00');
-    await expect(page.locator('#my-settings-body .mine-group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
+    await expect(page.locator('#my-settings-body .group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
     // A private chat has no "who presses the buttons"
     await expect(page.locator('[data-name="buttons_mode"]')).toHaveCount(0);
 

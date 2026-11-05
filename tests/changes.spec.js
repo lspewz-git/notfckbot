@@ -79,12 +79,12 @@ test('the change log is for panel admins only: account settings never show it, e
         await pickChat(page, 'my-settings', 'Киноклуб');
     };
     await open();
-    await expect(page.locator('.mine-note')).toContainText("Only the group's admins");
+    await expect(page.locator('#my-settings-body .chat-settings-note')).toContainText('the group’s admins change them');
     await expect(page.locator('#mine-changes')).toHaveCount(0);
 
     panel.account.chats[1].settings = true;
     await open();
-    await expect(page.locator('#my-settings-body .mine-sets').first()).toBeVisible();
+    await expect(page.locator('#my-settings-body .group-list').first()).toBeVisible();
     await expect(page.locator('#my-settings-body .changes')).toHaveCount(0);
     expect(asked).toEqual([]);
 });
