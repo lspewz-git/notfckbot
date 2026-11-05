@@ -113,11 +113,14 @@
     --radius-tile-lg: 16px; /* the current device's icon tile */
     --radius-tile: 12px; /* a row's icon tile */
     --radius-sheet: 32px; /* bottom sheet, tab bar capsule */
-    /* The floating phone tab bar: its height, the room the page leaves under its content (bar, 16px
-       gap, 40px of air) and where toasts sit above it */
+    /* The floating phone tab bar: its height, its distance from the screen's bottom edge, the room
+       the page leaves under its content (bar, gap, 40px of air) and where toasts sit above it.
+       Like Telegram's (05.11): it sits low, over the lower part of the home indicator area, and 12px
+       up where the screen has none */
     --tabbar-h: 64px;
-    --tabbar-room: calc(var(--tabbar-h) + 24px + 40px + env(safe-area-inset-bottom, 0px));
-    --tabbar-toast: calc(var(--tabbar-h) + 16px + 12px + env(safe-area-inset-bottom, 0px));
+    --tabbar-gap: max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) - 12px));
+    --tabbar-room: calc(var(--tabbar-h) + var(--tabbar-gap) + 40px);
+    --tabbar-toast: calc(var(--tabbar-h) + var(--tabbar-gap) + 12px);
 
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;

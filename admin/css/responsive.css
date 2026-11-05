@@ -8,8 +8,8 @@
         padding: 0;
     }
 
-    /* A floating capsule over the page (devices redesign, 05.11): 16px from the edges and above the
-       home indicator; frosted where the browser can blur, solid where it can't or the user asked */
+    /* A floating capsule over the page (devices redesign, 05.11): 16px from the sides, low at the
+       bottom (--tabbar-gap); frosted where the browser can blur, solid where it can't or the user asked */
     .tabbar {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -19,7 +19,7 @@
         position: fixed;
         left: var(--space-4);
         right: var(--space-4);
-        bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+        bottom: var(--tabbar-gap);
         z-index: 500;
         height: var(--tabbar-h);
         padding: 0 6px;
@@ -48,7 +48,7 @@
 
     .main-content {
         margin-left: 0;
-        /* top: the notch / status bar; bottom: the tab bar, its 16px gap and 40px of air under the page */
+        /* top: the notch / status bar; bottom: the tab bar, its gap and 40px of air under the page */
         padding: calc(var(--space-2) + env(safe-area-inset-top, 0px)) var(--space-2) var(--tabbar-room);
     }
 

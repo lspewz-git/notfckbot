@@ -348,7 +348,7 @@ test('the phone tab bar floats as a capsule and the page ends above it', async (
             position: css.position
         };
     });
-    expect(bar).toEqual({ left: 16, right: 16, bottom: 16, height: 64, radius: '32px', position: 'fixed' });
+    expect(bar).toEqual({ left: 16, right: 16, bottom: 12, height: 64, radius: '32px', position: 'fixed' });
     const active = page.locator('.tabbar .tab-item.active');
     await expect(active).toHaveAttribute('aria-current', 'page');
 
