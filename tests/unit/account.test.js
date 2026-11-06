@@ -1810,6 +1810,60 @@ test('the guard marks and remembers the browser; a day-old device may end sessio
     assert.equal((await call('POST', '/api/account/sessions/end-others', { cookie: user, device: mark })).status, 200);
 });
 
+test('parallel device checks keep one row and reuse the winning first-seen date and trust', async (t) => {
+    const count = 8;
+    let reads = 0;
+    let release;
+    const ready = new Promise((resolve) => (release = resolve));
+    t.mock.method(AccountDevice, 'findOne', async ({ where }) => {
+        const row = deviceRows.find((candidate) => deviceMatch(candidate, where));
+        if (row) return { ...row };
+        if (++reads === count) release();
+        await ready;
+        return null;
+    });
+    t.mock.method(AccountDevice, 'create', async (row) => {
+        if (deviceRows.some((candidate) => deviceMatch(candidate, { deviceId: row.deviceId, userId: row.userId })))
+            throw new UniqueConstraintError();
+        deviceRows.push({ ...row });
+    });
+    const now = Date.now();
+    const results = await Promise.allSettled(
+        Array.from({ length: count }, (_, i) =>
+            devices.remember(
+                { headers: { cookie: `nfb_device=${'r'.repeat(43)}` }, get: () => '', ip: '127.0.0.1' },
+                { append() {} },
+                7,
+                { now, since: now - i * 1000, trusted: i === 0 }
+            )
+        )
+    );
+    assert.equal(deviceRows.length, 1);
+    assert.equal(deviceRows[0].trusted, true, 'a concurrent untrusted check cannot downgrade trust');
+    assert.equal(reads, count, 'all checks read the missing row before any insert');
+    for (const result of results) {
+        assert.equal(result.status, 'fulfilled', result.reason?.message);
+        assert.equal(result.value.firstSeen, deviceRows[0].firstSeen.getTime());
+    }
+});
+
+test('device registration still reports database failures and unmatched unique conflicts', async (t) => {
+    for (const error of [new Error('database unavailable'), new UniqueConstraintError()]) {
+        t.mock.method(AccountDevice, 'create', async () => {
+            throw error;
+        });
+        await assert.rejects(
+            devices.remember(
+                { headers: { cookie: `nfb_device=${'s'.repeat(43)}` }, get: () => '', ip: '127.0.0.1' },
+                { append() {} },
+                7
+            ),
+            (err) => err === error
+        );
+        assert.equal(deviceRows.length, 0);
+    }
+});
+
 test('a session from before devices were remembered counts from its own start', async (t) => {
     const { server, call } = await serve(fakeBot({}));
     t.after(() => server.close());

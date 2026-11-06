@@ -9,7 +9,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const maxmind = require('maxmind');
-const { Op } = require('sequelize');
+const { Op, UniqueConstraintError } = require('sequelize');
 const { AccountDevice } = require('../db');
 const { lruCache } = require('../lru');
 const { log } = require('../log');
@@ -200,15 +200,24 @@ async function remember(req, res, userId, { since = Date.now(), trusted, now = D
     const trust = trusted === true;
     const where = { deviceId: client.deviceId, userId: String(userId) };
     const fields = { name: client.name, country: client.country, network: client.network, lastSeen: new Date(now) };
-    const row = await AccountDevice.findOne({ where, raw: true });
+    let row = await AccountDevice.findOne({ where, raw: true });
     if (row) await AccountDevice.update(trust ? { ...fields, trusted: true } : fields, { where });
-    else
-        await AccountDevice.create({
-            ...where,
-            ...fields,
-            trusted: trust || trusted !== false,
-            firstSeen: new Date(since)
-        });
+    else {
+        try {
+            await AccountDevice.create({
+                ...where,
+                ...fields,
+                trusted: trust || trusted !== false,
+                firstSeen: new Date(since)
+            });
+        } catch (err) {
+            if (!(err instanceof UniqueConstraintError)) throw err;
+            // Another request may have registered this browser after our lookup.
+            row = await AccountDevice.findOne({ where, raw: true });
+            if (!row) throw err;
+            await AccountDevice.update(trust ? { ...fields, trusted: true } : fields, { where });
+        }
+    }
     // "Это не я" pressed while this was being written: it stays forgotten
     if (denied.has(key)) {
         await AccountDevice.destroy({ where });
