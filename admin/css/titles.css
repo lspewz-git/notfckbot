@@ -107,12 +107,12 @@
     }
 }
 
-/* The page sits 12 + 32px under the top on a phone, like the redesign's frames (the inner padding is 20) */
-@media (max-width: 640px) {
-    .mine-section > header.tab-top,
-    .search-bar {
-        margin-top: var(--space-6);
-    }
+/* No top margin of their own: the content's top padding (--top-inset + 12px, responsive.css) places
+   the title row and the search bar */
+.mine-section > header.tab-top,
+.search-bar,
+.app-page > .page-nav {
+    margin-top: 0;
 }
 
 @media (min-width: 1025px) {
@@ -940,12 +940,6 @@
         line-height: 34px;
         font-weight: 700;
         letter-spacing: -0.015em;
-    }
-}
-
-@media (max-width: 640px) {
-    .app-page > .page-nav {
-        margin-top: var(--space-6);
     }
 }
 

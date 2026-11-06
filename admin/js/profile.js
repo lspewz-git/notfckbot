@@ -8,7 +8,7 @@ import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
 import { toast, openModal, showConfirm } from './ui.js';
 import { avatar, initial } from './pick-sheet.js';
-import { chatList, chatHint, selectChat, setChatHidden } from './account.js';
+import { chatList, chatHint, selectChat, setChatHidden, chatAvatar, setOwnName } from './account.js';
 import { setDevicesOwner, loadDevices } from './devices.js';
 
 const icon = (name) =>
@@ -32,6 +32,7 @@ export function setProfile(user) {
             `${avatar(nameOf(), true)}<span class="mine-chat-chip-name">My account</span></a>`;
     }
     for (const el of document.querySelectorAll('[data-profile-avatar]')) el.innerHTML = avatar(nameOf(), true);
+    setOwnName(me.system ? '' : nameOf());
     renderAccount();
     renderProfile();
 }
@@ -79,7 +80,7 @@ function chatsGroup() {
                 const on = c.id === chatId;
                 return (
                     `<li><button type="button" class="group-row chat-row" data-action="profile-chat" data-id="${escapeHtml(c.id)}" aria-pressed="${on}">` +
-                    avatar(c.title, c.type === 'private') +
+                    chatAvatar(c) +
                     `<span class="row-text"><span class="row-name">${escapeHtml(c.title)}</span>` +
                     `<span class="row-meta">${escapeHtml(chatHint(c))}</span></span>` +
                     (on ? `<span class="row-check">${icon('check')}</span>` : '') +
@@ -154,7 +155,7 @@ function visibilityRows() {
             const own = c.type === 'private';
             const title = escapeHtml(c.title);
             return (
-                `<div class="action-row profile-visibility-row">${avatar(c.title, own)}` +
+                `<div class="action-row profile-visibility-row">${chatAvatar(c)}` +
                 `<span class="action-text"><span class="action-title">${title}</span>` +
                 `<span class="action-desc">${own ? 'Always visible' : c.hidden ? 'Hidden' : 'Visible'}</span></span>` +
                 (own

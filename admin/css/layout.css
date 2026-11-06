@@ -5,17 +5,18 @@
     max-width: var(--page-max-width);
     min-height: 100vh;
     margin: 0 auto;
-    padding: var(--space-3);
+    padding: calc(var(--top-inset) + var(--space-3)) var(--space-3) var(--space-3);
 }
 
 /* Icon rail — sticky, no background of its own */
 .sidebar {
     position: sticky;
-    top: calc(var(--space-3) + var(--space-4));
+    /* Level with the content's first row: both start 12px under the page's top */
+    top: calc(var(--top-inset) + var(--space-3));
     align-self: flex-start;
     flex: 0 0 auto;
     width: var(--rail-width);
-    max-height: calc(100dvh - 2 * (var(--space-3) + var(--space-4)));
+    max-height: calc(100dvh - var(--top-inset) - 2 * var(--space-3));
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -89,9 +90,10 @@
     min-width: 0;
 }
 
-/* No separate panel: the cards sit straight on the page */
+/* No separate panel: the cards sit straight on the page. No top padding: the first row starts 12px
+   under the page's top (.app-container's padding), as on phones (responsive.css) */
 .main-inner {
-    padding: var(--space-4) var(--space-5) var(--space-6);
+    padding: 0 var(--space-5) var(--space-6);
 }
 
 /* Wide tables scroll inside their card rather than widening the page */
@@ -290,7 +292,7 @@ html.pull-holding .pull-refresh {
 .pull-refresh {
     --ring: 36px;
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + var(--space-2));
+    top: calc(var(--top-inset) + var(--space-2));
     left: 50%;
     z-index: 600;
     width: var(--ring);

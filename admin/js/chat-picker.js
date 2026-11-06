@@ -7,8 +7,9 @@ const CHECK = '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use hre
 const DOWN =
     '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/vendor/lucide.svg#chevron-down" /></svg>';
 
-export function chatChip({ title, accent = false, action, label = title }) {
-    return `<button type="button" class="mine-chat-chip" data-action="${action}" aria-haspopup="dialog" aria-label="${escapeHtml(label)}">${avatar(title, accent)}<span class="mine-chat-chip-name">${escapeHtml(title)}</span>${DOWN}</button>`;
+/** `letterOf`: whose first letter the avatar shows (the person's own name for their private chat) */
+export function chatChip({ title, accent = false, action, label = title, letterOf = title }) {
+    return `<button type="button" class="mine-chat-chip" data-action="${action}" aria-haspopup="dialog" aria-label="${escapeHtml(label)}">${avatar(letterOf, accent)}<span class="mine-chat-chip-name">${escapeHtml(title)}</span>${DOWN}</button>`;
 }
 
 export function chatRows(chats, selected, action) {

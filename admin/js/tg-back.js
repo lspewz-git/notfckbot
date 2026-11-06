@@ -4,6 +4,11 @@
  * does what the page's button does. The page keeps its own round one: Telegram for iPhone showed no
  * Back for it (06.11), so it is not the only way back. Talks to the native bridge session.js found (TelegramWebviewProxy), not telegram-web-app.js:
  * https://core.telegram.org/api/web-events#web-app-setup-back-button
+ *
+ * And Telegram's safe areas (Bot API 8.0): asked for once, kept up to date from its events and written
+ * as the CSS variables telegram-web-app.js would set (--tg-safe-area-inset-*,
+ * --tg-content-safe-area-inset-*). base.css --top-inset reads them; nothing here moves the page itself.
+ * https://core.telegram.org/bots/webapps#safeareainset
  */
 import { dismissTopLayer } from './ui.js';
 
@@ -32,22 +37,57 @@ function hasBackButton(version) {
     return !version || major > 6 || (major === 6 && minor >= 1);
 }
 
+const SIDES = ['top', 'bottom', 'left', 'right'];
+
+/** A safe area event's insets → the --tg-<name>-inset-<side> variables, in px (0 when missing) */
+export function applyInsets(name, data) {
+    let inset = data;
+    if (typeof data === 'string') {
+        try {
+            inset = JSON.parse(data);
+        } catch {
+            return;
+        }
+    }
+    for (const side of SIDES) {
+        const px = Number(inset?.[side]);
+        document.documentElement.style.setProperty(
+            `--tg-${name}-inset-${side}`,
+            `${Number.isFinite(px) && px > 0 ? px : 0}px`
+        );
+    }
+}
+
+let listening = false;
+
 /**
- * The Mini App's bridge is there: listen for Telegram's Back. An older Telegram has none.
+ * The Mini App's bridge is there: listen for Telegram's events (Back, safe areas) and ask for the
+ * safe areas once. An older Telegram has no Back and simply never answers the safe area requests.
  * @param {string | null} [version] tgWebAppVersion from the launch fragment
  */
 export function setupTelegramBack(nativeBridge, version = null) {
-    if (bridge || !hasBackButton(version)) return;
-    bridge = nativeBridge;
+    if (listening) return;
+    listening = true;
+    const back = hasBackButton(version);
+    if (back) bridge = nativeBridge;
     const w = /** @type {any} */ (window);
     w.Telegram ??= {};
     w.Telegram.WebView ??= {};
     // Telegram calls this for every event; anything else listening keeps getting them
     const previous = w.Telegram.WebView.receiveEvent;
     w.Telegram.WebView.receiveEvent = (event, data) => {
-        if (event === 'back_button_pressed') pressed();
+        if (event === 'back_button_pressed' && back) pressed();
+        if (event === 'safe_area_changed') applyInsets('safe-area', data);
+        if (event === 'content_safe_area_changed') applyInsets('content-safe-area', data);
         if (typeof previous === 'function') previous(event, data);
     };
+    for (const request of ['web_app_request_safe_area', 'web_app_request_content_safe_area']) {
+        try {
+            nativeBridge.postEvent(request, '');
+        } catch {
+            // An older Telegram: no safe areas, --top-inset stays the device's own
+        }
+    }
     syncTelegramBack();
 }
 

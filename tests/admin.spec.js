@@ -80,7 +80,8 @@ test('Tools opens readiness-first recap and its schedule without changing anythi
     await expect(page.locator('#recap-ready-pane')).toBeVisible();
     await expect(page.locator('#recap-ready-list')).toHaveAttribute('aria-busy', 'false', { timeout: 15000 });
     await expect(page.locator('.recap-readiness-count b')).toHaveText(/^\d+$/);
-    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'page');
+    // Recap is nested under Tools: its item is current ("true"), not the page itself
+    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'true');
     await page.locator('#recap-section [data-tab="schedule"]').click();
     await expect(page.locator('#recap-sched-pane')).toHaveAttribute('aria-busy', 'false', { timeout: 15000 });
     await expect(page.locator('#recap-sched-state')).toContainText('recap');
@@ -236,8 +237,8 @@ test('dialogs are announced, modal, and close on Escape', async ({ page }) => {
 
 test('sections are reachable with the keyboard alone', async ({ page }) => {
     const item = page.locator(`${isNarrow(page) ? '.tab-item' : '.nav-item'}[data-section="subs"]`);
-    // A native <button>, so Enter and Space work without a key handler
-    await expect(item).toHaveJSProperty('tagName', 'BUTTON');
+    // Native controls, so Enter works without a key handler: rail buttons, tab bar links (06.11)
+    await expect(item).toHaveJSProperty('tagName', isNarrow(page) ? 'A' : 'BUTTON');
     await item.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('#subs-section')).toHaveClass(/active/);

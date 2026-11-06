@@ -48,13 +48,14 @@
 
     .main-content {
         margin-left: 0;
-        /* top: the notch / status bar; bottom: the tab bar, its gap and 40px of air under the page */
-        padding: calc(var(--space-2) + env(safe-area-inset-top, 0px)) var(--space-2) var(--tabbar-room);
+        /* top: only the system inset (--top-inset); bottom: the tab bar, its gap and 40px of air */
+        padding: var(--top-inset) var(--space-2) var(--tabbar-room);
     }
 
+    /* The first row (a screen's title row, the search bar) starts 12px under the content's top */
     .main-inner {
         min-height: auto;
-        padding: var(--space-5);
+        padding: var(--space-3) var(--space-5) var(--space-5);
     }
     .toast-container {
         bottom: var(--tabbar-toast);
@@ -413,14 +414,14 @@
 @media (max-width: 640px) {
     /* The panel runs edge to edge; a frame around it would only eat width */
     .main-content {
-        padding: env(safe-area-inset-top, 0px) 0 var(--tabbar-room);
+        padding: var(--top-inset) 0 var(--tabbar-room);
     }
 
     .main-inner {
         border: none;
         border-radius: 0;
         background: transparent;
-        padding: var(--space-5) var(--space-4) var(--space-6);
+        padding: var(--space-3) var(--space-4) var(--space-6);
     }
 
     /* "More" opens as a sheet from the bottom edge */

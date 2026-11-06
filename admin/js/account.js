@@ -64,6 +64,18 @@ const state = {
     searching: false
 };
 
+/** The signed-in person's name (profile.js): their private chat's avatar shows its first letter */
+let ownName = '';
+
+/** A chat's avatar: a group's own letter, the person's for their private chat ("My account") */
+export const chatAvatar = (c) => (c.type === 'private' ? avatar(ownName || c.title, true) : avatar(c.title));
+
+/** Who is signed in changed (session.js → profile.js): the chips' avatars follow */
+export function setOwnName(name) {
+    ownName = String(name || '');
+    showChatChips();
+}
+
 const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${rest}`;
 
 /**
@@ -133,7 +145,8 @@ function showChatChips() {
         title: name,
         accent: !chat || chat.type === 'private',
         action: 'chat-switch',
-        label: `Current chat: ${name}. Switch chat`
+        label: `Current chat: ${name}. Switch chat`,
+        letterOf: !chat || chat.type === 'private' ? ownName || name : name
     });
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
     for (const holder of all('[data-profile-chat]')) holder.textContent = name;
@@ -162,7 +175,7 @@ function openChatSwitch() {
             value: c.id,
             label: c.title,
             hint: chatHint(c),
-            avatar: avatar(c.title, c.type === 'private')
+            avatar: chatAvatar(c)
         })),
         onPick: (id) => selectChat(id)
     });
@@ -715,7 +728,7 @@ function chatCard(data) {
     const meta = !group ? 'Your personal chat' : data.canChange ? 'You’re an admin' : 'Only admins change settings';
     return (
         `<button type="button" class="group-card chat-card" data-action="chat-switch" aria-haspopup="dialog" aria-label="Current chat: ${escapeHtml(title)}. Switch chat">` +
-        `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(title))}</span>` +
+        `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(group ? title : ownName || title))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(title)}</span>` +
         `<span class="role-chip">${group ? 'Group' : 'Private'}</span></span>` +
         `<span class="row-meta">${meta}</span></span>` +

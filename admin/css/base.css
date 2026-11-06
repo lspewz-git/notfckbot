@@ -134,6 +134,14 @@
        the page leaves under its content (bar, gap, 28px of air: 96px without a home indicator) and where toasts sit above it.
        Like Telegram's (05.11): it sits low, over the lower part of the home indicator area, and 12px
        up where the screen has none */
+    /* The system inset over the page's top: the device's safe area (an iPhone home-screen app) or
+       Telegram's in fullscreen, plus Telegram's room for its own buttons there (tg-back.js sets the
+       --tg-* variables from the bridge). 0 in a browser tab and in Telegram's normal mode: the address
+       bar or Telegram's header is already above the page */
+    --top-inset: calc(
+        max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px)) +
+            var(--tg-content-safe-area-inset-top, 0px)
+    );
     --tabbar-h: 56px;
     --tabbar-gap: max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) - 12px));
     --tabbar-room: calc(var(--tabbar-h) + var(--tabbar-gap) + 28px);
