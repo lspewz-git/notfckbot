@@ -36,11 +36,13 @@ let values = [];
  *   title: string,
  *   options: { value: string, label: string, hint?: string, avatar?: string }[],
  *   value: string,
+ *   admin?: boolean,
  *   onPick: (value: string) => void
  * }} spec  `avatar` is ready markup from `avatar()`; `onPick` runs only for another value
  */
-export function pickFrom({ title, options, value, onPick }) {
+export function pickFrom({ title, options, value, onPick, admin = false }) {
     $('pick-search').hidden = true;
+    $('pick-admin').hidden = !admin;
     $('pick-modal').classList.remove('chat-picker');
     // The choices are drawn as the redesign's sheet (05.11); the admin chat picker keeps its list
     $('pick-modal').classList.add('app-sheet');

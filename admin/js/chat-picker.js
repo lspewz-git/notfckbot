@@ -25,6 +25,7 @@ export function chatRows(chats, selected, action) {
 let choose = null;
 
 export function openChatPicker(chats, selected, onPick) {
+    $('pick-admin').hidden = true;
     $('pick-title').textContent = 'Choose a chat';
     $('pick-modal').classList.add('chat-picker');
     $('pick-modal').classList.remove('app-sheet');

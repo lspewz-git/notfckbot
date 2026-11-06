@@ -1250,23 +1250,60 @@ button.search-result-open:hover .mine-row-title {
     flex-direction: column;
 }
 
+@media (min-width: 641px) {
+    #pick-modal.app-sheet .modal-content {
+        border-radius: var(--radius-sheet);
+    }
+}
+
+#pick-modal .pick-header {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: start;
+    margin-bottom: var(--space-4);
+}
+
+#pick-modal .pick-header h3 {
+    grid-column: 2;
+    margin: var(--space-2) 0;
+    padding: 0;
+    font-size: 19px;
+    line-height: 24px;
+    font-weight: 700;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+#pick-modal .pick-header .sheet-close {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: start;
+}
+
+#pick-modal .pick-admin {
+    min-height: 56px;
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border: none;
+    border-radius: var(--radius-card);
+    background: var(--surface-2);
+}
+
+#pick-modal .pick-admin > .icon {
+    color: var(--text-faint);
+}
+
+#pick-modal .pick-admin .action-icon {
+    border: none;
+    background: transparent;
+}
+
 #pick-modal.app-sheet .sheet-grabber {
     margin-bottom: var(--space-3);
 }
 
-#pick-modal.app-sheet h3 {
-    margin: var(--space-1) 0 0;
-    font-size: 1.25rem;
-    line-height: 1.5rem;
-    font-weight: 700;
-    text-align: center;
-    /* no close button here to clear: the title sits in the middle */
-    padding-right: 0;
-}
-
 #pick-modal.app-sheet #pick-list {
     gap: 0;
-    overflow: hidden;
     border-radius: var(--radius-card);
     background: var(--surface-2);
 }
@@ -1277,6 +1314,20 @@ button.search-result-open:hover .mine-row-title {
     padding: var(--space-2) var(--space-4);
     border: none;
     border-radius: 0;
+}
+
+#pick-modal.app-sheet .pick-row:has(.pick-avatar) {
+    min-height: 56px;
+}
+
+#pick-modal.app-sheet .pick-row:first-child {
+    border-start-start-radius: var(--radius-card);
+    border-start-end-radius: var(--radius-card);
+}
+
+#pick-modal.app-sheet .pick-row:last-child {
+    border-end-start-radius: var(--radius-card);
+    border-end-end-radius: var(--radius-card);
 }
 
 #pick-modal.app-sheet .pick-row + .pick-row::before {

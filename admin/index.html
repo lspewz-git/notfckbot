@@ -1838,7 +1838,14 @@
         <dialog id="pick-modal" class="modal modal-sheet" aria-labelledby="pick-title">
             <div class="modal-content modal-narrow">
                 <span class="sheet-grabber" aria-hidden="true"></span>
-                <h3 id="pick-title"></h3>
+                <div class="pick-header">
+                    <h3 id="pick-title"></h3>
+                    <button type="button" class="sheet-close" data-close="pick-modal" aria-label="Close">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#x" />
+                        </svg>
+                    </button>
+                </div>
                 <div id="pick-search" class="pick-search" hidden>
                     <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
                         <use href="/vendor/lucide.svg#search" />
@@ -1865,6 +1872,24 @@
                     </button>
                 </div>
                 <div id="pick-list" class="action-list" role="listbox" aria-labelledby="pick-title"></div>
+                <button
+                    type="button"
+                    id="pick-admin"
+                    class="action-row pick-admin"
+                    data-action="view-admin"
+                    data-close="pick-modal"
+                    hidden
+                >
+                    <span class="action-icon">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#shield" />
+                        </svg>
+                    </span>
+                    <span class="action-text"><span class="action-title">Admin panel</span></span>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <use href="/vendor/lucide.svg#chevron-right" />
+                    </svg>
+                </button>
             </div>
         </dialog>
 

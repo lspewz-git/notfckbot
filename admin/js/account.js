@@ -156,6 +156,7 @@ function openChatSwitch() {
     const chats = state.chats.filter((c) => !c.hidden || c.id === state.chatId);
     pickFrom({
         title: 'Chats',
+        admin: !document.body.classList.contains('role-user'),
         value: String(state.chatId),
         options: chats.map((c) => ({
             value: c.id,
