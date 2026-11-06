@@ -4,7 +4,7 @@
  * poster opens it large over everything.
  */
 import { $, escapeHtml } from './dom.js';
-import { openModal, closeModal } from './ui.js';
+import { openModal, closeModal, preserveModalFrame } from './ui.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -132,10 +132,7 @@ function toggleNotify(button) {
     const field = button.closest('.tc-notify');
     const options = field.querySelector('.tc-notify-options');
     const open = button.getAttribute('aria-expanded') !== 'true';
-    const sheet = button.closest('.title-sheet');
-    // Keep this card's frame in place while choices expand inside its scrolling content.
-    // Rendering another card replaces the element and restores its natural height.
-    if (open && sheet && !sheet.style.height) sheet.style.height = getComputedStyle(sheet).height;
+    if (open) preserveModalFrame(button);
     button.setAttribute('aria-expanded', String(open));
     options.hidden = !open;
     // All sheet entry points share this handler, including Follow before anything is saved.
@@ -159,6 +156,7 @@ function toggleNotify(button) {
 function toggleMore(button) {
     const text = button.previousElementSibling;
     const open = button.getAttribute('aria-expanded') !== 'true';
+    if (open) preserveModalFrame(button);
     text.classList.toggle('is-open', open);
     button.setAttribute('aria-expanded', String(open));
     button.textContent = open ? 'Show less' : 'Show more';

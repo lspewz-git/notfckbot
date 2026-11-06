@@ -1,6 +1,6 @@
 /** Shared search results and preview cards for the admin panel and My subscriptions. */
 import { $, escapeHtml } from './dom.js';
-import { openModal } from './ui.js';
+import { openModal, preserveModalFrame } from './ui.js';
 import { NOTIFY, notifyField, posterSrc, titleCard, fitDescriptions } from './title-card.js';
 
 /** One rating treatment across account and admin cards. Zero means not rated. */
@@ -32,6 +32,7 @@ export function description(text) {
 
 export function toggleDescription(button) {
     const expanded = button.getAttribute('aria-expanded') !== 'true';
+    if (expanded) preserveModalFrame(button);
     button.parentElement.querySelector('[data-description-short]').hidden = expanded;
     button.parentElement.querySelector('[data-description-full]').hidden = !expanded;
     button.setAttribute('aria-expanded', String(expanded));

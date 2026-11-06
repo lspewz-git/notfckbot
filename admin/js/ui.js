@@ -49,6 +49,14 @@ function focusables(modal) {
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
 
+/** Preserve a card's outer frame while its details expand in the scrolling content. */
+export function preserveModalFrame(control) {
+    const content = /** @type {HTMLElement | null} */ (control.closest('.modal-content'));
+    if (!content || content.style.height) return;
+    content.style.height = getComputedStyle(content).height;
+    content.dataset.framePinned = 'true';
+}
+
 /**
  * Focus a field for typing, except on touch screens: there focus opens the
  * on-screen keyboard (or the OS picker) and scrolls the page under it, which a
@@ -113,6 +121,12 @@ export function openModal(id) {
     if (!modal) return;
     // Opened again while open (a dialog redrawn after saving): only focus is put back
     if (modal.open) return focusInside(modal);
+    // Static card dialogs reuse their content element for another title; start at its natural height.
+    const pinned = /** @type {HTMLElement | null} */ (modal.querySelector('.modal-content[data-frame-pinned]'));
+    if (pinned) {
+        pinned.style.removeProperty('height');
+        delete pinned.dataset.framePinned;
+    }
     watch(modal);
     // A list open on the page would stay there, under the dim and out of reach
     closeDropdown();

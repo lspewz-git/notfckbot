@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
-const { watchConsole, openSection, openProfilePage } = require('./helpers');
+const { watchConsole, openSection, openProfilePage, isPhone } = require('./helpers');
 
 watchConsole();
 
@@ -84,6 +84,81 @@ test('expanding Notify me keeps the card frame and page in place', async ({ page
     await first.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect.poll(frame).toEqual(before);
+});
+
+for (const section of ['Following fresh', 'Following after Notify', 'Calendar', 'Released', 'Follow', 'Admin details']) {
+    test(`${section}: description expands and collapses without moving the card`, async ({ page, isMobile }) => {
+        if (isMobile) await page.setViewportSize({ width: 390, height: 844 });
+        const overview = 'A long description with enough words to expand. '.repeat(60);
+        let card;
+        if (section.startsWith('Following')) {
+            await following(page, overview);
+            card = page.locator('#mine-card-body');
+            if (section === 'Following after Notify') {
+                const notify = card.getByRole('button', { name: /Notify me/ });
+                await notify.click();
+                await notify.click();
+            }
+        } else {
+            const admin = section === 'Follow' || section === 'Admin details';
+            const panel = await mockPanel(page, { role: admin ? 'admin' : 'user', overview });
+            if (section === 'Calendar') {
+                panel.account.calendar.items.forEach(item => { item.overview = overview; });
+                await openSection(page, 'my-calendar');
+                await page.locator('#my-calendar-body .cal-row').first().click();
+                card = page.locator('#mine-card-body');
+            } else if (section === 'Released') {
+                await openSection(page, 'my-aired');
+                await page.locator('#my-aired-series .history-open').first().click();
+                card = page.locator('#released-body');
+            } else if (section === 'Follow') {
+                await openSection(page, 'subs');
+                await page.locator('#subs-section [data-action="add-content"]').click();
+                await page.locator('#content-search-input').fill('long title');
+                await page.locator('#content-search-input').press('Enter');
+                await expect(page.locator('#content-search-results .search-result-open')).toHaveCount(2);
+                await page.locator('#content-search-results .search-result-open').first().click();
+                card = page.locator('#content-card-modal .modal-content');
+            } else {
+                await openSection(page, 'watchlist');
+                await page.locator(isPhone(page) ? '#watchlist-body .compact-title' : '#watchlist-body .title-with-poster .link-text').first().click();
+                card = page.locator('#detail-modal .modal-content');
+            }
+        }
+        const more = card.getByRole('button', { name: 'Show more', exact: true });
+        await expect(more).toBeVisible();
+        await card.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+        const frame = () => card.evaluate(el => {
+            const r = el.getBoundingClientRect();
+            return { top: Math.round(r.top), height: Math.round(r.height), page: scrollY };
+        });
+        const before = await frame();
+        await more.click();
+        const less = card.getByRole('button', { name: 'Show less', exact: true });
+        await expect(less).toHaveAttribute('aria-expanded', 'true');
+        await expect.poll(frame).toEqual(before);
+        await less.click();
+        await expect(more).toHaveAttribute('aria-expanded', 'false');
+        await expect.poll(frame).toEqual(before);
+    });
+}
+
+test('reopening a static detail card restores its natural height for new content', async ({ page }) => {
+    const options = { overview: 'A long description. '.repeat(90) };
+    await mockPanel(page, options);
+    await openSection(page, 'watchlist');
+    const opener = page.locator(isPhone(page) ? '#watchlist-body .compact-title' : '#watchlist-body .title-with-poster .link-text').first();
+    await opener.click();
+    const card = page.locator('#detail-modal .modal-content');
+    await expect(card.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+    await card.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+    const before = (await card.boundingBox()).height;
+    await card.getByRole('button', { name: 'Show more', exact: true }).click();
+    await page.keyboard.press('Escape');
+    options.overview = 'A short description.';
+    await opener.click();
+    await expect(page.locator('#detail-desc')).toHaveText(options.overview);
+    await expect.poll(async () => (await card.boundingBox()).height).toBeLessThan(before);
 });
 
 test('notification options support the keyboard and reduced motion', async ({ page }) => {
