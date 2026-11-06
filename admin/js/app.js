@@ -20,12 +20,12 @@ import {
     closeModal,
     closeModalReturning,
     dismissChatModals,
-    topmostModal,
+    dismissTopLayer,
     setReturnTo,
     showConfirm,
     setupKeyboardWatch
 } from './ui.js';
-import { enhanceSelects, closeDropdown, isDropdownOpen } from './select.js';
+import { enhanceSelects } from './select.js';
 import { setupProxyForm, openProxyModal } from './proxy.js';
 import { openServiceModal, setupServiceDialog } from './services.js';
 import {
@@ -58,6 +58,7 @@ import { deviceActions } from './devices.js';
 import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
 import { setupNavigation } from './navigation.js';
+import { syncTelegramBack } from './tg-back.js';
 
 const REFRESH_SECONDS = 10;
 
@@ -97,15 +98,18 @@ function switchSection(id) {
     // not pushed: Back still leaves the panel instead of stepping through its tabs
     window.history.replaceState(null, '', `#${id}`);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
+    syncTelegramBack();
     // Each section opens at its top: the page keeps one scroll position for all of them, and the
     // last section's would leave the new one scrolled down (or at the bottom, if it is shorter)
     window.scrollTo(0, 0);
     // Sidebar items and tab-bar items; "More" counts as active for the sections it holds
     all('.nav-item, .tab-item').forEach((n) => {
-        const on = n.dataset.section === id || (n.dataset.tabSections || '').split(' ').includes(id);
+        const own = n.dataset.section === id;
+        const on = own || (n.dataset.tabSections || '').split(' ').includes(id);
         n.classList.toggle('active', on);
-        // Screen readers announce the current section, not just a coloured row
-        if (on) n.setAttribute('aria-current', 'page');
+        // Screen readers announce the current section, not just a coloured row: "page" on the section
+        // itself, "true" on the tab holding a nested page (Account for Devices)
+        if (on) n.setAttribute('aria-current', own ? 'page' : 'true');
         else n.removeAttribute('aria-current');
     });
     if (id === 'recap') openRecapSection();
@@ -235,6 +239,12 @@ function setupDelegation() {
 
         const { action, section, close, closeReturn, open, logFilter, subsTab, filmsTab, chatsTab } = el.dataset;
 
+        // A tab bar link switches the section here: its own navigation would push a history entry
+        if (section && el.tagName === 'A') {
+            // Ctrl/Cmd/Shift-click: the browser opens the section in a new tab or window
+            if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+            e.preventDefault();
+        }
         if (action && CLICK_ACTIONS[action]) CLICK_ACTIONS[action](el);
         // Before the section switch, so the dashboard card lands on the right tab
         if (subsTab) setTableTab('subs', subsTab);
@@ -358,17 +368,7 @@ async function init() {
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
         // Handled here: the browser's own Escape would close the dialog under an open list too
-        if (isDropdownOpen()) {
-            e.preventDefault();
-            return closeDropdown();
-        }
-
-        // Same as pressing Cancel, so a child dialog returns to its menu
-        const modal = topmostModal();
-        if (modal) {
-            e.preventDefault();
-            return closeModalReturning(modal.id);
-        }
+        if (dismissTopLayer()) e.preventDefault();
     });
 
     // Who is signed in first: the sign-in screen, an admin's panel or a user's own chats. The initial

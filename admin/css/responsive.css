@@ -17,15 +17,15 @@
         /* No gap: five tabs and "Dashboard" still fit a 320px phone; the pill marks the open one */
         gap: 0;
         position: fixed;
-        left: var(--space-4);
-        right: var(--space-4);
+        left: var(--space-3);
+        right: var(--space-3);
         bottom: var(--tabbar-gap);
         z-index: 500;
         height: var(--tabbar-h);
-        padding: 0 6px;
+        padding: 0 5px;
         box-sizing: border-box;
-        border: 1px solid var(--border-strong);
-        border-radius: var(--radius-sheet);
+        border: 1px solid var(--bar-border);
+        border-radius: calc(var(--tabbar-h) / 2);
         background: var(--bar-glass);
         backdrop-filter: blur(24px) saturate(160%);
         -webkit-backdrop-filter: blur(24px) saturate(160%);
@@ -34,13 +34,13 @@
 
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
         .tabbar {
-            background: var(--surface-2);
+            background: var(--bar-solid);
         }
     }
 
     @media (prefers-reduced-transparency: reduce) {
         .tabbar {
-            background: var(--surface-2);
+            background: var(--bar-solid);
             backdrop-filter: none;
             -webkit-backdrop-filter: none;
         }

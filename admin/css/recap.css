@@ -225,6 +225,7 @@ button.recap-thumb:focus-visible {
 
 .recap-picture-x:hover {
     background: var(--danger-fill);
+    color: var(--on-danger);
 }
 
 .recap-picture-meta {

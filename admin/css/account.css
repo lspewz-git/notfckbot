@@ -30,9 +30,9 @@ body.view-mine .tabbar {
     }
     /* 24px: a round face reads smaller than the 22px line icons beside it */
     .tab-profile .pick-avatar {
-        width: 24px;
-        height: 24px;
-        font-size: var(--text-xs);
+        width: 22px;
+        height: 22px;
+        font-size: 11px;
     }
 }
 
@@ -120,15 +120,17 @@ body.view-mine .tabbar {
     }
 }
 
-/* --- Sign-in --- */
+/* --- Sign-in (redesign handoff, 06.11): the logo and name in the middle of the free space, the ways
+   in at the bottom. The nested screens (Telegram, QR code, Bot code, Password) swap the logo for a
+   top bar with Back and keep their actions at the bottom too --- */
 
 .login-gate {
     position: fixed;
     inset: 0;
     z-index: 1000;
-    display: grid;
-    place-items: center;
-    padding: var(--space-4);
+    display: flex;
+    justify-content: center;
+    padding: env(safe-area-inset-top, 0px) 16px calc(24px + env(safe-area-inset-bottom, 0px));
     background: var(--bg);
     overflow-y: auto;
 }
@@ -142,54 +144,189 @@ body.signed-out .tabbar {
     visibility: hidden;
 }
 
+/* A phone-wide column at any width; at least as tall as the screen, longer content scrolls */
 .login-card {
-    width: min(380px, 100%);
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-}
-
-.login-card h1 {
-    font-size: var(--text-2xl);
+    width: min(390px, 100%);
+    min-height: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
 }
 
 .login-brand {
     display: flex;
+    flex: 1;
+    flex-direction: column;
     align-items: center;
-    gap: var(--space-3);
+    justify-content: center;
+    gap: 14px;
+    padding: var(--space-6) 0;
 }
 
 .login-brand .login-logo {
-    flex-shrink: 0;
-    margin-bottom: 0;
+    width: 64px;
+    height: 64px;
+    margin: 0;
+    border-radius: var(--radius-card);
 }
 
-.login-text {
-    color: var(--text-secondary);
+.login-brand .login-logo .icon {
+    width: 30px;
+    height: 30px;
+    stroke-width: 2;
 }
 
-.login-hint {
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-}
-
-.login-error {
-    color: var(--danger);
-    font-size: var(--text-sm);
+.login-card h1 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
 }
 
 #login-body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
 }
 
-.login-primary-method {
+/* A nested screen: no logo, the body takes the whole height */
+.login-nested .login-brand {
+    display: none;
+}
+
+.login-nested #login-body {
+    flex: 1;
+    padding-top: 8px;
+}
+
+/* The top bar of a nested screen, like the account pages' */
+.login-top {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    height: 48px;
+    margin: 0 -4px;
+}
+
+.login-top h2 {
+    grid-column: 2;
+    margin: 0;
+    overflow: hidden;
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.login-top h2:focus {
+    outline: none;
+}
+
+html.tg-back .login-top .page-back {
+    visibility: hidden;
+}
+
+/* What the nested screen is about: in the middle of the space between the bar and the actions */
+.login-mid {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: var(--space-5) 4px;
+    text-align: center;
+}
+
+/* The password form starts under the bar */
+.login-mid-top {
+    justify-content: flex-start;
+    align-items: stretch;
+    padding-top: var(--space-6);
+    text-align: left;
+}
+
+.login-actions {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    margin-top: calc(var(--space-8) - var(--space-1));
+}
+
+.login-text {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 18px;
+    text-wrap: pretty;
+}
+
+.login-hint {
+    margin: 8px 0 0;
+    color: var(--text-help);
+    font-size: 12px;
+    line-height: 16px;
     text-align: center;
+    text-wrap: pretty;
+}
+
+.login-mid .login-hint {
+    margin: 0;
+}
+
+.login-error {
+    margin: 8px 0 0;
+    color: var(--danger);
+    font-size: 13px;
+    line-height: 18px;
+    text-align: center;
+}
+
+.login-mid .login-error {
+    margin: 0;
+}
+
+/* The buttons: 48 for the main one, 44 for the others, radius 14 */
+.login-card .btn {
+    gap: 10px;
+    border-radius: var(--radius-btn);
+    font-size: 15px;
+}
+
+.login-card .btn-primary {
+    height: 48px;
+    border: none;
+    background: var(--primary);
+    color: var(--on-primary);
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.login-card .btn-outline {
+    height: 44px;
+    border: none;
+    background: var(--surface-3);
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.login-card .login-actions .btn + .btn,
+.login-card .login-actions .btn-outline {
+    margin-top: 8px;
+}
+
+.login-card .login-actions > .btn:first-child {
+    margin-top: 0;
+}
+
+.login-card .btn .icon {
+    width: 19px;
+    height: 19px;
+    stroke-width: 2.1;
 }
 
 #login-tg[aria-disabled='true'] {
@@ -197,94 +334,143 @@ body.signed-out .tabbar {
     pointer-events: none;
 }
 
-.login-telegram-icon {
-    fill: currentColor;
-    stroke: none;
+/* "Other ways to sign in" between two rules */
+.login-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 24px 0 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
 }
+
+.login-or::before,
+.login-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--hairline);
+}
+
 .login-methods {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-3);
+    gap: 8px;
 }
+
 .login-method {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--space-1);
-    min-height: var(--login-method-h);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    background: var(--surface-2);
+    gap: 8px;
+    height: 76px;
+    padding: 0 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-method);
+    background: var(--surface-1);
     color: var(--text);
     font: inherit;
     cursor: pointer;
 }
-.login-method:hover {
-    background: var(--surface-3);
+
+.login-method .icon {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.8;
+    color: var(--text-secondary);
 }
+
+.login-method span {
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 500;
+}
+
+@media (hover: hover) {
+    .login-method:hover:not(:disabled) {
+        background: var(--surface-2);
+    }
+}
+
 .login-method:disabled {
     opacity: 0.6;
     cursor: wait;
 }
-.login-back {
-    align-self: flex-start;
-    padding-inline: 0;
-    border-color: transparent;
-}
-.login-card h2 {
-    font-size: var(--text-xl);
-}
+
 .login-qr {
     display: block;
-    width: min(var(--login-qr-size), 100%);
+    width: min(184px, 100%);
     height: auto;
-    margin: var(--space-2) auto;
+    border-radius: var(--radius-card);
     background: var(--qr-paper);
-    border-radius: var(--radius-sm);
 }
+
+/* The digits the bot shows too */
 .login-check {
+    margin: 0;
+    padding: 12px 18px;
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
     text-align: center;
+    font-variant-numeric: tabular-nums;
 }
+
 .login-check b {
     font-family: var(--font-mono);
-    font-size: var(--text-2xl);
-    letter-spacing: var(--space-1);
+    font-size: 30px;
+    line-height: 36px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
 }
-#login-body > .login-hint {
-    text-align: center;
+
+.login-check-sm {
+    padding: 8px 14px;
+}
+
+.login-check-sm b {
+    font-size: 22px;
+    line-height: 28px;
 }
 
 /* "Sign in with a code": plain text like "Send again" under an SMS code, not a button */
 .login-code-link {
     position: relative;
     align-self: center;
-    /* Close to the digits and the button: the line itself is short, the tap area stays control-high */
-    margin-block: calc(-1 * var(--space-1));
     padding: 0 var(--space-2);
     border: 0;
     background: none;
-    color: var(--accent);
+    color: var(--text-secondary);
     font: inherit;
-    font-size: var(--text-sm);
-    line-height: 1.4;
+    font-size: 13px;
+    line-height: 18px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
     cursor: pointer;
 }
 
+/* The line is short; the tap area is 44px high */
 .login-code-link::after {
     content: '';
     position: absolute;
-    inset: calc((var(--control-h) - 1lh) / -2) 0;
+    inset: -13px 0;
 }
 
 .login-steps {
-    margin-bottom: var(--space-2);
+    width: 100%;
+    padding: 12px;
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
     color: var(--text-secondary);
-    font-size: var(--text-sm);
+    font-size: 13px;
+    line-height: 18px;
+    text-align: left;
 }
 
 .login-steps ol {
-    margin: 0 0 var(--space-3);
+    margin: 0 0 12px;
     padding-left: var(--space-5);
 }
 
@@ -292,59 +478,61 @@ body.signed-out .tabbar {
     margin-top: var(--space-1);
 }
 
-.login-card :is(a, button):focus-visible {
-    background-color: var(--surface-3);
-    color: var(--accent);
-    text-decoration: underline;
+.login-steps p {
+    margin: 0;
+    color: var(--text-dim);
 }
 
-.login-card .btn-primary:focus-visible {
-    background-color: var(--accent);
-    color: var(--on-accent);
+.login-card .input-field {
+    height: 44px;
+    border-radius: var(--radius-btn);
+    background: var(--surface-1);
+    font-size: 15px;
 }
 
 .login-card .input-field:focus-visible {
-    border-color: var(--accent);
-}
-
-/* Outline buttons here stand next to the primary one at its height (and the 44px touch target) */
-.login-card .btn-outline {
-    min-height: var(--control-h);
+    border-color: var(--text-dim);
 }
 
 /* The HTTP status under a failed sign-in: what to quote when reporting it */
 .login-code {
-    margin-top: calc(-1 * var(--space-1));
+    margin: 4px 0 0;
     color: var(--text-dim);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+    text-align: center;
 }
 
-/* A rule on both sides of the alternate methods label. */
-.login-or {
+.login-password {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-}
-
-.login-or::before,
-.login-or::after {
-    content: '';
     flex: 1;
-    border-top: 1px solid var(--divider);
+    flex-direction: column;
 }
 
-.login-password,
+.login-password .field-label {
+    margin: 0 4px 6px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+}
+
+.login-password .password-input {
+    margin-bottom: 12px;
+}
+
+.login-password > .login-mid > .input-field {
+    margin-bottom: 12px;
+}
+
 .password-form {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
 }
 
-.login-password .field-label,
 .password-form .field-label {
     margin: var(--space-1) 0 0;
 }
@@ -392,7 +580,6 @@ body.signed-out .tabbar {
     opacity: 0;
 }
 
-.login-password > .btn,
 .password-form .btn-block {
     margin-top: var(--space-2);
 }
@@ -1155,15 +1342,6 @@ button.search-result-open:hover .mine-row-title {
     }
 }
 
-.login-check {
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    background: var(--fill-faint);
-    text-align: center;
-    font-size: var(--text-lg);
-    font-variant-numeric: tabular-nums;
-}
-
 /* --- Chat settings and Account settings: pages the profile menu opens (profile.js) --- */
 
 #my-signin:empty,
@@ -1374,46 +1552,83 @@ button.search-result-open:hover .mine-row-title {
 
 /* --- Account → Devices (devices.js) --- */
 
-/* Outranks .mine-section header (aligned to the end, wrapping) */
+/* Outranks .mine-section header (aligned to the end, wrapping). The top bar (redesign handoff,
+   06.11): Back on the left, the title centred, an empty column on the right to keep it centred */
 .app-page > .page-nav {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 0;
+    height: 48px;
+    margin: 0;
+}
+
+.app-page > .page-nav::after {
+    content: '';
 }
 
 .app-page > .page-nav h1 {
+    grid-column: 2;
     margin: 0;
-    font-size: 2.125rem;
-    line-height: 2.5rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    overflow: hidden;
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-align: center;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
+/* 8px from the top on a phone (the page itself gives 20). The sides stay the page's 16px, not the
+   handoff's 12: every tab shares one content column (tests/settings-width.spec.js) */
+@media (max-width: 640px) {
+    .app-page {
+        margin-top: calc(var(--space-3) * -1);
+    }
+}
+
+/* Inside Telegram the Mini App's own Back button stands in for this one (session.js) */
+html.tg-back .app-page .page-back {
+    visibility: hidden;
+}
+
+/* A 44px target with a 34px circle in it */
 .page-back {
+    position: relative;
     display: grid;
     place-items: center;
     width: 44px;
     height: 44px;
     padding: 0;
-    border: 1px solid var(--border);
+    border: none;
     border-radius: 50%;
-    background: var(--surface-1);
+    background: transparent;
     color: var(--text);
     cursor: pointer;
 }
 
+.page-back::before {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-1);
+}
+
 /* Hover only with a mouse: on a touch screen it sticks to the row that was tapped */
 @media (hover: hover) {
-    .page-back:hover {
+    .page-back:hover::before {
         background: var(--surface-2);
     }
 }
 
 .page-back .icon {
-    width: 22px;
-    height: 22px;
+    position: relative;
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.2;
 }
 
 .devices-body {
@@ -1421,68 +1636,79 @@ button.search-result-open:hover .mine-row-title {
     flex-direction: column;
 }
 
-/* The icon tiles: 40 in a row, 52 on the current card, 64 in the sheet */
+#devices-body,
+#my-account-info {
+    margin-top: var(--space-2);
+}
+
+/* The icon tiles: 32 in a row, 40 on the current device's card, 48 in a sheet */
 .row-tile {
     display: grid;
     place-items: center;
     flex: none;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-tile);
-    background: var(--surface-2);
+    background: var(--tile);
     color: var(--text-secondary);
 }
 
 .row-tile .icon {
-    width: 20px;
-    height: 20px;
+    width: 17px;
+    height: 17px;
+    stroke-width: 1.9;
 }
 
 .row-tile-lg {
-    width: 52px;
-    height: 52px;
+    width: 40px;
+    height: 40px;
     border-radius: var(--radius-tile-lg);
     color: var(--text);
 }
 
 .row-tile-lg .icon {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
 }
 
 .row-tile-xl {
-    width: 64px;
-    height: 64px;
-    border-radius: var(--radius-lg);
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-tile-xl);
     background: var(--surface-3);
     color: var(--text);
 }
 
 .row-tile-xl .icon {
-    width: 30px;
-    height: 30px;
+    width: 22px;
+    height: 22px;
 }
 
 .row-text {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
 }
 
+/* No overflow: hidden on cards and groups: it would cut the keyboard focus ring */
 .group-card {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: var(--space-4);
+    gap: 12px;
+    padding: 12px;
     border-radius: var(--radius-card);
     background: var(--surface-1);
 }
 
+.group-card > .row-text {
+    gap: 2px;
+}
+
 .card-name {
-    font-size: 1.0625rem;
-    line-height: 1.375rem;
+    font-size: 15px;
+    line-height: 20px;
     font-weight: 600;
 }
 
@@ -1491,15 +1717,15 @@ button.search-result-open:hover .mine-row-title {
     align-items: center;
     gap: 6px;
     color: var(--success);
-    font-size: 0.875rem;
-    line-height: 1.1875rem;
+    font-size: 13px;
+    line-height: 17px;
     font-weight: 500;
 }
 
 .status-dot {
     flex: none;
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--success);
 }
@@ -1507,66 +1733,86 @@ button.search-result-open:hover .mine-row-title {
 .row-meta {
     overflow: hidden;
     color: var(--text-dim);
-    font-size: 0.875rem;
-    line-height: 1.1875rem;
+    font-size: 13px;
+    line-height: 17px;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
-.devices-end-others {
+/* Buttons of these screens and their sheets: 44 high, radius 14, 15px */
+.devices-end-others,
+.sheet-btn-primary,
+.sheet-btn-danger,
+.sheet-btn-danger-soft,
+.sheet-btn-secondary {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    height: 52px;
-    margin-top: var(--space-3);
+    height: 44px;
     border: none;
     border-radius: var(--radius-btn);
-    background: var(--danger-soft);
-    color: var(--danger);
-    font-size: 1rem;
+    font: inherit;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
 }
 
+.devices-end-others,
+.sheet-btn-danger-soft {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.devices-end-others {
+    margin-top: 10px;
+}
+
 /* Hover only with a mouse: on a touch screen it sticks to the row that was tapped */
 @media (hover: hover) {
-    .devices-end-others:hover:not(:disabled) {
+    .devices-end-others:hover:not(:disabled),
+    .sheet-btn-danger-soft:hover:not(:disabled) {
         background: var(--danger-tint-hover);
     }
 }
 
-.devices-end-others:disabled {
+.devices-end-others:disabled,
+.sheet-btn-primary:disabled,
+.sheet-btn-danger:disabled,
+.sheet-btn-danger-soft:disabled {
     cursor: default;
     opacity: 0.7;
 }
 
-.devices-end-others .icon {
-    width: 20px;
-    height: 20px;
+.devices-end-others .icon,
+.sheet-btn-danger .icon {
+    width: 18px;
+    height: 18px;
 }
 
 .group-help {
-    margin: var(--space-2) var(--space-1) 0;
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-    line-height: 1.125rem;
+    margin: 6px var(--space-1) 0;
+    color: var(--text-help);
+    font-size: 12px;
+    line-height: 16px;
+    text-wrap: pretty;
 }
 
 /* Sentence case, not the capitals of the older groups' titles */
 .group-title {
-    margin: 28px var(--space-1) var(--space-2);
+    margin: 20px var(--space-1) 6px;
     color: var(--text-dim);
-    font-size: var(--text-sm);
-    line-height: 1.125rem;
+    font-size: 12px;
+    line-height: 16px;
     font-weight: 600;
 }
 
 .group-list {
+    display: flex;
+    flex-direction: column;
     margin: 0;
     padding: 0;
-    overflow: hidden;
     border-radius: var(--radius-card);
     background: var(--surface-1);
     list-style: none;
@@ -1579,15 +1825,15 @@ button.search-result-open:hover .mine-row-title {
         transform 0.2s ease;
 }
 
-/* The rule between rows starts under the text, not under the tile */
+/* The rule between rows starts under the text, not under the tile; none after the last row */
 .group-list > li + li::before {
     content: '';
     position: absolute;
     top: 0;
     right: 0;
-    left: 70px;
+    left: 56px;
     height: 1px;
-    background: var(--border-row);
+    background: var(--divider);
 }
 
 /* Signed out: slides away before the list is drawn without it */
@@ -1599,15 +1845,28 @@ button.search-result-open:hover .mine-row-title {
 .group-row {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     width: 100%;
-    min-height: 64px;
-    padding: var(--space-3) 14px var(--space-3) var(--space-4);
+    min-height: 52px;
+    padding: 8px 10px 8px 12px;
     border: none;
     background: transparent;
     color: var(--text);
+    font: inherit;
     text-align: left;
+    text-decoration: none;
     cursor: pointer;
+}
+
+/* The group isn't clipped: the first and last rows round their own hover and focus */
+.group-list > li:first-child > .group-row {
+    border-top-left-radius: var(--radius-card);
+    border-top-right-radius: var(--radius-card);
+}
+
+.group-list > li:last-child > .group-row {
+    border-bottom-left-radius: var(--radius-card);
+    border-bottom-right-radius: var(--radius-card);
 }
 
 /* Hover only with a mouse: on a touch screen it sticks to the row that was tapped */
@@ -1617,16 +1876,10 @@ button.search-result-open:hover .mine-row-title {
     }
 }
 
-/* Inside the clipped card the ring is drawn inside the row */
-.group-row:focus-visible {
-    outline-offset: -2px;
-    border-radius: var(--radius-card);
-}
-
 .row-name {
     overflow: hidden;
-    font-size: 1rem;
-    line-height: 1.3125rem;
+    font-size: 15px;
+    line-height: 20px;
     font-weight: 500;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -1639,8 +1892,9 @@ button.search-result-open:hover .mine-row-title {
 }
 
 .row-chevron .icon {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
 }
 
 .devices-more {
@@ -1653,10 +1907,12 @@ button.search-result-open:hover .mine-row-title {
     align-items: flex-start;
     gap: var(--space-3);
     margin: 0;
-    padding: var(--space-4);
+    padding: 16px 12px;
     border-radius: var(--radius-card);
     background: var(--surface-1);
     color: var(--text-dim);
+    font-size: 13px;
+    line-height: 17px;
 }
 
 .group-empty p {
@@ -1666,13 +1922,13 @@ button.search-result-open:hover .mine-row-title {
 .row-skeleton {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: 6px;
 }
 
 .row-skeleton .skeleton {
     display: block;
     width: 9rem;
-    height: 0.8rem;
+    height: 0.75rem;
 }
 
 .row-skeleton .skeleton + .skeleton {
@@ -1680,65 +1936,77 @@ button.search-result-open:hover .mine-row-title {
 }
 
 .devices-body > .group-list[aria-hidden='true'] {
-    margin-top: var(--space-6);
+    margin-top: 42px;
 }
 
-/* --- One session's sheet (devices.js) --- */
+/* --- Sheets: one session (devices.js), the password (password.js) --- */
 
 .sheet-content {
     display: flex;
     flex-direction: column;
-    padding: var(--space-2) var(--space-5) var(--space-8);
+    padding: 6px 16px 24px;
 }
 
 .sheet-grabber {
     display: none;
     align-self: center;
+    flex: none;
     width: 36px;
-    height: 5px;
-    border-radius: 3px;
-    background: var(--fill-strong);
+    height: 4px;
+    border-radius: 2px;
+    background: var(--grabber);
 }
 
+/* A 44px target with a 30px circle in it */
 .sheet-close {
+    position: relative;
     display: grid;
     place-items: center;
     align-self: flex-end;
     width: 44px;
     height: 44px;
-    margin-top: var(--space-1);
     padding: 0;
     border: none;
     border-radius: 50%;
-    background: var(--surface-3);
+    background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
 }
 
+.sheet-close::before {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border-radius: 50%;
+    background: var(--surface-3);
+}
+
 .sheet-close .icon {
-    width: 18px;
-    height: 18px;
+    position: relative;
+    width: 16px;
+    height: 16px;
 }
 
 .sheet-head {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    margin-top: calc(var(--space-3) * -1);
+    gap: 6px;
+    margin-top: -20px;
     text-align: center;
 }
 
 .sheet-head h2 {
-    margin: 0;
-    font-size: 1.375rem;
-    line-height: 1.75rem;
+    margin: 4px 0 0;
+    font-size: 19px;
+    line-height: 24px;
     font-weight: 700;
+    overflow-wrap: anywhere;
 }
 
 .sheet-details {
-    margin: var(--space-4) 0 0;
-    border-radius: var(--radius-lg);
+    margin: 12px 0 0;
+    border-radius: var(--radius-method);
     background: var(--surface-2);
 }
 
@@ -1747,95 +2015,75 @@ button.search-result-open:hover .mine-row-title {
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    min-height: 48px;
-    padding: 0 var(--space-4);
-    font-size: 0.9375rem;
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 14px;
 }
 
 .sheet-details > div + div {
-    border-top: 1px solid var(--border-row);
+    position: relative;
+}
+
+/* The rule between details starts at the text */
+.sheet-details > div + div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 14px;
+    height: 1px;
+    background: var(--divider);
 }
 
 .sheet-details dt {
+    flex: none;
     color: var(--text-dim);
 }
 
 .sheet-details dd {
     margin: 0;
-    overflow: hidden;
+    min-width: 0;
     text-align: right;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
 }
 
 .sheet-error {
-    margin: var(--space-4) 0 0;
+    margin: 12px 0 0;
     color: var(--danger);
-    font-size: var(--text-sm);
-}
-
-.sheet-btn-primary,
-.sheet-btn-danger,
-.sheet-btn-danger-soft,
-.sheet-btn-secondary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    height: 52px;
-    border: none;
-    border-radius: var(--radius-btn);
-    font-size: 1rem;
-    cursor: pointer;
+    font-size: 13px;
+    line-height: 18px;
 }
 
 .sheet-btn-danger {
-    margin-top: var(--space-5);
+    margin-top: 16px;
     background: var(--danger-fill);
     color: var(--on-danger);
     font-weight: 700;
 }
 
-.sheet-btn-primary:disabled,
-.sheet-btn-danger:disabled,
-.sheet-btn-danger-soft:disabled {
-    cursor: default;
-    opacity: 0.7;
-}
-
 /* The sheet's main action: light on dark, like the panel's primary buttons */
 .sheet-btn-primary {
-    margin-top: var(--space-6);
+    margin-top: 18px;
     background: var(--primary);
     color: var(--on-primary);
     font-weight: 700;
 }
 
-/* A removal that isn't the sheet's main action: quiet red */
-.sheet-btn-danger-soft {
-    margin-top: 10px;
-    background: var(--danger-soft);
-    color: var(--danger);
-    font-weight: 600;
-}
-
-.sheet-btn-danger .icon {
-    width: 20px;
-    height: 20px;
+.sheet-btn-danger-soft,
+.sheet-btn-secondary {
+    margin-top: 8px;
 }
 
 .sheet-btn-secondary {
-    margin-top: 10px;
     background: var(--surface-3);
     color: var(--text);
-    font-weight: 600;
 }
 
 @media (max-width: 640px) {
     .app-sheet.modal-sheet .modal-content {
         border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-        padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        box-shadow: var(--shadow-sheet);
     }
 
     .sheet-grabber {
@@ -1849,36 +2097,38 @@ button.search-result-open:hover .mine-row-title {
     display: grid;
     place-items: center;
     flex: none;
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: var(--accent);
     color: var(--on-accent);
-    font-size: 1.375rem;
+    font-size: 18px;
     font-weight: 700;
 }
 
 .profile-name {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 6px;
     min-width: 0;
 }
 
 .profile-name .card-name {
     overflow: hidden;
+    font-size: 16px;
+    line-height: 21px;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
 .role-chip {
     flex: none;
-    padding: 2px var(--space-2);
-    border-radius: var(--radius-sm);
+    padding: 2px 7px;
+    border-radius: var(--radius-chip);
     background: var(--fill-active);
     color: var(--text-secondary);
-    font-size: var(--text-xs);
-    line-height: 1rem;
+    font-size: 11px;
+    line-height: 14px;
     font-weight: 600;
 }
 
@@ -1897,8 +2147,8 @@ button.search-result-open:hover .mine-row-title {
 .row-value {
     flex: none;
     color: var(--text-dim);
-    font-size: 0.875rem;
-    line-height: 1.1875rem;
+    font-size: 13px;
+    line-height: 17px;
 }
 
 .group-row > .row-status {
@@ -1918,8 +2168,8 @@ button.search-result-open:hover .mine-row-title {
     align-items: center;
     gap: 6px;
     color: var(--text-dim);
-    font-size: 0.875rem;
-    line-height: 1.1875rem;
+    font-size: 13px;
+    line-height: 17px;
 }
 
 .sheet-state-on {
@@ -1928,18 +2178,20 @@ button.search-result-open:hover .mine-row-title {
 }
 
 .sheet-head .sheet-text {
-    margin: var(--space-1) var(--space-3) 0;
+    margin: 2px 12px 0;
     color: var(--text-dim);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
+    font-size: 13px;
+    line-height: 18px;
+    text-wrap: pretty;
 }
 
 .sheet-note {
-    margin: var(--space-2) var(--space-1) 0;
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-    line-height: 1.125rem;
+    margin: 8px var(--space-1) 0;
+    color: var(--text-help);
+    font-size: 12px;
+    line-height: 16px;
     text-align: center;
+    text-wrap: pretty;
 }
 
 /* --- Chat settings (account.js): the chat's card, then rows like Account settings' --- */

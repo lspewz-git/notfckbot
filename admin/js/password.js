@@ -26,15 +26,15 @@ const passwordField = (id, autocomplete, label) =>
 
 /** The form under "Continue with Telegram" (session.js draws the screen); the system account signs in here too. */
 export const signInForm = () =>
-    '<form class="login-password" data-login="password" novalidate>' +
+    '<form class="login-password" data-login="password" novalidate><div class="login-mid login-mid-top">' +
     '<label class="field-label" for="login-name">Login</label>' +
     '<input id="login-name" class="input-field" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="@username or ID" maxlength="64" />' +
     '<label class="field-label" for="login-pass">Password</label>' +
     passwordField('login-pass', 'current-password', 'Password') +
-    '<p class="login-error" id="login-pass-error" role="alert" hidden></p>' +
-    '<button type="submit" class="btn btn-primary btn-block">Log In</button>' +
-    '</form>' +
-    '<p class="login-hint">Next, confirm this sign-in in the bot. The system account signs in directly.</p>';
+    '<p class="login-error" id="login-pass-error" role="alert" hidden></p></div>' +
+    '<div class="login-actions"><button type="submit" class="btn btn-primary btn-block">Log In</button>' +
+    '<p class="login-hint">Next, confirm this sign-in in the bot. The system account signs in directly.</p></div>' +
+    '</form>';
 
 /**
  * Sends the sign-in form.

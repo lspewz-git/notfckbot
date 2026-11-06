@@ -10,19 +10,23 @@ import { $, escapeHtml } from './dom.js';
 import { setChats, chatsFailed, resetChatChoice } from './account.js';
 import { signInForm, submitSignIn, setMe } from './password.js';
 import { setProfile } from './profile.js';
+import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
-const TG_ICON =
-    '<svg class="icon login-telegram-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.7 3.3 18.4 21c-.2 1-1 1.2-1.8.7l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.3L5.8 14.2.9 12.7c-1-.3-1-1 .2-1.5L20.3 3c.9-.3 1.6.2 1.4.3Z" /></svg>';
+const SEND_ICON =
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#send" /></svg>';
 const QR_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#qr-code" /></svg>';
 const CODE_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#binary" /></svg>';
 const KEY_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#key-round" /></svg>';
-const backButton =
-    '<button type="button" id="login-back" class="btn btn-ghost login-back" data-action="login-cancel"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-left" /></svg>All sign-in methods</button>';
+/** A nested screen's top bar: Back to all the ways in, its title centred (Telegram's own Back in the Mini App) */
+const topBar = (title) =>
+    '<div class="login-top"><button type="button" id="login-back" class="page-back" data-action="login-cancel" aria-label="All sign-in methods">' +
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-left" /></svg></button>' +
+    `<h2 id="login-step" tabindex="-1">${title}</h2><span></span></div>`;
 
 let pollTimer = 0;
 // Each "Continue with Telegram" press: an older attempt's poll still on its way stops when it lands
@@ -30,10 +34,17 @@ let attempt = 0;
 // The first check of the session has answered: a 401 before it is that check's own, not an ended session
 let started = false;
 
-const gate = (html) => {
+/** A nested screen opened: focus on its Back (hidden in the Mini App: its title instead) */
+const focusStep = () =>
+    (document.documentElement.classList.contains('tg-back') ? $('login-step') : $('login-back'))?.focus();
+
+/** Draws a sign-in screen: `nested` ones (with a top bar) hide the logo and take the whole height. */
+const gate = (html, nested = false) => {
     $('login-body').innerHTML = html;
+    document.querySelector('.login-card').classList.toggle('login-nested', nested);
     $('login-gate').hidden = false;
     document.body.classList.add('signed-out');
+    syncTelegramBack();
 };
 
 // Saved to the iPhone home screen: iOS opens an https t.me link in an in-app Safari sheet that shows
@@ -137,8 +148,7 @@ const statusLine = (err) =>
 function miniAppScreen(error, restoreFocus, status = '') {
     const next = miniApp.next ?? (miniApp.initData ? 'retry' : 'reopen');
     gate(
-        `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
-            (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
+        '<div class="login-actions">' +
             (next === 'retry'
                 ? '<button type="button" class="btn btn-primary btn-block" data-action="login-retry">Try again</button>'
                 : next === 'reopen'
@@ -147,8 +157,10 @@ function miniAppScreen(error, restoreFocus, status = '') {
                   : next === 'signout'
                     ? '<button type="button" class="btn btn-primary btn-block" data-action="miniapp-signout">Sign out</button>'
                     : '') +
-            '<p class="login-or">Or</p>' +
-            `<button type="button" class="btn btn-outline btn-block" data-action="login-password">${KEY_ICON}Password</button>`
+            `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
+            (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
+            '<h2 class="login-or">Or</h2>' +
+            `<button type="button" class="btn btn-outline btn-block" data-action="login-password">${KEY_ICON}Password</button></div>`
     );
     if (restoreFocus) $('login-title').focus();
 }
@@ -158,14 +170,14 @@ function signInScreen(error = '', restoreFocus = $('login-body').contains(docume
     if (miniApp) return miniAppScreen(error, restoreFocus);
     gate(
         // A first time in signs up too: the bot is started on the way (with sign-up open)
-        '<div class="login-primary-method">' +
-            `<a id="login-tg" class="btn btn-primary btn-block"${botTarget()} aria-disabled="true" aria-describedby="login-tg-hint" data-action="login-telegram">${TG_ICON}Continue with Telegram</a>` +
-            '<p class="login-hint" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p></div>' +
+        '<div class="login-actions">' +
+            `<a id="login-tg" class="btn btn-primary btn-block"${botTarget()} aria-disabled="true" aria-describedby="login-tg-hint" data-action="login-telegram">${SEND_ICON}<span>Continue with Telegram</span></a>` +
+            '<p class="login-hint" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p>' +
             `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
-            '<p class="login-or">Other ways to sign in</p>' +
-            `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>Scan a QR code</span></button>` +
-            `<button type="button" class="login-method" data-action="login-code" disabled>${CODE_ICON}<span>Code in the bot</span></button>` +
-            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div>`
+            '<h2 class="login-or">Other ways to sign in</h2>' +
+            `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>QR code</span></button>` +
+            `<button type="button" class="login-method" data-action="login-code" disabled>${CODE_ICON}<span>Bot code</span></button>` +
+            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div></div>`
     );
     if (restoreFocus) $('login-title').focus();
     prepareCode();
@@ -195,32 +207,35 @@ const waitingScreen = (start, mode = 'telegram') => {
     const qr = mode === 'qr';
     const code = mode === 'code';
     gate(
-        backButton +
-            `<h2>${code ? 'Sign in with a code' : qr ? 'Scan to sign in' : 'Confirm in Telegram'}</h2>` +
+        topBar(code ? 'Bot code' : qr ? 'Scan to sign in' : 'Confirm in Telegram') +
+            '<div class="login-mid">' +
+            (qr
+                ? `<img class="login-qr" src="${escapeHtml(start.qr)}" alt="Scan to open the Telegram bot" width="184" height="184" />`
+                : '') +
             (code
                 ? ''
-                : `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the Telegram bot.' : 'Check that the bot shows the same code, then confirm the sign-in.'}</p>`) +
-            (qr
-                ? `<img class="login-qr" src="${escapeHtml(start.qr)}" alt="Scan to open the Telegram bot" width="232" height="232" />`
-                : '') +
-            `<p class="login-check"><b>${escapeHtml(start.check)}</b>` +
-            (code ? '' : '<br /><span class="login-hint">The bot shows the same one</span>') +
-            '</p>' +
+                : `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the bot. It shows the same code.' : 'Check that the bot shows the same code, then confirm the sign-in.'}</p>`) +
+            `<p class="login-check${qr ? ' login-check-sm' : ''}"><b>${escapeHtml(start.check)}</b></p>` +
             (code
                 ? codeSteps(start)
                 : `<button type="button" class="login-code-link" data-action="login-code-steps">Sign in with a code</button>`) +
+            `<p class="login-hint" id="login-wait">Waiting for the ${code ? 'bot' : 'confirmation'}…</p></div>` +
+            '<div class="login-actions">' +
             (start.url && !code
-                ? `<a class="btn btn-outline btn-block" href="${escapeHtml(botLink(start.url))}"${botTarget()}>${qr ? 'Open Telegram on this device' : 'Open the bot again'}</a>`
+                ? qr
+                    ? `<a class="btn btn-outline btn-block" href="${escapeHtml(botLink(start.url))}"${botTarget()}>Open Telegram on this device</a>`
+                    : `<a class="btn btn-primary btn-block" href="${escapeHtml(botLink(start.url))}"${botTarget()}>Open the bot again</a>`
                 : '') +
-            `<p class="login-hint" id="login-wait">Waiting for the ${code ? 'bot' : 'confirmation'}…</p>` +
-            `<p class="login-hint">${code ? 'Only send a code from your own screen.' : 'Only confirm a sign-in you started.'}</p>`
+            `<p class="login-hint">${code ? 'Only send a code from your own screen.' : 'Only confirm a sign-in you started.'}</p></div>`,
+        true
     );
 };
 
 const linkScreen = () =>
     gate(
-        '<p class="login-text">A sign-in link from the bot.</p>' +
-            '<button type="button" class="btn btn-primary btn-block" data-action="login-link">Sign in</button>'
+        '<div class="login-actions">' +
+            '<button type="button" class="btn btn-primary btn-block" data-action="login-link">Sign in</button>' +
+            '<p class="login-hint">A sign-in link from the bot.</p></div>'
     );
 
 /** @type {string | null} the chat this sign-in opens on (a group link or a Mini App opened from a group) */
@@ -264,6 +279,7 @@ export async function startSession(preferredChat = null, { current = () => true,
                 // Sign-in can continue when the bridge rejects the optional swipe setting.
             }
         }
+        setupTelegramBack(bridge, launch.get('tgWebAppVersion'));
         miniApp = {
             bridge,
             initData: launchData || miniApp?.initData || null,
@@ -298,8 +314,8 @@ export async function startSession(preferredChat = null, { current = () => true,
         } else if (err.status === 401) signInScreen();
         else
             gate(
-                `<p class="login-error" role="alert">The panel isn't answering: ${escapeHtml(err.message)}</p>` +
-                    '<button type="button" class="btn btn-outline btn-block" data-action="login-retry">Retry</button>'
+                '<div class="login-actions"><button type="button" class="btn btn-primary btn-block" data-action="login-retry">Retry</button>' +
+                    `<p class="login-error" role="alert">The panel isn't answering: ${escapeHtml(err.message)}</p></div>`
             );
         return null;
     } finally {
@@ -316,6 +332,7 @@ export async function startSession(preferredChat = null, { current = () => true,
     document.body.classList.toggle('system-account', Boolean(me.user.system));
     document.body.classList.remove('signed-out');
     $('login-gate').hidden = true;
+    syncTelegramBack();
     if (me.user.system) return me.user.role;
     // The chats ask Telegram about each group: they come later, the panel doesn't wait for them
     api('/account/chats')
@@ -381,7 +398,7 @@ export function sessionActions(onSignedIn) {
         activeChallenge = start;
         const mine = attempt;
         waitingScreen(start, mode);
-        $('login-back').focus();
+        focusStep();
         const until = start.deadline ?? performance.now() + (start.expiresIn ?? POLL_FOR_MS);
         let asking = false;
         const poll = async () => {
@@ -481,8 +498,8 @@ export function sessionActions(onSignedIn) {
         },
         'login-password': () => {
             discardChallenges();
-            gate(backButton + '<h2>Sign in with a password</h2>' + signInForm());
-            $('login-back').focus();
+            gate(topBar('Password') + signInForm(), true);
+            focusStep();
         },
         'login-cancel': () => {
             stopPolling();

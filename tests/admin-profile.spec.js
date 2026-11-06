@@ -84,10 +84,24 @@ test('local admin has profile settings, password and devices, without Telegram c
 });
 
 const ago = (hours) => new Date(Date.now() - hours * 3600_000).toISOString();
+// Yesterday, over a day ago, whatever the hour now (30 hours ago is two days back before 6 am)
+const yesterdayEarly = () => {
+    const at = new Date();
+    at.setDate(at.getDate() - 1);
+    at.setHours(0, 30, 0, 0);
+    return at.toISOString();
+};
 const DEVICES = [
     { id: '1'.repeat(24), name: 'Chrome, Windows', country: 'RU', network: 'Beeline', current: true, seenAt: ago(0) },
     { id: '2'.repeat(24), name: 'Safari, iPhone', country: 'RU', network: 'MTS', current: false, seenAt: ago(2) },
-    { id: '3'.repeat(24), name: 'Telegram, iPhone', country: 'RU', network: 'MTS', current: false, seenAt: ago(30) },
+    {
+        id: '3'.repeat(24),
+        name: 'Telegram, iPhone',
+        country: 'RU',
+        network: 'MTS',
+        current: false,
+        seenAt: yesterdayEarly()
+    },
     { id: '4'.repeat(24), name: 'Firefox, Mac', country: 'DE', network: 'Hetzner', current: false, seenAt: ago(80) },
     { id: '5'.repeat(24), name: 'Edge, Windows', country: 'RU', network: null, current: false, seenAt: ago(90) },
     { id: '6'.repeat(24), name: null, country: null, network: null, current: false, seenAt: ago(100) }
@@ -99,8 +113,8 @@ async function openDevices(page) {
     await page.locator('#profile-modal [data-section="my-account"]').click();
     const entry = page.locator('#my-devices [data-action="devices-open"]');
     await expect(entry).toContainText('6 active');
-    // Its keyboard ring is drawn inside the clipped card, not outside it
-    expect(await entry.evaluate((el) => getComputedStyle(el).outlineOffset)).not.toBe('2px');
+    // The group isn't clipped: the keyboard ring is drawn whole (redesign handoff)
+    expect(await entry.evaluate((el) => getComputedStyle(el.closest('.group-list')).overflow)).toBe('visible');
     await entry.click();
     await expect(page.locator('#my-devices-section')).toHaveClass(/active/);
 }
@@ -113,19 +127,21 @@ test('Devices: this device on its own card, the others in a list with Show more 
     const body = page.locator('#devices-body');
     const card = body.locator('.group-card');
     await expect(card).toContainText('Chrome, Windows');
-    // Back over the title, both at the start of the column, the button 44px round
+    // The top bar: Back at the start of the column, 44px, the title centred over the card
     const lefts = await page.evaluate(() => {
-        const left = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().left);
-        const back = document.querySelector('#my-devices-section .page-back').getBoundingClientRect();
+        const box = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const back = box('#my-devices-section .page-back');
+        const title = box('#my-devices-section h1');
+        const card = box('#devices-body .group-card');
         return {
-            back: left('#my-devices-section .page-back'),
-            title: left('#my-devices-section h1'),
-            card: left('#devices-body .group-card'),
+            back: Math.round(back.left),
+            card: Math.round(card.left),
+            centre: Math.round(Math.abs(title.left + title.width / 2 - card.left - card.width / 2)),
             size: [back.width, back.height]
         };
     });
     expect(lefts.back).toBe(lefts.card);
-    expect(Math.abs(lefts.title - lefts.card)).toBeLessThanOrEqual(3);
+    expect(lefts.centre).toBeLessThanOrEqual(1);
     expect(lefts.size).toEqual([44, 44]);
     // As wide as the other account pages: the column of the section, not a narrow strip
     const widths = await page.evaluate(() => ({
@@ -146,9 +162,9 @@ test('Devices: this device on its own card, the others in a list with Show more 
     await expect(rows.nth(1)).toContainText('yesterday');
     await expect(rows.nth(2)).toContainText('Germany, Hetzner');
     await expect(body.locator('.group-list')).not.toContainText('Sign out');
-    // Every row is one 64px-high button; no rule over the first one
+    // Every row is one button at least 52px high (redesign handoff); no rule over the first one
     const sizes = await rows.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(64);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(52);
     const firstRule = await body
         .locator('.group-list > li')
         .first()
@@ -348,9 +364,10 @@ test('the phone tab bar floats as a capsule and the page ends above it', async (
             position: css.position
         };
     });
-    expect(bar).toEqual({ left: 16, right: 16, bottom: 12, height: 64, radius: '32px', position: 'fixed' });
+    expect(bar).toEqual({ left: 12, right: 12, bottom: 12, height: 56, radius: '28px', position: 'fixed' });
     const active = page.locator('.tabbar .tab-item.active');
-    await expect(active).toHaveAttribute('aria-current', 'page');
+    // Devices is nested under Account: its tab is current ("true"), not the page itself
+    await expect(active).toHaveAttribute('aria-current', 'true');
 
     // Scrolled to the end, the last row and the hint still clear the bar
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

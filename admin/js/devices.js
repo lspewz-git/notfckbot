@@ -151,7 +151,8 @@ function row(device) {
         `<span class="row-tile">${kindIcon(device)}</span>` +
         `<span class="row-text"><span class="row-name">${escapeHtml(nameOf(device))}</span>` +
         (meta ? `<span class="row-meta">${escapeHtml(meta)}</span>` : '') +
-        `</span><span class="row-chevron">${icon('chevron-right')}</span></button></li>`
+        // No chevron (the mock-up): the row opens a sheet, not a page
+        '</span></button></li>'
     );
 }
 

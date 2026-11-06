@@ -46,7 +46,13 @@ test.beforeEach(async ({ page, context }) => {
     if (process.env.ADMIN_SESSION) {
         await context.setExtraHTTPHeaders({});
         await context.addCookies([
-            { name: 'nfb_session', value: process.env.ADMIN_SESSION, url: process.env.ADMIN_URL || 'http://localhost:8088', httpOnly: true, sameSite: 'Lax' }
+            {
+                name: 'nfb_session',
+                value: process.env.ADMIN_SESSION,
+                url: process.env.ADMIN_URL || 'http://localhost:8088',
+                httpOnly: true,
+                sameSite: 'Lax'
+            }
         ]);
     }
     // Activity is tested on the mock. Never allow any other live API mutation from these checks.
@@ -78,9 +84,15 @@ test('Tools opens readiness-first recap and its schedule without changing anythi
     await page.locator('#recap-section [data-tab="schedule"]').click();
     await expect(page.locator('#recap-sched-pane')).toHaveAttribute('aria-busy', 'false', { timeout: 15000 });
     await expect(page.locator('#recap-sched-state')).toContainText('recap');
-    const gaps = await page.locator('.recap-sched-field').evaluateAll((fields) => fields.map((field) =>
-        field.querySelector('.custom-select').getBoundingClientRect().top - field.querySelector('label').getBoundingClientRect().bottom,
-    ));
+    const gaps = await page
+        .locator('.recap-sched-field')
+        .evaluateAll((fields) =>
+            fields.map(
+                (field) =>
+                    field.querySelector('.custom-select').getBoundingClientRect().top -
+                    field.querySelector('label').getBoundingClientRect().bottom
+            )
+        );
     for (const gap of gaps) expect(gap).toBe(8);
 });
 

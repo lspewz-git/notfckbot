@@ -43,12 +43,14 @@ function item(section, tab = false) {
     const { id, label, aria = label, children = [], mine = false } = section;
     const cls = tab ? `tab-item${mine ? ' tab-mine' : ''}` : `nav-item${mine ? ' nav-mine' : ''}`;
     const active = id === 'dashboard';
+    // Tab bar items are links to their section (the click switches it in place, app.js)
+    const tag = tab ? 'a' : 'button';
     return (
-        `<button class="${cls}${active ? ' active' : ''}" data-section="${id}"` +
+        `<${tag} class="${cls}${active ? ' active' : ''}"${tab ? ` href="#${id}"` : ''} data-section="${id}"` +
         (active ? ' aria-current="page"' : '') +
         (!tab ? ` aria-label="${escapeHtml(aria)}"` : '') +
         (children.length ? ` data-tab-sections="${children.join(' ')}"` : '') +
-        `>${icon(section.icon)}<span${tab ? '' : ' class="nav-label" aria-hidden="true"'}>${escapeHtml(label)}</span></button>`
+        `>${icon(section.icon)}<span${tab ? '' : ' class="nav-label" aria-hidden="true"'}>${escapeHtml(label)}</span></${tag}>`
     );
 }
 

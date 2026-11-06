@@ -1,7 +1,7 @@
 /** Toasts, modals and the confirmation dialog. */
 
 import { $, setText } from './dom.js';
-import { closeDropdown } from './select.js';
+import { closeDropdown, isDropdownOpen } from './select.js';
 
 // --- Toasts ---
 /**
@@ -154,6 +154,22 @@ export function topmostModal() {
 }
 
 const isAnyModalOpen = () => openStack.length > 0;
+
+/**
+ * Escape, or Telegram's Back in the Mini App: closes the innermost layer, an open list before the
+ * dialog under it, and a child dialog as its Cancel would (back to its menu).
+ * @returns {boolean} whether there was a layer to close
+ */
+export function dismissTopLayer() {
+    if (isDropdownOpen()) {
+        closeDropdown();
+        return true;
+    }
+    const modal = topmostModal();
+    if (!modal) return false;
+    closeModalReturning(modal.id);
+    return true;
+}
 
 // How to reopen the parent menu when a child modal is dismissed, or null.
 // A callback rather than an id, so any menu can be returned to.

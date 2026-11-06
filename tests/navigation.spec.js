@@ -12,9 +12,9 @@ watchConsole();
 test('Tools above Logs contains recap, keeps its navigation active and survives a direct reload', async ({ page }) => {
     await mockPanel(page);
     for (const parent of ['.rail-nav', '#more-modal']) {
-        const sections = await page.locator(`${parent} [data-section]`).evaluateAll((items) =>
-            items.map((item) => item.dataset.section),
-        );
+        const sections = await page
+            .locator(`${parent} [data-section]`)
+            .evaluateAll((items) => items.map((item) => item.dataset.section));
         expect(sections.indexOf('tools')).toBe(sections.indexOf('logs') - 1);
         expect(sections).not.toContain('recap');
     }
@@ -24,11 +24,12 @@ test('Tools above Logs contains recap, keeps its navigation active and survives 
     await page.locator('#tools-section [data-section="recap"]').click();
     await expect(page.locator('#recap-section')).toBeVisible();
     await expect(page).toHaveURL(/#recap$/);
-    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('.tab-item[data-open="more-modal"]')).toHaveAttribute('aria-current', 'page');
+    // Recap is nested in Tools: their items are current ("true"), not the page itself
+    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('.tab-item[data-open="more-modal"]')).toHaveAttribute('aria-current', 'true');
     await page.reload();
     await expect(page.locator('#recap-ready-list .recap-row')).toHaveCount(3);
-    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('.nav-item[data-section="tools"]')).toHaveAttribute('aria-current', 'true');
     await page.locator('#recap-section [data-section="tools"]').click();
     await expect(page.locator('#tools-section')).toBeVisible();
     await expect(page).toHaveURL(/#tools$/);
@@ -111,7 +112,13 @@ test('pulling the page down refreshes the open section without reloading the pag
     await page.evaluate(() => (window.__samePage = true));
 
     const asked = [];
-    page.on('request', (r) => r.url().includes('/api/') && !r.url().endsWith('/api/account/activity') && asked.push(new URL(r.url()).pathname));
+    page.on(
+        'request',
+        (r) =>
+            r.url().includes('/api/') &&
+            !r.url().endsWith('/api/account/activity') &&
+            asked.push(new URL(r.url()).pathname)
+    );
 
     // A short pull springs back and asks for nothing
     await pullDown(page, 60);
@@ -142,7 +149,10 @@ test('no pull to refresh while a dialog is open or the page is scrolled down', a
 
     const asked = [];
     // A deliberate click renews the session; that is not a refresh of this section's data.
-    page.on('request', (r) => r.url().includes('/api/') && !r.url().endsWith('/api/account/activity') && asked.push(r.url()));
+    page.on(
+        'request',
+        (r) => r.url().includes('/api/') && !r.url().endsWith('/api/account/activity') && asked.push(r.url())
+    );
 
     await page.evaluate(() => window.scrollTo(0, 300));
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
@@ -169,7 +179,7 @@ test('on a wide screen the rail and content sit centered, every rail label fits'
 
     // Labels are whole, not cut with an ellipsis, and the last rail item is on screen
     const cut = await page.$$eval('.sidebar .nav-label', (els) =>
-        els.filter((e) => e.offsetParent && e.scrollWidth > e.clientWidth).map((e) => e.textContent),
+        els.filter((e) => e.offsetParent && e.scrollWidth > e.clientWidth).map((e) => e.textContent)
     );
     expect(cut).toEqual([]);
     const last = await page.locator('.rail-bottom .nav-item:visible').last().boundingBox();
@@ -189,8 +199,11 @@ test('desktop navigation has readable rows, grouped utilities and stays inside t
             items.map((item) => {
                 const icon = item.querySelector('.icon').getBoundingClientRect();
                 const label = item.querySelector('.nav-label').getBoundingClientRect();
-                return { gap: label.left - icon.right, center: Math.abs(label.top + label.height / 2 - icon.top - icon.height / 2) };
-            }),
+                return {
+                    gap: label.left - icon.right,
+                    center: Math.abs(label.top + label.height / 2 - icon.top - icon.height / 2)
+                };
+            })
         );
         for (const row of rows) {
             expect(row.gap).toBeGreaterThanOrEqual(12);

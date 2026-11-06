@@ -214,22 +214,26 @@ h3 {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     min-height: 3rem;
     padding: var(--space-1) 0;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-dim);
-    font-size: 0.6875rem;
+    font-size: 10px;
+    line-height: 12px;
     font-weight: 500;
+    text-decoration: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    /* A link now: no iOS link preview on a long press */
+    -webkit-touch-callout: none;
 }
 
 .tab-item .icon {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
 }
 
 .tab-item.active {
@@ -239,13 +243,13 @@ h3 {
 /* The selected tab: brighter, on a pill inside the capsule (devices redesign, 05.11; replaces the
    top-edge bar of 04.11) */
 .tab-item {
-    height: 52px;
+    height: 46px;
     min-height: 0;
-    border-radius: 26px;
+    border-radius: 23px;
 }
 
 .tab-item.active {
-    background: var(--fill-active);
+    background: var(--bar-active);
     font-weight: 600;
 }
 

@@ -123,13 +123,17 @@ test('a failed Mini App sign-in offers a retry and a password, not the bot link 
     await expect(page.locator('#login-code')).toHaveText('503 · Service Unavailable');
     const password = page.locator('#login-body [data-action="login-password"]');
     await expect(password).toBeVisible();
-    // The outline button keeps the primary one's height (44px touch target on a phone)
+    // The main action 48px high, the other 44 (redesign handoff)
     const heights = await Promise.all([retry, password].map((el) => el.evaluate((b) => b.offsetHeight)));
-    expect(heights[1]).toBe(heights[0]);
+    expect(heights).toEqual([48, 44]);
     await expect(page.locator('#login-tg, [data-action="login-qr"]')).toHaveCount(0);
-    // The password form's way back returns to this screen, not the bot link
+    // The password form's way back returns to this screen, not the bot link. In the Mini App it is
+    // Telegram's own Back button: the page's round one is hidden
     await page.locator('#login-body [data-action="login-password"]').click();
-    await page.locator('#login-back').click();
+    await expect(page.locator('#login-back')).toBeHidden();
+    await expect(page.locator('#login-step')).toBeFocused();
+    expect(events).toContain('web_app_setup_back_button');
+    await page.evaluate(() => window['Telegram'].WebView.receiveEvent('back_button_pressed', null));
     await retry.click();
     await expect(page.locator('body')).toHaveClass(/role-user/);
     const tries = panel.account.sent.filter((request) => request.path === '/api/login/miniapp');
@@ -280,14 +284,14 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     await expect(page.getByRole('link', { name: 'Continue with Telegram' })).toHaveAccessibleDescription(
         'You’ll confirm the sign-in in the NotFckBot chat.'
     );
-    await expect(page.getByRole('button', { name: 'Scan a QR code' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'QR code' })).toBeVisible();
     await expect(page.locator('.login-or')).toHaveText('Other ways to sign in');
     await expect(page.locator('[data-action="login-password"]')).toBeVisible();
     await expect(page.locator('#login-name')).toHaveCount(0);
     const tiles = await page
         .locator('.login-method')
         .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
-    expect(tiles.every((height) => height >= 44 && height <= 68)).toBe(true);
+    expect(tiles.every((height) => height === 76)).toBe(true);
     // One code for the one screen, and no "session ended" on a first visit
     await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/);
     expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
@@ -304,9 +308,10 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     } else {
         await page.keyboard.press('Tab');
         await expect(telegram).toBeFocused();
-        await expect(telegram).toHaveCSS('text-decoration-line', 'underline');
+        // The keyboard sees the focus ring (redesign handoff), not an underline
+        await expect(telegram).toHaveCSS('outline-style', 'solid');
         await page.keyboard.press('Tab');
-        await expect(page.getByRole('button', { name: 'Scan a QR code' })).toBeFocused();
+        await expect(page.getByRole('button', { name: 'QR code' })).toBeFocused();
     }
 });
 
@@ -363,14 +368,14 @@ test('"Code in the bot": the digits and how to send them, and the page signs in 
 }) => {
     const panel = await mockPanel(page, { signedOut: true });
     const tiles = page.locator('.login-method');
-    await expect(tiles).toHaveText(['Scan a QR code', 'Code in the bot', 'Password']);
+    await expect(tiles).toHaveText(['QR code', 'Bot code', 'Password']);
     // One row of three, the same size
     const boxes = await tiles.evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().toJSON()));
     expect(new Set(boxes.map((b) => Math.round(b.top))).size).toBe(1);
-    expect(boxes.every((b) => b.height >= 44 && b.height <= 68)).toBe(true);
+    expect(boxes.every((b) => b.height === 76)).toBe(true);
     expect(await page.locator('[data-action="login-code"] use').getAttribute('href')).toBe('/vendor/lucide.svg#binary');
     await page.locator('[data-action="login-code"]:not([disabled])').click();
-    await expect(page.locator('#login-body h2')).toHaveText('Sign in with a code');
+    await expect(page.locator('#login-step')).toHaveText('Bot code');
     await expect(page.locator('.login-check b')).toHaveText('042719');
     const steps = page.locator('#login-steps');
     await expect(steps).toContainText('Open @notfckbot on any device with Telegram.');
@@ -403,15 +408,15 @@ test('the waiting screen offers the code as plain text that turns into the steps
             border: css.borderTopWidth,
             background: css.backgroundColor,
             below: box.top >= check.bottom,
-            // Close to the digits above and the button below
+            // Close to the digits above; the button sits at the bottom of the screen
             above: Math.round(box.top - check.bottom),
             under: Math.round(button.top - box.bottom),
             tap: hit(box.top - 8) && hit(box.bottom + 8)
         };
     });
     expect(look).toMatchObject({ border: '0px', background: 'rgba(0, 0, 0, 0)', below: true, tap: true });
-    expect(look.above).toBeLessThanOrEqual(8);
-    expect(look.under).toBeLessThanOrEqual(8);
+    expect(look.above).toBeLessThanOrEqual(12);
+    expect(look.under).toBeGreaterThan(0);
     await link.click();
     await expect(link).toHaveCount(0);
     const steps = page.locator('#login-steps');
@@ -443,17 +448,21 @@ test('sign-in branding and confirmation fit without mixed-language instructions'
     panel.account.confirmationState = 'waiting';
     const logo = await page.locator('.login-logo').boundingBox();
     const title = await page.locator('.login-card h1').boundingBox();
-    expect(title.x).toBeGreaterThan(logo.x + logo.width);
-    expect(Math.abs(title.y + title.height / 2 - logo.y - logo.height / 2)).toBeLessThan(2);
+    // The logo over the name, both centred (redesign handoff)
+    expect(title.y).toBeGreaterThanOrEqual(logo.y + logo.height);
+    expect(Math.abs(title.x + title.width / 2 - logo.x - logo.width / 2)).toBeLessThan(2);
+    expect([logo.width, logo.height]).toEqual([64, 64]);
     const popup = context.waitForEvent('page');
     await page.locator('#login-tg[href]').click();
     await (await popup).close();
     await expect(page.locator('#login-body .login-text')).toHaveText(
         'Check that the bot shows the same code, then confirm the sign-in.'
     );
-    const back = page.locator('.login-back');
-    await expect(back).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-    expect(await back.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    // The top bar's round Back, 44px, the screen's title centred beside it
+    const back = page.locator('#login-back');
+    await expect(back).toHaveAccessibleName('All sign-in methods');
+    expect(await back.evaluate((el) => [el.offsetWidth, el.offsetHeight])).toEqual([44, 44]);
+    await expect(page.locator('#login-step')).toHaveText('Confirm in Telegram');
     await back.click();
     await expect(page.locator('#login-tg')).toBeVisible();
     await expect(page.locator('#login-title')).toBeFocused();
@@ -467,7 +476,7 @@ test('confirmation stays usable when the browser clock is ahead of the server', 
     const panel = await mockPanel(page, { signedOut: true });
     panel.account.confirmationState = 'waiting';
     await page.locator('[data-action="login-qr"]:enabled').click();
-    await expect(page.locator('.login-back')).toBeFocused();
+    await expect(page.locator('#login-back')).toBeFocused();
     await expect(page.getByRole('link', { name: 'Open Telegram on this device' })).toHaveAttribute('href', /t\.me/);
     await expect(page.locator('#login-wait')).toContainText('4:', { timeout: 5000 });
     expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
@@ -917,7 +926,10 @@ test('Chat settings: the chat on a card that opens the chats, rows with icon til
     await expect(card.locator('.row-meta')).toHaveText('Your personal chat');
     // The header has no chip of its own any more: the card is the way to the chats
     await expect(page.locator('#my-settings-section header .mine-chat-chip')).toHaveCount(0);
-    await expect(body.locator('.group-row .row-tile svg use').first()).toHaveAttribute('href', '/vendor/lucide.svg#moon');
+    await expect(body.locator('.group-row .row-tile svg use').first()).toHaveAttribute(
+        'href',
+        '/vendor/lucide.svg#moon'
+    );
     await expect(body.locator('.group-row-static .row-meta')).toHaveText(['Mondays at 10:00', 'On the 1st at 10:00']);
     for (const title of await body.locator('.group-title').all())
         expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
@@ -1266,7 +1278,7 @@ test('phone tabs mark the open one with a pill and the title search sits round a
         icon: getComputedStyle(el.querySelector('.icon')).backgroundColor
     }));
     expect(marks.bar).toBe('none');
-    expect(marks.tab).toBe('rgba(255, 255, 255, 0.08)');
+    expect(marks.tab).toBe('rgba(255, 255, 255, 0.1)');
     expect(marks.icon).toBe('rgba(0, 0, 0, 0)');
 });
 
