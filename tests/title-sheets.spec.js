@@ -66,6 +66,26 @@ test('selecting the current mode closes options without another save', async ({ 
     expect(panel.account.sent.filter(r => r.method === 'POST' && r.path.endsWith('/series'))).toHaveLength(0);
 });
 
+test('expanding Notify me keeps the card frame and page in place', async ({ page }) => {
+    await following(page);
+    const card = page.locator('#mine-card-body');
+    await card.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+    const frame = () => card.evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return { top: Math.round(box.top), height: Math.round(box.height), page: scrollY, content: el.scrollTop };
+    });
+    const before = await frame();
+    const toggle = card.getByRole('button', { name: /Notify me/ });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect.poll(frame).toEqual(before);
+    const first = card.locator('.tc-radio').first();
+    await expect(first).toBeInViewport({ ratio: 1 });
+    await first.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect.poll(frame).toEqual(before);
+});
+
 test('notification options support the keyboard and reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await following(page);

@@ -132,6 +132,10 @@ function toggleNotify(button) {
     const field = button.closest('.tc-notify');
     const options = field.querySelector('.tc-notify-options');
     const open = button.getAttribute('aria-expanded') !== 'true';
+    const sheet = button.closest('.title-sheet');
+    // Keep this card's frame in place while choices expand inside its scrolling content.
+    // Rendering another card replaces the element and restores its natural height.
+    if (open && sheet && !sheet.style.height) sheet.style.height = getComputedStyle(sheet).height;
     button.setAttribute('aria-expanded', String(open));
     options.hidden = !open;
     // All sheet entry points share this handler, including Follow before anything is saved.
