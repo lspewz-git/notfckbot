@@ -127,21 +127,27 @@ test('Devices: this device on its own card, the others in a list with Show more 
     const body = page.locator('#devices-body');
     const card = body.locator('.group-card');
     await expect(card).toContainText('Chrome, Windows');
-    // The top bar: Back at the start of the column, 44px, the title centred over the card
+    // Back's circle (5px inside its 44px target) on the card's left edge, then the title on the same
+    // row, as large as Following's (approved 06.11, variant B)
     const lefts = await page.evaluate(() => {
         const box = (sel) => document.querySelector(sel).getBoundingClientRect();
         const back = box('#my-devices-section .page-back');
         const title = box('#my-devices-section h1');
         const card = box('#devices-body .group-card');
+        const size = (sel) => getComputedStyle(document.querySelector(sel)).fontSize;
         return {
-            back: Math.round(back.left),
+            circle: Math.round(back.left + 5),
             card: Math.round(card.left),
-            centre: Math.round(Math.abs(title.left + title.width / 2 - card.left - card.width / 2)),
+            gap: Math.round(title.left - back.right),
+            row: Math.round(Math.abs(title.top + title.height / 2 - back.top - back.height / 2)),
+            font: [size('#my-devices-section h1'), size('#my-subs-section h1')],
             size: [back.width, back.height]
         };
     });
-    expect(lefts.back).toBe(lefts.card);
-    expect(lefts.centre).toBeLessThanOrEqual(1);
+    expect(lefts.circle).toBe(lefts.card);
+    expect(lefts.gap).toBe(4);
+    expect(lefts.row).toBeLessThanOrEqual(1);
+    expect(lefts.font[0]).toBe(lefts.font[1]);
     expect(lefts.size).toEqual([44, 44]);
     // As wide as the other account pages: the column of the section, not a narrow strip
     const widths = await page.evaluate(() => ({

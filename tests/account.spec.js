@@ -127,11 +127,11 @@ test('a failed Mini App sign-in offers a retry and a password, not the bot link 
     const heights = await Promise.all([retry, password].map((el) => el.evaluate((b) => b.offsetHeight)));
     expect(heights).toEqual([48, 44]);
     await expect(page.locator('#login-tg, [data-action="login-qr"]')).toHaveCount(0);
-    // The password form's way back returns to this screen, not the bot link. In the Mini App it is
-    // Telegram's own Back button: the page's round one is hidden
+    // The password form's way back returns to this screen, not the bot link. In the Mini App Telegram's
+    // own Back button too, but the page keeps its round one: Telegram for iPhone showed none (06.11)
     await page.locator('#login-body [data-action="login-password"]').click();
-    await expect(page.locator('#login-back')).toBeHidden();
-    await expect(page.locator('#login-step')).toBeFocused();
+    await expect(page.locator('#login-back')).toBeVisible();
+    await expect(page.locator('#login-back')).toBeFocused();
     expect(events).toContain('web_app_setup_back_button');
     await page.evaluate(() => window['Telegram'].WebView.receiveEvent('back_button_pressed', null));
     await retry.click();
@@ -458,10 +458,17 @@ test('sign-in branding and confirmation fit without mixed-language instructions'
     await expect(page.locator('#login-body .login-text')).toHaveText(
         'Check that the bot shows the same code, then confirm the sign-in.'
     );
-    // The top bar's round Back, 44px, the screen's title centred beside it
+    // The top bar's round Back, 44px, the screen's title beside it at a phone's Following size (28px)
     const back = page.locator('#login-back');
     await expect(back).toHaveAccessibleName('All sign-in methods');
     expect(await back.evaluate((el) => [el.offsetWidth, el.offsetHeight])).toEqual([44, 44]);
+    const stepTitle = await page.locator('#login-step').evaluate((el) => ({
+        size: getComputedStyle(el).fontSize,
+        gap: Math.round(
+            el.getBoundingClientRect().left - document.getElementById('login-back').getBoundingClientRect().right
+        )
+    }));
+    expect(stepTitle).toEqual({ size: '28px', gap: 4 });
     await expect(page.locator('#login-step')).toHaveText('Confirm in Telegram');
     await back.click();
     await expect(page.locator('#login-tg')).toBeVisible();

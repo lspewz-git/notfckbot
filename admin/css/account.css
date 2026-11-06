@@ -201,33 +201,32 @@ body.signed-out .tabbar {
     padding-top: 8px;
 }
 
-/* The top bar of a nested screen, like the account pages' */
+/* The top bar of a nested screen, like the account pages': Back, then the title as large as a phone's
+   Following (approved 06.11, variant B). The sign-in column is phone-wide on every screen, so the
+   phone size everywhere */
 .login-top {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    display: flex;
     align-items: center;
-    height: 48px;
-    margin: 0 -4px;
+    gap: var(--space-1);
+    min-height: 48px;
+    margin-left: -5px;
 }
 
 .login-top h2 {
-    grid-column: 2;
+    min-width: 0;
     margin: 0;
     overflow: hidden;
-    font-size: 17px;
-    line-height: 22px;
+    font-size: 1.75rem;
+    /* Taller than the page titles' 1.05: overflow is hidden for the ellipsis, and it cut the descenders */
+    line-height: 1.25;
     font-weight: 600;
-    text-align: center;
+    letter-spacing: -0.03em;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
-.login-top h2:focus {
-    outline: none;
-}
-
-html.tg-back .login-top .page-back {
-    visibility: hidden;
+.login-top .page-back {
+    flex: none;
 }
 
 /* What the nested screen is about: in the middle of the space between the bar and the actions */
@@ -1552,30 +1551,30 @@ button.search-result-open:hover .mine-row-title {
 
 /* --- Account → Devices (devices.js) --- */
 
-/* Outranks .mine-section header (aligned to the end, wrapping). The top bar (redesign handoff,
-   06.11): Back on the left, the title centred, an empty column on the right to keep it centred */
+/* Outranks .mine-section header (aligned to the end, wrapping). Back, then the title in the size and
+   place of Released, Following and Calendar (approved 06.11, variant B): the page's h1 size, the
+   circle (5px inside its 44px target) on the content's left edge */
 .app-page > .page-nav {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 0;
-    height: 48px;
-    margin: 0;
+    justify-content: flex-start;
+    gap: var(--space-1);
+    min-height: 48px;
+    margin: 0 0 0 -5px;
 }
 
-.app-page > .page-nav::after {
-    content: '';
+.app-page > .page-nav .page-back {
+    flex: none;
 }
 
 .app-page > .page-nav h1 {
-    grid-column: 2;
+    min-width: 0;
     margin: 0;
+    /* Overflow is hidden for the ellipsis: room for the descenders (g, y) */
+    line-height: 1.25;
     overflow: hidden;
-    font-size: 17px;
-    line-height: 22px;
-    font-weight: 600;
-    letter-spacing: 0;
-    text-align: center;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
@@ -1586,11 +1585,6 @@ button.search-result-open:hover .mine-row-title {
     .app-page {
         margin-top: calc(var(--space-3) * -1);
     }
-}
-
-/* Inside Telegram the Mini App's own Back button stands in for this one (session.js) */
-html.tg-back .app-page .page-back {
-    visibility: hidden;
 }
 
 /* A 44px target with a 34px circle in it */

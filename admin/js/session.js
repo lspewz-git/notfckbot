@@ -22,11 +22,11 @@ const CODE_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#binary" /></svg>';
 const KEY_ICON =
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#key-round" /></svg>';
-/** A nested screen's top bar: Back to all the ways in, its title centred (Telegram's own Back in the Mini App) */
+/** A nested screen's top bar: Back to all the ways in, then its title (Telegram's Back too in the Mini App) */
 const topBar = (title) =>
     '<div class="login-top"><button type="button" id="login-back" class="page-back" data-action="login-cancel" aria-label="All sign-in methods">' +
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-left" /></svg></button>' +
-    `<h2 id="login-step" tabindex="-1">${title}</h2><span></span></div>`;
+    `<h2 id="login-step">${title}</h2></div>`;
 
 let pollTimer = 0;
 // Each "Continue with Telegram" press: an older attempt's poll still on its way stops when it lands
@@ -34,9 +34,8 @@ let attempt = 0;
 // The first check of the session has answered: a 401 before it is that check's own, not an ended session
 let started = false;
 
-/** A nested screen opened: focus on its Back (hidden in the Mini App: its title instead) */
-const focusStep = () =>
-    (document.documentElement.classList.contains('tg-back') ? $('login-step') : $('login-back'))?.focus();
+/** A nested screen opened: focus on its Back */
+const focusStep = () => $('login-back')?.focus();
 
 /** Draws a sign-in screen: `nested` ones (with a top bar) hide the logo and take the whole height. */
 const gate = (html, nested = false) => {
