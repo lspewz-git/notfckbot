@@ -12,7 +12,7 @@ import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { pickFrom, avatar, initial } from './pick-sheet.js';
 import { chatChip } from './chat-picker.js';
 import { searchResults, openSearchCard, MODES } from './content-search.js';
-import { titleCard, notifyField, watchButton, posterSrc, fitDescriptions } from './title-card.js';
+import { titleCard, notifyField, watchButton, posterSrc, fitDescriptions, NOTIFY } from './title-card.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1018,6 +1018,8 @@ export function setupAccount() {
                         /** @type {HTMLInputElement} */ (radio).checked =
                             /** @type {HTMLInputElement} */ (radio).value === el.value;
                     }
+                    const summary = document.querySelector('#mine-card-body .tc-notify-summary strong');
+                    if (summary) summary.textContent = NOTIFY[el.value].long;
                 }
                 toast('Notifications changed', 'success');
                 if (state.list && visibleSection() === 'my-subs') $('my-subs-body').innerHTML = subsView();

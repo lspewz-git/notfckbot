@@ -1241,10 +1241,6 @@ button.search-result-open:hover .mine-row-title {
 
 /* The choices as the redesign's sheet (pick-sheet.js adds .app-sheet): a centred title over one
    rounded list, the current choice ticked in the accent; the admin chat picker keeps its list */
-#pick-modal:not(.app-sheet) .sheet-grabber {
-    display: none;
-}
-
 #pick-modal.app-sheet .modal-content {
     display: flex;
     flex-direction: column;
@@ -1275,6 +1271,7 @@ button.search-result-open:hover .mine-row-title {
 }
 
 #pick-modal .pick-header .sheet-close {
+    position: absolute;
     grid-column: 3;
     grid-row: 1;
     align-self: start;
@@ -1296,10 +1293,6 @@ button.search-result-open:hover .mine-row-title {
 #pick-modal .pick-admin .action-icon {
     border: none;
     background: transparent;
-}
-
-#pick-modal.app-sheet .sheet-grabber {
-    margin-bottom: var(--space-3);
 }
 
 #pick-modal.app-sheet #pick-list {
@@ -1827,25 +1820,17 @@ button.search-result-open:hover .mine-row-title {
 .sheet-content {
     display: flex;
     flex-direction: column;
-    padding: 6px 16px 24px;
-}
-
-.sheet-grabber {
-    display: none;
-    align-self: center;
-    flex: none;
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--grabber);
+    padding: var(--space-2) var(--space-4) var(--space-6);
 }
 
 /* A 44px target with a 30px circle in it */
 .sheet-close {
-    position: relative;
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    z-index: 2;
     display: grid;
     place-items: center;
-    align-self: flex-end;
     width: 44px;
     height: 44px;
     padding: 0;
@@ -1875,7 +1860,8 @@ button.search-result-open:hover .mine-row-title {
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    margin-top: -20px;
+    margin-top: var(--space-2);
+    padding: 0 40px;
     text-align: center;
 }
 
@@ -1989,10 +1975,6 @@ button.search-result-open:hover .mine-row-title {
         border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
         padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
         box-shadow: var(--shadow-sheet);
-    }
-
-    .sheet-grabber {
-        display: block;
     }
 }
 

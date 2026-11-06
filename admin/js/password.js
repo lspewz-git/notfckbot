@@ -138,7 +138,6 @@ let removing = false;
 function sheetHtml() {
     const changed = me.changedAt ? changedDay(me.changedAt) : '';
     return (
-        '<span class="sheet-grabber" aria-hidden="true"></span>' +
         `<button type="button" class="sheet-close" data-close="password-sheet" aria-label="Close">${icon('x')}</button>` +
         `<div class="sheet-head"><span class="row-tile row-tile-xl">${icon('key-round')}</span>` +
         '<h2 id="password-sheet-title">Password</h2>' +

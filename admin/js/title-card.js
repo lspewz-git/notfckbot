@@ -9,7 +9,8 @@ import { openModal, closeModal } from './ui.js';
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
 
-const KP_LOGO = '<svg class="kp-logo" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>';
+const KP_LOGO =
+    '<svg class="kp-logo" width="20" height="20" viewBox="0 0 300 300" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>';
 
 /** A stored poster path ("/abc.jpg") or a full TMDB URL, at a size, through the panel's cache */
 export function posterSrc(path, size = 'w185') {
@@ -40,10 +41,11 @@ function ratingLine(value) {
 }
 
 /**
- * The Notify me choice: three radios in one group, the bell hint under it.
+ * A collapsed summary, with the three choices and their hint revealed on demand.
  * @param {{ name: string, current: string, id?: string | null, disabled?: boolean, hint?: boolean }} o
  */
 export function notifyField({ name, current, id = null, disabled = false, hint = true }) {
+    const optionsId = `notify-options-${name}`;
     const radios = Object.entries(NOTIFY)
         .map(
             ([key, m]) =>
@@ -52,10 +54,14 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
         )
         .join('');
     return (
-        `<fieldset class="tc-notify mine-modes"${disabled ? ' disabled' : ''}><legend>Notify me</legend><div class="tc-radios">${radios}</div></fieldset>` +
+        `<fieldset class="tc-notify mine-modes"${disabled ? ' disabled' : ''}>` +
+        `<button type="button" class="tc-notify-toggle" data-action="tc-notify" aria-expanded="false" aria-controls="${escapeHtml(optionsId)}">` +
+        `${icon('bell')}<span class="tc-notify-summary"><span>Notify me</span><strong>${NOTIFY[current]?.long || NOTIFY.episode.long}</strong></span>${icon('chevron-down')}</button>` +
+        `<div class="tc-notify-options" id="${escapeHtml(optionsId)}" hidden><fieldset><legend>Notify me</legend><div class="tc-radios">${radios}</div></fieldset>` +
         (hint
             ? `<p class="tc-hint">${icon('bell')}<span>Releases the bot will message you about are marked with a bell in Calendar.</span></p>`
-            : '')
+            : '') +
+        '</div></fieldset>'
     );
 }
 
@@ -84,14 +90,14 @@ export function titleCard(t, { titleId = 'mine-card-title', notify = '', extra =
               : '') +
           '</div>'
         : '';
-    const overview = t.overview
-        ? `<p class="tc-overview" data-clamp>${escapeHtml(t.overview)}</p><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false" hidden>Show more</button>`
+    const description = t.overview?.trim();
+    const overview = description
+        ? `<p class="tc-overview" data-clamp>${escapeHtml(description)}</p><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false" hidden>Show more</button>`
         : '';
     const kinopoisk = t.kinopoiskUrl
         ? `<a class="tc-link" href="${escapeHtml(t.kinopoiskUrl)}" target="_blank" rel="noopener noreferrer">${KP_LOGO}<span>Open on Kinopoisk</span>${icon('external-link')}</a>`
         : '';
     return (
-        '<span class="sheet-grabber" aria-hidden="true"></span>' +
         (close
             ? `<button type="button" class="sheet-close" data-close="${close}" aria-label="Close">${icon('x')}</button>`
             : '') +
@@ -119,6 +125,30 @@ export function fitDescriptions(root) {
     for (const text of root.querySelectorAll('[data-clamp]')) {
         const more = /** @type {HTMLElement} */ (text.nextElementSibling);
         if (more?.dataset.action === 'tc-more') more.hidden = text.scrollHeight <= text.clientHeight + 1;
+    }
+}
+
+function toggleNotify(button) {
+    const field = button.closest('.tc-notify');
+    const options = field.querySelector('.tc-notify-options');
+    const open = button.getAttribute('aria-expanded') !== 'true';
+    button.setAttribute('aria-expanded', String(open));
+    options.hidden = !open;
+    // All sheet entry points share this handler, including Follow before anything is saved.
+    if (!field.dataset.watched) {
+        field.dataset.watched = 'true';
+        const select = (event) => {
+            const radio = /** @type {HTMLInputElement} */ (event.target);
+            if (!radio.matches('input[type="radio"]')) return;
+            field.querySelector('.tc-notify-summary strong').textContent = NOTIFY[radio.value].long;
+            button.setAttribute('aria-expanded', 'false');
+            // Return keyboard focus before hiding the selected radio.
+            button.focus({ preventScroll: true });
+            options.hidden = true;
+        };
+        field.addEventListener('change', select);
+        // A second tap on the current choice has no change event, but still closes the list.
+        field.addEventListener('click', select);
     }
 }
 
@@ -162,6 +192,7 @@ export function setupPosterViewer() {
 }
 
 export const titleCardActions = {
+    'tc-notify': toggleNotify,
     'tc-more': toggleMore,
     'poster-view': openPoster
 };

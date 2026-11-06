@@ -577,6 +577,7 @@ test('a series card changes the mode and unsubscribes after a confirmation', asy
     await page.locator('#my-subs-body button.title-row', { hasText: 'Одни из нас' }).click();
     const card = page.locator('#mine-card-modal');
     await expect(card).toBeVisible();
+    await card.getByRole('button', { name: /Notify me/ }).click();
     await card.getByText('When the whole season is out').click();
     await expect(page.locator('.toast').last()).toHaveText('Notifications changed');
     expect(
@@ -621,6 +622,7 @@ test('search: a series asks for the mode, a film is added at once, what is on th
     await expect(results.nth(1).locator('.search-following')).toHaveText('Following');
 
     await results.nth(0).getByRole('button', { name: /^Follow / }).click();
+    await page.locator('#mine-card-modal').getByRole('button', { name: /Notify me/ }).click();
     await page.locator('#mine-card-modal').getByText('Episode 1 and the whole season').click();
     await page.locator('#mine-card-modal').getByRole('button', { name: 'Follow', exact: true }).click();
     await expect(results.nth(0).locator('.search-following')).toHaveText('Following');
@@ -927,7 +929,7 @@ test('Chat settings: the chat on a card that opens the chats, rows with icon til
     await body.locator('[data-action="mine-pick"][data-name="quiet"]').click();
     const sheet = page.locator('#pick-modal');
     await expect(sheet).toHaveClass(/app-sheet/);
-    await expect(sheet.locator('.sheet-grabber')).toBeVisible({ visible: isNarrow(page) });
+    await expect(sheet.locator('.sheet-grabber')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
 

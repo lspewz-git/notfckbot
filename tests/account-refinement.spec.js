@@ -17,6 +17,7 @@ test.describe('shared cards and calendar unfollow', () => {
         await page.locator('#my-subs-body button.title-row').first().click();
         const card = page.locator('#mine-card-modal');
         try {
+            await card.getByRole('button', { name: /Notify me/ }).click();
             await card.getByText('When the whole season is out').click();
             await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeDisabled();
             await card.getByRole('button', { name: 'Close', exact: true }).click();
@@ -50,6 +51,7 @@ test.describe('shared cards and calendar unfollow', () => {
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-subs');
         await page.locator('#my-subs-body button.title-row').first().click();
+        await card.getByRole('button', { name: /Notify me/ }).click();
         await card.getByText('When the whole season is out').click();
         await expect(page.locator('.toast').last()).toContainText('Notifications changed');
         expect(panel.account.sent.find((r) => r.method === 'POST' && r.path.endsWith('/series')).body).toEqual({
@@ -193,6 +195,7 @@ test.describe('the title search page', () => {
         const card = page.locator('#mine-card-modal');
         await expect(card.locator('.tc-notify')).toBeVisible();
         await expect(card.locator('.tc-rating')).toContainText('7.1');
+        await card.getByRole('button', { name: /Notify me/ }).click();
         await card.getByText('Episode 1 and the whole season').click();
         await card.getByRole('button', { name: 'Follow', exact: true }).click();
         await expect(card).toBeHidden();

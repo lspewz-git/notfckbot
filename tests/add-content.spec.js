@@ -229,6 +229,7 @@ test('rows fit the dialog and the keyboard opens the series mode card', async ({
     await result(page, 2).focus();
     await page.keyboard.press('Enter');
     await expect(card(page).locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
+    await card(page).getByRole('button', { name: /Notify me/ }).click();
     await card(page).getByText('Episode 1 and the whole season').click();
     await card(page).getByRole('button', { name: 'Follow', exact: true }).click();
     await expect(card(page)).toBeHidden();

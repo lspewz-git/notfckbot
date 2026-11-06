@@ -213,7 +213,6 @@ function sheetHtml(device) {
         ['Last active', seenWhen(device.seenAt)]
     ].filter(([, value]) => value);
     return (
-        '<span class="sheet-grabber" aria-hidden="true"></span>' +
         `<button type="button" class="sheet-close" data-close="device-modal" aria-label="Close">${icon('x')}</button>` +
         `<div class="sheet-head"><span class="row-tile row-tile-xl">${kindIcon(device)}</span>` +
         `<h2 id="device-title">${escapeHtml(nameOf(device))}</h2></div>` +

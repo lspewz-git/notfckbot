@@ -398,10 +398,18 @@
 
 /* --- TitleCard: one sheet for a title (title-card.js) --- */
 
+.title-sheet {
+    display: block;
+}
+
+.app-sheet.modal-sheet .title-sheet:has(.tc-actions) {
+    padding-bottom: 0;
+}
+
 .tc-head {
     display: flex;
     gap: var(--space-4);
-    margin-top: var(--space-4);
+    margin-top: var(--space-2);
     padding-right: 40px;
 }
 
@@ -558,6 +566,7 @@
 }
 
 .tc-link {
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -576,9 +585,11 @@
 }
 
 .tc-link .kp-logo {
+    display: block;
     width: 20px;
     height: 20px;
     flex: none;
+    margin: 0;
 }
 
 .tc-link span {
@@ -588,8 +599,8 @@
 }
 
 .tc-link .icon {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     flex: none;
     color: var(--text-dim);
 }
@@ -601,13 +612,104 @@
     border: none;
 }
 
-.tc-notify legend {
+.tc-notify-options legend {
     margin: 0 var(--space-1) var(--space-2);
     padding: 0;
     color: var(--text-dim);
     font-size: 12px;
     line-height: 16px;
     font-weight: 600;
+}
+
+.tc-notify-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    border-radius: var(--radius-btn);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tc-notify-toggle > .icon {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+}
+
+.tc-notify-toggle > .icon:last-child {
+    color: var(--text-dim);
+    transition: transform 180ms ease;
+}
+
+.tc-notify-toggle[aria-expanded='true'] > .icon:last-child {
+    transform: rotate(180deg);
+}
+
+.tc-notify-summary {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.tc-notify-summary strong {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tc-notify-options {
+    margin-top: var(--space-3);
+    animation: tc-notify-in 180ms ease-out;
+}
+
+.tc-notify-options[hidden] {
+    display: none;
+}
+
+.tc-notify-options > fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.tc-notify:disabled .tc-notify-toggle {
+    opacity: 0.5;
+    cursor: default;
+}
+
+@keyframes tc-notify-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tc-notify-options {
+        animation: none;
+    }
+    .tc-notify-toggle > .icon:last-child {
+        transition: none;
+    }
 }
 
 .tc-radios {
@@ -705,6 +807,7 @@
     flex-direction: column;
     gap: var(--space-2);
     margin-top: var(--space-5);
+    padding: var(--space-2) 0 calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
 }
 
 .tc-actions .sheet-btn-primary,

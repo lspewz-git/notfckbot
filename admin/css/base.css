@@ -70,7 +70,6 @@
     --chip-count-on: #3a3a3a; /* a count on the selected (light) category chip */
     --divider: rgba(255, 255, 255, 0.06); /* between list rows, short rules in the rail and the header */
     --hairline: rgba(255, 255, 255, 0.08); /* the sign-in screen's rules */
-    --grabber: #4a4a4a; /* a sheet's handle */
 
     /* Overlays: what sits above the page */
     --scrim: rgba(0, 0, 0, 0.62); /* behind a dialog */
