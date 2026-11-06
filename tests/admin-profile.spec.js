@@ -428,3 +428,31 @@ test('chats failing while the profile menu is open show a retry that loads them'
     await expect(menu.locator('[data-action="profile-chat"]').first()).toBeVisible();
     await expect(retry).toHaveCount(0);
 });
+
+test('Chat settings, Account settings and Devices titles sit level with Following, 16px over the content', async ({
+    context
+}) => {
+    // Higher on a phone it went under Telegram's blurred top edge, and Chat settings' card touched it (06.11)
+    const measure = async (id) => {
+        const page = await context.newPage();
+        await mockPanel(page, { role: 'user', path: `/#${id}` });
+        const title = page.locator(`#${id}-section h1`);
+        await expect(title).toBeVisible();
+        return title.evaluate((h) => {
+            const box = h.getBoundingClientRect();
+            const header = h.closest('header');
+            let next = header.nextElementSibling;
+            while (next && !next.getBoundingClientRect().height) next = next.nextElementSibling;
+            return {
+                centre: box.top + box.height / 2,
+                gap: Math.round(next.getBoundingClientRect().top - header.getBoundingClientRect().bottom)
+            };
+        });
+    };
+    const following = await measure('my-subs');
+    for (const id of ['my-settings', 'my-account', 'my-devices']) {
+        const page_ = await measure(id);
+        expect(Math.abs(page_.centre - following.centre), id).toBeLessThanOrEqual(1);
+        expect(page_.gap, id).toBe(16);
+    }
+});

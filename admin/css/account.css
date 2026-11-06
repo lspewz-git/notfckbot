@@ -198,7 +198,8 @@ body.signed-out .tabbar {
 
 .login-nested #login-body {
     flex: 1;
-    padding-top: 8px;
+    /* The title level with the account pages' (20 + 22, half of Back) */
+    padding-top: var(--space-5);
 }
 
 /* The top bar of a nested screen, like the account pages': Back, then the title as large as a phone's
@@ -208,21 +209,20 @@ body.signed-out .tabbar {
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    min-height: 48px;
+    min-height: 44px;
     margin-left: -5px;
 }
 
 .login-top h2 {
     min-width: 0;
     margin: 0;
-    overflow: hidden;
     font-size: 1.75rem;
-    /* Taller than the page titles' 1.05: overflow is hidden for the ellipsis, and it cut the descenders */
-    line-height: 1.25;
+    line-height: 1.05;
     font-weight: 600;
     letter-spacing: -0.03em;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    /* A long title wraps rather than losing its end */
+    overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
 .login-top .page-back {
@@ -245,6 +245,8 @@ body.signed-out .tabbar {
 .login-mid-top {
     justify-content: flex-start;
     align-items: stretch;
+    /* The fields' edges on the buttons' */
+    padding-inline: 0;
     padding-top: var(--space-6);
     text-align: left;
 }
@@ -1561,29 +1563,28 @@ button.search-result-open:hover .mine-row-title {
     align-items: center;
     justify-content: flex-start;
     gap: var(--space-1);
-    min-height: 48px;
-    margin: 0 0 0 -5px;
+    min-height: 44px;
+    margin: 0 0 var(--space-4) -5px;
 }
 
 .app-page > .page-nav .page-back {
     flex: none;
 }
 
+/* The page title's own size and line height; a long one wraps rather than losing its end */
 .app-page > .page-nav h1 {
     min-width: 0;
     margin: 0;
-    /* Overflow is hidden for the ellipsis: room for the descenders (g, y) */
-    line-height: 1.25;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
-/* 8px from the top on a phone (the page itself gives 20). The sides stay the page's 16px, not the
-   handoff's 12: every tab shares one content column (tests/settings-width.spec.js) */
-@media (max-width: 640px) {
+/* The title's middle level with Released, Following and Calendar's (Back is taller than their line):
+   higher on a phone put it under Telegram's blurred top edge (06.11). The sides stay the page's 16px,
+   not the handoff's 12: every tab shares one content column (tests/settings-width.spec.js) */
+@media (min-width: 641px) {
     .app-page {
-        margin-top: calc(var(--space-3) * -1);
+        margin-top: calc(var(--space-1) * -0.75);
     }
 }
 
@@ -1628,11 +1629,6 @@ button.search-result-open:hover .mine-row-title {
 .devices-body {
     display: flex;
     flex-direction: column;
-}
-
-#devices-body,
-#my-account-info {
-    margin-top: var(--space-2);
 }
 
 /* The icon tiles: 32 in a row, 40 on the current device's card, 48 in a sheet */

@@ -32,7 +32,7 @@ export const signInForm = () =>
     '<label class="field-label" for="login-pass">Password</label>' +
     passwordField('login-pass', 'current-password', 'Password') +
     '<p class="login-error" id="login-pass-error" role="alert" hidden></p></div>' +
-    '<div class="login-actions"><button type="submit" class="btn btn-primary btn-block">Log In</button>' +
+    '<div class="login-actions"><button type="submit" class="btn btn-primary btn-block">Sign in</button>' +
     '<p class="login-hint">Next, confirm this sign-in in the bot. The system account signs in directly.</p></div>' +
     '</form>';
 

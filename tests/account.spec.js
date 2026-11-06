@@ -469,6 +469,11 @@ test('sign-in branding and confirmation fit without mixed-language instructions'
         )
     }));
     expect(stepTitle).toEqual({ size: '28px', gap: 4 });
+    // Level with the account pages' titles (42px down the middle), clear of Telegram's blurred top edge
+    const centre = await page
+        .locator('#login-step')
+        .evaluate((el) => Math.round(el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2));
+    expect(centre).toBe(42);
     await expect(page.locator('#login-step')).toHaveText('Confirm in Telegram');
     await back.click();
     await expect(page.locator('#login-tg')).toBeVisible();
@@ -991,7 +996,18 @@ test('a password signs in from the sign-in screen; a wrong one or too many tries
     const panel = await mockPanel(page, { signedOut: true });
     await page.locator('[data-action="login-password"]').click();
     const submit = page.locator('.login-password [type="submit"]');
-    await expect(submit).toHaveText('Log In');
+    await expect(submit).toHaveText('Sign in');
+    // The fields' edges on the button's (06.11: they sat 4px inside)
+    const edges = await page.evaluate(() =>
+        ['#login-pass', '.login-password [type="submit"]'].map((sel) => {
+            const box = document
+                .querySelector(sel)
+                .closest('.password-input, .input-field, button')
+                .getBoundingClientRect();
+            return [Math.round(box.left), Math.round(box.right)];
+        })
+    );
+    expect(edges[0]).toEqual(edges[1]);
     const eye = page.locator('.login-password [data-action="password-show"]');
     await expect(eye.locator('path')).toHaveAttribute('d', 'm3 3 18 18');
     const layout = await eye.evaluate((button) => {
