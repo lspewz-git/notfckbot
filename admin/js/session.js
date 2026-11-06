@@ -176,11 +176,33 @@ function signInScreen(error = '', restoreFocus = $('login-body').contains(docume
             '<h2 class="login-or">Other ways to sign in</h2>' +
             `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>QR code</span></button>` +
             `<button type="button" class="login-method" data-action="login-code" disabled>${CODE_ICON}<span>Bot code</span></button>` +
-            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div></div>`
+            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div>` +
+            '<p class="login-terms-note">By continuing, you agree to the <button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button>.</p></div>'
     );
     if (restoreFocus) $('login-title').focus();
     prepareCode();
 }
+
+/**
+ * The Terms of Service: plain text on a nested screen, Back to the ways in. A placeholder until the
+ * real terms are written (the user, 06.11)
+ */
+const TERMS =
+    '<div class="login-terms" tabindex="-1">' +
+    '<p>NotFckBot is a personal Telegram bot that tells you when new episodes of your series and new films come out. ' +
+    'By signing in to this panel you agree to the terms below.</p>' +
+    '<h3>Using the bot</h3>' +
+    '<p>The bot and the panel are provided as they are, without any guarantee that a notification arrives on time ' +
+    'or at all. Release dates come from TMDB and Kinopoisk and may be wrong or change.</p>' +
+    '<h3>Your data</h3>' +
+    '<p>The bot keeps your Telegram ID and name, the chats it is in, what you follow and your chat settings. ' +
+    'The panel keeps your signed-in devices: their name, country, network, IP address and when they were last active. ' +
+    'Nothing is sold or shared with anyone.</p>' +
+    '<h3>Links</h3>' +
+    '<p>Watch and Kinopoisk links lead to other websites. Their content and rules are their own.</p>' +
+    '<h3>Changes</h3>' +
+    '<p>These terms may change. The version shown here is the one that applies.</p>' +
+    '</div>';
 
 /** How to send the six digits to the bot from a device that has Telegram (src/bot/login.js). */
 function codeSteps(start) {
@@ -494,6 +516,11 @@ export function sessionActions(onSignedIn) {
             const start = activeChallenge;
             if (!start) return;
             el.outerHTML = codeSteps(start);
+        },
+        'login-terms': () => {
+            discardChallenges();
+            gate(topBar('Terms of Service') + TERMS, true);
+            focusStep();
         },
         'login-password': () => {
             discardChallenges();

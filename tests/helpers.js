@@ -59,19 +59,31 @@ async function openSettingsTab(page, tab) {
 }
 
 /** An account page's chat: its chip at the top, then the chat in the list it opens. */
-const profileButton = (page, section) =>
-    page.locator(isNarrow(page) ? '.tab-profile' : `#${section}-section [data-action="profile-open"]`);
+/** The chat chip at the top of a personal tab (redesign v2): it opens the chats sheet */
+const profileButton = (page, section) => page.locator(`#${section}-section [data-action="chat-switch"]`);
 
 async function pickChat(page, section, title) {
     await profileButton(page, section).click();
-    await page.locator('#profile-modal .pick-row', { hasText: title }).click();
-    await expect(page.locator('#profile-modal')).toBeHidden();
+    await page.locator('#pick-modal .pick-row', { hasText: title }).click();
+    await expect(page.locator('#pick-modal')).toBeHidden();
 }
 
-/** Chat settings or Account settings: from the profile menu behind the chat chip */
-async function openProfilePage(page, section, from = 'my-subs') {
-    await profileButton(page, from).click();
-    await page.locator(`#profile-modal [data-section="${section}"]`).click();
+/** The Account tab: the tab bar's Account, the rail's, or an admin header's chip */
+async function openAccount(page) {
+    const active = (await page.locator('.section.active').getAttribute('id')) || '';
+    const adminChip = page.locator(`#${active} [data-admin-profile] a`);
+    if (await adminChip.count()) await adminChip.click();
+    else if (isNarrow(page)) await page.locator('.tab-profile').click();
+    else await page.locator('.nav-item[data-section="my-profile"]').click();
+    await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
+}
+
+/** Chat settings or Account settings: rows on the Account tab */
+async function openProfilePage(page, section) {
+    if (!(await page.locator('#my-profile-section').evaluate((el) => el.classList.contains('active'))))
+        await openAccount(page);
+    if (section === 'my-profile') return;
+    await page.locator(`#my-profile-body [data-section="${section}"]`).last().click();
     await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
 }
 
@@ -84,4 +96,15 @@ async function openActions(page) {
     }
 }
 
-module.exports = { isNarrow, isPhone, watchConsole, openSection, openSettingsTab, pickChat, openProfilePage, profileButton, openActions };
+module.exports = {
+    isNarrow,
+    isPhone,
+    watchConsole,
+    openSection,
+    openSettingsTab,
+    pickChat,
+    openAccount,
+    openProfilePage,
+    profileButton,
+    openActions
+};

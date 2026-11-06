@@ -12,50 +12,47 @@ async function openHistory(page) {
     await expect(page.locator('#history-section')).toHaveClass(/active/);
 }
 
-test('the latest year: serials (with their seasons) and movies in two lists, with genres and Kinopoisk buttons', async ({
+test('the latest year: series (with their seasons) and films in two lists, with genres; Kinopoisk is in the card', async ({
     page
 }) => {
     await mockPanel(page);
     await openHistory(page);
 
-    await expect(page.locator('#history-years .btn')).toHaveText(['2026', '2025']);
-    await expect(page.locator('#history-years .btn.active')).toHaveText('2026');
-    await expect(page.locator('#history-series-count')).toHaveText('2');
-    await expect(page.locator('#history-films-count')).toHaveText('1');
+    await expect(page.locator('#history-years .cat-chip')).toHaveText(['2026', '2025']);
+    await expect(page.locator('#history-years .cat-chip.active')).toHaveText('2026');
+    await expect(page.locator('#history-years .cat-chip.active')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#history-series-count')).toHaveText(' · 2');
+    await expect(page.locator('#history-films-count')).toHaveText(' · 1');
+    await expect(page.locator('.history-title')).toHaveText(['Series · 2', 'Films · 1']);
 
     const first = page.locator('#history-series .history-item').first();
-    await expect(first.locator('.link-text')).toHaveText('Stranger Things');
+    await expect(first.locator('.row-name')).toHaveText('Stranger Things');
     await expect(first.locator('.history-genres')).toHaveText('Seasons 4, 5 · drama, mystery');
     await expect(page.locator('#history-series .history-genres').nth(1)).toHaveText('Season 2');
     await expect(page.locator('#history-films .history-genres')).toHaveText('sci-fi');
-    const kp = first.locator('.kp-link');
-    await expect(kp).toHaveAttribute('href', 'https://www.kinopoisk.ru/series/915196/');
-    await expect(kp).toHaveAttribute('target', '_blank');
-    await expect(kp).toHaveAccessibleName('Stranger Things on Kinopoisk');
-    // The logo draws (a <use> of the shared symbol), not an empty box
-    expect(await kp.locator('.kp-logo').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(10);
-    await expect(page.locator('#history-films .link-text')).toHaveText(['Dune: Part Three']);
+    await expect(page.locator('#history-section .kp-link')).toHaveCount(0);
+    await expect(page.locator('#history-films .row-name')).toHaveText(['Dune: Part Three']);
 });
 
 test('another year; an empty list says so', async ({ page }) => {
     await mockPanel(page);
     await openHistory(page);
-    await page.locator('#history-years .btn', { hasText: '2025' }).click();
-    await expect(page.locator('#history-years .btn.active')).toHaveText('2025');
-    await expect(page.locator('#history-series .link-text')).toHaveText(['Game of Thrones']);
+    await page.locator('#history-years .cat-chip', { hasText: '2025' }).click();
+    await expect(page.locator('#history-years .cat-chip.active')).toHaveText('2025');
+    await expect(page.locator('#history-series .row-name')).toHaveText(['Game of Thrones']);
     await expect(page.locator('#history-films .history-empty')).toHaveText('No movie came out in 2025.');
-    await expect(page.locator('#history-films-count')).toHaveText('0');
+    await expect(page.locator('#history-films-count')).toHaveText(' · 0');
 });
 
-test('a title opens its card', async ({ page }) => {
+test('a title opens its card, with Kinopoisk and its logo', async ({ page }) => {
     await mockPanel(page);
     await openHistory(page);
-    await page.locator('#history-series .link-text', { hasText: 'Stranger Things' }).click();
-    await expect(page.locator('#detail-title')).toHaveText('Stranger Things');
-    // The card's own Kinopoisk button still draws its logo from the shared symbol
-    expect(
-        await page.locator('#detail-kp .kp-logo').evaluate((el) => el.getBoundingClientRect().width)
-    ).toBeGreaterThan(10);
+    await page.locator('#history-series .history-open', { hasText: 'Stranger Things' }).click();
+    await expect(page.locator('#released-title')).toHaveText('Stranger Things');
+    const kp = page.locator('#released-modal .tc-link');
+    await expect(kp).toHaveAttribute('href', 'https://www.kinopoisk.ru/series/915196/');
+    await expect(kp).toHaveAttribute('target', '_blank');
+    expect(await kp.locator('.kp-logo').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(10);
 });
 
 test('a long list comes in pages of 10, with the size remembered; a short one has no pager', async ({ page }) => {
@@ -124,14 +121,14 @@ test('a slow answer for a year left behind does not replace the year pressed aft
         }
     });
     await openHistory(page);
-    await expect(page.locator('#history-series .link-text')).toHaveText('Serial of 2026');
+    await expect(page.locator('#history-series .row-name')).toHaveText('Serial of 2026');
 
-    await page.locator('#history-years .btn', { hasText: '2025' }).click();
-    await page.locator('#history-years .btn', { hasText: '2026' }).click();
+    await page.locator('#history-years .cat-chip', { hasText: '2025' }).click();
+    await page.locator('#history-years .cat-chip', { hasText: '2026' }).click();
     // Past the moment the 2025 answer arrives
     await page.waitForTimeout(2000);
-    await expect(page.locator('#history-years .btn.active')).toHaveText('2026');
-    await expect(page.locator('#history-series .link-text')).toHaveText('Serial of 2026');
+    await expect(page.locator('#history-years .cat-chip.active')).toHaveText('2026');
+    await expect(page.locator('#history-series .row-name')).toHaveText('Serial of 2026');
 });
 
 test('a year that fails to load says so and keeps the year on screen; pressing it again retries', async ({ page }) => {
@@ -143,47 +140,28 @@ test('a year that fails to load says so and keeps the year on screen; pressing i
         }
     });
     await openHistory(page);
-    const year2025 = page.locator('#history-years .btn', { hasText: '2025' });
+    const year2025 = page.locator('#history-years .cat-chip', { hasText: '2025' });
 
     await year2025.click();
     await expect(page.locator('.toast-error')).toContainText("Couldn't load 2025");
-    await expect(page.locator('#history-years .btn.active')).toHaveText('2026');
-    await expect(page.locator('#history-series .link-text')).toHaveText('Serial of 2026');
+    await expect(page.locator('#history-years .cat-chip.active')).toHaveText('2026');
+    await expect(page.locator('#history-series .row-name')).toHaveText('Serial of 2026');
 
     await year2025.click();
-    await expect(page.locator('#history-years .btn.active')).toHaveText('2025');
-    await expect(page.locator('#history-series .link-text')).toHaveText('Serial of 2025');
+    await expect(page.locator('#history-years .cat-chip.active')).toHaveText('2025');
+    await expect(page.locator('#history-series .row-name')).toHaveText('Serial of 2025');
     // The browser reports the failed request itself; nothing else may be logged
     page.__errors = page.__errors.filter((e) => !e.includes('500'));
 });
 
-test('a title looks clickable, like in the Serials and Movies tables, and opens from the keyboard', async ({
-    page
-}) => {
+test('a whole row is the title button and opens from the keyboard', async ({ page }) => {
     await mockPanel(page);
     await openHistory(page);
-    const title = page.locator('#history-series .link-text').first();
-    const style = await title.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return { cursor: s.cursor, line: s.textDecorationLine };
-    });
-    expect(style).toEqual({ cursor: 'pointer', line: 'underline' });
-    // Only as wide as the title: the empty space after it is not part of the link
-    const [titleBox, rowBox] = await Promise.all([
-        title.boundingBox(),
-        page.locator('#history-series .history-main').first().boundingBox()
-    ]);
-    // The poster now takes part of the row: compare with the text itself rather than half
-    // the remaining width, so this still proves that blank space is not clickable.
-    const textWidth = await title.evaluate((el) => {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        return range.getBoundingClientRect().width;
-    });
-    expect(Math.abs(titleBox.width - textWidth)).toBeLessThan(1);
-    expect(titleBox.width).toBeLessThan(rowBox.width);
-
-    await title.focus();
+    const row = page.locator('#history-series .history-open').first();
+    expect(await row.evaluate((el) => el.tagName)).toBe('BUTTON');
+    expect((await row.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await row.focus();
     await page.keyboard.press('Enter');
-    await expect(page.locator('#detail-title')).toHaveText('Stranger Things');
+    await expect(page.locator('#released-title')).toHaveText('Stranger Things');
 });
+

@@ -705,6 +705,8 @@ test('the Devices list: this browser first, then the latest seen; one of them si
             ['Safari, iPhone', false]
         ]
     );
+    // The address of each browser's latest request is noted for its owner (the test calls come from loopback)
+    assert.ok(list.body.every((d) => d.ip === '127.0.0.1'));
     assert.ok(list.body.every((d) => /^[0-9a-f]{24}$/.test(d.id)));
     assert.ok(!list.body.some((d) => sessions.has(d.id)), 'not the table key');
     const [mine, phone] = list.body.map((d) => d.id);

@@ -1,0 +1,957 @@
+/* The personal tabs after the redesign of 06.11 (docs: Downloads/notfckbot-redesign): the tab header
+   with the chat chip and the search pill, category chips, title and calendar rows, empty states,
+   the shared title card (title-card.js), the poster viewer and the search page. Tokens only. */
+
+/* --- TabTopBar: the title, the chat chip on the right, a line, the search pill --- */
+
+.mine-section > header.tab-top {
+    display: block;
+    margin: 0;
+}
+
+.tab-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 44px;
+}
+
+.tab-top-row h1 {
+    flex-shrink: 0;
+    margin: 0;
+    font-size: 28px;
+    line-height: 34px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+
+.tab-top .mine-chat {
+    display: flex;
+    min-width: 0;
+}
+
+.tab-top-sub {
+    max-width: 40rem;
+    margin: var(--space-2) 0 0;
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 20px;
+    text-wrap: pretty;
+}
+
+/* A link that looks like a field: it opens the search page */
+.search-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 44px;
+    margin-top: var(--space-4);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--divider);
+    border-radius: 22px;
+    background: var(--surface-1);
+    color: var(--text-dim);
+    font-size: 15px;
+    text-decoration: none;
+}
+
+.search-pill .icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+}
+
+@media (hover: hover) {
+    .search-pill:hover {
+        background: var(--surface-2);
+    }
+}
+
+/* The chip: a 36px pill inside a 44px target, the chat's avatar, its name cut at 180px */
+.mine-chat-chip {
+    gap: var(--space-2);
+    max-width: 180px;
+    height: 36px;
+    padding: 0 var(--space-3) 0 var(--space-1);
+    border: 1px solid var(--hairline);
+    border-radius: 18px;
+    background: var(--surface-1);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.mine-chat-chip::after {
+    content: '';
+    position: absolute;
+    /* From inside the 1px border: 34 + 2 × 5 = 44 */
+    inset: -5px 0;
+}
+
+.mine-chat-chip .pick-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+}
+
+.mine-chat-chip .icon {
+    width: 16px;
+    height: 16px;
+}
+
+@media (hover: hover) {
+    .mine-chat-chip:hover {
+        background: var(--surface-2);
+    }
+}
+
+/* The page sits 12 + 32px under the top on a phone, like the redesign's frames (the inner padding is 20) */
+@media (max-width: 640px) {
+    .mine-section > header.tab-top,
+    .search-bar {
+        margin-top: var(--space-6);
+    }
+}
+
+@media (min-width: 1025px) {
+    .tab-top-row h1 {
+        font-size: 2.25rem;
+        line-height: 1.05;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+    }
+}
+
+/* The tabs' bodies: spacing by margins (8 under the chips, 20 between groups), not the flex gap */
+#my-subs-body,
+#my-aired-body,
+#my-calendar-body,
+#mine-results {
+    display: block;
+}
+
+.cat-bar + .group-list,
+.cat-bar + .empty-state,
+.cat-bar + .group-title {
+    margin-top: var(--space-2);
+}
+
+.mine-section > header.tab-top + .mine-body > .group-list:first-child,
+.mine-section > header.tab-top + .mine-body > .empty-state:first-child {
+    margin-top: var(--space-4);
+}
+
+/* --- CategoryChips --- */
+
+.cat-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.cat-chips {
+    display: flex;
+    flex: 1;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.cat-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.cat-chip {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 44px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.cat-chip > span {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 36px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--hairline);
+    border-radius: 18px;
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.cat-chip[aria-selected='true'] > span {
+    border-color: var(--text);
+    background: var(--text);
+    color: var(--bg);
+    font-weight: 600;
+}
+
+.cat-count {
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.cat-chip[aria-selected='true'] .cat-count {
+    color: var(--chip-count-on);
+}
+
+.cat-chip:focus-visible {
+    outline: none;
+}
+
+.cat-chip:focus-visible > span {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* Following's "+": a white circle, 36 in a 44 target, to the search */
+.cat-plus {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-right: calc(var(--space-1) * -1);
+    color: var(--bg);
+}
+
+.cat-plus > span {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--text);
+}
+
+.cat-plus .icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.4;
+}
+
+/* --- Title rows (Following, the search) and calendar rows --- */
+
+.group-row.title-row {
+    min-height: 70px;
+}
+
+.title-row .row-text {
+    gap: 2px;
+}
+
+.title-thumb {
+    display: block;
+    flex: none;
+    width: 36px;
+    height: 54px;
+    border-radius: 6px;
+    background: var(--tile);
+    object-fit: cover;
+}
+
+.title-list > li + li::before {
+    left: 60px;
+}
+
+/* A short label in a row: the notification mode, a film's year */
+.row-badge {
+    flex: none;
+    padding: 4px 8px;
+    border-radius: var(--radius-chip);
+    background: var(--fill-active);
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.group-row.cal-row {
+    min-height: 64px;
+}
+
+.cal-day {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    width: 34px;
+}
+
+.cal-day b {
+    font-size: 18px;
+    line-height: 22px;
+    font-weight: 700;
+}
+
+.cal-day span {
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+}
+
+/* A second title on the same day: the day isn't repeated, the rule starts under the poster */
+.cal-same-day .cal-day {
+    visibility: hidden;
+}
+
+.title-thumb.cal-thumb {
+    width: 32px;
+    height: 48px;
+}
+
+.cal-list > li + li::before {
+    left: 12px;
+}
+
+.cal-list > li.cal-same-day::before {
+    left: 54px;
+}
+
+.cal-when {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.cal-bell,
+.tc-bell {
+    display: flex;
+    color: var(--accent);
+}
+
+.cal-bell .icon,
+.tc-bell .icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* --- EmptyState --- */
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 40px var(--space-6);
+    text-align: center;
+}
+
+.empty-icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--text-dim);
+}
+
+.empty-icon .icon {
+    width: 24px;
+    height: 24px;
+}
+
+.empty-title {
+    margin: var(--space-2) 0 0;
+    color: var(--text);
+    font-size: 16px;
+    line-height: 22px;
+    font-weight: 600;
+}
+
+.empty-text {
+    max-width: 22rem;
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 20px;
+    text-wrap: pretty;
+}
+
+.empty-state .empty-action {
+    width: auto;
+    margin-top: var(--space-1);
+    padding: 0 var(--space-6);
+}
+
+/* --- TitleCard: one sheet for a title (title-card.js) --- */
+
+.tc-head {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    padding-right: 40px;
+}
+
+.tc-poster {
+    flex: none;
+    width: 64px;
+    height: 96px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-tile);
+    background: var(--tile);
+    cursor: zoom-in;
+}
+
+.tc-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-tile);
+    object-fit: cover;
+}
+
+.tc-facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.tc-facts h2 {
+    margin: 0;
+    font-size: 19px;
+    line-height: 24px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.tc-facts p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 17px;
+    text-wrap: pretty;
+}
+
+.tc-rating {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.tc-rating .icon {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    color: var(--accent);
+    fill: var(--accent);
+}
+
+.tc-rating strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.tc-unrated .icon {
+    color: var(--text-faint);
+    fill: none;
+}
+
+.tc-date {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    border-radius: var(--radius-btn);
+    background: var(--surface-2);
+}
+
+.tc-date > .icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--text-dim);
+}
+
+.tc-date-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.tc-date-label {
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.tc-date-value {
+    font-size: 14px;
+    line-height: 19px;
+    font-weight: 500;
+}
+
+.tc-date-when {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-dim);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.tc-overview {
+    display: -webkit-box;
+    margin: var(--space-4) 0 0;
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 20px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+
+.tc-overview.is-open {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: none;
+    line-clamp: none;
+}
+
+.tc-more {
+    align-self: flex-start;
+    min-height: 44px;
+    margin: calc(var(--space-2) * -1) 0 0 -2px;
+    padding: 0 2px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.tc-more[hidden] {
+    display: none;
+}
+
+.tc-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 44px;
+    margin-top: var(--space-4);
+    padding: 0 var(--space-3);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-btn);
+    background: var(--surface-link);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.tc-more:not([hidden]) + .tc-link {
+    margin-top: var(--space-2);
+}
+
+.tc-link .kp-logo {
+    width: 20px;
+    height: 20px;
+    flex: none;
+}
+
+.tc-link span {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.tc-link .icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--text-dim);
+}
+
+.tc-notify {
+    min-width: 0;
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    border: none;
+}
+
+.tc-notify legend {
+    margin: 0 var(--space-1) var(--space-2);
+    padding: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+}
+
+.tc-radios {
+    display: flex;
+    flex-direction: column;
+    padding: 2px 0;
+    border-radius: 16px;
+    background: var(--surface-2);
+}
+
+.tc-radio {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    font-size: 15px;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+.tc-radio + .tc-radio::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 46px;
+    height: 1px;
+    background: var(--divider);
+}
+
+.tc-radio input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+}
+
+.tc-radio-mark {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-faint);
+    border-radius: 50%;
+}
+
+.tc-radio input:checked + .tc-radio-mark {
+    border-color: var(--text);
+    background: var(--text);
+}
+
+.tc-radio input:checked + .tc-radio-mark::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--bg);
+}
+
+.tc-radio input:focus-visible + .tc-radio-mark {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+.tc-notify:disabled .tc-radio {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.tc-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: var(--space-2) var(--space-1) 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    text-wrap: pretty;
+}
+
+.tc-hint .icon {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    margin-top: 1px;
+    color: var(--accent);
+}
+
+.tc-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+}
+
+.tc-actions .sheet-btn-primary,
+.tc-actions .sheet-btn-danger-soft,
+.tc-actions .sheet-btn-secondary {
+    margin-top: 0;
+}
+
+.tc-watch {
+    text-decoration: none;
+}
+
+.tc-watch .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.title-sheet .sheet-error {
+    margin: var(--space-3) 0 0;
+}
+
+[aria-busy='true'].sheet-btn-primary,
+[aria-busy='true'].sheet-btn-danger-soft,
+.follow-btn[aria-busy='true'] {
+    cursor: progress;
+}
+
+/* --- The poster, large (a tap anywhere, a swipe down or Esc closes it) --- */
+
+.modal.poster-modal {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    background: var(--scrim-strong);
+}
+
+.poster-view {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: calc(56px + env(safe-area-inset-top, 0px)) var(--space-4)
+        calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+    cursor: zoom-out;
+}
+
+.poster-view-img {
+    max-width: min(100%, 500px);
+    max-height: 100%;
+    border-radius: var(--radius-banner);
+    object-fit: contain;
+    box-shadow: var(--shadow-modal);
+}
+
+.poster-close {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    right: var(--space-2);
+}
+
+@media (min-width: 641px) {
+    .poster-view-img {
+        max-height: 80vh;
+    }
+}
+
+/* --- The search page --- */
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.search-field {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    height: 44px;
+    padding-left: var(--space-4);
+    border: 1px solid var(--divider);
+    border-radius: 22px;
+    background: var(--surface-1);
+}
+
+.search-field:has(input:focus-visible) {
+    border-color: var(--focus-ring);
+}
+
+.search-field > .icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--text-dim);
+}
+
+.search-field input {
+    flex: 1;
+    min-width: 0;
+    height: 42px;
+    padding: 0 var(--space-2);
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+}
+
+.search-field input::placeholder {
+    color: var(--text-dim);
+}
+
+/* Its own clear cross: 44 target, a small light circle */
+.search-clear {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--bg);
+    cursor: pointer;
+}
+
+.search-clear > span {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+}
+
+.search-clear .icon {
+    width: 12px;
+    height: 12px;
+    stroke-width: 3;
+}
+
+.search-clear[hidden] {
+    display: none;
+}
+
+#mine-results > .empty-state {
+    margin-top: 80px;
+}
+
+.group-row.search-row {
+    gap: var(--space-2);
+    padding-right: var(--space-2);
+    cursor: default;
+}
+
+.search-row .search-result-open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    min-height: 54px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.follow-btn {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 44px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.follow-btn > span {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 16px;
+    background: var(--surface-3);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.follow-btn:disabled > span {
+    opacity: 0.5;
+}
+
+.follow-btn:focus-visible {
+    outline: none;
+}
+
+.follow-btn:focus-visible > span {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+.search-following {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 0 var(--space-1);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.search-following .icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* --- SubTopBar pages (Account, its settings, Devices): their title level with the tabs' --- */
+
+@media (max-width: 1024px) {
+    .tab-top-row h1,
+    .app-page > .page-nav h1 {
+        font-size: 28px;
+        line-height: 34px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+    }
+}
+
+@media (max-width: 640px) {
+    .app-page > .page-nav {
+        margin-top: var(--space-6);
+    }
+}
+
+/* Both rows are 44px high from the same top now: the old lift would put these 3px higher */
+@media (min-width: 641px) {
+    .app-page {
+        margin-top: 0;
+    }
+}

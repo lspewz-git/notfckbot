@@ -19,7 +19,7 @@ test('native lazy loading loads visible posters and defers distant ones until sc
         })), films: []
     }) });
     await openSection(page, 'history');
-    const images = page.locator('#history-series .title-poster img');
+    const images = page.locator('#history-series img.title-thumb');
     await expect(images).toHaveCount(100);
     await expect.poll(() => images.first().evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
     expect(requested).toContain('/api/poster/w185/lazy0.png');
@@ -29,14 +29,29 @@ test('native lazy loading loads visible posters and defers distant ones until sc
     expect(requested).toContain('/api/poster/w185/lazy99.png');
 });
 
-test('account list posters are lazy while the opened card poster loads eagerly', async ({ page }) => {
-    const panel = await mockPanel(page, { role: 'user' });
+test('account list posters are lazy while the opened card poster loads at once; it opens large', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user', poster: true });
     panel.account.series[0].poster = '/poster.png';
     await openSection(page, 'my-subs');
-    const poster = page.locator('#my-subs-body .mine-row img').first();
+    const poster = page.locator('#my-subs-body button.title-row img').first();
     await expect(poster).toHaveAttribute('loading', 'lazy');
     await poster.click();
-    await expect(page.locator('#mine-card-modal img.mine-poster-big')).toHaveAttribute('loading', 'eager');
+    const cardPoster = page.locator('#mine-card-modal .tc-poster img');
+    expect(await cardPoster.getAttribute('loading')).toBeNull();
+    await expect(cardPoster).toHaveAttribute('src', '/api/poster/w185/poster.png');
+    // The poster viewer: the large size over the card, the cross and a tap anywhere close it
+    await page.locator('#mine-card-modal .tc-poster').click();
+    const viewer = page.locator('#poster-modal');
+    await expect(viewer).toBeVisible();
+    await expect(viewer.locator('.poster-view-img')).toHaveAttribute('alt', 'Poster: Одни из нас');
+    await expect.poll(() => viewer.locator('.poster-view-img').getAttribute('src')).toBe('/api/poster/w500/poster.png');
+    await page.keyboard.press('Escape');
+    await expect(viewer).toBeHidden();
+    await expect(page.locator('#mine-card-modal')).toBeVisible();
+    await page.locator('#mine-card-modal .tc-poster').click();
+    await viewer.locator('.poster-view').click({ position: { x: 10, y: 10 } });
+    await expect(viewer).toBeHidden();
+    await expect(page.locator('#mine-card-modal')).toBeVisible();
 });
 
 test('Released reuses the poster and shows every listed season premiere, including the previous December', async ({ page }) => {
@@ -52,20 +67,15 @@ test('Released reuses the poster and shows every listed season premiere, includi
     const row = page.locator('#history-series .history-item').first();
     const image = row.locator('img');
     await expect(image).toHaveAttribute('loading', 'lazy');
-    const title = row.locator('.link-text');
-    await title.focus();
-    expect(await title.evaluate(el => getComputedStyle(el).outlineStyle)).toBe('none');
-    await title.press('Enter');
-    await expect(page.locator('#detail-poster')).toHaveAttribute('loading', 'eager');
-    await expect(page.locator('#detail-poster')).toHaveAttribute('src', await image.getAttribute('src'));
-    await expect(page.locator('#detail-dates')).toContainText('Season 5 premiere');
-    await expect(page.locator('#detail-dates')).toContainText('20 Mar 2026');
-    await expect(page.locator('#detail-dates')).toContainText('Season 6 premiere');
-    await expect(page.locator('#detail-dates')).toContainText('15 Dec 2025');
-    await expect(page.locator('#detail-dates')).not.toContainText('2016');
-    await page.locator('#detail-modal [data-close="detail-modal"]').click();
-    await row.locator('.title-poster').click();
-    await expect(page.locator('#detail-dates')).toContainText('Season 6 premiere');
+    await row.locator('.history-open').press('Enter');
+    const card = page.locator('#released-modal');
+    await expect(card.locator('.tc-poster img')).toHaveAttribute('src', await image.getAttribute('src'));
+    const date = card.locator('.tc-date');
+    await expect(date).toContainText('Season 4 premiere');
+    await expect(date).toContainText('15 Dec 2025');
+    await expect(date).toContainText('Season 5: 20 Mar 2026');
+    await expect(date).toContainText('Season 6: 1 Jun 2026');
+    await expect(date).not.toContainText('2016');
 });
 
 test('Serials and Movies show clickable posters, round add controls and release dates', async ({ page }) => {
@@ -94,16 +104,16 @@ test('Serials and Movies show clickable posters, round add controls and release 
     }
 });
 
-test('Released is renamed everywhere and its posters open the title card', async ({ page }) => {
+test('Released is renamed everywhere and its rows open the title card', async ({ page }) => {
     await mockPanel(page, { poster: true });
     await openSection(page, 'history');
     await expect(page.locator('#history-section h1')).toHaveText('Released');
     await expect(page.locator('.nav-item[data-section="history"]')).toHaveAttribute('aria-label', 'Released');
     await expect(page.locator('#more-modal [data-section="history"]')).toContainText('Released');
-    const poster = page.locator('#history-series .title-poster').first();
-    await expect(poster.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
-    await poster.click();
-    await expect(page.locator('#detail-title')).toHaveText('Stranger Things');
+    const row = page.locator('#history-series .history-open').first();
+    await expect(row.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
+    await row.click();
+    await expect(page.locator('#released-title')).toHaveText('Stranger Things');
 });
 
 test('long descriptions expand, collapse and reset when another card opens, with text escaped', async ({ page }) => {

@@ -160,13 +160,13 @@ test('admin and user search popups have the same dialog geometry and close butto
     const measure = (selector) =>
         page.locator(selector).evaluate((el) => {
             const style = getComputedStyle(el);
-            const actions = getComputedStyle(el.querySelector('.modal-actions'));
+            const actions = getComputedStyle(el.querySelector('.tc-actions'));
             return {
                 width: style.width,
                 padding: style.padding,
                 gap: style.gap,
                 actionsMargin: actions.marginTop,
-                close: el.querySelector('.modal-x').innerHTML
+                close: el.querySelector('.sheet-close').innerHTML
             };
         });
     await mockPanel(page);
@@ -174,7 +174,7 @@ test('admin and user search popups have the same dialog geometry and close butto
     await result(page, 2).click();
     const admin = await measure('#content-card-modal .modal-content');
     await mockPanel(page, { role: 'user' });
-    await page.getByRole('button', { name: '+ Add' }).click();
+    await page.getByRole('link', { name: 'Follow a title' }).click();
     await page.locator('#mine-q').fill('дюна');
     await page.locator('#mine-q').press('Enter');
     await page.locator('#mine-results .search-result-open').first().click();
@@ -201,7 +201,7 @@ test('a search title opens a card; cancelling preserves the query and results', 
     await result(page, 0).click();
     await expect(card(page)).toBeVisible();
     await expect(card(page).locator('#content-card-title')).toContainText('film title');
-    await expect(card(page).locator('.mine-overview')).toHaveText('A search description.');
+    await expect(card(page).locator('.tc-overview')).toHaveText('A search description.');
     await expect(card(page).locator('.mine-modes')).toHaveCount(0);
     await card(page).getByRole('button', { name: 'Cancel' }).click();
     await expect(card(page)).toBeHidden();
@@ -229,23 +229,23 @@ test('rows fit the dialog and the keyboard opens the series mode card', async ({
     await result(page, 2).focus();
     await page.keyboard.press('Enter');
     await expect(card(page).locator('#confirm-add-content')).toBeInViewport({ ratio: 1 });
-    await card(page).getByLabel('Episode 1 and the whole season').check();
-    await card(page).getByRole('button', { name: 'Subscribe', exact: true }).click();
+    await card(page).getByText('Episode 1 and the whole season').click();
+    await card(page).getByRole('button', { name: 'Follow', exact: true }).click();
     await expect(card(page)).toBeHidden();
-    await expect(page.locator('#content-search-results li').nth(2).locator('.mine-chip')).toHaveText('Added');
+    await expect(page.locator('#content-search-results li').nth(2).locator('.search-following')).toHaveText('Following');
     expect(panel.lastAdd).toEqual({
         path: '/api/subscription',
         body: { chatId: '101', tmdbId: 903, notify_type: 'first_and_full' }
     });
     await result(page, 2).click();
-    await expect(card(page).getByRole('button', { name: 'Added', exact: true })).toBeDisabled();
+    await expect(card(page).getByRole('button', { name: 'Following', exact: true })).toBeDisabled();
 });
 
 test('a film adds directly from results and leaves the search open', async ({ page }) => {
     const panel = await mockPanel(page);
     await searchForAlice(page);
-    await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.locator('#content-search-results li').first().locator('.mine-chip')).toHaveText('Added');
+    await page.locator('#content-search-results li').first().getByRole('button', { name: /^Follow / }).click();
+    await expect(page.locator('#content-search-results li').first().locator('.search-following')).toHaveText('Following');
     await expect(card(page)).toBeHidden();
     await expect(page.locator('#add-content-modal')).toBeVisible();
     expect(panel.lastAdd).toMatchObject({ path: '/api/watchlist', body: { chatId: '101', tmdbId: 901 } });
@@ -264,7 +264,7 @@ test('a pending add cannot submit twice and an error keeps the card retryable', 
     await button.click({ force: true });
     release();
     await expect(button).toBeEnabled();
-    await expect(button).toHaveText('Add');
+    await expect(button).toHaveText('Follow');
     await expect(card(page)).toBeVisible();
     expect(panel.added).toBe(1);
 });
@@ -274,12 +274,12 @@ test('a card opened during a quick film add closes when that add succeeds', asyn
     const addHold = new Promise((r) => (release = r));
     const panel = await mockPanel(page, { addHold });
     await searchForAlice(page);
-    await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
+    await page.locator('#content-search-results li').first().getByRole('button', { name: /^Follow / }).click();
     await result(page, 0).click();
     await expect(card(page)).toBeVisible();
     release();
     await expect(card(page)).toBeHidden();
-    await expect(page.locator('#content-search-results li').first().locator('.mine-chip')).toHaveText('Added');
+    await expect(page.locator('#content-search-results li').first().locator('.search-following')).toHaveText('Following');
     expect(panel.added).toBe(1);
 });
 
@@ -295,9 +295,9 @@ test('existing subscriptions and waiting films are marked before any add', async
         })
     );
     await searchForAlice(page);
-    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(2);
+    await expect(page.locator('#content-search-results .search-following')).toHaveCount(2);
     await expect(
-        page.locator('#content-search-results li').nth(1).getByRole('button', { name: 'Add', exact: true })
+        page.locator('#content-search-results li').nth(1).getByRole('button', { name: /^Follow / })
     ).toBeVisible();
 });
 
@@ -308,7 +308,7 @@ test('an old add cannot close a new card for another chat', async ({ page }) => 
     await searchForAlice(page);
     await result(page, 0).click();
     await card(page).locator('#confirm-add-content').click();
-    await card(page).locator('.modal-x').click();
+    await card(page).locator('.sheet-close').click();
     await expect(page.locator('dialog[open]')).toHaveCount(0);
     await page.locator('[data-action="chat-actions"][data-id="102"]').click();
     await page.locator('#action-add').click();
@@ -322,7 +322,7 @@ test('an old add cannot close a new card for another chat', async ({ page }) => 
     await expect(card(page).locator('#content-card-title')).toContainText('series title');
     await card(page).getByRole('button', { name: 'Cancel' }).click();
     await expect(page.locator('#add-content-modal')).toBeVisible();
-    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(0);
+    await expect(page.locator('#content-search-results .search-following')).toHaveCount(0);
 });
 
 test('Serials filters results and requires the chat to be chosen explicitly', async ({ page }) => {
@@ -356,11 +356,11 @@ test('Movies filters films and Added belongs only to the selected chat', async (
     await page.locator('#content-search-input').fill('long title');
     await page.locator('#content-search-input').press('Enter');
     await expect(page.locator('#content-search-results li')).toHaveCount(4);
-    await page.locator('#content-search-results li').first().getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(1);
+    await page.locator('#content-search-results li').first().getByRole('button', { name: /^Follow / }).click();
+    await expect(page.locator('#content-search-results .search-following')).toHaveCount(1);
     await trigger.click();
     await page.locator('#pick-list .pick-row', { hasText: 'bob' }).click();
-    await expect(page.locator('#content-search-results .mine-chip')).toHaveCount(0);
+    await expect(page.locator('#content-search-results .search-following')).toHaveCount(0);
     expect(panel.lastAdd.body.chatId).toBe('101');
 });
 

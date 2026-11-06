@@ -128,8 +128,14 @@ function accountState(options) {
             options.devices ||
             [
                 { id: 'a'.repeat(24), name: 'Chrome, Windows', country: 'RU', network: 'Beeline', current: true },
-                { id: 'b'.repeat(24), name: 'Safari, iPhone', country: 'RU', network: 'MTS' },
-                { id: 'c'.repeat(24), name: 'Telegram, iPhone', country: 'RU', network: 'MTS' }
+                { id: 'b'.repeat(24), name: 'Safari, iPhone', country: 'RU', network: 'MTS', ip: '203.0.113.24' },
+                {
+                    id: 'c'.repeat(24),
+                    name: 'Telegram, iPhone',
+                    country: 'RU',
+                    network: 'MTS',
+                    ip: '2a00:1fa0:4c2b:7d10:9f3e:21ab:cd34:5e6f'
+                }
             ].map((d) => ({ current: false, seenAt: new Date(Date.now() - 2 * 3600_000).toISOString(), ...d })),
         chats: [
             { id: '42', type: 'private', title: 'My account', settings: true },
@@ -166,7 +172,16 @@ const bodyOf = (req) => {
 };
 
 const SEARCH = [
-    { tmdbId: 'tv_500', kind: 'tv', title: 'Дюна: Пророчество', year: '2024', poster: null, added: false },
+    {
+        tmdbId: 'tv_500',
+        kind: 'tv',
+        title: 'Дюна: Пророчество',
+        year: '2024',
+        poster: null,
+        rating: 7.1,
+        overview: 'The Sisterhood begins.',
+        added: false
+    },
     { tmdbId: 'movie_7', kind: 'movie', title: 'Дюна: Часть третья', year: '2026', poster: null, added: true },
     { tmdbId: 'movie_8', kind: 'movie', title: 'Дюна', year: '2021', poster: null, released: true, added: false }
 ];
@@ -202,9 +217,13 @@ const CALENDAR = {
             name: 'Feel Her Love',
             overview: 'Ellie and Dina head out.',
             rating: 8.7,
+            seasons: 2,
             mode: 'episode',
             poster: '/p1.jpg',
-            kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/'
+            kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/',
+            links: [{ kind: 'watch', label: 'Watch on SSPoisk', url: 'https://sspoisk.ru/series/1/' }],
+            // The bot writes the next morning (src/account/notify-day.js)
+            notifyOn: '2026-11-05'
         },
         {
             date: '2026-11-03',
@@ -225,7 +244,8 @@ const CALENDAR = {
             overview: 'A journey across the desert. '.repeat(18),
             rating: 7.4,
             poster: null,
-            kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=x'
+            kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=x',
+            notifyOn: '2026-11-06'
         },
         {
             date: '2027-01-15',

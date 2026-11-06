@@ -54,6 +54,7 @@ import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions } from './pick-sheet.js';
 import { profileActions, setupProfile } from './profile.js';
+import { titleCardActions, setupPosterViewer } from './title-card.js';
 import { deviceActions } from './devices.js';
 import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
@@ -70,10 +71,10 @@ let activeSection = 'dashboard';
 // The open section sets the view; each view reopens on the section it was left on
 const viewOf = (id) => (id.startsWith('my-') && !document.body.classList.contains('system-account') ? 'mine' : 'admin');
 const lastSection = { admin: 'dashboard', mine: 'my-subs' };
-// Opened from the profile menu, not tabs of their own: a view never reopens on them
-const ACCOUNT_PAGES = ['my-account', 'my-settings', 'my-devices'];
-// The local account has profile settings, but no Telegram chat pages
-const SYSTEM_PAGES = ['my-account', 'my-devices'];
+// Opened from the Account tab, not tabs of their own: a view never reopens on them
+const ACCOUNT_PAGES = ['my-account', 'my-settings', 'my-devices', 'my-search'];
+// The local account has its Account page and profile settings, but no Telegram chat pages
+const SYSTEM_PAGES = ['my-profile', 'my-account', 'my-devices'];
 
 function switchSection(id) {
     // Leaving Settings with changes not saved: ask, rather than lose them silently
@@ -214,6 +215,7 @@ const CLICK_ACTIONS = {
     ...chatPickerActions,
     ...profileActions,
     ...deviceActions,
+    ...titleCardActions,
     ...sessionActions(afterSignIn),
     'chart-subs': (el) => setSubsChart(el.dataset.by),
     'sends-recent': () => openRecentSends(),
@@ -251,7 +253,10 @@ function setupDelegation() {
         if (filmsTab) setTableTab('films', filmsTab);
         if (chatsTab) setTableTab('chats', chatsTab);
         if (section) switchSection(section);
-        if (close && !(el.classList.contains('modal-x') && dismissChatModals())) closeModal(close);
+        // A dialog's cross (a sheet's too, not the poster's) ends the whole chat action flow
+        const cross =
+            el.classList.contains('modal-x') || (el.classList.contains('sheet-close') && close !== 'poster-modal');
+        if (close && !(cross && dismissChatModals())) closeModal(close);
         if (closeReturn) closeModalReturning(closeReturn);
         // After any close, so a menu row can swap its sheet for the dialog it names
         if (open) openModal(open);
@@ -357,7 +362,7 @@ async function init() {
     setupProxyForm();
     setupAccount();
     setupProfile();
-    document.addEventListener('profile-chat-selected', () => switchSection(lastSection.mine));
+    setupPosterViewer();
     setupPassword();
     watchSession();
     enhanceSelects();

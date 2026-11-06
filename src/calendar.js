@@ -236,6 +236,8 @@ async function seriesEpisodes(series, from, to) {
                 episode: ep.episode_number,
                 note: NOTES[mark],
                 mark,
+                // The season's final episode, also when it is its only one (the calendar's bell)
+                last: Boolean(total && ep.episode_number === total),
                 name: names.get(ep.episode_number) || '',
                 overview: ep.overview || '',
                 genres: series.genres,

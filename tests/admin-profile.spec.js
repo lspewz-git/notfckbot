@@ -1,14 +1,17 @@
 const { test, expect } = require('@playwright/test');
-const { watchConsole, openSection, profileButton, isNarrow } = require('./helpers');
+const { watchConsole, openSection, isNarrow } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 // The final logout can race an in-flight authenticated refresh, which correctly receives 401; the
 // chats test makes Telegram fail with 503, the Devices tests refuse a sign-out (403).
 watchConsole({ ignore: /status of (401|403|404|503)/ });
 
-const adminProfile = (page) => page.locator('.section.active [data-admin-profile] button');
+// Every admin header's chip: a link to the Account tab (redesign v2)
+const adminProfile = (page) => page.locator('.section.active [data-admin-profile] a');
 
-test('every admin section has a profile instead of the rail view picker and sign out', async ({ page }) => {
+test('every admin section has a profile chip to the Account tab instead of the rail view picker and sign out', async ({
+    page
+}) => {
     await mockPanel(page);
     await expect(page.locator('.view-switch, .sidebar [data-action="logout"]')).toHaveCount(0);
     for (const section of ['dashboard', 'chats', 'subs', 'watchlist', 'history', 'recap', 'logs', 'settings']) {
@@ -20,40 +23,42 @@ test('every admin section has a profile instead of the rail view picker and sign
             return box.left >= 0 && box.right <= innerWidth;
         });
         expect(fits).toBe(true);
-        await chip.click();
-        await expect(page.locator('#profile-modal [data-action="logout"]')).toBeVisible();
-        await expect(page.locator('#profile-modal [data-action="view-mine"]')).toBeVisible();
-        await expect(page.locator('#profile-modal [data-action="view-admin"]')).toHaveCount(0);
-        await page.keyboard.press('Escape');
+        await expect(chip).toHaveAttribute('href', '#my-profile');
     }
+    await adminProfile(page).click();
+    await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-profile-body [data-action="profile-signout"]')).toBeVisible();
+    await expect(page.locator('#my-profile-body [data-action="view-admin"]')).toBeVisible();
 });
 
-test('admin profile chat selection opens personal pages and returns to the previous admin section', async ({
+test('the Account tab picks a chat for the personal pages and Admin panel returns to the previous admin section', async ({
     page
 }) => {
     await mockPanel(page);
     await openSection(page, 'logs');
     await adminProfile(page).click();
-    await page.locator('#profile-modal .pick-row', { hasText: 'Киноклуб' }).click();
-    await expect(page.locator('#my-subs-section')).toBeVisible();
-    await expect(page.locator('#my-subs-body .mine-row')).not.toHaveCount(0);
-    await profileButton(page, 'my-subs').click();
-    await page.locator('#profile-modal [data-action="view-admin"]').click();
+    await page.locator('#my-profile-body .chat-row', { hasText: 'Киноклуб' }).click();
+    await expect(page.locator('#my-profile-body .chat-row', { hasText: 'Киноклуб' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+    );
+    await page.locator('#my-profile-body [data-action="view-admin"]').click();
     await expect(page.locator('#logs-section')).toBeVisible();
     await adminProfile(page).click();
-    await page.locator('#profile-modal [data-section="my-account"]').click();
+    await page.locator('#my-profile-body [data-section="my-account"]').last().click();
     await expect(page.locator('#my-account-section')).toBeVisible();
     await page.locator('#my-account-section .mine-back').click();
-    await expect(page.locator('#logs-section')).toBeVisible();
+    await expect(page.locator('#my-profile-section')).toBeVisible();
 });
 
 test('local admin has profile settings, password and devices, without Telegram choices', async ({ page }) => {
     const panel = await mockPanel(page, { system: true });
     await adminProfile(page).click();
-    await expect(page.locator('.profile-head')).toContainText('admin');
-    await expect(page.locator('.profile-head')).toContainText('Local account');
-    await expect(page.locator('#profile-modal .pick-row, #profile-modal [data-action="view-mine"]')).toHaveCount(0);
-    await page.locator('#profile-modal [data-section="my-account"]').click();
+    const body = page.locator('#my-profile-body');
+    await expect(body.locator('.profile-card')).toContainText('admin');
+    await expect(body.locator('.profile-card')).toContainText('Local account');
+    await expect(body.locator('.chat-row, [data-section="my-settings"]')).toHaveCount(0);
+    await body.locator('[data-section="my-account"]').last().click();
     await expect(page.locator('#my-account-info')).toContainText('Local account');
     await expect(page.locator('#my-account-info')).not.toContainText('Telegram');
     await page.locator('#my-signin [data-action="access-system-password"]').click();
@@ -76,9 +81,9 @@ test('local admin has profile settings, password and devices, without Telegram c
     await expect(page.locator('#my-account-section .page-back')).toBeVisible();
     await expect(page.locator('#my-account-section [data-admin-profile]')).toHaveCount(0);
     await page.locator('#my-account-section .mine-back').click();
-    await expect(page.locator('#dashboard-section')).toBeVisible();
-    await adminProfile(page).click();
-    await page.locator('#profile-modal [data-action="logout"]').click();
+    await expect(page.locator('#my-profile-section')).toBeVisible();
+    await body.getByRole('button', { name: 'Sign out' }).click();
+    await page.locator('#modal-confirm-btn').click();
     await expect(page.locator('#login-gate')).toBeVisible();
     expect(panel.account.sent.some((r) => r.path === '/api/account/chats')).toBe(false);
 });
@@ -110,7 +115,7 @@ const DEVICES = [
 /** Account settings → the Devices row → its page */
 async function openDevices(page) {
     await adminProfile(page).click();
-    await page.locator('#profile-modal [data-section="my-account"]').click();
+    await page.locator('#my-profile-body [data-section="my-account"]').last().click();
     const entry = page.locator('#my-devices [data-action="devices-open"]');
     await expect(entry).toContainText('6 active');
     // The group isn't clipped: the keyboard ring is drawn whole (redesign handoff)
@@ -326,7 +331,7 @@ test('Devices: Sign out of other sessions asks first, then leaves the empty stat
 test('Devices: a failed load says so and Try again loads it', async ({ page }) => {
     await mockPanel(page, { devices: DEVICES, devicesFails: [503, 503] });
     await adminProfile(page).click();
-    await page.locator('#profile-modal [data-section="my-account"]').click();
+    await page.locator('#my-profile-body [data-section="my-account"]').last().click();
     await page.locator('#my-devices [data-action="devices-open"]').click();
     const body = page.locator('#devices-body');
     await expect(body.locator('[role="alert"]')).toContainText('Devices failed (503)');
@@ -385,47 +390,45 @@ test('the phone tab bar floats as a capsule and the page ends above it', async (
     expect(gap).toBeGreaterThanOrEqual(24);
 });
 
-test('the open profile menu draws the chats in when they arrive, from same-size skeleton rows', async ({ page }) => {
+test('the Account tab draws the chats in when they arrive, from same-size skeleton rows', async ({ page }) => {
     let finish;
     const chatsWait = new Promise((resolve) => {
         finish = resolve;
     });
     await mockPanel(page, { chatsWait });
     await adminProfile(page).click();
-    const menu = page.locator('#profile-modal');
-    const skeletons = menu.locator('.pick-row.profile-skeleton');
+    const body = page.locator('#my-profile-body');
+    const skeletons = body.locator('.chat-row[aria-hidden="true"]');
     await expect(skeletons).toHaveCount(2);
-    await expect(menu.locator('.profile-skeleton')).toHaveCount(3);
-    await expect(menu.locator('[data-action="profile-chat"]')).toHaveCount(0);
+    await expect(body.locator('[data-action="profile-chat"]')).toHaveCount(0);
     const skeletonHeight = await skeletons.first().evaluate((el) => el.getBoundingClientRect().height);
     finish();
-    // No reopening: the chats and Chat settings appear in the menu that is already open
-    await expect(menu.locator('[data-action="profile-chat"]').first()).toBeVisible();
-    await expect(menu.locator('[data-section="my-settings"]')).toBeVisible();
-    await expect(menu.locator('.profile-skeleton')).toHaveCount(0);
-    const rowHeight = await menu
+    await expect(body.locator('[data-action="profile-chat"]').first()).toBeVisible();
+    await expect(body.locator('[data-section="my-settings"]')).toBeVisible();
+    await expect(skeletons).toHaveCount(0);
+    const rowHeight = await body
         .locator('[data-action="profile-chat"]')
         .first()
         .evaluate((el) => el.getBoundingClientRect().height);
     expect(Math.abs(rowHeight - skeletonHeight)).toBeLessThan(1);
 });
 
-test('chats failing while the profile menu is open show a retry that loads them', async ({ page }) => {
+test('chats failing on the Account tab show a retry that loads them', async ({ page }) => {
     let finish;
     const chatsWait = new Promise((resolve) => {
         finish = resolve;
     });
     const panel = await mockPanel(page, { chatsWait, chatsDown: true });
     await adminProfile(page).click();
-    const menu = page.locator('#profile-modal');
-    await expect(menu.locator('.profile-skeleton').first()).toBeVisible();
+    const body = page.locator('#my-profile-body');
+    await expect(body.locator('.chat-row[aria-hidden="true"]').first()).toBeVisible();
     finish();
-    const retry = menu.locator('[data-action="mine-reload"]');
+    const retry = body.locator('[data-action="mine-reload"]');
     await expect(retry).toContainText("Couldn't load chats");
-    await expect(menu.locator('.profile-skeleton')).toHaveCount(0);
+    await expect(body.locator('.chat-row[aria-hidden="true"]')).toHaveCount(0);
     panel.account.chatsDown = false;
     await retry.click();
-    await expect(menu.locator('[data-action="profile-chat"]').first()).toBeVisible();
+    await expect(body.locator('[data-action="profile-chat"]').first()).toBeVisible();
     await expect(retry).toHaveCount(0);
 });
 
@@ -450,7 +453,7 @@ test('Chat settings, Account settings and Devices titles sit level with Followin
         });
     };
     const following = await measure('my-subs');
-    for (const id of ['my-settings', 'my-account', 'my-devices']) {
+    for (const id of ['my-profile', 'my-settings', 'my-account', 'my-devices']) {
         const page_ = await measure(id);
         expect(Math.abs(page_.centre - following.centre), id).toBeLessThanOrEqual(1);
         expect(page_.gap, id).toBe(16);

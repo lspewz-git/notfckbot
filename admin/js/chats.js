@@ -254,7 +254,7 @@ let pickedChatId = '';
 
 const SEARCH_PLACEHOLDER = { tv: 'Search serials...', movie: 'Search movies...' };
 
-const addLabel = (item) => (item.kind === 'tv' ? 'Subscribe' : item.released ? 'Add' : 'Wait for it');
+const addLabel = () => 'Follow';
 
 /** The dialog's state for a fresh opening; `kind` and `heading` set what it searches and says. */
 function resetAddContent(kind, heading, target) {
@@ -445,7 +445,7 @@ export async function submitAddContent() {
     let ok;
     try {
         ok = await mutate(isTv ? '/subscription' : '/watchlist', { method: 'POST', body }, (res) => {
-            if (isTv) return res.created === false ? 'Subscription already exists; mode updated' : 'Subscribed';
+            if (isTv) return res.created === false ? 'Already following; mode updated' : 'Following';
             return res.isReleased
                 ? 'The film is already out: added to the released ones'
                 : 'The bot writes when the film is out';
@@ -455,7 +455,7 @@ export async function submitAddContent() {
         if (button) {
             button.disabled = false;
             button.removeAttribute('aria-busy');
-            button.textContent = addLabel(item);
+            button.textContent = addLabel();
         }
     }
     if (ok && session === dialogSession) {

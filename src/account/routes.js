@@ -24,6 +24,7 @@ const { log } = require('../log');
 const QRCode = require('qrcode');
 const { confirmation } = require('./confirmation');
 const { lruCache } = require('../lru');
+const { notifyDays } = require('./notify-day');
 const confirmationCooldown = lruCache({ max: 2000, ttl: 60000 });
 
 /** A refusal from src/chat-ops.js with its own status; anything else is a 500 without details. */
@@ -436,7 +437,11 @@ const knownTitleId = (tmdbId) => {
 const titleMetadata = (tmdbId) => {
     const [kind, id] = String(tmdbId).split('_');
     const details = tmdb.peekDetails(id, kind);
-    return { overview: details?.overview || '', rating: details?.vote_average || null };
+    return {
+        overview: details?.overview || '',
+        rating: details?.vote_average || null,
+        seasons: kind === 'tv' ? details?.number_of_seasons || null : null
+    };
 };
 
 router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
@@ -564,6 +569,7 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
                     year: date.slice(0, 4) || null,
                     poster: r.poster_path || null,
                     overview: r.overview || '',
+                    rating: r.vote_average || null,
                     released:
                         r.media_type === 'movie' && Boolean(date) && date <= new Date().toISOString().slice(0, 10),
                     added: have.has(id)
@@ -608,9 +614,10 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
         const p = listPeriod(chat.timezone);
         const { items, failed } = await periodItems(req.chatId, p.from, p.to);
+        const bells = notifyDays(items, chat);
         res.json({
             ...p,
-            items: items.map((i) => {
+            items: items.map((i, index) => {
                 const metadata = titleMetadata(i.tmdbId);
                 return {
                     date: i.date,
@@ -626,8 +633,12 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
                     ...(i.kind === 'tv' ? { season: i.season, episode: i.episode, mark: i.mark, name: i.name } : {}),
                     overview: i.overview || metadata.overview,
                     rating: metadata.rating,
+                    seasons: metadata.seasons,
                     poster: posterPath(i.poster),
-                    kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie')
+                    kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie'),
+                    links: linksOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie'),
+                    // The chat's day the bot writes about this row (the bell), null when its mode stays silent
+                    notifyOn: bells[index]
                 };
             }),
             failed

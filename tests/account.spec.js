@@ -69,33 +69,25 @@ test('a Mini App opened from a group hidden in the menu still opens that group',
     await mockPanel(page, { path, signedOut: true, role: 'user', miniAppChat: '-100', groupHidden: true });
     await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
     await profileButton(page, 'my-subs').click();
-    await expect(page.locator('#profile-modal .pick-row.selected')).toContainText('Киноклуб');
+    await expect(page.locator('#pick-modal .pick-row.selected')).toContainText('Киноклуб');
 });
 
-test('each account page says whether it shows the personal account or a group, and the tab names the group', async ({
-    page
-}) => {
+test('the chat chip names the open chat on every tab; the Account tab shows its avatar', async ({ page }) => {
     await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    const line = page.locator('#my-subs-section [data-chat-context]');
-    await expect(line).toHaveText('Your personal account');
-    await expect(line).not.toHaveClass(/is-group/);
-    await expect(line.locator('button, a')).toHaveCount(0);
-    await expect(page.locator('[data-tab-label]')).toHaveText('Account');
+    await expect(profileButton(page, 'my-subs')).toContainText('My account');
+    await expect(page.locator('[data-chat-context]')).toHaveCount(0);
+    await expect(page.locator('.tab-profile-label')).toHaveText('Account');
     await pickChat(page, 'my-subs', 'Киноклуб');
-    await expect(line).toHaveText('Group Киноклуб · shared with everyone in it');
-    await expect(line).toHaveClass(/is-group/);
-    for (const id of ['my-aired', 'my-calendar'])
-        await expect(page.locator(`#${id}-section [data-chat-context]`)).toHaveText(/Group Киноклуб/);
+    for (const id of ['my-subs', 'my-aired', 'my-calendar'])
+        await expect(profileButton(page, id)).toContainText('Киноклуб');
     // Chat settings names the chat on its card instead
     await openMine(page, 'my-settings');
     await expect(page.locator('#my-settings-body .chat-card .card-name')).toHaveText('Киноклуб');
-    await openMine(page, 'my-subs');
-    await expect(page.locator('[data-tab-label]')).toHaveText('Киноклуб');
+    await expect(page.locator('.tab-profile-label')).toHaveText('Account');
     await expect(page.locator('[data-tab-chat-avatar]')).toHaveText('К');
     if (isNarrow(page)) {
         await expect(page.locator('.tab-profile [data-profile-avatar]')).toBeHidden();
         await expect(page.locator('[data-tab-chat-avatar]')).toBeVisible();
-        await expect(page.locator('#my-subs-section .mine-chat')).toBeHidden();
     }
 });
 
@@ -235,15 +227,12 @@ async function openMine(page, section, { admin = false } = {}) {
         await openMine(page, 'my-subs', { admin });
         return openProfilePage(page, section);
     }
-    if (admin) {
-        await page.locator('.section.active [data-admin-profile] button').click();
-        await page.locator('#profile-modal [data-action="view-mine"]').click();
-    }
+    // An admin reaches the personal tabs through the Account tab (their headers' chip)
+    if (admin) await page.locator('.section.active [data-admin-profile] a').click();
     if (!isNarrow(page)) {
         return page.locator(`.nav-item[data-section="${section}"]`).click();
     }
-    if (!admin) return page.locator(`.tab-item[data-section="${section}"]`).click();
-    if (section !== 'my-subs') await page.locator(`.tab-item[data-section="${section}"]`).click();
+    return page.locator(`.tab-item[data-section="${section}"]`).click();
 }
 
 for (const options of [{ signedOut: true }, { role: 'user' }, {}]) {
@@ -519,10 +508,8 @@ test('a user sees only their own sections, and the panel asks for nothing else',
     const panel = await mockPanel(page, { role: 'user' });
     await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
     const nav = isNarrow(page) ? '.tabbar .tab-item' : '.rail-nav .nav-item';
-    expect(await visibleNav(page, nav)).toEqual(
-        isNarrow(page) ? ['my-aired', 'my-subs', 'my-calendar', 'profile-open'] : ['my-aired', 'my-subs', 'my-calendar']
-    );
-    await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
+    expect(await visibleNav(page, nav)).toEqual(['my-calendar', 'my-aired', 'my-subs', 'my-profile']);
+    await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(2);
     // No admin request was made for a user (they would all be refused)
     expect(panel.account.sent.every((r) => r.path.startsWith('/api/account/'))).toBe(true);
 });
@@ -532,7 +519,7 @@ test('an admin has the whole panel and their own chats too', async ({ page }) =>
     await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
     await openMine(page, 'my-calendar', { admin: true });
     await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
-    await expect(page.locator('.mine-cal-row')).toHaveCount(2);
+    await expect(page.locator('button.cal-row')).toHaveCount(2);
 });
 
 test("an admin's two views: the admin panel and My account, each with only its own sections", async ({ page }) => {
@@ -543,15 +530,11 @@ test("an admin's two views: the admin panel and My account, each with only its o
 
     await openMine(page, 'my-calendar', { admin: true });
     await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
-    const mine = isNarrow(page)
-        ? ['my-aired', 'my-subs', 'my-calendar', 'profile-open']
-        : ['my-aired', 'my-subs', 'my-calendar'];
-    expect(await visibleNav(page, isNarrow(page) ? nav : '.rail-nav .nav-item')).toEqual(mine);
+    expect(await visibleNav(page, nav)).toEqual(['my-calendar', 'my-aired', 'my-subs', 'my-profile']);
 
-    // Return through the shared profile to the remembered admin section.
-    await profileButton(page, 'my-calendar').click();
-    await page.locator('#profile-modal [data-action="view-admin"]').click();
-    await expect(page.locator('#profile-modal')).toBeHidden();
+    // Back through the Account tab's Admin panel row to the remembered admin section
+    await openProfilePage(page, 'my-profile');
+    await page.locator('#my-profile-body [data-action="view-admin"]').click();
     await expect(page.locator('#dashboard-section')).toHaveClass(/active/);
     expect(await visibleNav(page, nav)).not.toContain('my-calendar');
 });
@@ -568,20 +551,20 @@ test("on an admin's phone navigation appears once, with Account at the right edg
     await mockPanel(page);
     await openMine(page, 'my-calendar', { admin: true });
     await expect(page.locator('.mine-switch')).toHaveCount(0);
-    await expect(page.locator('#my-calendar-section .mine-chat')).toBeHidden();
     const tabs = page.locator('.tabbar .tab-item:visible');
     await expect(tabs).toHaveCount(4);
-    await expect(tabs.first()).toHaveText('Released');
-    await expect(tabs.last()).toHaveAttribute('data-action', 'profile-open');
+    await expect(tabs.first()).toHaveText('Calendar');
+    await expect(tabs.last()).toHaveAttribute('data-section', 'my-profile');
 });
 
 test('subscriptions: running series, films and finished ones in their tabs', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
-    const rows = page.locator('#my-subs-body .mine-row');
+    const rows = page.locator('#my-subs-body button.title-row');
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText('Одни из нас');
     await expect(rows.first()).toContainText('S2E5');
-    await expect(rows.first().locator('.mine-chip')).toHaveText('Every episode');
+    await expect(rows.first().locator('.row-badge')).toHaveText('Every episode');
+    await expect(page.locator('[data-action="mine-subs-tab"]')).toHaveText(['Series2', 'Films1', 'Ended1']);
     await page.locator('[data-action="mine-subs-tab"][data-tab="films"]').click();
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText('Дюна');
@@ -591,73 +574,71 @@ test('subscriptions: running series, films and finished ones in their tabs', asy
 
 test('a series card changes the mode and unsubscribes after a confirmation', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    await page.locator('#my-subs-body .mine-row', { hasText: 'Одни из нас' }).click();
+    await page.locator('#my-subs-body button.title-row', { hasText: 'Одни из нас' }).click();
     const card = page.locator('#mine-card-modal');
     await expect(card).toBeVisible();
-    await card.getByLabel('When the whole season is out').check();
+    await card.getByText('When the whole season is out').click();
     await expect(page.locator('.toast').last()).toHaveText('Notifications changed');
     expect(
         panel.account.sent.find((r) => r.method === 'POST' && r.path === '/api/account/chats/42/series').body
     ).toEqual({ tmdbId: 'tv_100', mode: 'season' });
     await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
-    await card.getByRole('button', { name: 'Yes, unfollow' }).click();
+    await page.locator('#confirm-modal').getByRole('button', { name: 'Unfollow', exact: true }).click();
     await expect(card).toBeHidden();
-    await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(1);
+    await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(1);
 });
 
-test('a card closes with the cross in its corner; its buttons are one height; Kinopoisk has its logo', async ({
-    page
-}) => {
+test('a card is a sheet: a cross in its corner, buttons one height, Kinopoisk with its logo', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
-    await page.locator('#my-subs-body .mine-row', { hasText: 'Одни из нас' }).click();
+    await page.locator('#my-subs-body button.title-row', { hasText: 'Одни из нас' }).click();
     const card = page.locator('#mine-card-modal');
     await expect(card).toBeVisible();
-    await expect(card.getByRole('button', { name: 'Close', exact: true })).toHaveClass(/modal-x/);
-    await expect(card.locator('.modal-actions')).toHaveCount(0);
-    const kp = card.getByRole('link', { name: 'Kinopoisk' });
+    await expect(card).toHaveClass(/app-sheet/);
+    const close = card.getByRole('button', { name: 'Close', exact: true });
+    await expect(close).toHaveClass(/sheet-close/);
+    const kp = card.getByRole('link', { name: 'Open on Kinopoisk' });
     await expect(kp.locator('.kp-logo use')).toHaveAttribute('href', '#kp-logo-symbol');
     const heights = await card
-        .locator('.mine-links .btn, [data-action="mine-ask-unfollow"]')
+        .locator('.tc-actions > *')
         .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
-    expect(heights).toHaveLength(2);
-    // The dialog may still be scaling in: equal up to a fraction of a pixel
-    expect(Math.abs(heights[0] - heights[1])).toBeLessThan(0.5);
-    const box = await card.locator('.modal-x').boundingBox();
+    expect(heights.length).toBeGreaterThanOrEqual(1);
+    for (const h of heights) expect(Math.abs(h - 44)).toBeLessThan(0.5);
+    const box = await close.boundingBox();
     const content = await card.locator('.modal-content').boundingBox();
     expect(box.y - content.y).toBeLessThan(20);
     expect(content.x + content.width - (box.x + box.width)).toBeLessThan(20);
-    await card.locator('.modal-x').click();
+    await close.click();
     await expect(card).toBeHidden();
 });
 
 test('search: a series asks for the mode, a film is added at once, what is on the list is marked', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    await page.getByRole('button', { name: '+ Add' }).click();
+    await page.getByRole('link', { name: 'Follow a title' }).click();
     await page.locator('#mine-q').fill('дюна');
     await page.locator('#mine-q').press('Enter');
-    const results = page.locator('#mine-results .mine-row');
+    const results = page.locator('#mine-results .search-row');
     await expect(results).toHaveCount(3);
-    await expect(results.nth(1).locator('.mine-chip')).toHaveText('Added');
+    await expect(results.nth(1).locator('.search-following')).toHaveText('Following');
 
-    await results.nth(0).getByRole('button', { name: 'Subscribe' }).click();
-    await page.locator('#mine-card-modal').getByLabel('Episode 1 and the whole season').check();
-    await page.locator('#mine-card-modal').getByRole('button', { name: 'Subscribe' }).click();
-    await expect(results.nth(0).locator('.mine-chip')).toHaveText('Added');
+    await results.nth(0).getByRole('button', { name: /^Follow / }).click();
+    await page.locator('#mine-card-modal').getByText('Episode 1 and the whole season').click();
+    await page.locator('#mine-card-modal').getByRole('button', { name: 'Follow', exact: true }).click();
+    await expect(results.nth(0).locator('.search-following')).toHaveText('Following');
     expect(panel.account.sent.find((r) => r.path === '/api/account/chats/42/series').body).toEqual({
         tmdbId: 'tv_500',
         mode: 'first_and_full'
     });
 
-    await results.nth(2).getByRole('button', { name: 'Add' }).click();
-    await expect(results.nth(2).locator('.mine-chip')).toHaveText('Added');
+    await results.nth(2).getByRole('button', { name: /^Follow / }).click();
+    await expect(results.nth(2).locator('.search-following')).toHaveText('Following');
     expect(panel.account.sent.find((r) => r.path === '/api/account/chats/42/films').body).toEqual({
         tmdbId: 'movie_8'
     });
 });
 
-test('search titles open the shared series and film cards without adding anything', async ({ page }) => {
+test('search titles open the shared title card without adding anything', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    await page.getByRole('button', { name: '+ Add' }).click();
+    await page.getByRole('link', { name: 'Follow a title' }).click();
     await page.locator('#mine-q').fill('дюна');
     await page.locator('#mine-q').press('Enter');
     const rows = page.locator('#mine-results .search-result-open');
@@ -669,9 +650,11 @@ test('search titles open the shared series and film cards without adding anythin
     await expect(page.locator('#mine-card-title')).toHaveText('Дюна');
     await expect(page.locator('#mine-card-modal .mine-modes')).toHaveCount(0);
     expect(panel.account.sent.filter((r) => r.method === 'POST' && r.path !== '/api/account/activity')).toHaveLength(0);
-    await page.locator('#mine-card-modal').getByRole('button', { name: 'Add', exact: true }).click();
+    await page.locator('#mine-card-modal').getByRole('button', { name: 'Follow', exact: true }).click();
     await expect(page.locator('#mine-card-modal')).toBeHidden();
-    await expect(page.locator('#mine-results .mine-row').nth(2).locator('.mine-chip')).toHaveText('Added');
+    await expect(page.locator('#mine-results .search-row').nth(2).locator('.search-following')).toHaveText(
+        'Following'
+    );
 });
 
 test('calendar: one list of what is to come, series and films in their tabs, with posters; no period switch', async ({
@@ -680,83 +663,72 @@ test('calendar: one list of what is to come, series and films in their tabs, wit
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
-    const rows = body.locator('.mine-cal-row');
-    // The episode already out is left out; the rest share one card, a month's name before its first row
+    const rows = body.locator('button.cal-row');
+    // The episode already out is left out; a card per month under its name
     await expect(rows).toHaveCount(2);
-    await expect(body.locator('ul.mine-rows')).toHaveCount(1);
-    await expect(body.locator('.mine-cal-month')).toHaveText(['November', 'January 2027']);
-    await expect(body.locator('.mine-cal-date')).toHaveText(['04Wed', '15Fri']);
+    await expect(body.locator('ul.cal-list')).toHaveCount(2);
+    await expect(body.locator('.group-title')).toHaveText(['November', 'January 2027']);
+    await expect(body.locator('.cal-day')).toHaveText(['04Wed', '15Fri']);
     await expect(rows.first()).toContainText('Одни из нас');
     await expect(rows.first()).toContainText('S2E5 · Feel Her Love · season finale');
-    await expect(rows.first().locator('.mine-cal-when')).toHaveText('Today');
+    await expect(rows.first().locator('.cal-when')).toHaveText('today');
     // No title from TMDB yet: a stand-in
     await expect(rows.nth(1)).toContainText('S4E1 · Episode 1 · season premiere');
-    await expect(rows.first().locator('img.mine-poster')).toHaveAttribute('src', '/api/poster/w185/p1.jpg');
-    // Only the Series / Films tabs: no week, month or year, no paging
-    await expect(body.locator('.tab-filters')).toHaveCount(1);
+    await expect(rows.first().locator('img.title-thumb')).toHaveAttribute('src', '/api/poster/w185/p1.jpg');
+    // Only the Series / Films chips: no week, month or year, no paging
+    await expect(body.locator('.cat-chips')).toHaveCount(1);
     await expect(body.getByRole('button', { name: /^(Week|Month|Year|Earlier|Later)$/ })).toHaveCount(0);
     expect(panel.account.sent.some((r) => r.path.includes('/calendar?'))).toBe(false);
-    // Films have their own tab; yesterday's release is still shown
-    await body.getByRole('button', { name: 'Films' }).click();
+    // Films have their own chip; yesterday's release is still shown
+    await body.getByRole('tab', { name: 'Films' }).click();
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText('Мегалополис');
-    await expect(rows.first().locator('.mine-cal-when')).toHaveText('Yesterday');
+    await expect(rows.first().locator('.cal-when')).toHaveText('yesterday');
     await expect(rows.nth(1)).toContainText('Дюна: Часть третья');
-    await expect(rows.nth(1).locator('.mine-cal-when')).toHaveText('In 2 days');
+    await expect(rows.nth(1).locator('.cal-when')).toHaveText('in 2 days');
 });
 
 test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
     const card = page.locator('#mine-card-modal');
-    await page.locator('#my-calendar-body .mine-cal-row').first().click();
+    await page.locator('#my-calendar-body button.cal-row').first().click();
     await expect(card).toBeVisible();
-    await expect(card.locator('h3')).toHaveText('Одни из нас');
-    await expect(card).toContainText('S2E5 · Feel Her Love');
-    await expect(card).toContainText('Season finale');
+    await expect(card.locator('h2')).toHaveText('Одни из нас');
+    await expect(card.locator('.tc-facts')).toContainText('Series · 2 seasons');
+    await expect(card.locator('.tc-date-label').first()).toHaveText('S2E5 · Feel Her Love');
+    await expect(card.locator('.tc-date-value')).toHaveText('Nov 4, 2026 · season finale');
+    await expect(card.locator('.tc-date-when')).toHaveText('today');
     await expect(card).toContainText('Ellie and Dina head out.');
-    await expect(card.locator('.mine-release-date time')).toHaveText('Nov 4, 2026');
-    await expect(card.locator('.mine-release-date time')).toHaveAttribute('datetime', '2026-11-04');
-    await expect(card.locator('.mine-card-head .mine-release-date')).toHaveCount(1);
-    await expect(card.locator('.mine-release-count')).toHaveText('Today');
-    await expect(card.locator('.title-rating')).toHaveText('8.7/ 10 · TMDB');
-    await expect(card.locator('.title-rating use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
-    await expect(card.getByRole('link', { name: 'Kinopoisk' })).toHaveAttribute(
+    await expect(card.locator('.tc-rating')).toHaveText('8.7/ 10 · TMDB');
+    await expect(card.locator('.tc-rating use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
+    await expect(card.getByRole('link', { name: 'Open on Kinopoisk' })).toHaveAttribute(
         'href',
         'https://www.kinopoisk.ru/series/1/'
     );
-    await expect(card.getByRole('button', { name: /series card/i })).toHaveCount(0);
 });
 
-test('calendar: film dates and countdown are distinct, descriptions expand and missing metadata stays hidden', async ({
-    page
-}) => {
+test('calendar: a film card counts down, expands its description and leaves missing data out', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
-    await body.getByRole('button', { name: 'Films', exact: true }).click();
-    await body.locator('.mine-cal-row', { hasText: 'Дюна: Часть третья' }).click();
+    await body.getByRole('tab', { name: 'Films', exact: true }).click();
+    await body.locator('button.cal-row', { hasText: 'Дюна: Часть третья' }).click();
     const card = page.locator('#mine-card-modal');
-    await expect(card.locator('.mine-release-date time')).toHaveText('Nov 6, 2026');
-    await expect(card.locator('.mine-release-count')).toHaveText('In 2 days');
-    await expect(card.locator('.title-rating')).toContainText('7.4');
+    await expect(card.locator('.tc-date-value')).toHaveText('Nov 6, 2026');
+    await expect(card.locator('.tc-date-when')).toHaveText('in 2 days');
+    await expect(card.locator('.tc-rating')).toContainText('7.4');
+    const clamped = () => card.locator('.tc-overview').evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+    expect(await clamped()).toBe(true);
     await card.getByRole('button', { name: 'Show more', exact: true }).click();
-    await expect(card.locator('[data-description-full]')).toBeVisible();
+    await expect.poll(clamped).toBe(false);
     await card.getByRole('button', { name: 'Show less', exact: true }).click();
-    await expect(card.locator('[data-description-full]')).toBeHidden();
-    const layout = await card.locator('.mine-release-date').evaluate((el) => {
-        return {
-            fits: el.scrollWidth <= el.clientWidth,
-            border: getComputedStyle(el).borderStyle,
-            inHeading: Boolean(el.closest('.mine-card-head'))
-        };
-    });
-    expect(layout).toEqual({ fits: true, border: 'none', inHeading: true });
+    expect(await clamped()).toBe(true);
     await card.getByRole('button', { name: 'Close', exact: true }).click();
-    await body.locator('.mine-cal-row', { hasText: 'Мегалополис' }).click();
-    await expect(card.locator('.mine-release-count')).toHaveText('Yesterday');
-    await expect(card.locator('.title-rating')).toHaveCount(0);
-    await expect(card.locator('.mine-overview')).toHaveCount(0);
+    await body.locator('button.cal-row', { hasText: 'Мегалополис' }).click();
+    await expect(card.locator('.tc-date-when')).toHaveText('yesterday');
+    await expect(card.locator('.tc-rating')).toHaveText('Not rated on TMDB yet');
+    await expect(card.locator('.tc-overview')).toHaveCount(0);
 });
 
 test('the panel opens on the own account, not on the group picked last time', async ({ page }) => {
@@ -790,7 +762,7 @@ test("a group's settings: a member sees them, unchangeable; an admin's change is
 
 test('signing out, or a session that ends, brings back the sign-in screen', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
+    await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(2);
     panel.account.signedIn = false;
     await openMine(page, 'my-calendar');
     await expect(page.locator('#login-gate')).toBeVisible();
@@ -800,7 +772,7 @@ test('signing out, or a session that ends, brings back the sign-in screen', asyn
 test('on a phone a user has four tabs, big enough to tap, and nothing scrolls sideways', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await mockPanel(page, { role: 'user' });
-    await expect(page.locator('#my-subs-body .mine-row')).toHaveCount(2);
+    await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(2);
     const layout = await page.evaluate(() => {
         const tabs = [...document.querySelectorAll('.tabbar .tab-item')].filter(
             (el) => el.getBoundingClientRect().width > 0
@@ -816,62 +788,70 @@ test('on a phone a user has four tabs, big enough to tap, and nothing scrolls si
     expect(layout.overflow).toBeLessThanOrEqual(0);
 });
 
-test('the profile menu: chats, both settings pages and Sign out; nothing else signs out in My account', async ({
+test('the Account tab: who is signed in, the chats, both settings pages and Sign out with a confirmation', async ({
     page
 }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    // No Sign out in the rail, the tab bar or on a page: only in the menu
-    await expect(page.locator('[data-action="logout"]:visible')).toHaveCount(0);
-    const chip = profileButton(page, 'my-calendar');
-    await openMine(page, 'my-calendar');
-    await chip.click();
-    const menu = page.locator('#profile-modal');
-    await expect(menu.locator('.profile-head')).toContainText('@me');
-    await expect(menu.locator('.profile-head')).toContainText('User · ID 42');
-    await expect(menu.locator('.profile-links .action-title')).toHaveText([
+    // Sign out lives only on the Account tab
+    await expect(page.locator('[data-action="profile-signout"]:visible')).toHaveCount(0);
+    await openProfilePage(page, 'my-profile');
+    const body = page.locator('#my-profile-body');
+    await expect(body.locator('.profile-card')).toContainText('@me');
+    await expect(body.locator('.profile-card')).toContainText('Telegram · ID 42');
+    await expect(body.locator('.profile-card .role-chip')).toHaveText('User');
+    await expect(body.locator('.group-title')).toHaveText(['Chats', 'Settings']);
+    await expect(body.locator('.chat-row')).toHaveCount(2);
+    await expect(body.locator('.chat-row').first()).toHaveAttribute('aria-pressed', 'true');
+    await expect(body.locator('.chat-row').first().locator('.row-check')).toHaveCount(1);
+    await expect(body.locator('[data-action="profile-visibility"]')).toContainText('Hidden chats');
+    // A user has no Admin panel row
+    await expect(body.locator('[data-action="view-admin"]')).toHaveCount(0);
+    await expect(body.locator('[aria-labelledby="profile-settings"] .row-name')).toHaveText([
         'Chat settings',
-        'Account settings',
-        'Sign out'
+        'Account settings'
     ]);
-    const box = await menu.locator('.modal-content').boundingBox();
-    const chipBox = await chip.boundingBox();
-    if (isNarrow(page)) {
-        // A sheet on the bottom edge
-        await expect
-            .poll(async () => {
-                const b = await menu.locator('.modal-content').boundingBox();
-                return Math.round(b.y + b.height);
-            })
-            .toBe(page.viewportSize().height);
-    } else {
-        // Drops from the chip, right edges lined up
-        expect(box.y).toBeGreaterThan(chipBox.y + chipBox.height);
-        expect(Math.abs(box.x + box.width - (chipBox.x + chipBox.width))).toBeLessThan(2);
-    }
 
-    // Chat settings, and Back to the section the menu was opened from
-    await menu.locator('[data-section="my-settings"]').click();
+    // Chat settings, and Back to the Account tab
+    await body.locator('[data-section="my-settings"]').click();
     await expect(page.locator('#my-settings-section')).toHaveClass(/active/);
     await expect(page.locator('#my-settings-body .group-title')).toHaveText(['Notifications', 'Digests', 'Bot']);
     await page.locator('#my-settings-section .mine-back').click();
-    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
 
-    await chip.click();
-    await menu.getByRole('button', { name: 'Sign out' }).click();
+    // A chat row switches the chat
+    await body.locator('.chat-row', { hasText: 'Киноклуб' }).click();
+    await expect(body.locator('.chat-row', { hasText: 'Киноклуб' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
+
+    await body.getByRole('button', { name: 'Sign out' }).click();
+    await page.locator('#confirm-modal').getByRole('button', { name: 'Cancel', exact: true }).click();
+    expect(panel.account.sent.some((r) => r.path === '/api/logout')).toBe(false);
+    await body.getByRole('button', { name: 'Sign out' }).click();
+    await page.locator('#confirm-modal').getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.locator('#login-gate')).toBeVisible();
     expect(panel.account.sent.some((r) => r.path === '/api/logout')).toBe(true);
 });
 
-test('the chip opens the menu even when the chats could not load', async ({ page }) => {
-    await mockPanel(page, { role: 'user', chatsDown: true });
-    const chip = profileButton(page, 'my-subs');
-    await expect(chip).toContainText('My account');
-    await chip.click();
-    await expect(page.locator('#profile-modal .pick-row')).toHaveCount(0);
-    await expect(page.locator('#profile-modal .profile-links .action-title')).toHaveText([
-        'Account settings',
-        'Sign out'
+test('an admin sees an Admin panel row on the Account tab', async ({ page }) => {
+    await mockPanel(page);
+    await openMine(page, 'my-subs', { admin: true });
+    await openProfilePage(page, 'my-profile');
+    await expect(page.locator('#my-profile-body [aria-labelledby="profile-settings"] .row-name')).toHaveText([
+        'Admin panel',
+        'Chat settings',
+        'Account settings'
     ]);
+});
+
+test('the Account tab keeps Account settings and Sign out when the chats could not load', async ({ page }) => {
+    await mockPanel(page, { role: 'user', chatsDown: true });
+    await expect(profileButton(page, 'my-subs')).toContainText('My account');
+    await openProfilePage(page, 'my-profile');
+    const body = page.locator('#my-profile-body');
+    await expect(body.locator('.chat-row')).toHaveCount(0);
+    await expect(body).toContainText("Couldn't load chats");
+    await expect(body.locator('[aria-labelledby="profile-settings"] .row-name')).toHaveText(['Account settings']);
+    await expect(body.getByRole('button', { name: 'Sign out' })).toBeVisible();
 });
 
 test('Account settings: who is signed in, the role, and signing out on other devices', async ({ page }) => {
@@ -895,31 +875,29 @@ test('Account settings: who is signed in, the role, and signing out on other dev
     await page.locator('#my-devices-section .page-back').click();
     await expect(page.locator('#my-account-section')).toHaveClass(/active/);
     await page.locator('#my-account-section .mine-back').click();
-    await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
 });
 
-test('the profile button opens the chats; the choice shows on every page', async ({ page, isMobile }) => {
+test('the chat chip opens the chats; the choice shows on every page', async ({ page, isMobile }) => {
     const panel = await mockPanel(page, { role: 'user' });
     const chip = profileButton(page, 'my-subs');
     await expect(chip).toContainText('My account');
-    if (isMobile) {
-        // The avatar tab is at least a finger's 44 px and receives hits at its edges.
-        const hits = await chip.evaluate((el) => {
-            const r = el.getBoundingClientRect();
-            const x = r.left + r.width / 2;
-            return [r.top + 2, r.bottom - 2].map((y) => el.contains(document.elementFromPoint(x, y)));
-        });
-        expect(await chip.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
-        expect(hits).toEqual([true, true]);
-    }
+    // A finger's 44px: the 36px pill takes hits 4px above and below it
+    const hits = await chip.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        return [r.top - 3, r.bottom + 3].map((y) => el.contains(document.elementFromPoint(x, y)));
+    });
+    expect(await chip.evaluate((el) => el.getBoundingClientRect().height)).toBe(36);
+    if (isMobile) expect(hits).toEqual([true, true]);
     await chip.click();
-    const rows = page.locator('#profile-modal .pick-row');
+    const rows = page.locator('#pick-modal .pick-row');
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText('Private chat');
-    await expect(rows.nth(0)).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true');
     await expect(rows.nth(1)).toContainText('Group · view only');
     await rows.nth(1).click();
-    await expect(page.locator('#profile-modal')).toBeHidden();
+    await expect(page.locator('#pick-modal')).toBeHidden();
     await expect(chip).toContainText('Киноклуб');
     await openMine(page, 'my-calendar');
     await expect(page.locator('#my-calendar-section .mine-chat-chip')).toContainText('Киноклуб');
@@ -954,7 +932,7 @@ test('Chat settings: the chat on a card that opens the chats, rows with icon til
     await expect(sheet).toBeHidden();
 
     await card.click();
-    await expect(page.locator('#profile-modal .pick-row', { hasText: 'Киноклуб' })).toBeVisible();
+    await expect(page.locator('#pick-modal .pick-row', { hasText: 'Киноклуб' })).toBeVisible();
 });
 
 test('settings are rows; a row opens its choices and saves the one picked', async ({ page }) => {
@@ -1275,23 +1253,38 @@ test('an on-screen keyboard hides the tab bar; focus alone (hardware keyboard) k
     await page.setViewportSize(size);
 });
 
-test('phone tabs mark the open one with a pill and the title search sits round at the right edge', async ({ page }) => {
+test('the tab header: title and chat chip on one row, the line, the search pill under it; tabs in order', async ({
+    page
+}) => {
     await mockPanel(page, { role: 'user', path: '/#my-subs' });
     await expect(page.locator('#my-subs-section h1')).toBeVisible();
     await expect(page.locator('[data-section="my-aired"] use').first()).toHaveAttribute(
         'href',
         '/vendor/lucide.svg#clapperboard'
     );
-    const search = page.locator('#my-subs-section [data-action="mine-filter-toggle"]');
-    const box = await search.evaluate((el) => {
-        const r = el.getBoundingClientRect();
-        const h = el.closest('header').getBoundingClientRect();
-        return { right: h.right - r.right, round: getComputedStyle(el).borderRadius, w: r.width, h: r.height };
+    // No magnifier button in the header any more: the pill is the way to the search
+    await expect(page.locator('[data-action="mine-filter-toggle"]')).toHaveCount(0);
+    const layout = await page.evaluate(() => {
+        const box = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const h1 = box('#my-subs-section h1');
+        const chip = box('#my-subs-section .mine-chat-chip');
+        const sub = box('#my-subs-section .tab-top-sub');
+        const pill = box('#my-subs-section .search-pill');
+        return {
+            sameRow: Math.abs(h1.top + h1.height / 2 - (chip.top + chip.height / 2)) < 2,
+            chipRight: Math.round(document.querySelector('#my-subs-section header').getBoundingClientRect().right - chip.right),
+            subGap: Math.round(sub.top - Math.max(h1.bottom, chip.bottom)),
+            pillGap: Math.round(pill.top - sub.bottom),
+            pillHeight: pill.height
+        };
     });
-    expect(box.round).toBe('50%');
-    expect(box.w).toBe(box.h);
+    expect(layout.sameRow).toBe(true);
+    expect(Math.abs(layout.chipRight)).toBeLessThan(2);
+    expect(layout.pillGap).toBe(16);
+    expect(layout.pillHeight).toBe(44);
     if (!isNarrow(page)) return;
-    expect(Math.abs(box.right)).toBeLessThan(2);
+    expect(await visibleNav(page, '.tabbar .tab-item')).toEqual(['my-calendar', 'my-aired', 'my-subs', 'my-profile']);
+    await expect(page.locator('.tabbar .tab-profile .tab-profile-label')).toHaveText('Account');
     const tab = page.locator('.tabbar .tab-item.active');
     await expect(tab).toHaveAttribute('data-section', 'my-subs');
     // The capsule's own pill behind the whole tab, not a bar on its edge or a fill behind the icon
@@ -1303,65 +1296,26 @@ test('phone tabs mark the open one with a pill and the title search sits round a
     expect(marks.bar).toBe('none');
     expect(marks.tab).toBe('rgba(255, 255, 255, 0.1)');
     expect(marks.icon).toBe('rgba(0, 0, 0, 0)');
+    // The search page counts under Following
+    await page.locator('#my-subs-section .search-pill').click();
+    await expect(page.locator('.tabbar .tab-item[data-section="my-subs"]')).toHaveAttribute('aria-current', 'true');
 });
 
-test('a long group name on the Account tab ends in an ellipsis and keeps the four tabs equal', async ({ page }) => {
-    test.skip(!isNarrow(page), 'tab bar layout');
+test('a long chat name in the chip ends in an ellipsis at 180px', async ({ page }) => {
     const long = 'Очень длинное название киноклуба для проверки вёрстки';
     await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    await page.evaluate((title) => {
-        const label = document.querySelector('[data-tab-label]');
-        if (label) label.textContent = title;
-    }, long);
-    const sizes = await page.locator('.tabbar').evaluate((bar) => {
-        const tabs = [...bar.querySelectorAll('.tab-mine')].map((el) => el.getBoundingClientRect().width);
-        const label = bar.querySelector('[data-tab-label]');
+    const chip = page.locator('#my-subs-section .mine-chat-chip');
+    await expect(chip).toBeVisible();
+    const sizes = await chip.evaluate((el, title) => {
+        const name = el.querySelector('.mine-chat-chip-name');
+        name.textContent = title;
         return {
-            tabs,
-            barRight: bar.getBoundingClientRect().right,
-            right: bar.querySelector('.tab-profile').getBoundingClientRect().right,
-            clipped: label.scrollWidth > label.clientWidth,
-            ellipsis: getComputedStyle(label).textOverflow
+            width: el.getBoundingClientRect().width,
+            clipped: name.scrollWidth > name.clientWidth,
+            ellipsis: getComputedStyle(name).textOverflow
         };
-    });
-    expect(Math.max(...sizes.tabs) - Math.min(...sizes.tabs)).toBeLessThan(1);
-    expect(sizes.right).toBeLessThanOrEqual(sizes.barRight);
+    }, long);
+    expect(sizes.width).toBeLessThanOrEqual(180);
     expect(sizes.clipped).toBe(true);
     expect(sizes.ellipsis).toBe('ellipsis');
-});
-
-test('the title search grows out of its button, covers it, and the cross inside closes it', async ({ page }) => {
-    await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    const area = page.locator('#my-subs-section');
-    const toggle = area.locator('[data-action="mine-filter-toggle"]');
-    const field = area.locator('.mine-filter');
-    const close = field.getByRole('button', { name: 'Close search', exact: true });
-    await expect(field).toBeHidden();
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(area.locator('#my-subs-filter')).toBeFocused();
-    await expect.poll(() => field.evaluate((el) => getComputedStyle(el).clipPath)).toMatch(/^inset\(0(px)? round/);
-    const boxes = await page.evaluate(() => {
-        const box = (sel) => document.querySelector(sel).getBoundingClientRect();
-        const f = box('#my-subs-section .mine-filter');
-        const b = box('#my-subs-section [data-action="mine-filter-toggle"]');
-        const c = box('#my-subs-section .mine-filter-close');
-        const t = box('#my-subs-section .header-info');
-        const hit = (x, y) => document.elementFromPoint(x, y)?.closest('button')?.dataset.action;
-        return { f, b, c, t, hit: hit(c.x + c.width / 2, c.y + c.height / 2) };
-    });
-    expect(boxes.hit).toBe('mine-filter-close');
-    expect(Math.abs(boxes.f.y + boxes.f.height / 2 - (boxes.b.y + boxes.b.height / 2))).toBeLessThan(1);
-    expect(boxes.f.left).toBeLessThanOrEqual(boxes.b.left + 1);
-    if (isNarrow(page)) {
-        // Over the title, and the cross where the magnifier was
-        expect(boxes.f.left).toBeLessThanOrEqual(boxes.t.left + 1);
-        expect(Math.abs(boxes.f.right - boxes.b.right)).toBeLessThan(1);
-        expect(Math.abs(boxes.c.x + boxes.c.width / 2 - (boxes.b.x + boxes.b.width / 2))).toBeLessThan(2);
-        await expect(area.locator('h1')).toHaveCSS('opacity', '0');
-    } else await expect(area.locator('h1')).toHaveCSS('opacity', '1');
-    await close.click();
-    await expect(field).toBeHidden();
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 });

@@ -24,16 +24,27 @@ const SECTIONS = [
         hint: 'What the bot has been doing'
     },
     { id: 'settings', label: 'Settings', icon: 'settings', hint: 'Tokens, proxy, update check, restart' },
-    { id: 'my-aired', label: 'Released', icon: 'clapperboard', mine: true, divider: true },
+    // The personal tabs in the redesign's order (06.11): Calendar, Released, Following, Account
+    { id: 'my-calendar', label: 'Calendar', icon: 'calendar-days', mine: true, divider: true },
+    { id: 'my-aired', label: 'Released', icon: 'clapperboard', mine: true },
     {
         id: 'my-subs',
         label: 'Following',
         icon: 'bookmark',
         mine: true,
         moreLabel: 'My account',
+        children: ['my-search'],
         hint: 'Subscriptions, calendar and settings of your chats'
     },
-    { id: 'my-calendar', label: 'Calendar', icon: 'calendar-days', mine: true }
+    // The tab bar has its own Account item with the chat's avatar (index.html); the rail lists it here
+    {
+        id: 'my-profile',
+        label: 'Account',
+        icon: 'user-round',
+        mine: true,
+        railOnly: true,
+        children: ['my-settings', 'my-account', 'my-devices']
+    }
 ];
 
 const icon = (name) =>
@@ -79,7 +90,7 @@ export function setupNavigation() {
             .map((s) => item(s, true))
             .join('') +
             `<button class="tab-item" data-open="more-modal" data-tab-sections="${moreSections.join(' ')}" aria-haspopup="dialog">${icon('ellipsis')}<span>More</span></button>` +
-            SECTIONS.filter((s) => s.mine)
+            SECTIONS.filter((s) => s.mine && !s.railOnly)
                 .map((s) => item(s, true))
                 .join('')
     );

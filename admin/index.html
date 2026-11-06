@@ -20,11 +20,13 @@
         <link rel="stylesheet" href="css/responsive.css" />
         <link rel="stylesheet" href="css/dashboard.css" />
         <link rel="stylesheet" href="css/account.css" />
+        <link rel="stylesheet" href="css/titles.css" />
         <!-- Every module at once: otherwise the browser finds each one only after loading the one
              importing it, a chain of round trips before the panel runs (tests/unit/panel-files.test.js
              keeps this list complete) -->
         <link rel="modulepreload" href="js/app.js" />
         <link rel="modulepreload" href="js/navigation.js" />
+        <link rel="modulepreload" href="js/title-card.js" />
         <link rel="modulepreload" href="js/about.js" />
         <link rel="modulepreload" href="js/access.js" />
         <link rel="modulepreload" href="js/account.js" />
@@ -1208,155 +1210,131 @@
                     </section>
 
                     <section id="my-aired-section" class="section mine-section">
-                        <header>
-                            <div class="header-info">
-                                <div class="mine-heading">
-                                    <h1>Released</h1>
-                                    <button
-                                        type="button"
-                                        class="btn btn-ghost btn-icon-square"
-                                        data-action="mine-filter-toggle"
-                                        data-page="my-aired"
-                                        aria-label="Search titles"
-                                        aria-expanded="false"
-                                        aria-controls="my-aired-search"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <use href="/vendor/lucide.svg#search" />
-                                        </svg>
-                                    </button>
-                                    <div id="my-aired-search" class="mine-filter">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <use href="/vendor/lucide.svg#search" />
-                                        </svg>
-                                        <input
-                                            id="my-aired-filter"
-                                            type="search"
-                                            data-mine-filter="my-aired"
-                                            aria-label="Search released titles"
-                                            placeholder="Search titles…"
-                                        /><button
-                                            type="button"
-                                            class="mine-filter-close"
-                                            data-action="mine-filter-close"
-                                            data-page="my-aired"
-                                            aria-label="Close search"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <use href="/vendor/lucide.svg#x" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p>Series and films already released among the chosen chat's subscriptions.</p>
+                        <header class="tab-top">
+                            <div class="tab-top-row">
+                                <h1>Released</h1>
+                                <div class="mine-chat" data-chat-picker></div>
                             </div>
-                            <div class="mine-chat" data-chat-picker></div>
+                            <p class="tab-top-sub">
+                                Series and films already released among this chat’s subscriptions.
+                            </p>
+                            <a
+                                class="search-pill"
+                                href="#my-search"
+                                data-action="mine-search-open"
+                                data-section="my-search"
+                            >
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#search" /></svg
+                                ><span>Search series and films</span>
+                            </a>
                         </header>
-                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-aired-body" aria-live="polite"></div>
                     </section>
                     <section id="my-subs-section" class="section mine-section">
-                        <header>
-                            <div class="header-info">
-                                <div class="mine-heading">
-                                    <h1>Following</h1>
-                                    <button
-                                        type="button"
-                                        class="btn btn-ghost btn-icon-square"
-                                        data-action="mine-filter-toggle"
-                                        data-page="my-subs"
-                                        aria-label="Search titles"
-                                        aria-expanded="false"
-                                        aria-controls="my-subs-search"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <use href="/vendor/lucide.svg#search" />
-                                        </svg>
-                                    </button>
-                                    <div id="my-subs-search" class="mine-filter">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <use href="/vendor/lucide.svg#search" />
-                                        </svg>
-                                        <input
-                                            id="my-subs-filter"
-                                            type="search"
-                                            data-mine-filter="my-subs"
-                                            aria-label="Search followed titles"
-                                            placeholder="Search titles…"
-                                        /><button
-                                            type="button"
-                                            class="mine-filter-close"
-                                            data-action="mine-filter-close"
-                                            data-page="my-subs"
-                                            aria-label="Close search"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <use href="/vendor/lucide.svg#x" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p>Series and films the bot writes about in the chosen chat.</p>
+                        <header class="tab-top">
+                            <div class="tab-top-row">
+                                <h1>Following</h1>
+                                <div class="mine-chat" data-chat-picker></div>
                             </div>
-                            <div class="mine-chat" data-chat-picker></div>
+                            <p class="tab-top-sub">Series and films the bot writes about in the chosen chat.</p>
+                            <a
+                                class="search-pill"
+                                href="#my-search"
+                                data-action="mine-search-open"
+                                data-section="my-search"
+                            >
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#search" /></svg
+                                ><span>Search series and films</span>
+                            </a>
                         </header>
-                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
                     <section id="my-calendar-section" class="section mine-section">
-                        <header>
-                            <div class="header-info">
-                                <div class="mine-heading">
-                                    <h1>Calendar</h1>
-                                    <button
-                                        type="button"
-                                        class="btn btn-ghost btn-icon-square"
-                                        data-action="mine-filter-toggle"
-                                        data-page="my-calendar"
-                                        aria-label="Search titles"
-                                        aria-expanded="false"
-                                        aria-controls="my-calendar-search"
-                                    >
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <use href="/vendor/lucide.svg#search" />
-                                        </svg>
-                                    </button>
-                                    <div id="my-calendar-search" class="mine-filter">
-                                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                            <use href="/vendor/lucide.svg#search" />
-                                        </svg>
-                                        <input
-                                            id="my-calendar-filter"
-                                            type="search"
-                                            data-mine-filter="my-calendar"
-                                            aria-label="Search calendar titles"
-                                            placeholder="Search titles…"
-                                        /><button
-                                            type="button"
-                                            class="mine-filter-close"
-                                            data-action="mine-filter-close"
-                                            data-page="my-calendar"
-                                            aria-label="Close search"
-                                        >
-                                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <use href="/vendor/lucide.svg#x" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p>What comes out among the chosen chat's subscriptions.</p>
+                        <header class="tab-top">
+                            <div class="tab-top-row">
+                                <h1>Calendar</h1>
+                                <div class="mine-chat" data-chat-picker></div>
                             </div>
-                            <div class="mine-chat" data-chat-picker></div>
+                            <p class="tab-top-sub">What comes out among the chosen chat’s subscriptions.</p>
+                            <a
+                                class="search-pill"
+                                href="#my-search"
+                                data-action="mine-search-open"
+                                data-section="my-search"
+                            >
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#search" /></svg
+                                ><span>Search series and films</span>
+                            </a>
                         </header>
-                        <p class="mine-context" data-chat-context hidden></p>
                         <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
                     </section>
 
-                    <!-- Opened from the profile menu (profile.js); Back returns to the section it came from -->
+                    <!-- The title search (account.js): Back to the tab it came from, the field, the results -->
+                    <section id="my-search-section" class="section mine-section mine-page search-page">
+                        <form class="search-bar" data-content-search="account" role="search">
+                            <button
+                                type="button"
+                                id="mine-search-back"
+                                class="page-back"
+                                data-action="mine-search-close"
+                                data-section="my-subs"
+                                aria-label="Back"
+                            >
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#chevron-left" />
+                                </svg>
+                            </button>
+                            <div class="search-field">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="/vendor/lucide.svg#search" />
+                                </svg>
+                                <input
+                                    id="mine-q"
+                                    type="text"
+                                    name="q"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Series or film title"
+                                    placeholder="Series or film title"
+                                /><button
+                                    type="button"
+                                    id="mine-q-clear"
+                                    class="search-clear"
+                                    data-action="mine-search-clear"
+                                    aria-label="Clear search"
+                                    hidden
+                                >
+                                    <span
+                                        ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="/vendor/lucide.svg#x" /></svg
+                                    ></span>
+                                </button>
+                            </div>
+                        </form>
+                        <div id="mine-results" aria-live="polite"></div>
+                    </section>
+
+                    <!-- The Account tab (profile.js): who is signed in, the chats, the settings pages, Sign out -->
+                    <section id="my-profile-section" class="section mine-section mine-page app-page">
+                        <header class="page-nav">
+                            <h1>Account</h1>
+                        </header>
+                        <div id="my-profile-body" class="mine-body"></div>
+                    </section>
+
+                    <!-- Opened from the Account tab; Back returns there -->
                     <section id="my-settings-section" class="section mine-section mine-page app-page">
                         <header class="page-nav">
-                            <button type="button" class="page-back mine-back" data-section="my-subs" aria-label="Back">
+                            <button
+                                type="button"
+                                class="page-back mine-back"
+                                data-section="my-profile"
+                                aria-label="Back to Account"
+                            >
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                     <use href="/vendor/lucide.svg#chevron-left" />
                                 </svg>
@@ -1369,9 +1347,13 @@
 
                     <!-- The person's own settings, not a chat's: who they are, sign-in, devices -->
                     <section id="my-account-section" class="section mine-section mine-page app-page">
-                        <!-- Back returns to the section the profile menu was opened from (profile.js) -->
                         <header class="page-nav">
-                            <button type="button" class="page-back mine-back" data-section="my-subs" aria-label="Back">
+                            <button
+                                type="button"
+                                class="page-back mine-back"
+                                data-section="my-profile"
+                                aria-label="Back to Account"
+                            >
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                     <use href="/vendor/lucide.svg#chevron-left" />
                                 </svg>
@@ -1782,23 +1764,49 @@
 
         <!-- Phones and tablets: app-style tab bar instead of the sidebar -->
         <nav class="tabbar" aria-label="Sections">
-            <button
+            <a
                 class="tab-item tab-mine tab-profile"
-                data-action="profile-open"
-                aria-label="Account"
-                aria-haspopup="dialog"
+                href="#my-profile"
+                data-section="my-profile"
                 data-tab-sections="my-settings my-account my-devices"
             >
                 <span data-profile-avatar></span><span data-tab-chat-avatar hidden></span
-                ><span class="tab-profile-label" data-tab-label>Account</span
-                ><span class="sr-only" data-profile-chat></span>
-            </button>
+                ><span class="tab-profile-label">Account</span><span class="sr-only" data-profile-chat></span>
+            </a>
         </nav>
 
         <!-- Modals -->
         <!-- A title on the user's own list (account.js) -->
-        <dialog id="mine-card-modal" class="modal" aria-labelledby="mine-card-title">
-            <div class="modal-content modal-narrow" id="mine-card-body"></div>
+        <dialog
+            id="mine-card-modal"
+            class="modal modal-sheet app-sheet"
+            aria-modal="true"
+            aria-labelledby="mine-card-title"
+        >
+            <div class="modal-content modal-narrow sheet-content title-sheet" id="mine-card-body"></div>
+        </dialog>
+        <!-- A released title, in both views (records.js openReleasedDetails): the shared title card -->
+        <dialog
+            id="released-modal"
+            class="modal modal-sheet app-sheet"
+            aria-modal="true"
+            aria-labelledby="released-title"
+        >
+            <div class="modal-content modal-narrow sheet-content title-sheet" id="released-body"></div>
+        </dialog>
+        <!-- A title card's poster, large (title-card.js): a tap anywhere, a swipe down or Esc closes it -->
+        <dialog id="poster-modal" class="modal poster-modal" aria-label="Poster">
+            <div class="poster-view" data-close="poster-modal">
+                <button
+                    type="button"
+                    class="sheet-close poster-close"
+                    data-close="poster-modal"
+                    aria-label="Close poster"
+                >
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
+                </button>
+                <img class="poster-view-img" alt="" />
+            </div>
         </dialog>
 
         <!-- Choosing one of a few (pick-sheet.js): the account pages' chat and settings -->
@@ -1858,12 +1866,6 @@
                 </div>
                 <div id="pick-list" class="action-list" role="listbox" aria-labelledby="pick-title"></div>
             </div>
-        </dialog>
-
-        <!-- The profile menu under the chat chip (profile.js): the chat, both settings, sign out.
-             A sheet on phones, a menu under the chip elsewhere -->
-        <dialog id="profile-modal" class="modal modal-sheet profile-modal" aria-label="Profile">
-            <div class="modal-content modal-narrow" id="profile-body"></div>
         </dialog>
 
         <dialog id="visibility-modal" class="modal modal-sheet" aria-labelledby="visibility-title">
@@ -2129,7 +2131,12 @@
             </div>
         </dialog>
 
-        <dialog id="content-card-modal" class="modal" aria-labelledby="content-card-title"></dialog>
+        <dialog
+            id="content-card-modal"
+            class="modal modal-sheet app-sheet"
+            aria-modal="true"
+            aria-labelledby="content-card-title"
+        ></dialog>
 
         <!-- A chat's bot settings: the same as its ⚙️ Settings screen in Telegram -->
         <!-- A chat's change log (changes.js): search and pages, filled when opened -->

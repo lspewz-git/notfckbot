@@ -1,28 +1,18 @@
 /**
- * The user's own chats inside the panel (src/account/routes.js): "My subscriptions", "Calendar" and
- * "Chat settings" for the chat picked at the top of each. Every signed-in user has these; an
- * admin has the rest of the panel too. In English like the panel (a language switch comes later).
+ * The user's own chats inside the panel (src/account/routes.js): Calendar, Released, Following, the
+ * title search and Chat settings for the chat picked with the chip at the top of each tab (the
+ * redesign, 06.11). Every signed-in user has these; an admin has the rest of the panel too. In
+ * English like the panel (a language switch comes later).
  */
 import { api } from './api.js';
 import { createHistory } from './history.js';
 import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
-import { toast, openModal, closeModal } from './ui.js';
+import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { pickFrom, avatar, initial } from './pick-sheet.js';
 import { chatChip } from './chat-picker.js';
-
-const POSTER = (path, size = 'w185') => (path ? `/api/poster/${size}${path}` : '');
-
-import {
-    MODES,
-    modesField,
-    searchResults,
-    openSearchCard,
-    cardClose,
-    searchForm,
-    titleRating,
-    description
-} from './content-search.js';
+import { searchResults, openSearchCard, MODES } from './content-search.js';
+import { titleCard, notifyField, watchButton, posterSrc, fitDescriptions } from './title-card.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -42,12 +32,13 @@ const weekday = (iso) => WEEKDAYS[new Date(`${iso}T00:00:00Z`).getUTCDay()];
 const daysUntil = (day, today) =>
     Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 864e5);
 
+/** "in 6 days", "tomorrow", "today", "2 days ago": one grey line on every row */
 function whenText(day, today) {
     const n = daysUntil(day, today);
-    if (n === 0) return 'Today';
-    if (n === 1) return 'Tomorrow';
-    if (n === -1) return 'Yesterday';
-    return n > 0 ? `In ${n} days` : `${-n} days ago`;
+    if (n === 0) return 'today';
+    if (n === 1) return 'tomorrow';
+    if (n === -1) return 'yesterday';
+    return n > 0 ? `in ${n} days` : `${-n} days ago`;
 }
 
 const MARKS = { premiere: 'season premiere', finale: 'season finale' };
@@ -68,41 +59,10 @@ const state = {
     query: '',
     /** @type {any[]} */
     results: [],
+    /** @type {string | null} why the last search failed */
+    searchError: null,
     searching: false
 };
-
-const filters = { 'my-subs': '', 'my-calendar': '', 'my-aired': '' };
-const matchesTitle = (title, section) =>
-    String(title || '')
-        .toLocaleLowerCase()
-        .includes(filters[section].trim().toLocaleLowerCase());
-const noMatches = () => empty('No matching titles', 'Try another title or clear the search.');
-
-function renderFiltered(section) {
-    if (section === 'my-subs' && state.list && !searchOpen) $('my-subs-body').innerHTML = subsView();
-    if (section === 'my-calendar' && state.cal) showCalendar();
-    if (section === 'my-aired') airedHistory?.filter(filters['my-aired']);
-}
-
-const filterToggle = (section) =>
-    /** @type {HTMLElement} */ (document.querySelector(`[data-action="mine-filter-toggle"][data-page="${section}"]`));
-
-/** The title search grows out of its round button and covers it; the cross inside closes it */
-function showFilter(section, open) {
-    const toggle = filterToggle(section);
-    toggle.closest('.mine-heading').classList.toggle('is-searching', open);
-    toggle.setAttribute('aria-expanded', String(open));
-}
-
-const filterOpen = (section) => filterToggle(section).getAttribute('aria-expanded') === 'true';
-
-function closeFilter(section) {
-    filters[section] = '';
-    const input = /** @type {HTMLInputElement} */ ($(`${section}-filter`));
-    input.value = '';
-    showFilter(section, false);
-    renderFiltered(section);
-}
 
 const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${rest}`;
 
@@ -120,17 +80,17 @@ export function setChats(chats, preferred = null) {
     state.list = null;
     state.cal = null;
     resetAired();
-    for (const section of Object.keys(filters)) closeFilter(section);
     showChatChips();
     chatsChanged();
     reload();
 }
 
-/** The profile menu (profile.js) redraws itself if it is open while the chats arrive or fail */
+/** The Account tab (profile.js) redraws itself when the chats arrive, fail or change */
 const chatsChanged = () => document.dispatchEvent(new window.CustomEvent('account-chats'));
 
-const CHEVRON_RIGHT =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg>';
+const ICON = (name) =>
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+const CHEVRON_RIGHT = ICON('chevron-right');
 
 export const chatHint = (c) =>
     c.type === 'private' ? 'Private chat' : c.settings ? "Group · you're an admin" : 'Group · view only';
@@ -143,7 +103,7 @@ export function resetChatChoice() {
     chatsChanged();
 }
 
-/** The chats and the open one, for the profile menu (profile.js); `error` once they failed */
+/** The chats and the open one, for the Account tab (profile.js); `error` once they failed */
 export const chatList = () => ({
     chats: state.chats || [],
     chatId: state.chatId,
@@ -159,12 +119,12 @@ export async function setChatHidden(id, hidden) {
     if ((hidden && state.chatId === id) || (!hidden && !state.chatId)) {
         await selectChat((state.chats || []).find((c) => !c.hidden)?.id || null);
     }
+    chatsChanged();
 }
 
 /**
- * The chat at the top of each section: a small chip that opens the profile menu (profile.js) with
- * the chats, the settings and Sign out. Without a chat yet (loading, failed) it shows My account,
- * so signing out is always in reach
+ * The chat at the top of each tab: a chip with its avatar and name that opens the chats
+ * (`chat-switch`). Without a chat yet (loading, failed) it shows My account
  */
 function showChatChips() {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
@@ -172,38 +132,39 @@ function showChatChips() {
     const html = chatChip({
         title: name,
         accent: !chat || chat.type === 'private',
-        action: 'profile-open',
-        label: chat ? `Profile and chat: ${name}` : 'Profile'
+        action: 'chat-switch',
+        label: `Current chat: ${name}. Switch chat`
     });
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
     for (const holder of all('[data-profile-chat]')) holder.textContent = name;
-    showChatContext(chat);
+    showTabChat(chat);
 }
 
-const ICON = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
-
-/**
- * Where the user is, for information only (switching stays in the profile menu): a line under each
- * section's title, and on phones the Account tab shows the open group instead of the user
- */
-function showChatContext(chat) {
+/** The Account tab shows the open chat's avatar: a group's letter, else the person's own */
+function showTabChat(chat) {
     const group = Boolean(chat && chat.type !== 'private');
-    for (const line of all('[data-chat-context]')) {
-        line.hidden = !chat;
-        line.classList.toggle('is-group', group);
-        line.innerHTML = !chat
-            ? ''
-            : group
-              ? `${ICON('users')}<span>Group <b>${escapeHtml(chat.title)}</b> · shared with everyone in it</span>`
-              : `${ICON('user-round')}<span>Your personal account</span>`;
-    }
     for (const el of all('[data-tab-chat-avatar]')) {
         el.hidden = !group;
         el.innerHTML = group ? avatar(chat.title) : '';
     }
     for (const el of all('.tab-profile [data-profile-avatar]')) el.hidden = group;
-    for (const el of all('[data-tab-label]')) el.textContent = group ? chat.title : 'Account';
+}
+
+/** The chip's sheet: the visible chats (and the open one), the open one checked */
+function openChatSwitch() {
+    if (!state.chats || !state.chats.length) return;
+    const chats = state.chats.filter((c) => !c.hidden || c.id === state.chatId);
+    pickFrom({
+        title: 'Chats',
+        value: String(state.chatId),
+        options: chats.map((c) => ({
+            value: c.id,
+            label: c.title,
+            hint: chatHint(c),
+            avatar: avatar(c.title, c.type === 'private')
+        })),
+        onPick: (id) => selectChat(id)
+    });
 }
 
 /** Another chat picked: every section shows it, and the open one loads it */
@@ -214,17 +175,18 @@ export async function selectChat(id) {
     state.cal = null;
     cardVersion += 1;
     closeModal('mine-card-modal');
-    for (const section of Object.keys(filters)) closeFilter(section);
     resetAired();
-    searchOpen = false;
-    // The search's "Added" marks belong to the chat it was made for
+    // The search's Following marks belong to the chat it was made for
     state.query = '';
     state.results = [];
+    state.searchError = null;
+    searchRequest += 1;
     // The other chat's settings rows would save their choices to this one while it loads
     settings = null;
     const sets = $('my-settings-body');
     if (sets && sets.querySelector('.group-list')) sets.innerHTML = loading();
     showChatChips();
+    chatsChanged();
     await reload();
 }
 
@@ -237,36 +199,53 @@ export function chatsFailed(message) {
 
 // --- Pieces ---
 
-const poster = (path, cls = 'mine-poster', loading = 'lazy') =>
-    path
-        ? `<img class="${cls}" src="${escapeHtml(POSTER(path))}" alt="" loading="${loading}" decoding="async" />`
-        : `<span class="${cls} mine-poster-empty" aria-hidden="true"></span>`;
+const thumb = (path, cls = 'title-thumb') => {
+    const src = posterSrc(path);
+    return src
+        ? `<img class="${cls}" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
+        : `<span class="${cls} title-thumb-empty" aria-hidden="true"></span>`;
+};
 
-const empty = (title, body) =>
-    `<div class="glass-card mine-empty"><p class="mine-empty-title">${escapeHtml(title)}</p><p class="mine-dim">${escapeHtml(body)}</p></div>`;
+/** EmptyState: an icon in a circle, a title, one line */
+const empty = (title, body, iconName = 'bookmark') =>
+    `<div class="empty-state"><span class="empty-icon">${ICON(iconName)}</span>` +
+    `<p class="empty-title">${escapeHtml(title)}</p><p class="empty-text">${escapeHtml(body)}</p></div>`;
 
-const loading = () => '<div class="glass-card mine-empty"><p class="mine-dim">Loading…</p></div>';
+/** Rows the size of the real ones while the list loads */
+const loading = (rows = 3) =>
+    `<ul class="group-list title-list" aria-busy="true" aria-label="Loading">${'<li><div class="group-row title-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>'.repeat(rows)}</ul>`;
 
 const failed = (message) =>
-    '<div class="glass-card mine-empty"><p class="mine-empty-title">Failed to load</p>' +
-    `<p class="mine-dim">${escapeHtml(message)}</p>` +
-    '<button type="button" class="btn btn-outline" data-action="mine-reload">Retry</button></div>';
+    `<div class="empty-state" role="alert"><span class="empty-icon">${ICON('triangle-alert')}</span>` +
+    `<p class="empty-title">Failed to load</p><p class="empty-text">${escapeHtml(message)}</p>` +
+    '<button type="button" class="sheet-btn-secondary empty-action" data-action="mine-reload">Retry</button></div>';
 
-const tabs = (items, active, action, key) =>
-    `<div class="tab-filters" role="group">${items
+/** CategoryChips: pills in 44px zones, the open one inverted; optional counts */
+const chips = (items, active, action, key) =>
+    `<div class="cat-chips" role="tablist">${items
         .map(
-            ([value, label]) =>
-                `<button type="button" class="btn btn-ghost${value === active ? ' active' : ''}" aria-pressed="${value === active}" data-action="${action}" data-${key}="${value}">${label}</button>`
+            ([value, label, count]) =>
+                `<button type="button" class="cat-chip" role="tab" aria-selected="${value === active}" data-action="${action}" data-${key}="${value}">` +
+                `<span>${label}${count === undefined ? '' : `<span class="cat-count">${count}</span>`}</span></button>`
         )
         .join('')}</div>`;
+
+const FOLLOW_PLUS = `<a class="cat-plus" href="#my-search" data-action="mine-search-open" data-section="my-search" aria-label="Follow a title"><span>${ICON('plus')}</span></a>`;
 
 const noChats = () =>
     empty(
         'No chats yet',
-        'Send /start to the bot to get your own chat. Groups are the ones where both you and the bot are.'
+        'Send /start to the bot to get your own chat. Groups are the ones where both you and the bot are.',
+        'users'
     );
 
-// --- Subscriptions ---
+/** A title in a list: poster, name, one line, an optional badge, the chevron */
+const titleRow = ({ action, id, poster, title, note, badge = '' }) =>
+    `<li><button type="button" class="group-row title-row" data-action="${action}" data-id="${escapeHtml(id)}">${thumb(poster)}` +
+    `<span class="row-text"><span class="row-name">${escapeHtml(title)}</span><span class="row-meta">${escapeHtml(note)}</span></span>` +
+    `${badge ? `<span class="row-badge">${escapeHtml(badge)}</span>` : ''}<span class="row-chevron">${CHEVRON_RIGHT}</span></button></li>`;
+
+// --- Following ---
 
 const seriesNote = (s) => {
     if (s.finished) return 'Ended';
@@ -282,141 +261,143 @@ const filmNote = (f) =>
         .filter(Boolean)
         .join(' · ');
 
-const row = (action, id, picture, title, note, chip) =>
-    `<li><button type="button" class="mine-row" data-action="${action}" data-id="${escapeHtml(id)}">${picture}` +
-    `<span class="mine-row-text"><span class="mine-row-title">${escapeHtml(title)}</span><span class="mine-dim">${escapeHtml(note)}</span></span>` +
-    `${chip ? `<span class="mine-chip">${escapeHtml(chip)}</span>` : ''}</button></li>`;
-
 function subsView() {
     const list = state.list;
     const running = list.series.filter((s) => !s.finished);
     const archive = list.series.filter((s) => s.finished);
     const tab = state.subsTab;
     const top =
-        '<div class="mine-toolbar">' +
-        tabs(
+        '<div class="cat-bar">' +
+        chips(
             [
-                ['series', `Series <span class="mine-count">${running.length}</span>`],
-                ['films', `Films <span class="mine-count">${list.films.length}</span>`],
-                ['archive', `Ended <span class="mine-count">${archive.length}</span>`]
+                ['series', 'Series', running.length],
+                ['films', 'Films', list.films.length],
+                ['archive', 'Ended', archive.length]
             ],
             tab,
             'mine-subs-tab',
             'tab'
         ) +
-        '<button type="button" class="btn btn-primary" data-action="mine-search-open">+ Add</button></div>';
+        FOLLOW_PLUS +
+        '</div>';
     let body;
     if (tab === 'films') {
-        const films = list.films.filter((f) => matchesTitle(f.title, 'my-subs'));
-        body = films.length
-            ? `<ul class="glass-card mine-rows">${films.map((f) => row('mine-film', f.id, poster(f.poster), f.title, filmNote(f), f.year)).join('')}</ul>`
-            : filters['my-subs']
-              ? noMatches()
-              : empty('No films waiting', 'Find a film and add it: the bot writes when it comes out.');
+        body = list.films.length
+            ? `<ul class="group-list title-list">${list.films
+                  .map((f) =>
+                      titleRow({
+                          action: 'mine-film',
+                          id: f.id,
+                          poster: f.poster,
+                          title: f.title,
+                          note: filmNote(f),
+                          badge: f.year
+                      })
+                  )
+                  .join('')}</ul>`
+            : empty('No films waiting', 'Find a film and follow it: the bot writes when it comes out.', 'film');
     } else {
-        const items = (tab === 'archive' ? archive : running).filter((s) => matchesTitle(s.title, 'my-subs'));
+        const items = tab === 'archive' ? archive : running;
         body = items.length
-            ? `<ul class="glass-card mine-rows">${items.map((s) => row('mine-series', s.id, poster(s.poster), s.title, seriesNote(s), MODES[s.mode]?.short)).join('')}</ul>`
-            : filters['my-subs']
-              ? noMatches()
-              : tab === 'archive'
-                ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.')
-                : empty('No subscriptions yet', 'Find a series and subscribe to its new episodes.');
+            ? `<ul class="group-list title-list">${items
+                  .map((s) =>
+                      titleRow({
+                          action: 'mine-series',
+                          id: s.id,
+                          poster: s.poster,
+                          title: s.title,
+                          note: seriesNote(s),
+                          badge: MODES[s.mode]?.short
+                      })
+                  )
+                  .join('')}</ul>`
+            : tab === 'archive'
+              ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.', 'tv')
+              : empty('No series yet', 'Find a series and follow its new episodes.', 'tv');
     }
     return top + body;
 }
 
-function searchView() {
-    return (
-        searchForm({ context: 'account', inputId: 'mine-q', query: state.query, back: 'mine-search-close' }) +
-        '<div id="mine-results"></div>'
-    );
-}
+// --- The title card (Following and Calendar) ---
 
-function resultsView() {
-    return searchResults(state.results, {
-        open: 'mine-search-card',
-        series: 'mine-pick-series',
-        film: 'mine-add-film'
-    });
-}
+const CLOSE = 'mine-card-modal';
 
-// --- The card ---
-
-// The 'info' link is Kinopoisk's page: its logo and an out arrow, as in the panel's History
-const KP_LOGO = '<svg class="kp-logo" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>';
-const OUT_ARROW =
-    '<svg class="icon kp-out" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-up-right" /></svg>';
-
-const linkButtons = (links) =>
-    links.length
-        ? `<div class="mine-links">${links
-              .map((l) =>
-                  l.kind === 'watch'
-                      ? `<a class="btn btn-primary" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">▶ ${escapeHtml(l.label)}</a>`
-                      : `<a class="btn btn-ghost" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${KP_LOGO}<span>${escapeHtml(l.label)}</span>${OUT_ARROW}</a>`
-              )
-              .join('')}</div>`
-        : '';
-
-const cardHead = (picture, title, lines, rating = '') =>
-    `<div class="mine-card-head">${picture}<div><h3 id="mine-card-title">${escapeHtml(title)}</h3>${lines
+/** What the card's date block says: the next episode, the calendar's episode, a film's release */
+function dateBlock(item, event, today) {
+    if (event) {
+        const when = today ? whenText(event.date, today) : '';
+        const bell = Boolean(event.notifyOn);
+        const note = bell && event.notifyOn !== event.date ? `The bot messages you on ${dateText(event.notifyOn)}` : '';
+        if (event.kind === 'tv')
+            return {
+                label: `S${event.season}E${event.episode} · ${episodeName(event)}`,
+                value: [dateText(event.date, { withYear: true }), MARKS[event.mark]].filter(Boolean).join(' · '),
+                when,
+                bell,
+                note
+            };
+        return { label: 'Digital release', value: dateText(event.date, { withYear: true }), when, bell, note };
+    }
+    if (item.kind === 'tv') {
+        if (item.finished) return { label: 'Status', value: 'The series has ended' };
+        return item.next
+            ? {
+                  label: 'Next episode',
+                  value: `S${item.next.season}E${item.next.episode} · ${dateText(item.next.date, { withYear: true })}`,
+                  when: today ? whenText(item.next.date, today) : ''
+              }
+            : { label: 'Next episode', value: 'Date not known yet' };
+    }
+    const ru = [
+        item.ruPremiere ? `In Russian cinemas ${dateText(item.ruPremiere, { withYear: true })}` : '',
+        item.ruDigital ? `Online in Russia ${dateText(item.ruDigital, { withYear: true })}` : ''
+    ]
         .filter(Boolean)
-        .map((l) => `<p class="mine-dim">${escapeHtml(l)}</p>`)
-        .join('')}${rating}</div></div>`;
+        .join(' · ');
+    return item.date
+        ? {
+              label: 'Digital release',
+              value: dateText(item.date, { withYear: true }),
+              when: today ? whenText(item.date, today) : '',
+              note: ru
+          }
+        : { label: 'Digital release', value: 'Date not known yet', note: ru };
+}
 
-const CLOSE_X = cardClose('mine-card-modal');
-
-/** Following and Calendar share their subscription card and spacing. */
-function followingCard(item, { event = null, today, confirm = false }) {
-    const busy =
-        pendingModeSaves.has(titleKey(item, state.chatId)) || pendingUnfollows.has(titleKey(item, state.chatId));
+/** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */
+function followingCard(item, { event = null, today }) {
+    const key = titleKey(item, state.chatId);
+    const busy = pendingModeSaves.has(key) || pendingUnfollows.has(key);
     const tv = item.kind === 'tv';
-    const date = event?.date || (tv ? item.next?.date : item.date);
-    const release = date
-        ? `<div class="mine-release-date"><time datetime="${escapeHtml(date)}">${escapeHtml(dateText(date, { withYear: true }))}</time>${today ? `<span class="mine-release-count">${escapeHtml(whenText(date, today))}</span>` : ''}</div>`
-        : '<p class="mine-dim">Release date not known yet</p>';
-    const lines = tv
-        ? [
-              event
-                  ? `S${event.season}E${event.episode} · ${episodeName(event)}`
-                  : item.finished
-                    ? 'The series has ended'
-                    : item.next
-                      ? `Next: S${item.next.season}E${item.next.episode}`
-                      : 'Next episode date unknown',
-              event && MARKS[event.mark] ? MARKS[event.mark][0].toUpperCase() + MARKS[event.mark].slice(1) : '',
-              [item.genres, item.networks].filter(Boolean).join(' · ')
-          ]
-        : ['Film · digital release', item.genres];
-    const secondaryDates = !tv
-        ? [
-              item.ruPremiere ? `In Russian cinemas: ${dateText(item.ruPremiere, { withYear: true })}` : '',
-              item.ruDigital ? `Online in Russia: ${dateText(item.ruDigital, { withYear: true })}` : ''
-          ]
-              .filter(Boolean)
-              .map((text) => `<p class="mine-dim mine-card-note">${escapeHtml(text)}</p>`)
-              .join('')
-        : '';
-    return (
-        '<div class="mine-following-card">' +
-        cardHead(
-            poster(item.poster, 'mine-poster mine-poster-big', 'eager'),
-            item.title,
-            lines,
-            titleRating(item.rating) + release
-        ) +
-        secondaryDates +
-        (item.overview ? `<p class="mine-overview">${description(item.overview)}</p>` : '') +
-        (!event && tv && item.mode ? modesField('mine-mode', item.mode, item.id, busy) : '') +
-        (!tv ? '<p class="mine-dim mine-card-note">When the film is out, the bot sends links to watch it.</p>' : '') +
-        `<div class="mine-card-actions">${linkButtons(item.links || [])}${
-            item.id == null
-                ? ''
-                : confirm
-                  ? `<div class="mine-confirm"><p>Unfollow “${escapeHtml(item.title)}”?</p><p>It will leave this chat’s following list and calendar. Release notifications will stop.</p><div class="modal-actions"><button type="button" class="btn btn-danger btn-grow" data-action="mine-confirm-unfollow"${busy ? ' disabled' : ''}>Yes, unfollow</button><button type="button" class="btn btn-ghost" data-action="mine-keep-following">Keep following</button></div></div>`
-                  : `<button type="button" class="btn btn-danger-quiet btn-block" data-action="mine-ask-unfollow"${busy ? ' disabled' : ''}>Unfollow</button>`
-        }</div></div>`
+    const links = item.links || [];
+    const kinopoiskUrl = links.find((l) => l.kind === 'info')?.url || item.kinopoiskUrl || null;
+    const unfollow =
+        item.id == null
+            ? ''
+            : `<button type="button" class="sheet-btn-danger-soft" data-action="mine-ask-unfollow"${busy ? ' disabled' : ''}>Unfollow</button>`;
+    return titleCard(
+        {
+            kind: item.kind,
+            title: item.title,
+            poster: item.poster,
+            seasons: item.seasons,
+            year: item.year,
+            rating: item.rating,
+            genres: item.genres,
+            networks: item.networks,
+            overview: item.overview,
+            kinopoiskUrl,
+            date: dateBlock(item, event, today)
+        },
+        {
+            close: CLOSE,
+            notify:
+                !event && tv && item.mode
+                    ? notifyField({ name: 'mine-mode', current: item.mode, id: item.id, disabled: busy })
+                    : '',
+            extra: '<p class="sheet-error" id="mine-card-error" role="alert" hidden></p>',
+            actions: watchButton(links) + unfollow
+        }
     );
 }
 
@@ -429,10 +410,13 @@ function syncFollowingBusy(item, chatId) {
     const key = titleKey(item, chatId);
     if (!activeFollowing || titleKey(activeFollowing.item, activeFollowing.chatId) !== key) return;
     const busy = pendingModeSaves.has(key) || pendingUnfollows.has(key);
-    for (const control of all(
-        '#mine-card-body .mine-modes, #mine-card-body [data-action="mine-ask-unfollow"], #mine-card-body [data-action="mine-confirm-unfollow"]'
-    )) {
+    for (const control of all('#mine-card-body .mine-modes, #mine-card-body [data-action="mine-ask-unfollow"]')) {
         /** @type {HTMLFieldSetElement | HTMLButtonElement} */ (control).disabled = busy;
+    }
+    const unfollowButton = document.querySelector('#mine-card-body [data-action="mine-ask-unfollow"]');
+    if (unfollowButton) {
+        unfollowButton.toggleAttribute('aria-busy', pendingUnfollows.has(key));
+        unfollowButton.textContent = pendingUnfollows.has(key) ? 'Unfollowing…' : 'Unfollow';
     }
 }
 
@@ -459,29 +443,56 @@ const episodeName = (item) => item.name || `Episode ${item.episode}`;
 
 /** An episode or a film from the calendar */
 function releaseCard(item, today) {
-    openFollowing(
-        {
-            ...item,
-            id: item.kind === 'tv' ? item.tmdbId : item.listId,
-            links:
-                item.links || (item.kinopoiskUrl ? [{ kind: 'info', label: 'Kinopoisk', url: item.kinopoiskUrl }] : [])
-        },
-        { event: item.kind === 'tv' ? item : null, today }
-    );
+    openFollowing({ ...item, id: item.kind === 'tv' ? item.tmdbId : item.listId }, { event: item, today });
 }
 
 function openCard(html, tmdbId = null) {
     activeFollowing = null;
     cardVersion += 1;
     searchCardId = tmdbId;
-    $('mine-card-body').innerHTML = html + CLOSE_X;
+    $('mine-card-modal').innerHTML =
+        `<div class="modal-content modal-narrow sheet-content title-sheet" id="mine-card-body">${html}</div>`;
     openModal('mine-card-modal');
+    fitDescriptions($('mine-card-modal'));
 }
 
 let cardVersion = 0;
 let searchCardId = null;
 let searchRequest = 0;
 const pendingAdds = new Set();
+
+/** Unfollow after the confirmation; a failure stays on the card, next to the button */
+async function unfollow(context) {
+    const { item, chatId } = context;
+    const key = titleKey(item, chatId);
+    if (pendingUnfollows.has(key) || pendingModeSaves.has(key)) return;
+    pendingUnfollows.add(key);
+    syncFollowingBusy(item, chatId);
+    const cardNow = cardVersion;
+    const error = $('mine-card-error');
+    if (error) error.hidden = true;
+    try {
+        await api(
+            `/account/chats/${encodeURIComponent(chatId)}/${item.kind === 'tv' ? 'series' : 'films'}/${encodeURIComponent(item.id)}`,
+            { method: 'DELETE' }
+        );
+        if (state.chatId !== chatId) return;
+        if (cardVersion === cardNow) closeModal('mine-card-modal');
+        toast('Unfollowed', 'success');
+        state.cal = null;
+        state.list = null;
+        await reload();
+    } catch (err) {
+        const shown = cardVersion === cardNow && $('mine-card-error');
+        if (shown) {
+            shown.textContent = err.message;
+            shown.hidden = false;
+        } else toast(err.message, 'error');
+    } finally {
+        pendingUnfollows.delete(key);
+        syncFollowingBusy(item, chatId);
+    }
+}
 
 // --- Released: the same view as the admin panel, scoped to the selected chat ---
 let airedHistory = null;
@@ -494,26 +505,27 @@ function getAiredHistory() {
 }
 function resetAired() {
     airedHistory?.reset();
-    closeModal('detail-modal');
+    closeModal('released-modal');
     const body = $('my-aired-body');
-    if (body) body.innerHTML = loading();
+    if (body) body.innerHTML = loading(6);
 }
 
 // --- Calendar ---
 
 const calWhatOf = (kind) => (kind === 'movie' ? 'films' : 'series');
 
-function calRow(item, index, today) {
+const BELL = `<span class="cal-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${ICON('bell')}</span>`;
+
+function calRow(item, index, today, sameDay) {
     const sub =
         item.kind === 'tv'
             ? [`S${item.season}E${item.episode}`, episodeName(item), MARKS[item.mark]].filter(Boolean).join(' · ')
             : 'Digital release';
-    const n = daysUntil(item.date, today);
     return (
-        `<li><button type="button" class="mine-row mine-cal-row" data-action="mine-cal-item" data-index="${index}">` +
-        `<span class="mine-cal-date"><b>${item.date.slice(8, 10)}</b>${weekday(item.date)}</span>${poster(item.poster)}` +
-        `<span class="mine-row-text"><span class="mine-row-title">${escapeHtml(item.title)}</span><span class="mine-dim mine-cal-sub">${escapeHtml(sub)}</span></span>` +
-        `<span class="mine-cal-when${n === 0 ? ' today' : ''}">${whenText(item.date, today)}</span></button></li>`
+        `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
+        `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${thumb(item.poster, 'title-thumb cal-thumb')}` +
+        `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta">${escapeHtml(sub)}</span></span>` +
+        `<span class="cal-when">${item.notifyOn ? BELL : ''}<span>${whenText(item.date, today)}</span></span></button></li>`
     );
 }
 
@@ -525,42 +537,43 @@ const monthTitle = (key, today) =>
         ...(key.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' })
     });
 
-/** Yesterday and what is still to come, in one card by date, a month's name before its first row */
+/** Yesterday and what is still to come, a card per month, the day shown once for its rows */
 function daysBody(data) {
     const shown = data.items
         .map((item, index) => ({ item, index }))
-        .filter(
-            ({ item }) =>
-                calWhatOf(item.kind) === state.calWhat &&
-                daysUntil(item.date, data.today) >= -1 &&
-                matchesTitle(item.title, 'my-calendar')
-        );
+        .filter(({ item }) => calWhatOf(item.kind) === state.calWhat && daysUntil(item.date, data.today) >= -1);
     if (!shown.length)
-        return filters['my-calendar']
-            ? noMatches()
-            : state.calWhat === 'films'
-              ? empty('No films coming', 'No films on the list have a release date yet.')
-              : empty('No episodes coming', 'No subscribed series have dated episodes yet.');
-    let month = '';
-    const rows = shown.map(({ item, index }) => {
-        const key = item.date.slice(0, 7);
-        const head = key === month ? '' : `<li class="mine-cal-month">${monthTitle(key, data.today)}</li>`;
-        month = key;
-        return head + calRow(item, index, data.today);
-    });
-    return `<ul class="glass-card mine-rows">${rows.join('')}</ul>`;
+        return state.calWhat === 'films'
+            ? empty('No films coming', 'No films on the list have a release date yet.', 'film')
+            : empty('No episodes coming', 'No followed series have dated episodes yet.', 'calendar-days');
+    const months = [];
+    for (const entry of shown) {
+        const key = entry.item.date.slice(0, 7);
+        if (!months.length || months[months.length - 1].key !== key) months.push({ key, rows: [] });
+        months[months.length - 1].rows.push(entry);
+    }
+    return months
+        .map(
+            ({ key, rows }) =>
+                `<h2 class="group-title">${monthTitle(key, data.today)}</h2><ul class="group-list cal-list">${rows
+                    .map(({ item, index }, i) =>
+                        calRow(item, index, data.today, i > 0 && rows[i - 1].item.date === item.date)
+                    )
+                    .join('')}</ul>`
+        )
+        .join('');
 }
 
 /** One list from yesterday on */
 function calendarView(data) {
-    const body = !data ? loading() : daysBody(data);
+    const body = !data ? loading(4) : daysBody(data);
     const note =
         data && data.failed && state.calWhat === 'series'
-            ? `<p class="mine-dim">TMDB didn't answer for ${data.failed} series: their episodes may be missing here.</p>`
+            ? `<p class="group-help">TMDB didn't answer for ${data.failed} series: their episodes may be missing here.</p>`
             : '';
     return (
-        '<div class="mine-toolbar mine-cal-bar">' +
-        tabs(
+        '<div class="cat-bar mine-cal-bar">' +
+        chips(
             [
                 ['series', 'Series'],
                 ['films', 'Films']
@@ -573,6 +586,40 @@ function calendarView(data) {
         body +
         note
     );
+}
+
+// --- Search ---
+
+/** The tab the search was opened from: its Back returns there */
+let searchFrom = 'my-subs';
+let searchTimer = 0;
+
+function resultsView() {
+    if (state.searchError) return failed(state.searchError);
+    if (!state.query)
+        return empty(
+            'Find a series or film',
+            'Type a title in any language. Follow it to get messages in the chosen chat.',
+            'search'
+        );
+    if (state.searching) return loading(4);
+    return searchResults(state.results, {
+        open: 'mine-search-card',
+        series: 'mine-pick-series',
+        film: 'mine-add-film'
+    });
+}
+
+const showResults = () => {
+    const box = $('mine-results');
+    if (box) box.innerHTML = resultsView();
+};
+
+function syncSearchField() {
+    const input = /** @type {HTMLInputElement | null} */ ($('mine-q'));
+    if (!input) return;
+    if (input.value !== state.query && document.activeElement !== input) input.value = state.query;
+    $('mine-q-clear').hidden = !input.value;
 }
 
 // --- Settings ---
@@ -658,7 +705,7 @@ function settingsView(data) {
 
 /**
  * Whose settings these are: the chat's letter, name and kind, and whether the user may change them.
- * A tap opens the profile menu with the chats, as the chip on the other sections does
+ * A tap opens the chats, as the chip on the tabs does
  */
 function chatCard(data) {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
@@ -666,7 +713,7 @@ function chatCard(data) {
     const group = Boolean(data.group);
     const meta = !group ? 'Your personal chat' : data.canChange ? 'You’re an admin' : 'Only admins change settings';
     return (
-        `<button type="button" class="group-card chat-card" data-action="profile-open" aria-haspopup="dialog" title="Switch chat">` +
+        `<button type="button" class="group-card chat-card" data-action="chat-switch" aria-haspopup="dialog" aria-label="Current chat: ${escapeHtml(title)}. Switch chat">` +
         `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(title))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(title)}</span>` +
         `<span class="role-chip">${group ? 'Group' : 'Private'}</span></span>` +
@@ -677,10 +724,16 @@ function chatCard(data) {
 
 // --- Loading a section ---
 
-let searchOpen = false;
+const SECTIONS = ['my-aired', 'my-subs', 'my-calendar', 'my-settings', 'my-search'];
 
-/** Fills one of the three sections (data.js calls it like the panel's own loaders). */
+/** Fills one of the sections (data.js calls it like the panel's own loaders). */
 export async function loadMine(section) {
+    if (!SECTIONS.includes(section)) return;
+    if (section === 'my-search') {
+        syncSearchField();
+        if ($('mine-results') && !$('mine-results').firstChild) showResults();
+        return;
+    }
     const body = $(`${section}-body`);
     if (!body) return;
     if (state.chatsError) {
@@ -688,7 +741,7 @@ export async function loadMine(section) {
         return;
     }
     if (!state.chats) {
-        body.innerHTML = loading();
+        body.innerHTML = section === 'my-settings' ? loading(2) : loading();
         return;
     }
     const chatNow = state.chatId;
@@ -702,13 +755,6 @@ export async function loadMine(section) {
         if (section === 'my-aired') {
             await getAiredHistory().load();
         } else if (section === 'my-subs') {
-            if (searchOpen) {
-                if (!body.querySelector('#mine-q')) {
-                    body.innerHTML = searchView();
-                    if (state.query) $('mine-results').innerHTML = resultsView();
-                }
-                return;
-            }
             if (!state.list) body.innerHTML = loading();
             const list = await api(chatPath('/list'));
             if (stale()) return;
@@ -721,7 +767,7 @@ export async function loadMine(section) {
             state.cal = data;
             body.innerHTML = calendarView(data);
         } else if (section === 'my-settings') {
-            if (!body.querySelector('.group-list')) body.innerHTML = loading();
+            if (!body.querySelector('.group-list')) body.innerHTML = loading(2);
             const data = await api(chatPath('/settings'));
             if (stale()) return;
             body.innerHTML = settingsView(data);
@@ -748,8 +794,7 @@ const findFilm = (id) => state.list && state.list.films.find((f) => String(f.id)
 function markAdded(tmdbId) {
     const r = state.results.find((x) => x.tmdbId === tmdbId);
     if (r) r.added = true;
-    const results = $('mine-results');
-    if (results && state.query) results.innerHTML = resultsView();
+    if (state.query) showResults();
 }
 
 async function changeSettings(body) {
@@ -766,20 +811,35 @@ const showCalendar = () => {
     $('my-calendar-body').innerHTML = calendarView(state.cal);
 };
 
+/** Adds a title from the search; the button is busy until the answer, the sheet closes on success */
+async function addTitle(el, path, body, done) {
+    const chatNow = state.chatId;
+    const cardNow = cardVersion;
+    const key = `${chatNow}:${el.dataset.id}`;
+    if (pendingAdds.has(key)) return;
+    pendingAdds.add(key);
+    const button = /** @type {HTMLButtonElement} */ (el);
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    try {
+        const answer = await api(chatPath(path), { method: 'POST', body });
+        toast(done(answer), 'success');
+        if (state.chatId !== chatNow) return;
+        if (cardVersion === cardNow || searchCardId === el.dataset.id) closeModal('mine-card-modal');
+        markAdded(el.dataset.id);
+        state.list = null;
+    } catch (err) {
+        button.disabled = false;
+        toast(err.message, 'error');
+    } finally {
+        pendingAdds.delete(key);
+        button.removeAttribute('aria-busy');
+    }
+}
+
 /** Click handlers, merged into app.js's delegation like the other modules' */
 export const accountActions = {
-    'mine-filter-toggle': (el) => {
-        const section = el.dataset.page;
-        if (!Object.hasOwn(filters, section)) return;
-        if (filterOpen(section)) return closeFilter(section);
-        showFilter(section, true);
-        $(`${section}-filter`).focus();
-    },
-    'mine-filter-close': (el) => {
-        const section = el.dataset.page;
-        closeFilter(section);
-        filterToggle(section).focus();
-    },
+    'chat-switch': openChatSwitch,
     'mine-reload': () => {
         state.list = null;
         if (!state.chatsError) {
@@ -806,55 +866,45 @@ export const accountActions = {
         const f = findFilm(el.dataset.id);
         if (f) openFollowing({ ...f, kind: 'movie' });
     },
-    'mine-ask-unfollow': () => {
-        if (activeFollowing?.chatId !== state.chatId) return;
-        if (pendingModeSaves.has(titleKey(activeFollowing.item, activeFollowing.chatId))) return;
-        openFollowing(activeFollowing.item, { ...activeFollowing, confirm: true });
-    },
-    'mine-keep-following': () => {
-        if (activeFollowing?.chatId !== state.chatId) return;
-        openFollowing(activeFollowing.item, { ...activeFollowing, confirm: false });
-    },
-    'mine-confirm-unfollow': async (el) => {
+    'mine-ask-unfollow': (el) => {
         const context = activeFollowing;
-        if (!context || context.chatId !== state.chatId || el.disabled) return;
-        const { item, chatId } = context;
-        const key = titleKey(item, chatId);
-        if (pendingUnfollows.has(key) || pendingModeSaves.has(key)) return;
-        pendingUnfollows.add(key);
-        syncFollowingBusy(item, chatId);
-        const cardNow = cardVersion;
-        el.disabled = true;
-        try {
-            await api(
-                `/account/chats/${encodeURIComponent(chatId)}/${item.kind === 'tv' ? 'series' : 'films'}/${encodeURIComponent(item.id)}`,
-                { method: 'DELETE' }
-            );
-            if (state.chatId !== chatId) return;
-            if (cardVersion === cardNow) closeModal('mine-card-modal');
-            toast('No longer following', 'success');
-            state.cal = null;
-            state.list = null;
-            await reload();
-        } catch (err) {
-            toast(err.message, 'error');
-        } finally {
-            pendingUnfollows.delete(key);
-            syncFollowingBusy(item, chatId);
-        }
+        if (!context || context.chatId !== state.chatId || /** @type {HTMLButtonElement} */ (el).disabled) return;
+        const key = titleKey(context.item, context.chatId);
+        if (pendingModeSaves.has(key) || pendingUnfollows.has(key)) return;
+        showConfirm({
+            title: `Unfollow “${context.item.title}”?`,
+            text: 'It will leave this chat’s following list and calendar. Release notifications will stop.',
+            confirmLabel: 'Unfollow',
+            cancelLabel: 'Keep following',
+            onConfirm: () => unfollow(context)
+        });
     },
+    // The search pill and Following's +: Back on the search returns to the tab it came from
     'mine-search-open': () => {
-        closeFilter('my-subs');
-        searchOpen = true;
-        $('my-subs-body').innerHTML = searchView();
-        if (state.query) $('mine-results').innerHTML = resultsView();
-        $('mine-q').focus();
+        const from = visibleSection();
+        if (from && from !== 'my-search') searchFrom = from;
+        const back = $('mine-search-back');
+        if (back) back.dataset.section = searchFrom;
+        window.setTimeout(() => $('mine-q')?.focus(), 0);
     },
     'mine-search-close': () => {
-        searchOpen = false;
+        window.clearTimeout(searchTimer);
+        searchRequest += 1;
         state.query = '';
         state.results = [];
-        reload();
+        state.searchError = null;
+        state.searching = false;
+        const input = /** @type {HTMLInputElement | null} */ ($('mine-q'));
+        if (input) input.value = '';
+        showResults();
+        syncSearchField();
+    },
+    'mine-search-clear': () => {
+        const input = /** @type {HTMLInputElement} */ ($('mine-q'));
+        input.value = '';
+        searchAccount('');
+        syncSearchField();
+        input.focus();
     },
     'mine-search-card': (el) => {
         const r = state.results.find((x) => x.tmdbId === el.dataset.id);
@@ -864,61 +914,21 @@ export const accountActions = {
         const r = state.results.find((x) => x.tmdbId === el.dataset.id);
         if (r) openNewCard(r);
     },
-    'mine-subscribe': async (el) => {
-        const chatNow = state.chatId;
-        const cardNow = cardVersion;
-        const key = `${chatNow}:${el.dataset.id}`;
-        if (pendingAdds.has(key)) return;
-        pendingAdds.add(key);
+    'mine-subscribe': (el) => {
         const picked = /** @type {HTMLInputElement | null} */ (
             document.querySelector('input[name="mine-new-mode"]:checked')
         );
-        const button = /** @type {HTMLButtonElement} */ (el);
-        button.disabled = true;
-        try {
-            await api(chatPath('/series'), {
-                method: 'POST',
-                body: { tmdbId: el.dataset.id, mode: picked ? picked.value : 'episode' }
-            });
-            toast('Subscribed', 'success');
-            if (state.chatId !== chatNow) return;
-            if (cardVersion === cardNow || searchCardId === el.dataset.id) closeModal('mine-card-modal');
-            markAdded(el.dataset.id);
-            state.list = null;
-        } catch (err) {
-            button.disabled = false;
-            toast(err.message, 'error');
-        } finally {
-            pendingAdds.delete(key);
-        }
+        return addTitle(
+            el,
+            '/series',
+            { tmdbId: el.dataset.id, mode: picked ? picked.value : 'episode' },
+            () => 'Following'
+        );
     },
-    'mine-add-film': async (el) => {
-        const chatNow = state.chatId;
-        const cardNow = cardVersion;
-        const key = `${chatNow}:${el.dataset.id}`;
-        if (pendingAdds.has(key)) return;
-        pendingAdds.add(key);
-        const button = /** @type {HTMLButtonElement} */ (el);
-        button.disabled = true;
-        try {
-            const { released } = await api(chatPath('/films'), { method: 'POST', body: { tmdbId: el.dataset.id } });
-            toast(
-                released
-                    ? 'The film is already out: added to the released ones'
-                    : 'The bot writes when the film is out',
-                'success'
-            );
-            if (state.chatId !== chatNow) return;
-            if (cardVersion === cardNow || searchCardId === el.dataset.id) closeModal('mine-card-modal');
-            markAdded(el.dataset.id);
-            state.list = null;
-        } catch (err) {
-            button.disabled = false;
-            toast(err.message, 'error');
-        } finally {
-            pendingAdds.delete(key);
-        }
-    },
+    'mine-add-film': (el) =>
+        addTitle(el, '/films', { tmdbId: el.dataset.id }, ({ released }) =>
+            released ? 'The film is already out: added to the released ones' : 'Following: the bot writes when it’s out'
+        ),
     'mine-cal-what': (el) => {
         state.calWhat = el.dataset.what === 'films' ? 'films' : 'series';
         showCalendar();
@@ -949,21 +959,18 @@ export const accountActions = {
     }
 };
 
-/** The mode radios and the search form. */
+/** The mode radios and the search field. */
 export function setupAccount() {
+    // The search runs as the person types (after a pause), or at once on Enter (setupSearchForms)
     document.addEventListener('input', (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
-        const section = input.dataset.mineFilter;
-        if (!Object.hasOwn(filters, section)) return;
-        filters[section] = input.value;
-        renderFiltered(section);
-    });
-    document.addEventListener('keydown', (event) => {
-        const input = /** @type {HTMLInputElement} */ (event.target);
-        if (event.key === 'Escape' && Object.hasOwn(filters, input.dataset.mineFilter)) {
-            event.preventDefault();
-            accountActions['mine-filter-close']({ dataset: { page: input.dataset.mineFilter } });
-        }
+        if (input.id !== 'mine-q') return;
+        syncSearchField();
+        window.clearTimeout(searchTimer);
+        const query = input.value.trim();
+        searchTimer = window.setTimeout(() => {
+            if (query.length >= 2 || !query) searchAccount(query);
+        }, 450);
     });
     document.addEventListener('change', async (event) => {
         const el = /** @type {HTMLInputElement | HTMLSelectElement} */ (event.target);
@@ -988,7 +995,9 @@ export function setupAccount() {
                 if (state.chatId !== chatNow) return;
                 const listed = findSeries(s.id);
                 if (listed) listed.mode = el.value;
-                if (state.cal) for (const item of state.cal.items) if (item.tmdbId === s.id) item.mode = el.value;
+                if (state.cal) for (const row of state.cal.items) if (row.tmdbId === s.id) row.mode = el.value;
+                // The bells follow the mode: the calendar asks again when it opens
+                state.cal = null;
                 if (activeFollowing && titleKey(activeFollowing.item, activeFollowing.chatId) === key) {
                     activeFollowing.item.mode = el.value;
                     for (const radio of all('#mine-card-body input[data-mine="mode"]')) {
@@ -997,7 +1006,7 @@ export function setupAccount() {
                     }
                 }
                 toast('Notifications changed', 'success');
-                if (state.list && !searchOpen) $('my-subs-body').innerHTML = subsView();
+                if (state.list && visibleSection() === 'my-subs') $('my-subs-body').innerHTML = subsView();
             } catch (err) {
                 toast(err.message, 'error');
                 if (state.chatId === chatNow && context && cardVersion === cardNow) openFollowing(s, context);
@@ -1011,25 +1020,32 @@ export function setupAccount() {
 
 /** Role-specific loading behind the shared search form. */
 export async function searchAccount(query) {
+    window.clearTimeout(searchTimer);
+    const request = ++searchRequest;
+    state.query = query;
+    state.searchError = null;
     if (!query) {
-        searchRequest += 1;
-        state.query = '';
         state.results = [];
-        if ($('mine-results')) $('mine-results').innerHTML = '';
+        state.searching = false;
+        showResults();
         return;
     }
-    state.query = query;
-    const request = ++searchRequest;
+    if (!state.chatId) {
+        state.searchError = state.chatsError || 'Your chats are still loading. Try again in a moment.';
+        showResults();
+        return;
+    }
     const chatNow = state.chatId;
-    const results = $('mine-results');
-    results.innerHTML = loading();
+    state.searching = true;
+    showResults();
     try {
         const found = await api(chatPath(`/search?q=${encodeURIComponent(query)}`));
-        if (request !== searchRequest || state.query !== query || state.chatId !== chatNow || !searchOpen) return;
+        if (request !== searchRequest || state.chatId !== chatNow) return;
         state.results = found;
-        if ($('mine-results')) $('mine-results').innerHTML = resultsView();
     } catch (err) {
-        if (request === searchRequest && state.chatId === chatNow && searchOpen)
-            results.innerHTML = failed(err.message);
+        if (request !== searchRequest || state.chatId !== chatNow) return;
+        state.searchError = err.message;
     }
+    state.searching = false;
+    showResults();
 }

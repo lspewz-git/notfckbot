@@ -2,6 +2,8 @@ const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
 const { watchConsole, openSection, pickChat } = require('./helpers');
 
+const confirmUnfollow = (page) => page.locator('#confirm-modal').getByRole('button', { name: 'Unfollow', exact: true });
+
 test.describe('shared cards and calendar unfollow', () => {
     watchConsole();
 
@@ -12,14 +14,14 @@ test.describe('shared cards and calendar unfollow', () => {
             release = resolve;
         });
         await openSection(page, 'my-subs');
-        await page.locator('#my-subs-body .mine-row').first().click();
+        await page.locator('#my-subs-body button.title-row').first().click();
         const card = page.locator('#mine-card-modal');
         try {
-            await card.getByLabel('When the whole season is out').check();
+            await card.getByText('When the whole season is out').click();
             await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeDisabled();
             await card.getByRole('button', { name: 'Close', exact: true }).click();
             await openSection(page, 'my-calendar');
-            const episode = page.locator('#my-calendar-body .mine-cal-row').first();
+            const episode = page.locator('#my-calendar-body button.cal-row').first();
             await episode.click();
             await expect(card.locator('.mine-modes')).toHaveCount(0);
             await card.getByRole('button', { name: 'Close', exact: true }).click();
@@ -32,22 +34,23 @@ test.describe('shared cards and calendar unfollow', () => {
         await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeEnabled();
         await expect(card.locator('.mine-modes')).toHaveCount(0);
         await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
-        await card.getByRole('button', { name: 'Yes, unfollow', exact: true }).click();
+        await confirmUnfollow(page).click();
         await expect(card).toBeHidden();
+        await expect(page.locator('.toast').last()).toContainText('Unfollowed');
         expect(panel.account.series.some((item) => item.id === 'tv_100')).toBe(false);
     });
 
     test('notification mode can be changed in Following and is absent from Calendar', async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });
         await openSection(page, 'my-calendar');
-        await page.locator('#my-calendar-body .mine-cal-row').first().click();
+        await page.locator('#my-calendar-body button.cal-row').first().click();
         const card = page.locator('#mine-card-modal');
         await expect(card.locator('.mine-modes')).toHaveCount(0);
         expect(panel.account.sent.filter((r) => r.method === 'POST' && r.path.endsWith('/series'))).toHaveLength(0);
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-subs');
-        await page.locator('#my-subs-body .mine-row').first().click();
-        await card.getByLabel('When the whole season is out').check();
+        await page.locator('#my-subs-body button.title-row').first().click();
+        await card.getByText('When the whole season is out').click();
         await expect(page.locator('.toast').last()).toContainText('Notifications changed');
         expect(panel.account.sent.find((r) => r.method === 'POST' && r.path.endsWith('/series')).body).toEqual({
             tmdbId: 'tv_100',
@@ -55,32 +58,52 @@ test.describe('shared cards and calendar unfollow', () => {
         });
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-calendar');
-        await page.locator('#my-calendar-body .mine-cal-row').first().click();
+        await page.locator('#my-calendar-body button.cal-row').first().click();
         await expect(card.locator('.mine-modes')).toHaveCount(0);
     });
 
-    test('Following and Calendar use the same film card, compact date and spaced actions', async ({ page }) => {
+    test('Following and Calendar share the title card: rows without data are left out', async ({ page }) => {
         await mockPanel(page, { role: 'user' });
         await openSection(page, 'my-subs');
         await expect(page.locator('#my-subs-section h1')).toHaveText('Following');
         await page.locator('[data-action="mine-subs-tab"][data-tab="films"]').click();
-        await page.locator('#my-subs-body .mine-row').click();
+        await page.locator('#my-subs-body button.title-row').click();
         const card = page.locator('#mine-card-modal');
-        const following = await card.locator('.mine-following-card').innerHTML();
+        await expect(card.locator('.tc-head h2')).toBeVisible();
+        await expect(card.locator('.tc-date')).toContainText('in 2 days');
+        await expect(card.locator('.tc-overview')).toBeVisible();
         const gap = await card.evaluate((el) => {
-            const note = el.querySelector('.mine-card-note').getBoundingClientRect();
-            const button = el.querySelector('.mine-links').getBoundingClientRect();
-            return button.top - note.bottom;
+            const above = el.querySelector('.tc-actions').previousElementSibling.getBoundingClientRect();
+            return el.querySelector('.tc-actions').getBoundingClientRect().top - above.bottom;
         });
         expect(gap).toBeGreaterThanOrEqual(20);
-        const date = card.locator('.mine-card-head .mine-release-date');
-        await expect(date).toContainText('In 2 days');
-        expect(await date.evaluate((el) => getComputedStyle(el).borderStyle)).toBe('none');
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-calendar');
         await page.locator('[data-action="mine-cal-what"][data-what="films"]').click();
-        await page.locator('#my-calendar-body .mine-cal-row', { hasText: 'Дюна' }).click();
-        await expect(card.locator('.mine-following-card')).toHaveJSProperty('innerHTML', following);
+        await page.locator('#my-calendar-body button.cal-row', { hasText: 'Дюна' }).click();
+        await expect(card.locator('.tc-head h2')).toHaveText('Дюна: Часть третья');
+        await expect(card.locator('.tc-rating')).toContainText('7.4');
+        // A long overview is cut at three lines, Show more opens it
+        const more = card.getByRole('button', { name: 'Show more', exact: true });
+        await expect(more).toBeVisible();
+        await more.click();
+        await expect(card.getByRole('button', { name: 'Show less', exact: true })).toHaveAttribute(
+            'aria-expanded',
+            'true'
+        );
+    });
+
+    test('the calendar bell marks the days the bot writes, and the card says when', async ({ page }) => {
+        await mockPanel(page, { role: 'user' });
+        await openSection(page, 'my-calendar');
+        const rows = page.locator('#my-calendar-body button.cal-row');
+        await expect(rows.filter({ hasText: 'Одни из нас' }).locator('.cal-bell')).toHaveCount(1);
+        await expect(rows.filter({ hasText: 'Gone Show' }).locator('.cal-bell')).toHaveCount(0);
+        await rows.filter({ hasText: 'Одни из нас' }).click();
+        const card = page.locator('#mine-card-modal');
+        await expect(card.locator('.tc-date .tc-bell')).toHaveCount(1);
+        await expect(card.locator('.tc-date')).toContainText('The bot messages you on Nov 5');
+        await expect(card.getByRole('link', { name: 'Watch on SSPoisk' })).toBeVisible();
     });
 
     for (const kind of ['series', 'films']) {
@@ -92,17 +115,19 @@ test.describe('shared cards and calendar unfollow', () => {
             await pickChat(page, 'my-calendar', 'Киноклуб');
             const body = page.locator('#my-calendar-body');
             if (kind === 'films') await body.locator('[data-action="mine-cal-what"][data-what="films"]').click();
-            await body.locator('.mine-cal-row', { hasText: kind === 'series' ? 'Одни из нас' : 'Дюна' }).click();
+            await body.locator('button.cal-row', { hasText: kind === 'series' ? 'Одни из нас' : 'Дюна' }).click();
             const card = page.locator('#mine-card-modal');
+            const confirm = page.locator('#confirm-modal');
             const deletes = () => panel.account.sent.filter((r) => r.method === 'DELETE');
             await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
-            await expect(card).toContainText('Release notifications will stop.');
+            await expect(confirm).toContainText('Release notifications will stop.');
             expect(deletes()).toHaveLength(0);
-            await card.getByRole('button', { name: 'Keep following', exact: true }).click();
-            await expect(card.locator('.mine-confirm')).toHaveCount(0);
+            await confirm.getByRole('button', { name: 'Keep following', exact: true }).click();
+            await expect(confirm).toBeHidden();
+            await expect(card).toBeVisible();
             expect(deletes()).toHaveLength(0);
             await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
-            await card.getByRole('button', { name: 'Yes, unfollow', exact: true }).click();
+            await confirmUnfollow(page).click();
             await expect(card).toBeHidden();
             await expect(body).not.toContainText(kind === 'series' ? 'Одни из нас' : 'Дюна');
             expect(deletes().map((r) => r.path)).toEqual([
@@ -117,57 +142,66 @@ test.describe('shared cards and calendar unfollow', () => {
 
 test.describe('unfollow service outage', () => {
     watchConsole({ ignore: /status of 503/ });
-    test('failed calendar unfollow keeps the card and can be retried', async ({ page }) => {
+    test('a failed unfollow shows the error on the card, which stays and can retry', async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });
         panel.account.unfollowError = true;
         await openSection(page, 'my-calendar');
-        await page.locator('#my-calendar-body .mine-cal-row').first().click();
+        await page.locator('#my-calendar-body button.cal-row').first().click();
         const card = page.locator('#mine-card-modal');
         await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
-        await card.getByRole('button', { name: 'Yes, unfollow', exact: true }).click();
-        await expect(page.locator('.toast').last()).toContainText('Could not unfollow');
+        await confirmUnfollow(page).click();
+        await expect(card.locator('#mine-card-error')).toContainText('Could not unfollow');
         await expect(card).toBeVisible();
-        await expect(card.getByRole('button', { name: 'Yes, unfollow', exact: true })).toBeEnabled();
+        await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toBeEnabled();
         panel.account.unfollowError = false;
-        await card.getByRole('button', { name: 'Yes, unfollow', exact: true }).click();
+        await card.getByRole('button', { name: 'Unfollow', exact: true }).click();
+        await confirmUnfollow(page).click();
         await expect(card).toBeHidden();
     });
 });
 
-test.describe('local title search', () => {
+test.describe('the title search page', () => {
     watchConsole();
-    test('quiet search filters each user page, closes with its cross/Escape, and Released is renamed', async ({
+    test('the search pill opens it from each tab; Back returns there; results Follow or show Following', async ({
         page
     }) => {
         const panel = await mockPanel(page, { role: 'user' });
-        for (const section of ['my-subs', 'my-calendar', 'my-aired']) {
+        for (const section of ['my-calendar', 'my-aired', 'my-subs']) {
             await openSection(page, section);
-            const area = page.locator(`#${section}-section`);
-            const toggle = area.getByRole('button', { name: 'Search titles', exact: true });
-            const input = area.locator('[data-mine-filter]');
-            await expect(input).toBeHidden();
-            if (section === 'my-aired') await expect(area.locator('h1')).toHaveText('Released');
-            await toggle.click();
-            await expect(input).toBeFocused();
-            const sentBeforeTyping = panel.account.sent.length;
-            await input.fill('  ОДНИ  ');
-            const rows = area.locator(section === 'my-aired' ? '.history-item:not(.history-filler)' : '.mine-row');
-            await expect(rows).toHaveCount(1);
-            await expect(rows).toContainText('Одни из нас');
-            await input.fill('no-such-title');
-            await expect(area).toContainText('No matching titles');
-            expect(panel.account.sent.slice(sentBeforeTyping).some((r) => r.path.includes('/search'))).toBe(false);
-            // The field covers the magnifier; its own cross closes it
-            await expect(toggle).toBeHidden();
-            await area.getByRole('button', { name: 'Close search', exact: true }).click();
-            await expect(input).toBeHidden();
-            await expect(rows).toHaveCount(2);
-            await toggle.click();
-            await input.fill('no-such-title');
-            await input.press('Escape');
-            await expect(input).toBeHidden();
-            await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-            await expect(rows).toHaveCount(2);
+            await page.locator(`#${section}-section .search-pill`).click();
+            await expect(page.locator('#my-search-section')).toHaveClass(/active/);
+            await expect(page.locator('#mine-q')).toBeFocused();
+            await expect(page.locator('#mine-results')).toContainText('Find a series or film');
+            await page.locator('#mine-search-back').click();
+            await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
         }
+        // Following's "+" opens it too; typing searches after a pause
+        await page.getByRole('link', { name: 'Follow a title' }).click();
+        await page.locator('#mine-q').fill('Дюна');
+        await expect(page.locator('#mine-results .search-row')).toHaveCount(3);
+        expect(panel.account.sent.filter((r) => r.path.includes('/search'))).toHaveLength(1);
+        await expect(page.locator('#mine-results .search-row', { hasText: 'Часть третья' })).toContainText(
+            'Following'
+        );
+        // The clear cross empties the field and the results
+        await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+        await expect(page.locator('#mine-q')).toHaveValue('');
+        await expect(page.locator('#mine-results')).toContainText('Find a series or film');
+        // A series' Follow opens its sheet with Notify me; Follow there subscribes
+        await page.locator('#mine-q').fill('Дюна');
+        await page.getByRole('button', { name: 'Follow Дюна: Пророчество', exact: true }).click();
+        const card = page.locator('#mine-card-modal');
+        await expect(card.locator('.tc-notify')).toBeVisible();
+        await expect(card.locator('.tc-rating')).toContainText('7.1');
+        await card.getByText('Episode 1 and the whole season').click();
+        await card.getByRole('button', { name: 'Follow', exact: true }).click();
+        await expect(card).toBeHidden();
+        expect(panel.account.sent.find((r) => r.method === 'POST' && r.path.endsWith('/series')).body).toEqual({
+            tmdbId: 'tv_500',
+            mode: 'first_and_full'
+        });
+        await expect(page.locator('#mine-results .search-row', { hasText: 'Пророчество' })).toContainText(
+            'Following'
+        );
     });
 });

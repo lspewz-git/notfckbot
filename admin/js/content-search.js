@@ -1,6 +1,7 @@
 /** Shared search results and preview cards for the admin panel and My subscriptions. */
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
+import { NOTIFY, notifyField, posterSrc, titleCard, fitDescriptions } from './title-card.js';
 
 /** One rating treatment across account and admin cards. Zero means not rated. */
 export function titleRating(value) {
@@ -60,34 +61,29 @@ export function setupSearchForms(handlers) {
 export const cardClose = (modal) =>
     `<button type="button" data-close="${modal}" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg></button>`;
 
-/** Both views use the user's complete dialog: width, spacing, close button and focus. */
+/** Both views use the same sheet: the shared title card, its close button and focus. */
 export function openSearchCard(item, options) {
     const { modal, bodyId } = options;
     $(modal).innerHTML =
-        `<div class="modal-content modal-narrow search-card-body" id="${bodyId}">${searchCard(item, options)}${cardClose(modal)}</div>`;
+        `<div class="modal-content modal-narrow sheet-content title-sheet" id="${bodyId}">${searchCard(item, options)}</div>`;
     openModal(modal);
+    fitDescriptions($(modal));
 }
 
-export const MODES = {
-    episode: { short: 'Every episode', long: 'Every episode' },
-    first_and_full: { short: 'Ep. 1 + season', long: 'Episode 1 and the whole season' },
-    season: { short: 'Season', long: 'When the whole season is out' }
-};
+export const MODES = NOTIFY;
 
+/** The Notify me radios (the shared title card's) */
 export const modesField = (name, current, id, disabled = false) =>
-    `<fieldset class="mine-modes"${disabled ? ' disabled' : ''}><legend class="field-label">Notify me</legend>${Object.entries(
-        MODES
-    )
-        .map(
-            ([key, m]) =>
-                `<label class="mine-radio"><input type="radio" name="${name}" value="${key}"${id ? ` data-mine="mode" data-id="${escapeHtml(id)}"` : ''}${current === key ? ' checked' : ''} /> ${m.long}</label>`
-        )
-        .join('')}</fieldset>`;
+    notifyField({ name, current, id, disabled, hint: false });
 
-const picture = (path, big = false) =>
-    path
-        ? `<img class="mine-poster${big ? ' mine-poster-big' : ''}" src="/api/poster/w185${escapeHtml(path)}" alt="" loading="${big ? 'eager' : 'lazy'}" decoding="async" />`
-        : `<span class="mine-poster mine-poster-empty${big ? ' mine-poster-big' : ''}" aria-hidden="true"></span>`;
+const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg>';
+
+const thumb = (path) => {
+    const src = posterSrc(path);
+    return src
+        ? `<img class="title-thumb" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
+        : '<span class="title-thumb title-thumb-empty" aria-hidden="true"></span>';
+};
 
 /** Adapt TMDB's response once; the account API already returns this shape. */
 export function searchItem(r) {
@@ -103,38 +99,51 @@ export function searchItem(r) {
         year: date?.slice(0, 4) || null,
         poster: r.poster_path || null,
         overview: r.overview || '',
+        rating: r.vote_average || null,
         released: r.media_type === 'movie' && Boolean(date) && date <= new Date().toISOString().slice(0, 10),
         added: false
     };
 }
 
+const noteOf = (r) =>
+    [r.kind === 'tv' ? 'Series' : 'Film', r.year, r.kind === 'movie' && r.released ? 'already out' : '']
+        .filter(Boolean)
+        .join(' · ');
+
 /** Only action names differ; rendering and keyboard access are identical in both views. */
 export function searchResults(items, { open, series, film }) {
-    if (!items.length) return '<p class="empty-note">Nothing found. Try another spelling or the original title.</p>';
-    return `<ul class="glass-card mine-rows">${items
+    if (!items.length)
+        return (
+            '<div class="empty-state"><span class="empty-icon">' +
+            '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#search" /></svg></span>' +
+            '<p class="empty-title">Nothing found</p><p class="empty-text">Try another spelling or the original title.</p></div>'
+        );
+    return `<h2 class="group-title">Results</h2><ul class="group-list title-list">${items
         .map((r, index) => {
             const attrs = `data-id="${escapeHtml(r.tmdbId)}" data-index="${index}"`;
-            const note = [
-                r.kind === 'tv' ? 'Series' : 'Film',
-                r.year,
-                r.kind === 'movie' && r.released ? 'already out' : ''
-            ]
-                .filter(Boolean)
-                .join(' · ');
             const action = r.added
-                ? '<span class="mine-chip">Added</span>'
-                : `<button type="button" class="btn btn-outline btn-compact" data-action="${r.kind === 'tv' ? series : film}" ${attrs}>${r.kind === 'tv' ? 'Subscribe' : r.released ? 'Add' : 'Wait for it'}</button>`;
-            return `<li><div class="mine-row"><button type="button" class="search-result-open" data-action="${open}" ${attrs}>${picture(r.poster)}<span class="mine-row-text"><span class="mine-row-title">${escapeHtml(r.title)}</span><span class="mine-dim">${escapeHtml(note)}</span></span></button>${action}</div></li>`;
+                ? `<span class="search-following">${CHECK}Following</span>`
+                : `<button type="button" class="follow-btn" data-action="${r.kind === 'tv' ? series : film}" ${attrs} aria-label="Follow ${escapeHtml(r.title)}"><span>Follow</span></button>`;
+            return (
+                `<li><div class="group-row title-row search-row"><button type="button" class="search-result-open" data-action="${open}" ${attrs}>${thumb(r.poster)}` +
+                `<span class="row-text"><span class="row-name">${escapeHtml(r.title)}</span><span class="row-meta">${escapeHtml(noteOf(r))}</span></span></button>${action}</div></li>`
+            );
         })
         .join('')}</ul>`;
 }
 
+/** The search's Follow sheet: the title card with Notify me for a series, Follow and Cancel */
 export function searchCard(r, { modeName, submit, modal, buttonId = '', titleId = 'mine-card-title' }) {
-    const label = r.added ? 'Added' : r.kind === 'tv' ? 'Subscribe' : r.released ? 'Add' : 'Wait for it';
-    return (
-        `<div class="mine-card-head">${picture(r.poster, true)}<div><h3 id="${titleId}">${escapeHtml(r.title)}</h3><p class="mine-dim">${escapeHtml([r.kind === 'tv' ? 'Series' : 'Film', r.year, r.kind === 'movie' && r.released ? 'already out' : ''].filter(Boolean).join(' · '))}</p></div></div>` +
-        (r.overview ? `<p class="mine-overview">${escapeHtml(r.overview)}</p>` : '') +
-        (r.kind === 'tv' && !r.added ? modesField(modeName, 'episode', null) : '') +
-        `<div class="modal-actions"><button type="button" ${buttonId ? `id="${buttonId}"` : ''} class="btn btn-primary btn-grow" data-action="${submit}" data-id="${escapeHtml(r.tmdbId)}"${r.added ? ' disabled' : ''}>${label}</button><button type="button" class="btn btn-ghost" data-close="${modal}">Cancel</button></div>`
+    const label = r.added ? 'Following' : 'Follow';
+    return titleCard(
+        { kind: r.kind, title: r.title, poster: r.poster, year: r.year, rating: r.rating, overview: r.overview },
+        {
+            titleId,
+            close: modal,
+            notify: r.kind === 'tv' && !r.added ? notifyField({ name: modeName, current: 'episode' }) : '',
+            actions:
+                `<button type="button" ${buttonId ? `id="${buttonId}"` : ''} class="sheet-btn-primary" data-action="${submit}" data-id="${escapeHtml(r.tmdbId)}"${r.added ? ' disabled' : ''}>${label}</button>` +
+                `<button type="button" class="sheet-btn-secondary" data-close="${modal}">Cancel</button>`
+        }
     );
 }

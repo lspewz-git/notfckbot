@@ -8,6 +8,7 @@ import { setSelectValue } from './select.js';
 import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
 import { description, titleRating } from './content-search.js';
+import { titleCard, fitDescriptions } from './title-card.js';
 
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
 const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
@@ -157,33 +158,81 @@ async function releasedPeople(item) {
     return people;
 }
 
-/** One public card for both scopes; only admins request private subscriber/chat information. */
-export const openReleasedDetails = (item, source, admin = false) =>
-    openDetails(async () => {
-        const tv = item.kind === 'tv';
-        const count = item.seasonCount;
-        const rating = titleRating(item.rating) || 'Not rated on TMDB yet';
+/** The date block of a released title: its season's premiere, or a film's release */
+function releasedDate(item) {
+    if (item.kind === 'tv') {
+        const seasons = (item.seasons || []).filter(Boolean);
+        if (!seasons.length) return null;
+        const premiere = (season) => (item.seasonPremieres || []).find((s) => s.season === season)?.date;
+        const [first, ...more] = seasons;
         return {
-            title: item.title,
-            meta:
-                rating +
-                (tv
-                    ? count
-                        ? ` · ${escapeHtml(count)} season${count === 1 ? '' : 's'}`
-                        : ''
-                    : ` · ${escapeHtml(item.status || 'Unknown status')}`),
-            desc: item.overview || '',
-            people: admin ? '<p class="people-none">Loading chat information…</p>' : '',
-            peopleLoad: admin ? () => releasedPeople(item) : undefined,
-            dates: tv
-                ? seasonDates(item.seasons || [], item.seasonPremieres || [])
-                : filmDates(
-                      item.dates || { digital: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital }
-                  ),
-            poster: sourcePoster(source) || posterUrl(String(item.poster || '').match(/\/[^/]+\.(?:jpg|png)$/)?.[0]),
-            url: item.kinopoiskUrl
+            label: `Season ${first} premiere`,
+            value: formatReleaseDate(premiere(first)),
+            note: more.map((season) => `Season ${season}: ${formatReleaseDate(premiere(season))}`).join(' · ')
         };
-    });
+    }
+    const d = item.dates || { digital: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital };
+    const main = d.release || d.digital;
+    if (!main && !d.ruPremiere && !d.ruDigital) return null;
+    const notes = [
+        d.digital && d.release && d.digital !== d.release
+            ? `Digital ${formatReleaseDate(d.digital)}${d.digitalCountry ? ` · ${d.digitalCountry}` : ''}`
+            : '',
+        d.ruPremiere ? `Premiere in Russia ${formatPremiereRu(d.ruPremiere)}` : '',
+        d.ruDigital
+            ? `Digital in Russia ${formatReleaseDate(d.ruDigital)}${d.ruServices ? ` · ${d.ruServices}` : ''}`
+            : ''
+    ];
+    return {
+        label: d.release ? 'Release' : 'Digital release',
+        value: main ? formatReleaseDate(main) : 'TBA',
+        note: notes.filter(Boolean).join(' · ')
+    };
+}
+
+let releasedRequest = 0;
+
+/**
+ * One public card for both scopes (the shared title card, without actions); only admins request
+ * private subscriber/chat information, which never holds up the card.
+ */
+export function openReleasedDetails(item, source, admin = false) {
+    const request = ++releasedRequest;
+    const tv = item.kind === 'tv';
+    const genres = Array.isArray(item.genres) ? item.genres.join(', ') : item.genres;
+    $('released-body').innerHTML = titleCard(
+        {
+            kind: item.kind,
+            title: item.title,
+            poster: item.poster,
+            seasons: tv ? item.seasonCount : null,
+            year: tv ? null : item.year,
+            rating: item.rating,
+            genres,
+            networks: item.networks || null,
+            overview: item.overview || '',
+            kinopoiskUrl: item.kinopoiskUrl || null,
+            date: releasedDate(item)
+        },
+        {
+            titleId: 'released-title',
+            close: 'released-modal',
+            extra: admin
+                ? '<div id="released-people" class="detail-people"><p class="people-none">Loading chat information…</p></div>'
+                : ''
+        }
+    );
+    openModal('released-modal');
+    fitDescriptions($('released-modal'));
+    if (!admin) return;
+    const fill = (html) => {
+        if (request !== releasedRequest || !$('released-people')) return;
+        $('released-people').innerHTML = html;
+    };
+    releasedPeople(item)
+        .then(fill)
+        .catch(() => fill('<p class="people-none">Chat information unavailable.</p>'));
+}
 
 export const openSeriesDetails = (tmdbId, source = null) => {
     const poster = sourcePoster(source);

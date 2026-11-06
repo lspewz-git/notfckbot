@@ -1,29 +1,20 @@
 /**
- * The profile menu behind the chat chip on the account pages: the chats to switch between, Chat
- * settings, Account settings and Sign out (a sheet on phones, a menu under the chip elsewhere).
- * And the Account settings page's own group: who is signed in (the password group under it is
- * password.js, the Devices row devices.js).
+ * The Account tab (`#my-profile`, the redesign of 06.11 instead of the old profile menu): who is
+ * signed in, the chats to switch between, the settings pages and Sign out. And the Account settings
+ * page's own group: who is signed in (the password group under it is password.js, the Devices row
+ * devices.js). The chat chip in the tabs' headers opens only the chats (account.js).
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
-import { toast, openModal, closeModal } from './ui.js';
-import { avatar } from './pick-sheet.js';
-import { chatRows, chatChip } from './chat-picker.js';
+import { toast, openModal, showConfirm } from './ui.js';
+import { avatar, initial } from './pick-sheet.js';
 import { chatList, chatHint, selectChat, setChatHidden } from './account.js';
-import { openActionDropdown, closeDropdown } from './select.js';
 import { setDevicesOwner, loadDevices } from './devices.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
 
-const CHEVRON = icon('chevron-right');
-const SLIDERS = icon('sliders-horizontal');
-const PERSON = icon('user-round');
-const SIGN_OUT = icon('log-out');
-const HIDDEN = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path d="m3 3 18 18" /></svg>`;
-
-/** The pages the menu opens: Back on them returns to the section the menu was opened from */
-const PAGES = ['my-settings', 'my-account', 'my-devices'];
+const CHEVRON = `<span class="row-chevron">${icon('chevron-right')}</span>`;
 
 const ROLES = { admin: 'Admin', user: 'User' };
 
@@ -34,14 +25,15 @@ const visibilitySaving = new Set();
 /** Who is signed in (session.js, from /account/me). */
 export function setProfile(user) {
     me = { id: String(user.id), name: user.name || null, role: user.role, system: Boolean(user.system) };
-    backTo = me.system ? 'dashboard' : 'my-subs';
-    for (const back of document.querySelectorAll('.mine-back')) back.setAttribute('data-section', backTo);
+    // The admin sections' headers: the person's avatar, a link to the Account tab
     for (const holder of document.querySelectorAll('[data-admin-profile]')) {
-        holder.innerHTML = chatChip({ title: 'My account', accent: true, action: 'profile-open', label: 'Profile' });
-        holder.querySelector('.pick-avatar').outerHTML = avatar(nameOf(), true);
+        holder.innerHTML =
+            `<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="Account">` +
+            `${avatar(nameOf(), true)}<span class="mine-chat-chip-name">My account</span></a>`;
     }
     for (const el of document.querySelectorAll('[data-profile-avatar]')) el.innerHTML = avatar(nameOf(), true);
     renderAccount();
+    renderProfile();
 }
 
 const nameOf = () => (me && (me.name || me.id)) || '';
@@ -54,145 +46,107 @@ export function setupProfile() {
         holder.setAttribute('data-admin-profile', '');
         header.append(holder);
     }
-    document.addEventListener('account-chats', redrawMenu);
+    // The chats arrived, failed or changed (another chat picked, one hidden): the page follows
+    document.addEventListener('account-chats', renderProfile);
 }
 
-/** The chats arrived (or failed) while the menu is open: draw them in, keeping focus on its row */
-function redrawMenu() {
-    const modal = /** @type {HTMLDialogElement} */ ($('profile-modal'));
-    if (!modal.open) return;
-    const body = $('profile-body');
-    const focused = /** @type {HTMLElement} */ (document.activeElement);
-    const key = body.contains(focused) && focused.dataset.action;
-    const section = key && focused.dataset.section;
-    body.innerHTML = menuHtml();
-    if (!key) return;
-    const again = [...body.querySelectorAll(`[data-action="${key}"]`)].find(
-        (el) => /** @type {HTMLElement} */ (el).dataset.section === section
-    );
-    /** @type {HTMLElement} */ (again || body).focus();
-}
+// --- The Account tab ---
 
-const row = ({ action, attrs = '', iconHtml, title, hint = '', end = '', cls = '' }) =>
-    `<button type="button" class="action-row${cls}" data-action="${action}"${attrs}>` +
-    iconHtml +
-    `<span class="action-text"><span class="action-title">${escapeHtml(title)}</span>` +
-    (hint ? `<span class="action-desc">${escapeHtml(hint)}</span>` : '') +
-    `</span>${end}</button>`;
-
-const pageRow = (section, iconHtml, title) =>
-    row({
-        action: 'profile-page',
-        attrs: ` data-section="${section}" data-close="profile-modal"`,
-        iconHtml: `<span class="action-icon">${iconHtml}</span>`,
-        title,
-        end: `<span class="action-chevron">${CHEVRON}</span>`
-    });
+const pageRow = ({ attrs, tile, title, end = CHEVRON }) =>
+    `<li><button type="button" class="group-row"${attrs}><span class="row-tile">${icon(tile)}</span>` +
+    `<span class="row-text"><span class="row-name">${escapeHtml(title)}</span></span>${end}</button></li>`;
 
 /** Chat rows still on their way from Telegram: the same size as the rows that replace them */
 const SKELETON_CHAT =
-    '<div class="action-row pick-row profile-skeleton" aria-hidden="true"><span class="pick-avatar skeleton"></span>' +
-    '<span class="action-text"><span class="action-title"><span class="skeleton"></span></span>' +
-    '<span class="action-desc"><span class="skeleton"></span></span></span></div>';
-const SKELETON_PAGE =
-    '<div class="action-row profile-skeleton" aria-hidden="true"><span class="action-icon"></span>' +
-    '<span class="action-text"><span class="action-title"><span class="skeleton"></span></span></span></div>';
+    '<li><div class="group-row chat-row" aria-hidden="true"><span class="pick-avatar skeleton"></span>' +
+    '<span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>';
 
-function chatsLoading() {
-    return (
-        '<h4 class="profile-label" id="profile-chats">Chats</h4>' +
-        `<div class="action-list" role="group" aria-labelledby="profile-chats" aria-busy="true">${SKELETON_CHAT.repeat(2)}</div>`
-    );
-}
-
-const chatsFailedRow = (message) =>
-    '<h4 class="profile-label" id="profile-chats">Chats</h4><div class="action-list">' +
-    row({
-        action: 'mine-reload',
-        iconHtml: `<span class="action-icon">${icon('triangle-alert')}</span>`,
-        title: "Couldn't load chats",
-        hint: message,
-        end: '<span class="profile-retry">Retry</span>'
-    }) +
-    '</div>';
-
-function menuHtml() {
-    const { chats, chatId, loading, error } = me?.system
-        ? { chats: [], chatId: null, loading: false, error: null }
-        : chatList();
-    const head = me
-        ? `<div class="profile-head">${avatar(nameOf(), true)}<span class="action-text">` +
-          `<span class="action-title">${escapeHtml(nameOf())}</span>` +
-          `<span class="action-desc">${escapeHtml(ROLES[me.role] || me.role)} · ${me.system ? 'Local account' : `ID ${escapeHtml(me.id)}`}</span></span>` +
-          (chats.some((c) => c.type !== 'private')
-              ? `<button type="button" class="icon-button" data-action="profile-options" aria-label="Chat display options" aria-expanded="false" aria-controls="profile-options-menu">${icon('ellipsis')}</button>`
-              : '') +
-          '</div>'
-        : '';
-    const choices = chatRows(
+function chatsGroup() {
+    if (me?.system) return '';
+    const { chats, chatId, loading, error } = chatList();
+    let rows;
+    if (loading) rows = SKELETON_CHAT.repeat(2);
+    else if (error)
+        rows =
+            `<li><button type="button" class="group-row" data-action="mine-reload"><span class="row-tile">${icon('triangle-alert')}</span>` +
+            `<span class="row-text"><span class="row-name">Couldn't load chats</span><span class="row-meta">${escapeHtml(error)}</span></span>` +
+            '<span class="row-value profile-retry">Retry</span></button></li>';
+    else {
         // The open chat stays listed even when hidden (opened from its group's Mini App link)
-        chats.filter((c) => !c.hidden || c.id === chatId).map((c) => ({ ...c, hint: chatHint(c) })),
-        chatId,
-        'profile-chat'
-    );
+        rows = chats
+            .filter((c) => !c.hidden || c.id === chatId)
+            .map((c) => {
+                const on = c.id === chatId;
+                return (
+                    `<li><button type="button" class="group-row chat-row" data-action="profile-chat" data-id="${escapeHtml(c.id)}" aria-pressed="${on}">` +
+                    avatar(c.title, c.type === 'private') +
+                    `<span class="row-text"><span class="row-name">${escapeHtml(c.title)}</span>` +
+                    `<span class="row-meta">${escapeHtml(chatHint(c))}</span></span>` +
+                    (on ? `<span class="row-check">${icon('check')}</span>` : '') +
+                    '</button></li>'
+                );
+            })
+            .join('');
+        const hidden = chats.filter((c) => c.hidden).length;
+        if (chats.some((c) => c.type !== 'private'))
+            rows += pageRow({
+                attrs: ' data-action="profile-visibility" aria-haspopup="dialog"',
+                tile: 'eye-off',
+                title: 'Hidden chats',
+                end: (hidden ? `<span class="row-value">${hidden}</span>` : '') + CHEVRON
+            });
+    }
     return (
-        head +
-        (loading ? chatsLoading() : '') +
-        (error ? chatsFailedRow(error) : '') +
-        (chats.length
-            ? `<h4 class="profile-label" id="profile-chats">Chats</h4><div class="action-list" role="group" aria-labelledby="profile-chats">${choices}</div>`
-            : '') +
-        (chats.some((c) => c.hidden)
-            ? `<button type="button" class="action-row profile-hidden" data-action="profile-visibility"><span class="action-icon">${HIDDEN}</span><span>Hidden chats <span class="mine-count">${chats.filter((c) => c.hidden).length}</span></span><span class="action-chevron">${CHEVRON}</span></button>`
-            : '') +
-        '<div class="action-list profile-links">' +
-        (me && me.role === 'admin' && document.body.classList.contains('view-mine')
-            ? row({
-                  action: 'view-admin',
-                  attrs: ' data-close="profile-modal"',
-                  iconHtml: `<span class="action-icon">${icon('shield')}</span>`,
-                  title: 'Admin panel',
-                  end: `<span class="action-chevron">${CHEVRON}</span>`
-              })
-            : '') +
-        (me?.role === 'admin' && !me.system && !document.body.classList.contains('view-mine')
-            ? row({
-                  action: 'view-mine',
-                  attrs: ' data-close="profile-modal"',
-                  iconHtml: `<span class="action-icon">${icon('bookmark')}</span>`,
-                  title: 'My subscriptions',
-                  end: `<span class="action-chevron">${CHEVRON}</span>`
-              })
-            : '') +
-        (chats.length ? pageRow('my-settings', SLIDERS, 'Chat settings') : loading ? SKELETON_PAGE : '') +
-        pageRow('my-account', PERSON, 'Account settings') +
-        row({
-            action: 'logout',
-            attrs: ' data-close="profile-modal"',
-            cls: ' action-row-danger',
-            iconHtml: `<span class="action-icon">${SIGN_OUT}</span>`,
-            title: 'Sign out'
-        }) +
-        '</div>'
+        '<h2 class="group-title" id="profile-chats">Chats</h2>' +
+        `<ul class="group-list" aria-labelledby="profile-chats"${loading ? ' aria-busy="true"' : ''}>${rows}</ul>` +
+        '<p class="group-help">The chosen chat sets what Calendar, Released and Following show.</p>'
     );
 }
 
-/** The section the menu was opened from: Back on Chat / Account settings leads there */
-let backTo = 'my-subs';
-
-function openMenu(chip) {
-    const open = document.querySelector('.section.active');
-    const from = open ? open.id.replace(/-section$/, '') : '';
-    if (from && !PAGES.includes(from)) backTo = from;
-    $('profile-body').innerHTML = menuHtml();
-    const modal = $('profile-modal');
-    openModal('profile-modal');
-    // Wider than a phone it drops from the chip, its right edge under the chip's. Measured once
-    // open: the dialog's own width, not the page's, is what its padding counts from
-    const box = chip.getBoundingClientRect();
-    modal.style.setProperty('--menu-top', `${Math.round(box.bottom + 8)}px`);
-    modal.style.setProperty('--menu-right', `${Math.max(16, Math.round(modal.clientWidth - box.right))}px`);
+function profileHtml() {
+    if (!me) return '';
+    const { chats } = chatList();
+    const card =
+        `<button type="button" class="group-card profile-card" data-section="my-account" aria-label="Account settings: ${escapeHtml(nameOf())}">` +
+        `<span class="profile-avatar" aria-hidden="true">${escapeHtml(initial(nameOf()))}</span>` +
+        `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(nameOf())}</span>` +
+        `<span class="role-chip">${escapeHtml(ROLES[me.role] || me.role)}</span></span>` +
+        `<span class="row-meta">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span>${CHEVRON}</button>`;
+    const settings =
+        (me.role === 'admin'
+            ? pageRow({ attrs: ' data-action="view-admin"', tile: 'shield', title: 'Admin panel' })
+            : '') +
+        (!me.system && chats.length
+            ? pageRow({ attrs: ' data-section="my-settings"', tile: 'panel-bottom', title: 'Chat settings' })
+            : '') +
+        pageRow({ attrs: ' data-section="my-account"', tile: 'circle-user-round', title: 'Account settings' });
+    return (
+        card +
+        chatsGroup() +
+        `<h2 class="group-title" id="profile-settings">Settings</h2><ul class="group-list" aria-labelledby="profile-settings">${settings}</ul>` +
+        `<button type="button" class="sheet-btn-danger-soft profile-signout" data-action="profile-signout">${icon('log-out')}<span>Sign out</span></button>`
+    );
 }
+
+/** Redraws the page, keeping focus on the row it was on */
+function renderProfile() {
+    const body = $('my-profile-body');
+    if (!body) return;
+    const focused = /** @type {HTMLElement} */ (document.activeElement);
+    const key =
+        body.contains(focused) && (focused.dataset.action || focused.dataset.section)
+            ? [focused.dataset.action, focused.dataset.section, focused.dataset.id]
+            : null;
+    body.innerHTML = profileHtml();
+    if (!key) return;
+    const again = [...body.querySelectorAll('button')].find((el) => {
+        const d = /** @type {HTMLElement} */ (el).dataset;
+        return d.action === key[0] && d.section === key[1] && d.id === key[2];
+    });
+    /** @type {HTMLElement | undefined} */ (again)?.focus({ preventScroll: true });
+}
+
+// --- Hidden chats ---
 
 function visibilityRows() {
     return chatList()
@@ -213,7 +167,6 @@ function visibilityRows() {
 }
 
 function openVisibility() {
-    closeDropdown();
     $('visibility-list').innerHTML = visibilityRows();
     openModal('visibility-modal');
 }
@@ -231,13 +184,13 @@ async function toggleVisibility(button) {
         if (me !== user) return;
         await setChatHidden(id, hidden);
         if (me !== user) return;
-        // Keep the management list mounted so its scroll position and focus survive saving.
-        $('profile-body').innerHTML = menuHtml();
+        renderProfile();
     } catch (err) {
         if (me === user) toast(err.message, 'error');
     } finally {
         visibilitySaving.delete(id);
         if (me === user) {
+            // The list stays mounted so its scroll position and focus survive saving
             for (const current of $('visibility-list').querySelectorAll('button[data-id]')) {
                 const el = /** @type {HTMLButtonElement} */ (current);
                 if (el.dataset.id !== id) continue;
@@ -259,9 +212,8 @@ function renderAccount() {
     const info = $('my-account-info');
     if (!info || !me) return;
     // Who it is, with the role as a chip beside the name: information, not a control
-    const letter = nameOf().replace(/^@/, '').charAt(0).toUpperCase();
     info.innerHTML =
-        `<div class="group-card"><span class="profile-avatar" aria-hidden="true">${escapeHtml(letter)}</span>` +
+        `<div class="group-card"><span class="profile-avatar" aria-hidden="true">${escapeHtml(initial(nameOf()))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(nameOf())}</span>` +
         `<span class="role-chip">${escapeHtml(ROLES[me.role] || me.role)}</span></span>` +
         `<span class="row-meta">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span></div>`;
@@ -271,23 +223,23 @@ function renderAccount() {
 
 /** Click handlers, merged into app.js's delegation like the other modules' */
 export const profileActions = {
-    'profile-open': (el) => openMenu(el),
-    'profile-options': (el) => {
-        openActionDropdown(
-            el,
-            `<button type="button" class="action-row" data-action="profile-visibility">${icon('eye')}<span class="action-text">Chat visibility</span><span class="action-chevron">${CHEVRON}</span></button>`
-        );
-    },
     'profile-visibility': openVisibility,
     'profile-visibility-toggle': toggleVisibility,
-    'profile-chat': (el) => {
-        closeModal('profile-modal');
-        selectChat(el.dataset.id);
-        if (!document.body.classList.contains('view-mine'))
-            document.dispatchEvent(new window.CustomEvent('profile-chat-selected'));
-    },
-    // Runs before the section switch (app.js): the page's Back is pointed at where the menu was opened
-    'profile-page': () => {
-        for (const back of document.querySelectorAll('.mine-back')) back.setAttribute('data-section', backTo);
-    }
+    'profile-chat': (el) => selectChat(el.dataset.id),
+    'profile-signout': () =>
+        showConfirm({
+            title: 'Sign out?',
+            text: 'This browser signs out of the panel. Other devices stay signed in.',
+            confirmLabel: 'Sign out',
+            cancelLabel: 'Cancel',
+            onConfirm: async () => {
+                try {
+                    await api('/logout', { method: 'POST' });
+                } catch {
+                    // Signed out on this page all the same
+                }
+                toast('Signed out', 'success');
+                location.href = '/';
+            }
+        })
 };

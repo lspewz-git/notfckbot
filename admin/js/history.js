@@ -4,27 +4,38 @@ import { api } from './api.js';
 import { toast } from './ui.js';
 import { PAGE_SIZES, fillPagers } from './pager.js';
 import { enhanceIn } from './select.js';
-import { titlePoster } from './content-search.js';
+import { posterSrc } from './title-card.js';
 import { openReleasedDetails } from './records.js';
 
 const views = {};
-const OUT_ARROW =
-    '<svg class="icon kp-out" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-up-right" /></svg>';
+const CHEVRON =
+    '<span class="row-chevron"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg></span>';
 const SKELETON =
-    '<li class="history-skeleton" aria-hidden="true"><span class="skeleton" style="width:45%"></span></li>'.repeat(4);
-const FILLER = `<li class="history-item history-filler" aria-hidden="true"><span class="title-poster"></span><div class="history-main"><span>&nbsp;</span><span class="history-genres">&nbsp;</span></div><span class="kp-link"><svg class="kp-logo"></svg><span>Kinopoisk</span>${OUT_ARROW}</span></li>`;
+    '<li class="history-skeleton" aria-hidden="true"><div class="group-row title-row"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>'.repeat(
+        4
+    );
+// Keeps a short last page as tall as the others, so the pager under it doesn't jump
+const FILLER = `<li class="history-item history-filler" aria-hidden="true"><div class="group-row title-row"><span class="title-thumb"></span><span class="row-text"><span class="row-name">&nbsp;</span><span class="row-meta">&nbsp;</span></span></div></li>`;
 
+/** The redesign's Released (06.11): years as chips, then Series and Films, each one rounded list */
 function markup(prefix) {
-    return `<div id="${prefix}-years" class="tab-filters history-years" role="group" aria-label="Year"></div><div class="history-grid">${[
-        ['series', 'Serials'],
-        ['films', 'Movies']
+    return `<div id="${prefix}-years" class="cat-chips history-years" role="tablist" aria-label="Year"></div><div class="history-grid">${[
+        ['series', 'Series'],
+        ['films', 'Films']
     ]
         .map(
             ([kind, label]) =>
-                `<div class="glass-card history-group"><h2 class="history-title">${label} <span id="${prefix}-${kind}-count"></span></h2><ul id="${prefix}-${kind}" class="history-list" aria-busy="true"></ul><div class="pager" id="${prefix}-${kind}-pager" data-pager="history-${kind}" data-pager-label="${label} per page" hidden></div></div>`
+                `<div class="history-group"><h2 class="group-title history-title">${label}<span id="${prefix}-${kind}-count"></span></h2><ul id="${prefix}-${kind}" class="group-list title-list history-list" aria-busy="true"></ul><div class="pager" id="${prefix}-${kind}-pager" data-pager="history-${kind}" data-pager-label="${label} per page" hidden></div></div>`
         )
         .join('')}</div>`;
 }
+
+const thumb = (path) => {
+    const src = posterSrc(path);
+    return src
+        ? `<img class="title-thumb" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
+        : '<span class="title-thumb title-thumb-empty" aria-hidden="true"></span>';
+};
 
 /** Separate state per scope; markup, filtering, year changes and paging are shared. */
 export function createHistory({ prefix, fetchYear, openTitle }) {
@@ -79,7 +90,12 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
             ? `${item.seasons.length > 1 ? 'Seasons' : 'Season'} ${item.seasons.join(', ')}`
             : '';
         const note = [seasons, (item.genres || []).join(', ')].filter(Boolean).join(' · ');
-        return `<li class="history-item" data-release-year="${selectedYear}" data-release-seasons="${escapeHtml((item.seasons || []).join(','))}">${titlePoster(item.poster, 'history-open', item.tmdbId)}<div class="history-main"><span class="link-text" data-action="history-open" data-id="${escapeHtml(item.tmdbId)}" role="button" tabindex="0">${escapeHtml(item.title)}</span><span class="history-genres">${note ? escapeHtml(note) : '&nbsp;'}</span></div><a class="kp-link" href="${escapeHtml(item.kinopoiskUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(item.title)} on Kinopoisk"><svg class="kp-logo" aria-hidden="true"><use href="#kp-logo-symbol" /></svg><span>Kinopoisk</span>${OUT_ARROW}</a></li>`;
+        // The whole row opens the title card; Kinopoisk is inside it, not on the row (the redesign)
+        return (
+            `<li class="history-item" data-release-year="${selectedYear}" data-release-seasons="${escapeHtml((item.seasons || []).join(','))}">` +
+            `<button type="button" class="group-row title-row history-open" data-action="history-open" data-id="${escapeHtml(item.tmdbId)}">${thumb(item.poster)}` +
+            `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta history-genres">${note ? escapeHtml(note) : '&nbsp;'}</span></span>${CHEVRON}</button></li>`
+        );
     }
     function draw(kind) {
         const list = lists[kind];
@@ -88,7 +104,7 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
         list.page = Math.min(list.page, Math.max(0, Math.ceil(total / list.size) - 1));
         const start = list.page * list.size;
         const shown = items.slice(start, start + list.size);
-        el(`${kind}-count`).textContent = data?.year == null ? '' : String(total);
+        el(`${kind}-count`).textContent = data?.year == null ? '' : ` · ${total}`;
         el(kind).removeAttribute('aria-busy');
         const empty = query
             ? 'No matching titles'
@@ -122,7 +138,7 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
         el('years').innerHTML = next.years
             .map(
                 (year) =>
-                    `<button class="btn btn-ghost${year === next.year ? ' active' : ''}" data-action="history-year" data-year="${year}" aria-pressed="${year === next.year}">${year}</button>`
+                    `<button type="button" class="cat-chip${year === next.year ? ' active' : ''}" role="tab" data-action="history-year" data-year="${year}" aria-selected="${year === next.year}"><span>${year}</span></button>`
             )
             .join('');
         el('years').hidden = !next.years.length;

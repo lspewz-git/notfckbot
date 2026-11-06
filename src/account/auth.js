@@ -162,15 +162,19 @@ const noted = lruCache({ max: 5000, ttl: NOTE_EVERY_MS });
 
 /**
  * The guard's note of a signed-in browser for the Devices list: its name once (a session started
- * before the list existed, or by a page that didn't name it), its latest country and network, and when.
+ * before the list existed, or by a page that didn't name it), its latest country, network and address, and when.
  */
 async function noteSession(req, session, now = Date.now()) {
     const seenAt = session.seenAt ? new Date(session.seenAt).getTime() : 0;
     if ((seenAt <= now && now - seenAt < NOTE_EVERY_MS) || noted.has(session.id)) return;
     noted.set(session.id, true);
-    const place = devices.placeOf(devices.ipOf(req));
+    const ip = devices.ipOf(req);
+    const place = devices.placeOf(ip);
     const name = session.name || devices.deviceName(req.get('user-agent'));
-    await AccountSession.update({ name, ...place, seenAt: new Date(now) }, { where: { id: session.id } });
+    await AccountSession.update(
+        { name, ...place, ip: ip ? ip.slice(0, 45) : null, seenAt: new Date(now) },
+        { where: { id: session.id } }
+    );
 }
 
 // What the page gets instead of a session's id: the id is a hash of the cookie, but still the table's key
@@ -179,7 +183,7 @@ const publicId = (id) => hash(`device-list:${id}`).slice(0, 24);
 /**
  * The user's signed-in browsers, this one first, then the latest seen.
  * @returns {Promise<Array<{ id: string, name: string | null, country: string | null,
- *   network: string | null, seenAt: Date, current: boolean }>>}
+ *   network: string | null, ip: string | null, seenAt: Date, current: boolean }>>}
  */
 async function listSessions(session, now = Date.now()) {
     const rows = await AccountSession.findAll({
@@ -192,6 +196,7 @@ async function listSessions(session, now = Date.now()) {
             name: row.name || null,
             country: row.country || null,
             network: row.network || null,
+            ip: row.ip || null,
             seenAt: new Date(row.seenAt || row.createdAt || now),
             current: row.id === session.id
         }))

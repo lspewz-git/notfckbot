@@ -47,13 +47,15 @@
 }
 
 .btn-danger {
-    background: var(--danger-soft);
+    background: var(--danger-bg);
     color: var(--danger);
+    font-weight: 600;
 }
 
 .btn-danger:hover {
-    background: var(--danger-fill);
-    color: var(--on-danger);
+    background: var(--danger-bg);
+    color: var(--danger);
+    opacity: 0.85;
 }
 
 /* Quiet destructive action — deliberately less prominent than the safe choice */

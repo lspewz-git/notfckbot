@@ -158,7 +158,7 @@
     height: 20px;
     flex: 0 0 auto;
     border-radius: 999px;
-    background: var(--fill-strong);
+    background: var(--switch-off);
     transition: background-color 0.2s ease;
 }
 

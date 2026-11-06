@@ -15,7 +15,7 @@ const icon = (name) =>
 const SHOWN = 4;
 
 /** @typedef {{ id: string, name: string | null, country: string | null, network: string | null,
- *   seenAt: string, current: boolean }} Device */
+ *   ip?: string | null, seenAt: string, current: boolean }} Device */
 
 /** @type {Device[] | null} null: not loaded (yet) */
 let list = null;
@@ -193,10 +193,23 @@ function render() {
 
 // --- One session's sheet ---
 
+/**
+ * The address in mono, selected whole by one tap; a long IPv6 loses its middle, not its end: the
+ * start shrinks with an ellipsis, the last group stays (the copy still takes the whole address)
+ */
+function ipHtml(ip) {
+    const cut = ip.length > 20 ? ip.length - 9 : ip.length;
+    return (
+        `<span class="ip-address" title="${escapeHtml(ip)}"><span class="ip-start">${escapeHtml(ip.slice(0, cut))}</span>` +
+        `<span class="ip-end">${escapeHtml(ip.slice(cut))}</span></span>`
+    );
+}
+
 function sheetHtml(device) {
     const details = [
         ['Location', countryName(device.country)],
         ['Network', device.network],
+        ['IP address', device.ip],
         ['Last active', seenWhen(device.seenAt)]
     ].filter(([, value]) => value);
     return (
@@ -206,7 +219,11 @@ function sheetHtml(device) {
         `<h2 id="device-title">${escapeHtml(nameOf(device))}</h2></div>` +
         (details.length
             ? `<dl class="sheet-details">${details
-                  .map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`)
+                  .map(([label, value]) =>
+                      label === 'IP address'
+                          ? `<div><dt>${label}</dt><dd>${ipHtml(value)}</dd></div>`
+                          : `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`
+                  )
                   .join('')}</dl>`
             : '') +
         '<p class="sheet-error" id="device-error" role="alert" hidden></p>' +

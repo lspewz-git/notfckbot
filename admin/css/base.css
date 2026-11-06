@@ -15,6 +15,7 @@
     --surface-3: #2a2a2a; /* selected, tooltips, secondary buttons, a sheet's close and icon */
     --surface-overlay: #1c1c1c; /* sheets, modals, toasts, dropdowns */
     --tile: #262626; /* a row's icon tile */
+    --surface-link: #222222; /* the Open on Kinopoisk row in a title card */
     --border: rgba(255, 255, 255, 0.06);
     --border-row: rgba(255, 255, 255, 0.05); /* between list rows */
     --border-strong: rgba(255, 255, 255, 0.1);
@@ -47,6 +48,7 @@
     --danger-dot: #f2836b;
     --danger-muted: #c97a72;
     --danger-fill: #f2836b;
+    --danger-bg: #382926; /* a destructive button: solid, the same on any surface (never a coral fill) */
     --danger-soft: rgba(242, 131, 107, 0.13);
     --danger-border: rgba(242, 131, 107, 0.2);
     --warning: #e8b04a;
@@ -63,13 +65,16 @@
     --fill-subtle: rgba(255, 255, 255, 0.05); /* poster stub */
     --fill-active: rgba(255, 255, 255, 0.08); /* selected rail item */
     --fill-shine: rgba(255, 255, 255, 0.09); /* the skeleton's moving highlight */
-    --fill-strong: rgba(255, 255, 255, 0.14); /* a switch that is off */
+    --fill-strong: rgba(255, 255, 255, 0.14); /* the pull-refresh ring's track */
+    --switch-off: #3a3a3a; /* a switch that is off */
+    --chip-count-on: #3a3a3a; /* a count on the selected (light) category chip */
     --divider: rgba(255, 255, 255, 0.06); /* between list rows, short rules in the rail and the header */
     --hairline: rgba(255, 255, 255, 0.08); /* the sign-in screen's rules */
     --grabber: #4a4a4a; /* a sheet's handle */
 
     /* Overlays: what sits above the page */
     --scrim: rgba(0, 0, 0, 0.62); /* behind a dialog */
+    --scrim-strong: rgba(0, 0, 0, 0.92); /* behind a poster opened large */
     /* The year recap's six cards, their plain colours (src/recap/cards.js, THEMES) */
     --recap-1: #f5b14c;
     --recap-2: #1d2b6b;

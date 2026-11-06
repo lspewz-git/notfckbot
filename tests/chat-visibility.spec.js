@@ -1,56 +1,51 @@
 const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
-const { watchConsole, profileButton } = require('./helpers');
+const { watchConsole, openProfilePage } = require('./helpers');
 
 watchConsole({ ignore: /status of 503/ });
 
-async function profile(page) {
-    await profileButton(page, 'my-subs').click();
-}
+// The Account tab's chats (redesign v2): rows that switch, and Hidden chats → the visibility dialog
+const rows = (page) => page.locator('#my-profile-body [data-action="profile-chat"]');
+const hiddenRow = (page) => page.locator('#my-profile-body [data-action="profile-visibility"]');
 
-async function options(page) {
-    await page.getByRole('button', { name: 'Chat display options', exact: true }).click();
-    await expect(page.locator('#profile-options-menu')).toBeVisible();
-    await page.locator('#profile-options-menu [data-action="profile-visibility"]').click();
+async function visibility(page) {
+    await openProfilePage(page, 'my-profile');
+    await hiddenRow(page).click();
     await expect(page.locator('#visibility-modal')).toBeVisible();
 }
 
-test('hide and restore through the dropdown or count shortcut; persists after reload', async ({ page }) => {
+test('hide and restore through Hidden chats; the count shows; persists after reload', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    await profile(page);
-    const trigger = page.getByRole('button', { name: 'Chat display options', exact: true });
-    await trigger.click();
-    await expect(page.locator('#profile-options-menu')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(page.locator('#profile-options-menu')).toHaveCount(0);
-    await expect(page.locator('#profile-modal')).toBeVisible();
-    await page.locator('#profile-modal [data-action="profile-chat"][data-id="-100"]').click();
-    await profile(page);
-    await options(page);
+    await openProfilePage(page, 'my-profile');
+    await expect(hiddenRow(page)).toContainText('Hidden chats');
+    await expect(hiddenRow(page).locator('.row-value')).toHaveCount(0);
+    await rows(page).filter({ hasText: 'Киноклуб' }).click();
+    await visibility(page);
     await expect(page.locator('#visibility-list [role="switch"]')).toHaveCount(1);
     const toggle = page.getByRole('switch', { name: 'Show Киноклуб' });
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
     expect(panel.account.chats.find((c) => c.id === '-100').hidden).toBe(true);
     await page.locator('#visibility-modal [data-close]').click();
-    await expect(page.locator('#profile-modal .pick-row')).toHaveCount(1);
-    await expect(page.locator('#profile-modal .pick-row')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.profile-hidden')).toContainText('1');
+    // Hiding the open group returns to the first visible chat
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toHaveAttribute('aria-pressed', 'true');
+    await expect(hiddenRow(page).locator('.row-value')).toHaveText('1');
     await page.reload();
-    await profile(page);
-    await expect(page.locator('#profile-modal .pick-row')).toHaveCount(1);
-    await page.locator('.profile-hidden').click();
+    await openProfilePage(page, 'my-profile');
+    await expect(rows(page)).toHaveCount(1);
+    await hiddenRow(page).click();
     await expect(page.locator('#visibility-modal')).toBeVisible();
     await page.getByRole('switch', { name: 'Show Киноклуб' }).click();
     await expect(page.getByRole('switch', { name: 'Show Киноклуб' })).toHaveAttribute('aria-checked', 'true');
     await page.locator('#visibility-modal [data-close]').click();
-    await expect(page.locator('#profile-modal .pick-row')).toHaveCount(2);
-    await expect(page.locator('.profile-hidden')).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(2);
+    await expect(hiddenRow(page).locator('.row-value')).toHaveCount(0);
 });
 
 test('failed save leaves the chat visible and can be retried; long list stays inside the dialog', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    await expect(page.locator('#my-subs-body .mine-row').first()).toBeVisible();
+    await expect(page.locator('#my-subs-body button.title-row').first()).toBeVisible();
     panel.account.chats.push(
         ...Array.from({ length: 40 }, (_, i) => ({
             id: String(-200 - i),
@@ -61,8 +56,7 @@ test('failed save leaves the chat visible and can be retried; long list stays in
         }))
     );
     await page.reload();
-    await profile(page);
-    await page.locator('.profile-hidden').click();
+    await visibility(page);
     const toggle = page.getByRole('switch', { name: 'Show Киноклуб' });
     panel.account.visibilityError = true;
     await toggle.click();
@@ -86,8 +80,7 @@ test('failed save leaves the chat visible and can be retried; long list stays in
 
 test('reopening while saving keeps switches pending and shows the saved value', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    await profile(page);
-    await options(page);
+    await visibility(page);
     let finish;
     panel.account.visibilityWait = new Promise((resolve) => {
         finish = resolve;
@@ -96,7 +89,7 @@ test('reopening while saving keeps switches pending and shows the saved value', 
     await toggle.click();
     await expect(toggle).toBeDisabled();
     await page.locator('#visibility-modal [data-close]').click();
-    await options(page);
+    await hiddenRow(page).click();
     await expect(toggle).toBeDisabled();
     finish();
     await expect(toggle).toBeEnabled();
@@ -105,16 +98,15 @@ test('reopening while saving keeps switches pending and shows the saved value', 
 
 test('restoring the only group selects it when there is no private chat', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', path: '/#my-subs' });
-    await expect(page.locator('#my-subs-body .mine-row').first()).toBeVisible();
+    await expect(page.locator('#my-subs-body button.title-row').first()).toBeVisible();
     panel.account.chats = panel.account.chats.filter((c) => c.type !== 'private');
     await page.reload();
-    await profile(page);
-    await options(page);
+    await visibility(page);
     const toggle = page.getByRole('switch', { name: 'Show Киноклуб' });
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
     await page.locator('#visibility-modal [data-close]').click();
-    await expect(page.locator('#profile-modal .pick-row')).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows(page)).toHaveAttribute('aria-pressed', 'true');
 });
