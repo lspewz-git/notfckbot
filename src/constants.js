@@ -52,6 +52,17 @@ const COUNTRY_NAMES = {
     JP: 'Япония'
 };
 
+/** "Бельгия" for "BE": the names above, else the runtime's own, else the code itself. */
+function countryName(code) {
+    if (!code) return '';
+    if (COUNTRY_NAMES[code]) return COUNTRY_NAMES[code];
+    try {
+        return new Intl.DisplayNames(['ru'], { type: 'region' }).of(code) || code;
+    } catch {
+        return code;
+    }
+}
+
 /**
  * Whether a Russian cinema premiere from Kinopoisk is only a month: Kinopoisk puts a month it
  * knows no day of on the 1st, and films open in Russian cinemas on Thursdays, so a 1st that isn't
@@ -89,7 +100,7 @@ function extraFilmDates(data, ru = {}, { markExpected, cinema = true } = {}) {
     const tmdbDate = data.digital_release_date;
     const tmdbCountry = data.digital_release_country;
     if (tmdbDate) {
-        const where = tmdbCountry ? ` (${escapeHtml(COUNTRY_NAMES[tmdbCountry] || tmdbCountry)})` : '';
+        const where = tmdbCountry ? ` (${escapeHtml(countryName(tmdbCountry))})` : '';
         lines.push(`💻 Цифровой релиз: <b>${formatRuDate(tmdbDate)}</b>${where}${expected(tmdbDate)}\n`);
     }
     if (ru.digital && !(tmdbCountry === 'RU' && tmdbDate === ru.digital)) {
@@ -180,7 +191,9 @@ module.exports = {
     formatRuDate,
     extraFilmDates,
     COUNTRY_NAMES,
+    countryName,
     premiereMonthOnly,
+    formatRuPremiere,
     formatDigitalDate,
     getWatchLinks,
     formatWatchLinks

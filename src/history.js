@@ -181,7 +181,7 @@ async function upcomingHistory({ chatId, year, from = `${year}-01-01` }) {
     const to = `${year}-12-31`;
     const inYear = (date) => Boolean(date) && String(date).slice(0, 10) >= from && String(date).slice(0, 10) <= to;
     const [{ items, failed }, subs] = await Promise.all([
-        periodItems(chatId, from, to),
+        periodItems(chatId, from, to, { filmsByRelease: true }),
         Subscription.findAll({ where: { chatId }, include: [{ model: Series }] })
     ]);
 

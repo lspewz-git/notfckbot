@@ -60,6 +60,10 @@ const films = () => [
         overview: 'A journey across the desert. '.repeat(18),
         ruPremiere: null,
         ruDigital: null,
+        cinema: { date: '2026-11-06', country: 'BE' },
+        cinemaRu: '2027-02-18',
+        online: { date: '2026-12-21', estimate: true, country: null },
+        premiere: null,
         genres: 'Фантастика',
         links: [{ kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/index.php?kp_query=x' }]
     }
@@ -230,6 +234,9 @@ const CALENDAR = {
             kind: 'movie',
             tmdbId: 'movie_6',
             listId: 6,
+            event: 'online',
+            estimate: false,
+            country: 'US',
             title: 'Мегалополис',
             poster: null,
             kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=y'
@@ -239,6 +246,9 @@ const CALENDAR = {
             kind: 'movie',
             tmdbId: 'movie_7',
             listId: 7,
+            event: 'online',
+            estimate: true,
+            country: null,
             genres: 'Фантастика',
             title: 'Дюна: Часть третья',
             overview: 'A journey across the desert. '.repeat(18),

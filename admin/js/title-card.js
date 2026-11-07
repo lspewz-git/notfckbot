@@ -72,8 +72,9 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
  *   rating?: number | null, genres?: string | null, networks?: string | null, overview?: string | null,
  *   kinopoiskUrl?: string | null,
  *   premieres?: { season: number, date?: string | null }[],
- *   date?: { label: string, value: string, when?: string, bell?: boolean, note?: string } | null
+ *   date?: DateBlock | DateBlock[] | null
  * }} t
+ * @typedef {{ label: string, value: string, when?: string, bell?: boolean, note?: string, icon?: string }} DateBlock
  * @param {{ titleId?: string, notify?: string, extra?: string, error?: string, actions?: string, close?: string }} [options]
  *   `notify`: the Notify me markup; `extra`: anything between it and the actions; `close`: the modal id
  */
@@ -87,14 +88,18 @@ export function titleCard(
         ? `<button type="button" class="tc-poster" data-action="poster-view" data-src="${escapeHtml(big)}" data-thumb="${escapeHtml(src)}" data-title="${escapeHtml(t.title)}" aria-label="Open the poster of ${escapeHtml(t.title)}"><img src="${escapeHtml(src)}" alt="" decoding="async" /></button>`
         : '<span class="tc-poster tc-poster-empty" aria-hidden="true"></span>';
     const about = [t.genres, t.networks].filter(Boolean).join(' · ');
-    const date = t.date
-        ? `<div class="tc-date">${icon('calendar')}<span class="tc-date-text"><span class="tc-date-label">${escapeHtml(t.date.label)}</span>` +
-          `<span class="tc-date-value">${escapeHtml(t.date.value)}</span>${t.date.note ? `<span class="tc-date-label">${escapeHtml(t.date.note)}</span>` : ''}</span>` +
-          (t.date.when || t.date.bell
-              ? `<span class="tc-date-when">${t.date.bell ? `<span class="tc-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${icon('bell')}</span>` : ''}${escapeHtml(t.date.when || '')}</span>`
-              : '') +
-          '</div>'
-        : '';
+    // One date block, or several (a film: in cinemas and online)
+    const date = (Array.isArray(t.date) ? t.date : t.date ? [t.date] : [])
+        .map(
+            (d) =>
+                `<div class="tc-date">${icon(d.icon || 'calendar')}<span class="tc-date-text"><span class="tc-date-label">${escapeHtml(d.label)}</span>` +
+                `<span class="tc-date-value">${escapeHtml(d.value)}</span>${d.note ? `<span class="tc-date-label">${escapeHtml(d.note)}</span>` : ''}</span>` +
+                (d.when || d.bell
+                    ? `<span class="tc-date-when">${d.bell ? `<span class="tc-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${icon('bell')}</span>` : ''}${escapeHtml(d.when || '')}</span>`
+                    : '') +
+                '</div>'
+        )
+        .join('');
     const description = t.overview?.trim();
     const overview = description
         ? `<div class="tc-description"><p class="tc-overview" data-clamp><span class="tc-copy">${escapeHtml(description)}</span><span class="tc-tail" hidden><span class="tc-ellipsis">… </span><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false">Show more</button></span></p></div>`

@@ -267,13 +267,26 @@ const seriesNote = (s) => {
     return 'Next episode date unknown';
 };
 
+/** "Belgium" for "BE"; the code itself where the browser has no name for it */
+const countryName = (code) => {
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
+    } catch {
+        return code;
+    }
+};
+
+/** A film's online date in words: "about 26 Dec 2026" when it is the 45-day estimate */
+const onlineText = (online) => `${online.estimate ? 'about ' : ''}${dateText(online.date, { withYear: true })}`;
+
 const filmNote = (f) =>
-    [
-        f.date ? `out ${dateText(f.date, { withYear: true })}` : 'release date unknown',
-        f.ruPremiere ? `in Russian cinemas ${dateText(f.ruPremiere)}` : ''
-    ]
-        .filter(Boolean)
-        .join(' · ');
+    f.online
+        ? `Online ${onlineText(f.online)}`
+        : f.date
+          ? `Release ${dateText(f.date, { withYear: true })}`
+          : 'Release date unknown';
+
+const ESTIMATE_NOTE = 'No digital date yet: usually 45 days after cinemas.';
 
 function subsView() {
     const list = state.list;
@@ -350,7 +363,16 @@ function dateBlock(item, event, today) {
                 bell,
                 note
             };
-        return { label: 'Release', value: dateText(event.date, { withYear: true }), when, bell, note };
+        const cinema = event.event === 'cinema';
+        const where = event.country ? ` · ${countryName(event.country)}` : '';
+        return {
+            label: cinema ? 'In cinemas' : event.event === 'release' ? 'Release' : 'Online',
+            icon: cinema ? 'clapperboard' : 'tv',
+            value: `${event.estimate ? 'About ' : ''}${dateText(event.date, { withYear: true })}${where}`,
+            when,
+            bell,
+            note: [event.estimate ? ESTIMATE_NOTE : '', note].filter(Boolean).join(' ')
+        };
     }
     if (item.kind === 'tv') {
         if (item.finished) return { label: 'Status', value: 'The series has ended' };
@@ -362,20 +384,41 @@ function dateBlock(item, event, today) {
               }
             : { label: 'Next episode', value: 'Date not known yet' };
     }
-    const ru = [
-        item.ruPremiere ? `In Russian cinemas ${dateText(item.ruPremiere, { withYear: true })}` : '',
-        item.ruDigital ? `Online in Russia ${dateText(item.ruDigital, { withYear: true })}` : ''
-    ]
-        .filter(Boolean)
-        .join(' · ');
-    return item.date
+    return filmDates(item, today);
+}
+
+/**
+ * A film's two dates: in cinemas (with Russia's when known) and online, the exact digital date or
+ * the estimate. The bell where the bot writes: online always, the cinema premiere only for a chat
+ * with premieres on (item.premiere).
+ */
+function filmDates(item, today) {
+    const ruCinema = item.cinemaRu;
+    // The premiere the chat follows when it has one (Russia's in "Russia only"), else the first
+    const shown = item.premiere || item.cinema || (item.date ? { date: item.date, country: null } : null);
+    const cinema = {
+        label: 'In cinemas',
+        icon: 'clapperboard',
+        value: shown
+            ? `${dateText(shown.date, { withYear: true })}${shown.country ? ` · ${countryName(shown.country)}` : ''}`
+            : 'Date not known yet',
+        note: ruCinema && shown?.country !== 'RU' ? `In Russia ${dateText(ruCinema, { withYear: true })}` : '',
+        bell: Boolean(item.premiere),
+        when: item.premiere && today ? whenText(item.premiere.date, today) : ''
+    };
+    const online = item.online
         ? {
-              label: 'Release',
-              value: dateText(item.date, { withYear: true }),
-              when: today ? whenText(item.date, today) : '',
-              note: ru
+              label: 'Online',
+              icon: 'tv',
+              value: `${item.online.estimate ? 'About ' : ''}${dateText(item.online.date, { withYear: true })}${item.online.country ? ` · ${countryName(item.online.country)}` : ''}`,
+              note: item.online.estimate
+                  ? `${ESTIMATE_NOTE} The bot messages you then.`
+                  : 'The bot messages you on this day.',
+              bell: true,
+              when: today ? whenText(item.online.date, today) : ''
           }
-        : { label: 'Release', value: 'Date not known yet', note: ru };
+        : { label: 'Online', icon: 'tv', value: 'Date not known yet', note: 'The bot messages you when it is online.' };
+    return [cinema, online];
 }
 
 /** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */
@@ -552,7 +595,13 @@ function calRow(item, index, today, sameDay) {
     const sub =
         item.kind === 'tv'
             ? [`S${item.season}E${item.episode}`, episodeName(item), MARKS[item.mark]].filter(Boolean).join(' · ')
-            : 'Release';
+            : item.event === 'cinema'
+              ? 'In cinemas'
+              : item.event === 'release'
+                ? 'Release'
+                : item.estimate
+                  ? 'Online · estimate'
+                  : 'Online';
     return (
         `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
         `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${thumb(item.poster, 'title-thumb cal-thumb')}` +

@@ -59,6 +59,35 @@ describe('online', () => {
     });
 });
 
+describe('the dates kept on a row', () => {
+    const { storedDates, onlineCountry } = require('../../src/film-release');
+
+    test('cinema, Russia, online with the estimate flag; where the online date comes from', () => {
+        const film = {
+            status: 'Released',
+            cinema_release_date: '2026-11-11',
+            cinema_release_country: 'BE',
+            cinema_ru_date: '2027-02-18'
+        };
+        assert.deepEqual(storedDates(film), {
+            cinema_date: '2026-11-11',
+            cinema_country: 'BE',
+            cinema_ru_date: '2027-02-18',
+            online_date: '2026-12-26',
+            online_estimate: true
+        });
+        const withRu = storedDates(film, { digital: '2026-12-10' });
+        assert.equal(withRu.online_date, '2026-12-10');
+        assert.equal(withRu.online_estimate, false);
+        assert.equal(onlineCountry({ ...withRu, ru_digital: '2026-12-10' }), 'RU');
+        assert.equal(
+            onlineCountry({ online_date: '2026-12-01', digital_date: '2026-12-01', digital_country: 'US' }),
+            'US'
+        );
+        assert.equal(onlineCountry({ online_date: '2026-12-26', online_estimate: true }), null);
+    });
+});
+
 describe('the cinema premiere', () => {
     const film = {
         status: 'Released',

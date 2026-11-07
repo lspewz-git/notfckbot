@@ -43,6 +43,14 @@ const Watchlist = sequelize.define('Watchlist', {
     ru_premiere: { type: DataTypes.STRING(10), allowNull: true },
     ru_digital: { type: DataTypes.STRING(10), allowNull: true },
     ru_services: { type: DataTypes.STRING, allowNull: true },
+    // From src/film-release.js storedDates(), for the calendar and the cards: the first wide cinema
+    // release (and its country), Russia's cinema release on TMDB, and when the film is online —
+    // online_estimate when that is the 45-day guess, not a digital release
+    cinema_date: { type: DataTypes.STRING(10), allowNull: true },
+    cinema_country: { type: DataTypes.STRING(2), allowNull: true },
+    cinema_ru_date: { type: DataTypes.STRING(10), allowNull: true },
+    online_date: { type: DataTypes.STRING(10), allowNull: true },
+    online_estimate: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     // When Kinopoisk was last asked; null = never
     ru_checked_at: { type: DataTypes.DATE, allowNull: true },
     // What the title is, for the chats' statistics (titleFacts() in src/api/tmdb.js); kept current

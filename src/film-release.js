@@ -80,16 +80,70 @@ function isOnline(data, ru = {}, today) {
  * @param {'off' | 'all' | 'ru'} mode
  */
 function premiereDue(data, ru = {}, mode, today) {
-    let premiere = null;
-    if (mode === 'all' && dayOf(data.cinema_release_date)) {
-        premiere = { date: dayOf(data.cinema_release_date), country: data.cinema_release_country || null };
-    } else if (mode === 'ru') {
-        const kp = dayOf(ru.premiere);
-        const date = kp && !premiereMonthOnly(kp) ? kp : dayOf(data.cinema_ru_date);
-        if (date) premiere = { date, country: 'RU' };
-    }
+    const premiere = premiereOf(data, ru, mode);
     if (!premiere || !hasCome(data, premiere.date, today)) return null;
     return addDays(premiere.date, PREMIERE_FRESH_DAYS) >= today ? premiere : null;
+}
+
+/** Which cinema premiere a mode is about: { date, country }, or null (off, or no such release). */
+function premiereOf(data, ru = {}, mode) {
+    if (mode === 'all' && dayOf(data.cinema_release_date)) {
+        return { date: dayOf(data.cinema_release_date), country: data.cinema_release_country || null };
+    }
+    if (mode === 'ru') {
+        const kp = dayOf(ru.premiere);
+        const date = kp && !premiereMonthOnly(kp) ? kp : dayOf(data.cinema_ru_date);
+        if (date) return { date, country: 'RU' };
+    }
+    return null;
+}
+
+/**
+ * The dates kept on a film's Watchlist rows for the calendar and the cards (src/cron/films.js on
+ * every check, src/chat-ops.js on adding): the first cinema release and Russia's, and when it is
+ * online, `online_estimate` when that is the 45-day guess.
+ */
+function storedDates(data, ru = {}) {
+    const online = onlineDate(data, ru);
+    return {
+        cinema_date: dayOf(data.cinema_release_date),
+        cinema_country: data.cinema_release_country || null,
+        cinema_ru_date: dayOf(data.cinema_ru_date),
+        online_date: online ? online.date : null,
+        online_estimate: Boolean(online && online.fallback)
+    };
+}
+
+/**
+ * A row's premiere for a mode, from its stored dates (the calendar's "In cinemas" row): null when
+ * there is none, or when it falls on or after the online date — the bot then sends "Фильм вышел"
+ * instead (src/cron/films.js).
+ */
+function rowPremiere(row, mode) {
+    const premiere = premiereOf(
+        {
+            cinema_release_date: row.cinema_date,
+            cinema_release_country: row.cinema_country,
+            cinema_ru_date: row.cinema_ru_date
+        },
+        { premiere: row.ru_premiere },
+        mode
+    );
+    if (!premiere || (row.online_date && premiere.date >= row.online_date)) return null;
+    return premiere;
+}
+
+/** Russia's cinema date for a row: Kinopoisk's when it has the day, else TMDB's. */
+function ruCinemaDate(row) {
+    const kp = dayOf(row.ru_premiere);
+    return (kp && !premiereMonthOnly(kp) ? kp : null) || dayOf(row.cinema_ru_date);
+}
+
+/** Where a row's online date comes from: TMDB's country, Russia (Kinopoisk), or null. */
+function onlineCountry(row) {
+    if (!row.online_date || row.online_estimate) return null;
+    if (row.online_date === row.digital_date) return row.digital_country || null;
+    return row.online_date === row.ru_digital ? 'RU' : null;
 }
 
 /**
@@ -107,6 +161,10 @@ function premierePassed(data, ru = {}, today) {
 module.exports = {
     isOnline,
     premierePassed,
+    storedDates,
+    rowPremiere,
+    ruCinemaDate,
+    onlineCountry,
     onlineDate,
     premiereDue,
     PREMIERE_MODES,

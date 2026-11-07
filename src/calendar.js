@@ -11,6 +11,7 @@ const { parseAired } = require('./cron/aired-episodes');
 const { zoneOf } = require('./quiet');
 const { escapeHtml, isFinishedStatus } = require('./constants');
 const { plural } = require('./words');
+const { rowPremiere, onlineCountry } = require('./film-release');
 
 // --- Dates as "YYYY-MM-DD" strings: TMDB's air dates are days, not moments ---
 
@@ -254,7 +255,7 @@ async function seriesEpisodes(series, from, to) {
  * Everything of a chat's in the period, by date, and how many series TMDB didn't answer for.
  * @returns {Promise<{ items: object[], failed: number }>}
  */
-async function periodItems(chatId, from, to) {
+async function periodItems(chatId, from, to, { premieres = 'off', filmsByRelease = false } = {}) {
     const [subs, films] = await Promise.all([
         Subscription.findAll({ where: { chatId }, include: [{ model: Series }] }),
         Watchlist.findAll({ where: { chatId } })
@@ -269,22 +270,44 @@ async function periodItems(chatId, from, to) {
     );
     const modes = new Map(subs.filter((s) => s.Series).map((s) => [s.Series.tmdb_id, s.notify_type]));
     const items = perSeries.flat().map((item) => ({ ...item, mode: modes.get(item.tmdbId) }));
+    // A film on the day it is online (the bot's "Фильм вышел"; an estimate when no digital date is
+    // known), and on its cinema premiere only for a chat with premieres on (src/film-release.js).
+    // A row without them stays on its main release date, as before.
     const seenFilms = new Set();
     for (const f of films) {
-        const date = f.premiere_digital && String(f.premiere_digital).slice(0, 10);
-        if (!date || date < from || date > to || seenFilms.has(f.tmdb_id)) continue;
-        seenFilms.add(f.tmdb_id);
-        items.push({
-            date,
-            kind: 'movie',
-            tmdbId: f.tmdb_id,
-            listId: f.id,
-            title: f.title,
-            poster: f.poster_url || null,
-            genres: f.genres,
-            ruPremiere: f.ru_premiere,
-            ruDigital: f.ru_digital
-        });
+        const premiere = !filmsByRelease && rowPremiere(f, premieres);
+        const rows = [
+            f.online_date && !filmsByRelease
+                ? {
+                      event: 'online',
+                      date: f.online_date,
+                      estimate: Boolean(f.online_estimate) && !f.notified,
+                      country: onlineCountry(f)
+                  }
+                : // No online date kept (an older row, or none known): the main release, no bell
+                  { event: 'release', date: f.premiere_digital, estimate: false, country: null },
+            premiere && { event: 'cinema', date: premiere.date, country: premiere.country, estimate: false }
+        ];
+        for (const row of rows) {
+            const date = row && row.date && String(row.date).slice(0, 10);
+            const key = row && `${f.tmdb_id}:${row.event}`;
+            if (!date || date < from || date > to || seenFilms.has(key)) continue;
+            seenFilms.add(key);
+            items.push({
+                date,
+                kind: 'movie',
+                event: row.event,
+                estimate: row.estimate,
+                country: row.country,
+                tmdbId: f.tmdb_id,
+                listId: f.id,
+                title: f.title,
+                poster: f.poster_url || null,
+                genres: f.genres,
+                ruPremiere: f.ru_premiere,
+                ruDigital: f.ru_digital
+            });
+        }
     }
     items.sort(
         (a, b) =>
@@ -299,7 +322,12 @@ async function periodItems(chatId, from, to) {
 const MAX_TEXT = 3600;
 
 function itemLine(item, past) {
-    if (item.kind === 'movie') return `🎬 ${escapeHtml(item.title)} — ${past ? 'вышел' : 'выход'}`;
+    if (item.kind === 'movie') {
+        const title = escapeHtml(item.title);
+        if (item.event === 'cinema') return `🎞 ${title} — ${past ? 'вышел в кино' : 'в кино'}`;
+        if (item.event === 'release') return `🎬 ${title} — ${past ? 'вышел' : 'выход'}`;
+        return `💻 ${title} — ${past ? 'вышел онлайн' : item.estimate ? 'онлайн (примерно)' : 'онлайн'}`;
+    }
     return `📺 ${escapeHtml(item.title)} — S${item.season}E${item.episode}${item.note ? `, ${item.note}` : ''}`;
 }
 
@@ -313,7 +341,7 @@ function fitter() {
         push(...more) {
             const size = more.reduce((n, l) => n + l.length + 1, 0);
             if (length + size > MAX_TEXT) {
-                left += more.filter((l) => /^(📺|🎬)/.test(l)).length;
+                left += more.filter((l) => /^(📺|🎬|💻|🎞)/.test(l)).length;
                 return;
             }
             lines.push(...more);

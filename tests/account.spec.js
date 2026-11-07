@@ -625,8 +625,14 @@ test('search: a series asks for the mode, a film is added at once, what is on th
     await expect(results).toHaveCount(3);
     await expect(results.nth(1).locator('.search-following')).toHaveText('Following');
 
-    await results.nth(0).getByRole('button', { name: /^Follow / }).click();
-    await page.locator('#mine-card-modal').getByRole('button', { name: /Notify me/ }).click();
+    await results
+        .nth(0)
+        .getByRole('button', { name: /^Follow / })
+        .click();
+    await page
+        .locator('#mine-card-modal')
+        .getByRole('button', { name: /Notify me/ })
+        .click();
     await page.locator('#mine-card-modal').getByText('Episode 1 and the whole season').click();
     await page.locator('#mine-card-modal').getByRole('button', { name: 'Follow', exact: true }).click();
     await expect(results.nth(0).locator('.search-following')).toHaveText('Following');
@@ -635,7 +641,10 @@ test('search: a series asks for the mode, a film is added at once, what is on th
         mode: 'first_and_full'
     });
 
-    await results.nth(2).getByRole('button', { name: /^Follow / }).click();
+    await results
+        .nth(2)
+        .getByRole('button', { name: /^Follow / })
+        .click();
     await expect(results.nth(2).locator('.search-following')).toHaveText('Following');
     expect(panel.account.sent.find((r) => r.path === '/api/account/chats/42/films').body).toEqual({
         tmdbId: 'movie_8'
@@ -659,9 +668,7 @@ test('search titles open the shared title card without adding anything', async (
     expect(panel.account.sent.filter((r) => r.method === 'POST' && r.path !== '/api/account/activity')).toHaveLength(0);
     await page.locator('#mine-card-modal').getByRole('button', { name: 'Follow', exact: true }).click();
     await expect(page.locator('#mine-card-modal')).toBeHidden();
-    await expect(page.locator('#mine-results .search-row').nth(2).locator('.search-following')).toHaveText(
-        'Following'
-    );
+    await expect(page.locator('#mine-results .search-row').nth(2).locator('.search-following')).toHaveText('Following');
 });
 
 test('calendar: one list of what is to come, series and films in their tabs, with posters; no period switch', async ({
@@ -717,16 +724,25 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
 
 test('calendar: a film card counts down, expands its description and leaves missing data out', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    panel.account.calendar.items.filter(item => item.kind === 'movie' && item.overview).forEach(item => { item.overview = 'A long calendar overview. '.repeat(100); });
+    panel.account.calendar.items
+        .filter((item) => item.kind === 'movie' && item.overview)
+        .forEach((item) => {
+            item.overview = 'A long calendar overview. '.repeat(100);
+        });
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
     await body.getByRole('tab', { name: 'Films', exact: true }).click();
     await body.locator('button.cal-row', { hasText: 'Дюна: Часть третья' }).click();
     const card = page.locator('#mine-card-modal');
-    await expect(card.locator('.tc-date-value')).toHaveText('Nov 6, 2026');
+    // The calendar's row is the film's online date, here the estimate
+    await expect(card.locator('.tc-date-value')).toHaveText('About Nov 6, 2026');
     await expect(card.locator('.tc-date-when')).toHaveText('in 2 days');
     await expect(card.locator('.tc-rating')).toContainText('7.4');
-    const clamped = () => card.locator('.tc-more').getAttribute('aria-expanded').then(value => value === 'false');
+    const clamped = () =>
+        card
+            .locator('.tc-more')
+            .getAttribute('aria-expanded')
+            .then((value) => value === 'false');
     expect(await clamped()).toBe(true);
     await card.getByRole('button', { name: 'Show more', exact: true }).click();
     await expect.poll(clamped).toBe(false);
@@ -1296,7 +1312,9 @@ test('the tab header: title and chat chip on one row, the line, the search pill 
         const pill = box('#my-subs-section .search-pill');
         return {
             sameRow: Math.abs(h1.top + h1.height / 2 - (chip.top + chip.height / 2)) < 2,
-            chipRight: Math.round(document.querySelector('#my-subs-section header').getBoundingClientRect().right - chip.right),
+            chipRight: Math.round(
+                document.querySelector('#my-subs-section header').getBoundingClientRect().right - chip.right
+            ),
             subGap: Math.round(sub.top - Math.max(h1.bottom, chip.bottom)),
             pillGap: Math.round(pill.top - sub.bottom),
             pillHeight: pill.height
@@ -1342,4 +1360,33 @@ test('a long chat name in the chip ends in an ellipsis at 180px', async ({ page 
     expect(sizes.width).toBeLessThanOrEqual(180);
     expect(sizes.clipped).toBe(true);
     expect(sizes.ellipsis).toBe('ellipsis');
+});
+
+test('a waiting film shows both dates: in cinemas and online, the bell on online; the calendar row says which', async ({
+    page
+}) => {
+    await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-subs');
+    await page.locator('#my-subs-body [role="tab"]', { hasText: 'Films' }).click();
+    const row = page.locator('#my-subs-body button.title-row', { hasText: 'Дюна: Часть третья' });
+    await expect(row.locator('.row-meta')).toHaveText('Online about Dec 21, 2026');
+    await row.click();
+    const dates = page.locator('#mine-card-modal .tc-date');
+    await expect(dates).toHaveCount(2);
+    await expect(dates.nth(0).locator('.tc-date-label').first()).toHaveText('In cinemas');
+    await expect(dates.nth(0).locator('.tc-date-value')).toHaveText('Nov 6, 2026 · Belgium');
+    await expect(dates.nth(0)).toContainText('In Russia Feb 18, 2027');
+    await expect(dates.nth(0).locator('.tc-bell')).toHaveCount(0);
+    await expect(dates.nth(1).locator('.tc-date-value')).toHaveText('About Dec 21, 2026');
+    await expect(dates.nth(1)).toContainText('usually 45 days after cinemas');
+    await expect(dates.nth(1).locator('.tc-bell')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+
+    await openMine(page, 'my-calendar');
+    const body = page.locator('#my-calendar-body');
+    await body.getByRole('tab', { name: 'Films', exact: true }).click();
+    await expect(body.locator('button.cal-row', { hasText: 'Дюна: Часть третья' }).locator('.row-meta')).toHaveText(
+        'Online · estimate'
+    );
+    await expect(body.locator('button.cal-row', { hasText: 'Мегалополис' }).locator('.row-meta')).toHaveText('Online');
 });

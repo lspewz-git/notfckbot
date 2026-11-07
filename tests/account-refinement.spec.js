@@ -73,7 +73,9 @@ test.describe('shared cards and calendar unfollow', () => {
         await page.locator('#my-subs-body button.title-row').click();
         const card = page.locator('#mine-card-modal');
         await expect(card.locator('.tc-head h2')).toBeVisible();
-        await expect(card.locator('.tc-date')).toContainText('in 2 days');
+        // A film: in cinemas and online, two date blocks
+        await expect(card.locator('.tc-date')).toHaveCount(2);
+        await expect(card.locator('.tc-date').first()).toContainText('Nov 6, 2026');
         await expect(card.locator('.tc-overview')).toBeVisible();
         await card.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(animation=>animation.finished)));
         const gap = await card.evaluate((el) => {

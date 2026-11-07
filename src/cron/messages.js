@@ -1,5 +1,5 @@
 /** The notification texts the update check sends. Pure: no Telegram, database or network. */
-const { isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates, COUNTRY_NAMES } = require('../constants');
+const { isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates, countryName } = require('../constants');
 const { onlineDate } = require('../film-release');
 
 /**
@@ -60,7 +60,7 @@ function buildFilmMessage({ entry, data, links, now = new Date(), ru = {} }) {
  *   links: string }} parts links: the info links (formatWatchLinks of kind 'info')
  */
 function buildPremiereMessage({ entry, data, premiere, links }) {
-    const country = premiere.country ? ` (${escapeHtml(COUNTRY_NAMES[premiere.country] || premiere.country)})` : '';
+    const country = premiere.country ? ` (${escapeHtml(countryName(premiere.country))})` : '';
     return (
         `🎞 <b>Премьера в кино!</b>\n\n` +
         filmHead(entry, data) +

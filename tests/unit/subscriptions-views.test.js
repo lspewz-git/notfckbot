@@ -92,6 +92,38 @@ describe('the cards', () => {
         assert.deepEqual(buttons(view), [['❌ Удалить', '⬅️ К списку']]);
     });
 
+    test("a waiting film: in cinemas, Russia's cinemas and online, the estimate explained", () => {
+        const row = {
+            id: 9,
+            title: 'Как ограбить банк',
+            year: 2026,
+            premiere_digital: '2026-11-11',
+            cinema_date: '2026-11-11',
+            cinema_country: 'BE',
+            cinema_ru_date: '2027-02-18',
+            online_date: '2026-12-26',
+            online_estimate: true
+        };
+        const card = views.buildMovieCard(row, '0').text;
+        assert.match(card, /🎞 В кино: <b>11 ноября 2026 г\.<\/b> \(Бельгия\)/);
+        assert.match(card, /В кино в России: <b>18 февраля 2027 г\.<\/b>/);
+        assert.match(card, /💻 Онлайн: <b>примерно 26 декабря 2026 г\.<\/b>/);
+        assert.match(card, /обычно через 45 дней после кино/);
+
+        const exact = views.buildMovieCard(
+            {
+                ...row,
+                online_date: '2026-12-23',
+                online_estimate: false,
+                digital_date: '2026-12-23',
+                digital_country: 'US'
+            },
+            '0'
+        ).text;
+        assert.match(exact, /💻 Онлайн: <b>23 декабря 2026 г\.<\/b> \(США\)/);
+        assert.doesNotMatch(exact, /примерно|45 дней/);
+    });
+
     test('confirmations: yes removes, no returns to the card', () => {
         const unsub = views.buildUnsubscribeConfirm({ title: 'Пацаны', status: 'Ended' }, 'tv_1', '3');
         assert.match(unsub.text, /Если сериал продлят, уведомление не придёт/);

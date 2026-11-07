@@ -44,7 +44,9 @@ const loadSubscriptionItems = async (chatId) => {
         id: w.id,
         title: w.title,
         year: w.year,
-        date: w.premiere_digital
+        date: w.premiere_digital,
+        online: w.online_date || null,
+        estimate: Boolean(w.online_estimate)
     }));
     return {
         active: [...series.filter((s) => !isFinishedStatus(s.status)), ...movies],

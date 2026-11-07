@@ -88,6 +88,53 @@ test('calendar items carry full-unfollow film ids and the series notification mo
     assert.equal(items.find((item) => item.kind === 'tv').mode, 'season');
 });
 
+test('a film: online always (estimate marked), the cinema premiere only for a chat with premieres on', async (t) => {
+    const film = {
+        id: 90,
+        tmdb_id: 'movie_9',
+        title: 'Как ограбить банк',
+        premiere_digital: '2026-11-11',
+        cinema_date: '2026-11-11',
+        cinema_country: 'BE',
+        cinema_ru_date: '2027-02-18',
+        online_date: '2026-12-26',
+        online_estimate: true
+    };
+    t.mock.method(Watchlist, 'findAll', async () => [film]);
+    t.mock.method(Subscription, 'findAll', async () => []);
+    const rows = async (premieres) =>
+        (await calendar.periodItems(10, '2026-11-01', '2027-02-28', { premieres })).items.map((i) => [
+            i.date,
+            i.event,
+            i.estimate,
+            i.country
+        ]);
+    assert.deepEqual(await rows('off'), [['2026-12-26', 'online', true, null]]);
+    assert.deepEqual(await rows('all'), [
+        ['2026-11-11', 'cinema', false, 'BE'],
+        ['2026-12-26', 'online', true, null]
+    ]);
+    // Russia's cinemas come after the online date: the bot sends "Фильм вышел" then, no premiere
+    assert.deepEqual(await rows('ru'), [['2026-12-26', 'online', true, null]]);
+    film.online_date = '2027-03-01';
+    assert.deepEqual((await rows('ru'))[0], ['2027-02-18', 'cinema', false, 'RU']);
+    film.online_date = '2026-12-26';
+
+    // The year history counts films by their release date
+    const history = await calendar.periodItems(10, '2026-11-01', '2027-02-28', {
+        filmsByRelease: true,
+        premieres: 'all'
+    });
+    assert.deepEqual(
+        history.items.map((i) => [i.date, i.event]),
+        [['2026-11-11', 'release']]
+    );
+
+    const p = { kind: 'm', from: '2026-12-01', to: '2026-12-31', today: '2026-11-07' };
+    const { items } = await calendar.periodItems(10, p.from, p.to, { premieres: 'off' });
+    assert.match(calendar.calendarText(p, { items, failed: 0 }), /💻 Как ограбить банк — онлайн \(примерно\)/);
+});
+
 describe('dates', () => {
     test('a week runs Monday to Sunday; offsets go back and ahead, across months and years', () => {
         assert.deepEqual(pick(calendar.period('w', 0, 'Europe/Moscow', NOW)), ['2026-10-12', '2026-10-18']);

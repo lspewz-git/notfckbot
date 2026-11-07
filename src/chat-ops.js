@@ -7,7 +7,7 @@ const tmdb = require('./api/tmdb');
 const { ZONES, isHour } = require('./quiet');
 const { sentMarkOnEnable } = require('./cron/digests');
 // The update check's own rule, so a film added now is filed exactly as the check would announce it
-const { isOnline, premierePassed, PREMIERE_MODES } = require('./film-release');
+const { isOnline, premierePassed, storedDates, PREMIERE_MODES } = require('./film-release');
 const kinopoisk = require('./api/kinopoisk');
 const { todayIn } = require('./calendar');
 const { NOTIFY_LABELS } = require('./constants');
@@ -115,6 +115,7 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
         ru_premiere: ru.premiere || null,
         ru_digital: ru.digital || null,
         ru_services: ru.services && ru.services.length ? ru.services.join(', ') : null,
+        ...storedDates(details, ru),
         notified: waitingOnly ? false : isReleased,
         premiere_notified: premierePassed(details, ru, today)
     };

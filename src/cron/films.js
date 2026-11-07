@@ -4,7 +4,7 @@ const { getDetails, getDetailsCached, titleFacts } = require('../api/tmdb');
 const { findKinopoiskId, russianDates } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
 const { buildFilmMessage, buildPremiereMessage, heldLine } = require('./messages');
-const { isOnline, premiereDue } = require('../film-release');
+const { isOnline, premiereDue, storedDates } = require('../film-release');
 const { todayIn } = require('../calendar');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
@@ -88,6 +88,16 @@ const checkWatchlistReleases = async (bot) => {
                 digital: firstEntry.ru_digital || null,
                 services: firstEntry.ru_services ? firstEntry.ru_services.split(', ') : []
             };
+            // The cinema and online dates for the calendar and the cards, current on every check
+            const stored = storedDates(data, ru);
+            for (const entry of filmEntries) {
+                const changes = Object.fromEntries(
+                    Object.entries(stored).filter(
+                        ([k, v]) => (entry[k] ?? null) !== v && !(k === 'online_estimate' && Boolean(entry[k]) === v)
+                    )
+                );
+                if (Object.keys(changes).length) await entry.update(changes);
+            }
             // Looked up only when a message is due, once per film
             let kinopoiskId;
             const linksFor = async (watch) => {
