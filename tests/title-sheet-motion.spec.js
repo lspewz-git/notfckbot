@@ -33,22 +33,23 @@ test('description expansion preserves the frame and reading position while actio
     await expect.poll(measure).toEqual(before);
 });
 
-// Synthetic pointer distances isolate the threshold from the physical screen's available drag space.
+// Synthetic touch distances isolate the threshold from the physical screen's available drag space.
 async function drag(card, fraction, cancel = false) {
     return card.evaluate((el, { fraction, cancel }) => {
         const y = el.getBoundingClientRect().top + 60;
         const target = el.querySelector('.tc-head');
-        const pointer = { pointerId: 99, pointerType: 'touch', isPrimary: true, clientX: 100, bubbles: true };
-        // Synthetic events have no browser pointer capture; real CDP gestures are covered separately.
-        const capture = el.setPointerCapture;
-        el.setPointerCapture = () => {};
-        try {
-            target.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, clientY: y }));
-            target.dispatchEvent(new PointerEvent('pointermove', { ...pointer, clientY: y + el.clientHeight * fraction }));
-            const moved = el.getBoundingClientRect().top;
-            target.dispatchEvent(new PointerEvent(cancel ? 'pointercancel' : 'pointerup', { ...pointer, clientY: y + el.clientHeight * fraction }));
-            return { open: el.closest('dialog').open, moved, released: el.getBoundingClientRect().top };
-        } finally { el.setPointerCapture = capture; }
+        const point = clientY => ({ identifier: 99, target, clientX: 100, clientY });
+        const start = point(y), end = point(y + el.clientHeight * fraction);
+        const dispatch = (type, touch, ended = false) => {
+            const event = new Event(type, { bubbles: true, cancelable: true });
+            Object.defineProperties(event, { touches: { value: ended ? [] : [touch] }, changedTouches: { value: [touch] } });
+            target.dispatchEvent(event);
+        };
+        dispatch('touchstart', start);
+        dispatch('touchmove', end);
+        const moved = el.getBoundingClientRect().top;
+        dispatch(cancel ? 'touchcancel' : 'touchend', end, true);
+        return { open: el.closest('dialog').open, moved, released: el.getBoundingClientRect().top };
     }, { fraction, cancel });
 }
 

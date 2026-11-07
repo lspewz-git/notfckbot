@@ -406,11 +406,11 @@
     max-height: calc(100svh - var(--top-inset) - var(--space-4));
     padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
     overflow: visible;
-    touch-action: pan-x pinch-zoom;
+    touch-action: auto;
 }
 
 .tc-scroll {
-    touch-action: pan-x pinch-zoom;
+    touch-action: auto;
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -420,6 +420,12 @@
     overflow-anchor: none;
     overscroll-behavior: contain;
     scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    padding-inline-end: var(--space-2);
+}
+
+.title-sheet.tc-dragging {
+    will-change: transform;
 }
 
 .tc-scroll > * {
