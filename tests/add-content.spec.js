@@ -174,6 +174,7 @@ test('admin and user search popups have the same dialog geometry and close butto
     await result(page, 2).click();
     const admin = await measure('#content-card-modal .modal-content');
     await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     await page.getByRole('link', { name: 'Follow a title' }).click();
     await page.locator('#mine-q').fill('дюна');
     await page.locator('#mine-q').press('Enter');

@@ -63,7 +63,7 @@ test('Buttons pressed by closes without saving and still saves a selected choice
     page,
     isMobile
 }, testInfo) => {
-    const panel = await mockPanel(page, { role: 'user', groupAdmin: true });
+    const panel = await mockPanel(page, { role: 'user', groupAdmin: true, path: '/#my-subs' });
     if (process.env.PICK_SCREENSHOTS && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
     await pickChat(page, 'my-subs', 'Киноклуб');
     await openProfilePage(page, 'my-settings');

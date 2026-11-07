@@ -58,7 +58,7 @@ import { titleCardActions, setupPosterViewer } from './title-card.js';
 import { deviceActions } from './devices.js';
 import { setupSearchForms, toggleDescription } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
-import { setupNavigation } from './navigation.js';
+import { setupNavigation, DEFAULT_PERSONAL_SECTION } from './navigation.js';
 import { syncTelegramBack } from './tg-back.js';
 
 const REFRESH_SECONDS = 10;
@@ -70,7 +70,7 @@ let activeSection = 'dashboard';
 // An admin has two views: the admin panel and "My account" (their own chats, what a user sees).
 // The open section sets the view; each view reopens on the section it was left on
 const viewOf = (id) => (id.startsWith('my-') && !document.body.classList.contains('system-account') ? 'mine' : 'admin');
-const lastSection = { admin: 'dashboard', mine: 'my-subs' };
+const lastSection = { admin: 'dashboard', mine: DEFAULT_PERSONAL_SECTION };
 // Opened from the Account tab, not tabs of their own: a view never reopens on them
 const ACCOUNT_PAGES = ['my-account', 'my-settings', 'my-devices', 'my-search'];
 // The local account has its Account page and profile settings, but no Telegram chat pages
@@ -336,11 +336,11 @@ function sectionFromHash(role) {
 
 /**
  * Once signed in: the section in the address (a reload keeps the tab), else an admin's panel opens
- * on the dashboard and a user's on their subscriptions.
+ * on the dashboard and a user's on Calendar, the first personal tab.
  */
 function afterSignIn(role) {
-    // Opened from a group (a Mini App or a group's sign-in link): that chat's subscriptions
-    const start = launchedInChat() ? 'my-subs' : role === 'admin' ? activeSection : 'my-subs';
+    // Opened from a group (a Mini App or a group's sign-in link): that chat's Calendar
+    const start = !launchedInChat() && role === 'admin' ? activeSection : DEFAULT_PERSONAL_SECTION;
     switchSection(sectionFromHash(role) || start);
 }
 

@@ -9,6 +9,36 @@ const { mockPanel } = require('./mock-panel');
 
 watchConsole();
 
+test('My account in the admin More menu opens Calendar, the first personal tab', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'More is the narrow-screen entry to personal mode');
+    await mockPanel(page);
+    await expect(page.locator('#dashboard-section')).toBeVisible();
+    await page.locator('.tab-item[data-open="more-modal"]').click();
+    await page.locator('#more-modal').getByRole('button', { name: /^My account/ }).click();
+    await expect(page.locator('#my-calendar-section')).toBeVisible();
+    await expect(page).toHaveURL(/#my-calendar$/);
+    await expect(page.locator('.tab-item[data-section="my-calendar"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#more-modal')).toBeHidden();
+    await openSection(page, 'my-subs');
+    await page.locator('.tab-profile').click();
+    await page.locator('#my-profile-body [data-action="view-admin"]').click();
+    await expect(page.locator('#dashboard-section')).toBeVisible();
+    await page.locator('.tab-item[data-open="more-modal"]').click();
+    await page.locator('#more-modal').getByRole('button', { name: /^My account/ }).click();
+    await expect(page.locator('#my-calendar-section')).toBeVisible();
+});
+
+test('a fresh personal launch opens Calendar, the first tab, and explicit links survive reload', async ({ page }) => {
+    await mockPanel(page, { role: 'user' });
+    await expect(page.locator('#my-calendar-section')).toBeVisible();
+    await expect(page).toHaveURL(/#my-calendar$/);
+    await expect(page.locator('.tab-item[data-section="my-calendar"]')).toHaveAttribute('aria-current', 'page');
+    await openSection(page, 'my-subs');
+    await page.reload();
+    await expect(page.locator('#my-subs-section')).toBeVisible();
+    await expect(page).toHaveURL(/#my-subs$/);
+});
+
 test('Tools above Logs contains recap, keeps its navigation active and survives a direct reload', async ({ page }) => {
     await mockPanel(page);
     for (const parent of ['.rail-nav', '#more-modal']) {
@@ -39,9 +69,9 @@ test('Tools above Logs contains recap, keeps its navigation active and survives 
 
 test('Tools direct links stay unavailable to a user', async ({ page }) => {
     await mockPanel(page, { role: 'user', path: '/#tools' });
-    await expect(page.locator('#my-subs-section')).toBeVisible();
+    await expect(page.locator('#my-calendar-section')).toBeVisible();
     await expect(page.locator('#tools-section')).toBeHidden();
-    await expect(page).toHaveURL(/#my-subs$/);
+    await expect(page).toHaveURL(/#my-calendar$/);
 });
 
 test('a section opens at its top, not where the previous one was scrolled to', async ({ page }) => {
@@ -70,11 +100,11 @@ test('the open section is kept in the address: a reload opens it again', async (
     await expect(page.locator('#dashboard-section')).toBeHidden();
 });
 
-test("a user's address naming an admin section opens their subscriptions instead", async ({ page }) => {
+test("a user's address naming an admin section opens their Calendar instead", async ({ page }) => {
     await mockPanel(page, { role: 'user', path: '/#logs' });
-    await expect(page.locator('#my-subs-section')).toBeVisible();
+    await expect(page.locator('#my-calendar-section')).toBeVisible();
     await expect(page.locator('#logs-section')).toBeHidden();
-    await expect(page).toHaveURL(/#my-subs$/);
+    await expect(page).toHaveURL(/#my-calendar$/);
 });
 
 /** A finger pulling the page down by `dy` px from near the top, as touch events. */

@@ -32,9 +32,7 @@ const SECTIONS = [
         label: 'Following',
         icon: 'bookmark',
         mine: true,
-        moreLabel: 'My account',
-        children: ['my-search'],
-        hint: 'Subscriptions, calendar and settings of your chats'
+        children: ['my-search']
     },
     // The tab bar has its own Account item with the chat's avatar (index.html); the rail lists it here
     {
@@ -46,6 +44,16 @@ const SECTIONS = [
         children: ['my-settings', 'my-account', 'my-devices']
     }
 ];
+
+/** All entry points to personal mode start on the first personal tab. */
+export const DEFAULT_PERSONAL_SECTION = SECTIONS.find((s) => s.mine).id;
+
+const PERSONAL_ENTRY = {
+    id: DEFAULT_PERSONAL_SECTION,
+    label: 'My account',
+    icon: 'bookmark',
+    hint: 'Subscriptions, calendar and settings of your chats'
+};
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -96,8 +104,5 @@ export function setupNavigation() {
     );
     $('more-modal')
         .querySelector('.action-list')
-        .insertAdjacentHTML(
-            'afterbegin',
-            [SECTIONS.find((s) => s.id === 'my-subs'), ...overflow].map(moreItem).join('')
-        );
+        .insertAdjacentHTML('afterbegin', [PERSONAL_ENTRY, ...overflow].map(moreItem).join(''));
 }

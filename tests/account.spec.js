@@ -42,12 +42,12 @@ test('Mini App sign-in continues if Telegram rejects the swipe setting', async (
 });
 
 for (const role of ['user', 'admin']) {
-    test(`a Mini App opened from a group opens that group's subscriptions (${role})`, async ({ page }) => {
+    test(`a Mini App opened from a group opens that group's Calendar (${role})`, async ({ page }) => {
         await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
         const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
         const panel = await mockPanel(page, { path, signedOut: true, role, miniAppChat: '-100' });
-        await expect(page.locator('#my-subs-section')).toBeVisible();
-        await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
+        await expect(page.locator('#my-calendar-section')).toBeVisible();
+        await expect(profileButton(page, 'my-calendar')).toContainText('Киноклуб');
         await expect
             .poll(() => panel.account.sent.some((r) => r.path.startsWith('/api/account/chats/-100/')))
             .toBe(true);
@@ -67,8 +67,8 @@ test('a Mini App opened from a group hidden in the menu still opens that group',
     await page.addInitScript(() => (window.TelegramWebviewProxy = { postEvent() {} }));
     const path = `/#${new URLSearchParams({ tgWebAppData: 'auth_date=123&hash=test' })}`;
     await mockPanel(page, { path, signedOut: true, role: 'user', miniAppChat: '-100', groupHidden: true });
-    await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
-    await profileButton(page, 'my-subs').click();
+    await expect(profileButton(page, 'my-calendar')).toContainText('Киноклуб');
+    await profileButton(page, 'my-calendar').click();
     await expect(page.locator('#pick-modal .pick-row.selected')).toContainText('Киноклуб');
 });
 
@@ -255,7 +255,7 @@ for (const options of [{ signedOut: true }, { role: 'user' }, {}]) {
         if (options.signedOut) await expect(page.locator('#login-gate')).toBeVisible();
         else
             await expect(
-                page.locator(options.role === 'user' ? '#my-subs-section' : '#dashboard-section')
+                page.locator(options.role === 'user' ? '#my-calendar-section' : '#dashboard-section')
             ).toBeVisible();
     });
 }
@@ -493,8 +493,8 @@ test('a one-time sign-in link signs in only after a press and opens the chat it 
     await expect(page.locator('#login-gate')).toBeHidden();
     expect(panel.account.sent.find((r) => r.path === '/api/login').body).toEqual({ token: 'good-token' });
     expect(new URL(page.url()).pathname).toBe('/');
-    await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
-    await expect(page.locator('#my-subs-section .mine-chat-chip')).toContainText('Киноклуб');
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-calendar-section .mine-chat-chip')).toContainText('Киноклуб');
 });
 
 test('a used link says so and offers the other ways in', async ({ page }) => {
@@ -506,10 +506,10 @@ test('a used link says so and offers the other ways in', async ({ page }) => {
 
 test('a user sees only their own sections, and the panel asks for nothing else', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
     const nav = isNarrow(page) ? '.tabbar .tab-item' : '.rail-nav .nav-item';
     expect(await visibleNav(page, nav)).toEqual(['my-calendar', 'my-aired', 'my-subs', 'my-profile']);
-    await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(2);
+    await expect(page.locator('#my-calendar-body button.cal-row')).toHaveCount(2);
     // No admin request was made for a user (they would all be refused)
     expect(panel.account.sent.every((r) => r.path.startsWith('/api/account/'))).toBe(true);
 });
@@ -541,7 +541,7 @@ test("an admin's two views: the admin panel and My account, each with only its o
 
 test('a user has no view switch', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
-    await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
     await expect(page.locator('.view-switch')).toBeHidden();
     await expect(page.locator('.tab-admin')).toBeHidden();
 });
@@ -559,6 +559,7 @@ test("on an admin's phone navigation appears once, with Account at the right edg
 
 test('subscriptions: running series, films and finished ones in their tabs', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     const rows = page.locator('#my-subs-body button.title-row');
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText('Одни из нас');
@@ -574,6 +575,7 @@ test('subscriptions: running series, films and finished ones in their tabs', asy
 
 test('a series card changes the mode and unsubscribes after a confirmation', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     await page.locator('#my-subs-body button.title-row', { hasText: 'Одни из нас' }).click();
     const card = page.locator('#mine-card-modal');
     await expect(card).toBeVisible();
@@ -591,6 +593,7 @@ test('a series card changes the mode and unsubscribes after a confirmation', asy
 
 test('a card is a sheet: a cross in its corner, buttons one height, Kinopoisk with its logo', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     await page.locator('#my-subs-body button.title-row', { hasText: 'Одни из нас' }).click();
     const card = page.locator('#mine-card-modal');
     await expect(card).toBeVisible();
@@ -614,6 +617,7 @@ test('a card is a sheet: a cross in its corner, buttons one height, Kinopoisk wi
 
 test('search: a series asks for the mode, a film is added at once, what is on the list is marked', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     await page.getByRole('link', { name: 'Follow a title' }).click();
     await page.locator('#mine-q').fill('дюна');
     await page.locator('#mine-q').press('Enter');
@@ -640,6 +644,7 @@ test('search: a series asks for the mode, a film is added at once, what is on th
 
 test('search titles open the shared title card without adding anything', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     await page.getByRole('link', { name: 'Follow a title' }).click();
     await page.locator('#mine-q').fill('дюна');
     await page.locator('#mine-q').press('Enter');
@@ -765,6 +770,7 @@ test("a group's settings: a member sees them, unchangeable; an admin's change is
 
 test('signing out, or a session that ends, brings back the sign-in screen', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
+    await openSection(page, 'my-subs');
     await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(2);
     panel.account.signedIn = false;
     await openMine(page, 'my-calendar');
@@ -775,7 +781,7 @@ test('signing out, or a session that ends, brings back the sign-in screen', asyn
 test('on a phone a user has four tabs, big enough to tap, and nothing scrolls sideways', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await mockPanel(page, { role: 'user' });
-    await expect(page.locator('#my-subs-body button.title-row')).toHaveCount(2);
+    await expect(page.locator('#my-calendar-body button.cal-row')).toHaveCount(2);
     const layout = await page.evaluate(() => {
         const tabs = [...document.querySelectorAll('.tabbar .tab-item')].filter(
             (el) => el.getBoundingClientRect().width > 0
@@ -883,7 +889,7 @@ test('Account settings: who is signed in, the role, and signing out on other dev
 
 test('the chat chip opens the chats; the choice shows on every page', async ({ page, isMobile }) => {
     const panel = await mockPanel(page, { role: 'user' });
-    const chip = profileButton(page, 'my-subs');
+    const chip = profileButton(page, 'my-calendar');
     await expect(chip).toContainText('My account');
     // A finger's 44px: the 36px pill takes hits 4px above and below it
     const hits = await chip.evaluate((el) => {
