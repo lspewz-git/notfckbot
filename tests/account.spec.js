@@ -711,7 +711,8 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
 });
 
 test('calendar: a film card counts down, expands its description and leaves missing data out', async ({ page }) => {
-    await mockPanel(page, { role: 'user' });
+    const panel = await mockPanel(page, { role: 'user' });
+    panel.account.calendar.items.filter(item => item.kind === 'movie' && item.overview).forEach(item => { item.overview = 'A long calendar overview. '.repeat(100); });
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
     await body.getByRole('tab', { name: 'Films', exact: true }).click();
@@ -720,7 +721,7 @@ test('calendar: a film card counts down, expands its description and leaves miss
     await expect(card.locator('.tc-date-value')).toHaveText('Nov 6, 2026');
     await expect(card.locator('.tc-date-when')).toHaveText('in 2 days');
     await expect(card.locator('.tc-rating')).toContainText('7.4');
-    const clamped = () => card.locator('.tc-overview').evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+    const clamped = () => card.locator('.tc-more').getAttribute('aria-expanded').then(value => value === 'false');
     expect(await clamped()).toBe(true);
     await card.getByRole('button', { name: 'Show more', exact: true }).click();
     await expect.poll(clamped).toBe(false);

@@ -70,11 +70,11 @@ test('Released reuses the poster and shows every listed season premiere, includi
     await row.locator('.history-open').press('Enter');
     const card = page.locator('#released-modal');
     await expect(card.locator('.tc-poster img')).toHaveAttribute('src', await image.getAttribute('src'));
-    const date = card.locator('.tc-date');
-    await expect(date).toContainText('Season 4 premiere');
-    await expect(date).toContainText('15 Dec 2025');
-    await expect(date).toContainText('Season 5: 20 Mar 2026');
-    await expect(date).toContainText('Season 6: 1 Jun 2026');
+    const date = card.locator('.tc-premieres');
+    await expect(date).toContainText('Season 4');
+    await expect(date.locator('.tc-season').nth(0)).toContainText('15 Dec2025');
+    await expect(date.locator('.tc-season').nth(1)).toContainText('20 Mar2026');
+    await expect(date.locator('.tc-season').nth(2)).toContainText('1 Jun2026');
     await expect(date).not.toContainText('2016');
 });
 

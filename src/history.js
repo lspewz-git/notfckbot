@@ -59,6 +59,7 @@ async function entry({
     ruPremiere = null,
     ruDigital = null,
     ruServices = null,
+    listId = null,
     networks = ''
 }) {
     const [type, numericId] = tmdbId.split('_');
@@ -69,6 +70,7 @@ async function entry({
     const link = links.find((l) => l.kind === 'info');
     return {
         tmdbId,
+        ...(listId != null ? { listId } : {}),
         title,
         overview: details?.overview || '',
         rating: details?.vote_average || null,
@@ -127,6 +129,7 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
         if (filmYear && !films.has(f.tmdb_id))
             films.set(f.tmdb_id, {
                 tmdbId: f.tmdb_id,
+                ...(chatId ? { listId: f.id } : {}),
                 title: f.title,
                 year: filmYear,
                 poster: f.poster_url || null,

@@ -74,6 +74,25 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 
+test('Released opens the shared title sheet with visible bottom links', async ({ page }) => {
+    const loaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/history' && response.status() === 200);
+    await goToSection(page, 'history');
+    await loaded;
+    await expect(page.locator('#history-series')).not.toHaveAttribute('aria-busy', 'true');
+    const first = page.locator('#history-series .history-open').first();
+    if (!(await first.count())) {
+        test.skip(true, 'No released series in this production dataset');
+        return;
+    }
+    await first.click();
+    const card = page.locator('#released-modal');
+    await expect(card.locator('.tc-scroll')).toBeVisible();
+    await expect(card.locator('.tc-footer').getByRole('link', { name: 'Open on Kinopoisk' })).toBeInViewport({ ratio: 1 });
+    await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toHaveCount(0);
+    await card.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(card).toBeHidden();
+});
+
 test('Tools opens readiness-first recap and its schedule without changing anything', async ({ page }) => {
     await goToSection(page, 'tools');
     await page.locator('#tools-section [data-section="recap"]').click();

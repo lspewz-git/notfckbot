@@ -4,7 +4,8 @@
  * poster opens it large over everything.
  */
 import { $, escapeHtml } from './dom.js';
-import { openModal, closeModal, preserveModalFrame } from './ui.js';
+import { openModal, closeModal } from './ui.js';
+import { fitTitleSheet } from './title-sheet.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -70,12 +71,16 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
  *   kind: string, title: string, poster?: string | null, seasons?: number | null, year?: string | number | null,
  *   rating?: number | null, genres?: string | null, networks?: string | null, overview?: string | null,
  *   kinopoiskUrl?: string | null,
+ *   premieres?: { season: number, date?: string | null }[],
  *   date?: { label: string, value: string, when?: string, bell?: boolean, note?: string } | null
  * }} t
- * @param {{ titleId?: string, notify?: string, extra?: string, actions?: string, close?: string }} [options]
+ * @param {{ titleId?: string, notify?: string, extra?: string, error?: string, actions?: string, close?: string }} [options]
  *   `notify`: the Notify me markup; `extra`: anything between it and the actions; `close`: the modal id
  */
-export function titleCard(t, { titleId = 'mine-card-title', notify = '', extra = '', actions = '', close = '' } = {}) {
+export function titleCard(
+    t,
+    { titleId = 'mine-card-title', notify = '', extra = '', error = '', actions = '', close = '' } = {}
+) {
     const src = posterSrc(t.poster);
     const big = posterSrc(t.poster, 'w500');
     const poster = src
@@ -92,7 +97,7 @@ export function titleCard(t, { titleId = 'mine-card-title', notify = '', extra =
         : '';
     const description = t.overview?.trim();
     const overview = description
-        ? `<p class="tc-overview" data-clamp>${escapeHtml(description)}</p><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false" hidden>Show more</button>`
+        ? `<div class="tc-description"><p class="tc-overview" data-clamp><span class="tc-copy">${escapeHtml(description)}</span><span class="tc-tail" hidden><span class="tc-ellipsis">… </span><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false">Show more</button></span></p></div>`
         : '';
     const kinopoisk = t.kinopoiskUrl
         ? `<a class="tc-link" href="${escapeHtml(t.kinopoiskUrl)}" target="_blank" rel="noopener noreferrer">${KP_LOGO}<span>Open on Kinopoisk</span>${icon('external-link')}</a>`
@@ -101,14 +106,48 @@ export function titleCard(t, { titleId = 'mine-card-title', notify = '', extra =
         (close
             ? `<button type="button" class="sheet-close" data-close="${close}" aria-label="Close">${icon('x')}</button>`
             : '') +
-        `<div class="tc-head">${poster}<div class="tc-facts"><h2 id="${titleId}">${escapeHtml(t.title)}</h2>` +
+        `<div class="tc-scroll"><div class="tc-head">${poster}<div class="tc-facts"><h2 id="${titleId}">${escapeHtml(t.title)}</h2>` +
         `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating)}${about ? `<p>${escapeHtml(about)}</p>` : ''}</div></div>` +
-        date +
+        (t.premieres?.length ? seasonPremieres(t.premieres, titleId) : date) +
         overview +
-        kinopoisk +
         notify +
         extra +
-        (actions ? `<div class="tc-actions">${actions}</div>` : '')
+        '</div>' +
+        `<div class="tc-footer">${kinopoisk}${error}${actions ? `<div class="tc-actions">${actions}</div>` : ''}</div>`
+    );
+}
+
+/** All title entry points use the same watch/unfollow controls and delegated action. */
+export function subscriptionActions(item, disabled = false) {
+    return (
+        watchButton(item.links) +
+        (item.id == null
+            ? ''
+            : `<button type="button" class="sheet-btn-danger-soft" data-action="mine-ask-unfollow"${disabled ? ' disabled' : ''}>Unfollow</button>`)
+    );
+}
+
+/** Equal-weight premiere blocks; three per row at most, with full-width incomplete rows. */
+function seasonPremieres(premieres, titleId) {
+    const gridId = `${titleId}-seasons`;
+    const rows = premieres
+        .map(({ season, date }, index) => {
+            const parsed = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || '');
+            const month = parsed
+                ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][
+                      Number(parsed[2]) - 1
+                  ]
+                : '';
+            const value = parsed && month ? `${Number(parsed[3])} ${month}` : 'TBA';
+            return `<div class="tc-season"${index >= 3 ? ' hidden' : ''}>${icon('calendar')}<div class="tc-season-text"><span class="tc-season-label">${icon('calendar')}<span>Season ${escapeHtml(season)}</span></span><strong><span>${escapeHtml(value)}</span>${parsed && month ? `<small>${parsed[1]}</small>` : ''}</strong></div></div>`;
+        })
+        .join('');
+    return (
+        `<section class="tc-premieres"><h3>Season premieres</h3><div class="tc-season-grid" id="${gridId}" data-columns="${Math.min(3, premieres.length)}">${rows}</div>` +
+        (premieres.length > 3
+            ? `<button type="button" class="tc-seasons-more" data-action="tc-seasons" data-count="${premieres.length - 3}" aria-expanded="false" aria-controls="${gridId}"><span>Show more · ${premieres.length - 3} seasons</span>${icon('chevron-down')}</button>`
+            : '') +
+        '</section>'
     );
 }
 
@@ -120,21 +159,18 @@ export function watchButton(links) {
         : '';
 }
 
-/** "Show more" only where the three lines cut the text; call once the card is in an open dialog */
+/** Fit the shared description to available space after opening or updating a title card. */
 export function fitDescriptions(root) {
-    for (const text of root.querySelectorAll('[data-clamp]')) {
-        const more = /** @type {HTMLElement} */ (text.nextElementSibling);
-        if (more?.dataset.action === 'tc-more') more.hidden = text.scrollHeight <= text.clientHeight + 1;
-    }
+    fitTitleSheet(root);
 }
 
 function toggleNotify(button) {
     const field = button.closest('.tc-notify');
     const options = field.querySelector('.tc-notify-options');
     const open = button.getAttribute('aria-expanded') !== 'true';
-    if (open) preserveModalFrame(button);
     button.setAttribute('aria-expanded', String(open));
     options.hidden = !open;
+    fitDescriptions(field.closest('.modal-content'));
     // All sheet entry points share this handler, including Follow before anything is saved.
     if (!field.dataset.watched) {
         field.dataset.watched = 'true';
@@ -146,6 +182,7 @@ function toggleNotify(button) {
             // Return keyboard focus before hiding the selected radio.
             button.focus({ preventScroll: true });
             options.hidden = true;
+            fitDescriptions(field.closest('.modal-content'));
         };
         field.addEventListener('change', select);
         // A second tap on the current choice has no change event, but still closes the list.
@@ -154,12 +191,20 @@ function toggleNotify(button) {
 }
 
 function toggleMore(button) {
-    const text = button.previousElementSibling;
+    const text = button.closest('.tc-overview');
     const open = button.getAttribute('aria-expanded') !== 'true';
-    if (open) preserveModalFrame(button);
     text.classList.toggle('is-open', open);
     button.setAttribute('aria-expanded', String(open));
     button.textContent = open ? 'Show less' : 'Show more';
+    fitDescriptions(button.closest('.modal-content'));
+}
+
+function toggleSeasons(button) {
+    const open = button.getAttribute('aria-expanded') !== 'true';
+    for (const row of [...button.closest('.tc-premieres').querySelectorAll('.tc-season')].slice(3)) row.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+    button.querySelector('span').textContent = open ? 'Show less' : `Show more · ${button.dataset.count} seasons`;
+    fitDescriptions(button.closest('.modal-content'));
 }
 
 // --- The poster, large ---
@@ -196,5 +241,6 @@ export function setupPosterViewer() {
 export const titleCardActions = {
     'tc-notify': toggleNotify,
     'tc-more': toggleMore,
+    'tc-seasons': toggleSeasons,
     'poster-view': openPoster
 };

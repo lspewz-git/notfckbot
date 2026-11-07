@@ -8,7 +8,7 @@ import { setSelectValue } from './select.js';
 import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
 import { description, titleRating } from './content-search.js';
-import { titleCard, fitDescriptions } from './title-card.js';
+import { titleCard, fitDescriptions, watchButton } from './title-card.js';
 
 /** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
 const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
@@ -193,10 +193,15 @@ function releasedDate(item) {
 let releasedRequest = 0;
 
 /**
- * One public card for both scopes (the shared title card, without actions); only admins request
+ * One title card for both scopes; account supplies personal chat actions. Only admins request
  * private subscriber/chat information, which never holds up the card.
  */
-export function openReleasedDetails(item, source, admin = false) {
+export function openReleasedDetails(
+    item,
+    source,
+    admin = false,
+    { actions = watchButton(item.links), error = '' } = {}
+) {
     const request = ++releasedRequest;
     const tv = item.kind === 'tv';
     const genres = Array.isArray(item.genres) ? item.genres.join(', ') : item.genres;
@@ -212,11 +217,19 @@ export function openReleasedDetails(item, source, admin = false) {
             networks: item.networks || null,
             overview: item.overview || '',
             kinopoiskUrl: item.kinopoiskUrl || null,
-            date: releasedDate(item)
+            date: releasedDate(item),
+            premieres: tv
+                ? (item.seasons || []).map((season) => ({
+                      season,
+                      date: (item.seasonPremieres || []).find((s) => s.season === season)?.date
+                  }))
+                : []
         },
         {
             titleId: 'released-title',
             close: 'released-modal',
+            actions,
+            error,
             extra: admin
                 ? '<div id="released-people" class="detail-people"><p class="people-none">Loading chat information…</p></div>'
                 : ''
@@ -228,6 +241,7 @@ export function openReleasedDetails(item, source, admin = false) {
     const fill = (html) => {
         if (request !== releasedRequest || !$('released-people')) return;
         $('released-people').innerHTML = html;
+        fitDescriptions($('released-modal'));
     };
     releasedPeople(item)
         .then(fill)

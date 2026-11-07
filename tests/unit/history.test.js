@@ -209,13 +209,14 @@ describe('releaseHistory', () => {
     const FILMS = [
         {
             tmdb_id: 'movie_7',
+            id: 71,
             title: 'Дюна',
             premiere_digital: '2026-03-01',
             ru_digital: '2026-03-02',
             ru_services: 'Service A',
             chatId: 1
         },
-        { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01', chatId: 2 }, // another chat's copy
+        { id: 72, tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01', chatId: 2 }, // another chat's copy
         { tmdb_id: 'movie_8', title: 'Будущее', premiere_digital: '2099-01-01', chatId: 1 } // not out yet
     ];
 
@@ -345,7 +346,9 @@ describe('releaseHistory', () => {
 
     test("for one chat: only that chat's subscriptions and films", async () => {
         mock.method(Subscription, 'findAll', async ({ where }) => (where.chatId === 1 ? [{ Series: SERIES[0] }] : []));
-        mock.method(Watchlist, 'findAll', async ({ where }) => FILMS.filter((f) => f.chatId === where.chatId));
+        mock.method(Watchlist, 'findAll', async ({ where }) =>
+            FILMS.filter((f) => where.chatId == null || f.chatId === where.chatId)
+        );
         const h = await releaseHistory({ chatId: 1, now });
         assert.deepEqual(
             h.series.map((s) => s.title),
@@ -356,6 +359,9 @@ describe('releaseHistory', () => {
             ['Дюна']
         );
         assert.equal((await releaseHistory({ chatId: 2, now })).series.length, 0);
+        assert.equal(h.films[0].listId, 71);
+        assert.equal((await releaseHistory({ chatId: 2, now })).films[0].listId, 72);
+        assert.equal((await releaseHistory({ now })).films[0].listId, undefined);
     });
 });
 

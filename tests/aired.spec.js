@@ -4,7 +4,7 @@ const { watchConsole, openSection, pickChat, openProfilePage } = require('./help
 // The shared Released card (records.js openReleasedDetails): the title card in #released-modal
 const toMine=async(page)=>{await page.locator('.section.active [data-admin-profile] a').click();await openSection(page,'my-aired');};
 const toAdmin=async(page)=>{await openProfilePage(page,'my-profile');await page.locator('#my-profile-body [data-action="view-admin"]').click();};
-const publicCard=(page)=>page.locator('#released-body').evaluate(el=>{const c=el.cloneNode(true);c.querySelector('#released-people')?.remove();return c.innerHTML;});
+const publicCard=(page)=>page.locator('#released-body').evaluate(el=>{const c=el.cloneNode(true);c.querySelectorAll('#released-people,.tc-footer,.sheet-error').forEach(node=>node.remove());c.querySelectorAll('[style]').forEach(node=>node.removeAttribute('style'));return c.innerHTML;});
 watchConsole({ignore:/status of (?:500|503)|Fetch error: Error: Temporary failure/});
 
 test('personal Released uses the shared lists, years and title card without admin requests', async ({page}) => {
@@ -40,9 +40,10 @@ for(const kind of ['series','films'])test(`personal Released ${kind} opens the s
     const card=page.locator('#released-modal');
     await expect(card).toBeVisible();
     await expect(card.locator('.tc-rating')).toContainText(kind==='series'?'8.6':'7.4');
-    await expect(card.locator('.tc-date')).toContainText(kind==='series'?'28 Dec 2025':'26 Feb 2026');
+    await expect(card.locator(kind==='series'?'.tc-premieres':'.tc-date')).toContainText(kind==='series'?'28 Dec':'26 Feb 2026');
     await expect(card.locator('.mine-modes')).toHaveCount(0);
-    await expect(card.locator('.tc-actions')).toHaveCount(0);
+    await expect(card.getByRole('link',{name:'Watch on SSPoisk'})).toBeVisible();
+    await expect(card.getByRole('button',{name:'Unfollow',exact:true})).toBeVisible();
     await card.getByRole('button',{name:'Show more'}).click();
     await expect(card.locator('.tc-overview')).toHaveClass(/is-open/);
     await card.getByRole('button',{name:'Show less'}).click();

@@ -415,10 +415,13 @@ function accountAnswer(state, req, url) {
         return state.modeHold ? state.modeHold.then(save) : save();
     }
     if (rest.startsWith('/series/') && method === 'DELETE') {
-        if (state.unfollowError) return { status: 503, body: { error: 'Could not unfollow' } };
-        state.series = state.series.filter((x) => x.id !== decodeURIComponent(rest.slice(8)));
-        state.calendar.items = state.calendar.items.filter((x) => x.tmdbId !== decodeURIComponent(rest.slice(8)));
-        return { removed: true };
+        const remove = () => {
+            if (state.unfollowError) return { status: 503, body: { error: 'Could not unfollow' } };
+            state.series = state.series.filter((x) => x.id !== decodeURIComponent(rest.slice(8)));
+            state.calendar.items = state.calendar.items.filter((x) => x.tmdbId !== decodeURIComponent(rest.slice(8)));
+            return { removed: true };
+        };
+        return state.unfollowHold ? state.unfollowHold.then(remove) : remove();
     }
     if (rest === '/films' && method === 'POST') return { id: 9, released: false };
     if (rest.startsWith('/films/') && method === 'DELETE') {
@@ -450,7 +453,7 @@ function accountAnswer(state, req, url) {
                     genres: ['драма'],
                     networks: 'HBO',
                     rating: 8.6,
-                    overview: 'A released season description. '.repeat(20),
+                    overview: 'A released season description. '.repeat(80),
                     links: [
                         { kind: 'watch', label: 'Watch on SSPoisk', url: 'https://www.sspoisk.ru/series/1/' },
                         { kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/series/1/' }
@@ -463,12 +466,13 @@ function accountAnswer(state, req, url) {
                     ? [
                           {
                               tmdbId: 'movie_9',
+                              listId: 9,
                               title: 'Released film',
                               poster: null,
                               genres: ['фантастика'],
                               date: '2026-03-01',
                               rating: 7.4,
-                              overview: 'A released film description. '.repeat(20),
+                              overview: 'A released film description. '.repeat(80),
                               ruPremiere: '2026-02-26',
                               links: [
                                   { kind: 'watch', label: 'Watch on SSPoisk', url: 'https://www.sspoisk.ru/film/9/' },

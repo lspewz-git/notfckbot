@@ -398,12 +398,64 @@
 
 /* --- TitleCard: one sheet for a title (title-card.js) --- */
 
-.title-sheet {
-    display: block;
+.app-sheet.modal-sheet .title-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    height: 90svh;
+    max-height: calc(100svh - var(--top-inset) - var(--space-4));
+    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+    touch-action: pan-x pinch-zoom;
 }
 
-.app-sheet.modal-sheet .title-sheet:has(.tc-actions) {
-    padding-bottom: 0;
+.tc-scroll {
+    touch-action: pan-x pinch-zoom;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.tc-scroll > * {
+    flex-shrink: 0;
+}
+
+.tc-footer {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.tc-footer:empty {
+    display: none;
+}
+
+.tc-footer .tc-link,
+.tc-footer .tc-actions,
+.tc-footer .sheet-error {
+    margin: 0;
+}
+
+.tc-footer .tc-actions {
+    padding: 0;
+}
+
+.tc-scroll .tc-date,
+.tc-scroll .tc-notify,
+.tc-scroll .sheet-error {
+    margin: 0;
+}
+
+@media (min-width: 761px) {
+    .app-sheet.modal-sheet .title-sheet {
+        max-height: calc(100svh - var(--top-inset) - var(--space-8));
+    }
 }
 
 .tc-head {
@@ -527,15 +579,19 @@
 }
 
 .tc-overview {
-    display: -webkit-box;
-    margin: var(--space-4) 0 0;
-    overflow: hidden;
+    display: block;
+    margin: 0;
     color: var(--text-secondary);
     font-size: 14px;
     line-height: 20px;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+}
+
+.tc-description {
+    flex: none;
+}
+
+.tc-tail {
+    white-space: nowrap;
 }
 
 .tc-overview.is-open {
@@ -546,10 +602,11 @@
 }
 
 .tc-more {
-    align-self: flex-start;
-    min-height: 44px;
-    margin: calc(var(--space-2) * -1) 0 0 -2px;
-    padding: 0 2px;
+    position: relative;
+    display: inline;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
     border: none;
     background: transparent;
     color: var(--text);
@@ -559,10 +616,157 @@
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
+    vertical-align: baseline;
+}
+
+.tc-more::after {
+    content: '';
+    position: absolute;
+    inset: -12px 0;
 }
 
 .tc-more[hidden] {
     display: none;
+}
+
+.tc-premieres {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.tc-premieres h3 {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+}
+
+.tc-season-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.tc-season {
+    display: flex;
+    flex: 1 0 calc((100% - var(--space-4)) / 3);
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-3);
+    border-radius: var(--radius-btn);
+    background: var(--surface-2);
+}
+
+.tc-season-grid:not([data-columns='3']) .tc-season {
+    flex-basis: calc((100% - var(--space-2)) / 2);
+}
+
+.tc-season-grid[data-columns='2'] .tc-season {
+    padding: var(--space-2);
+}
+
+.tc-season-grid[data-columns='3'] .tc-season {
+    padding: var(--space-2);
+}
+
+.tc-season[hidden] {
+    display: none;
+}
+
+.tc-season > .icon {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--text-dim);
+}
+
+.tc-season-text {
+    display: grid;
+    gap: var(--space-1);
+    width: 100%;
+    min-width: 0;
+}
+
+.tc-season-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.tc-season-label .icon {
+    width: 14px;
+    height: 14px;
+    flex: none;
+}
+
+.tc-season-grid[data-columns='1'] .tc-season-label .icon,
+.tc-season-grid:not([data-columns='1']) .tc-season > .icon,
+.tc-season-label.tc-no-calendar .icon {
+    display: none;
+}
+
+.tc-season strong {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.tc-season strong small {
+    font: inherit;
+}
+
+.tc-season-grid[data-columns='3'] strong {
+    display: block;
+}
+
+.tc-season-grid[data-columns='3'] strong small {
+    display: block;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+}
+
+.tc-seasons-more {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-self: start;
+    gap: var(--space-1);
+    min-height: 20px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 13px;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+.tc-seasons-more::after {
+    content: '';
+    position: absolute;
+    inset: calc(var(--space-3) * -1) 0;
+}
+
+.tc-seasons-more .icon {
+    width: 14px;
+    height: 14px;
+}
+
+.tc-seasons-more[aria-expanded='true'] .icon {
+    transform: rotate(180deg);
 }
 
 .tc-link {

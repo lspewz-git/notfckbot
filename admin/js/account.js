@@ -12,7 +12,7 @@ import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { pickFrom, avatar, initial } from './pick-sheet.js';
 import { chatChip } from './chat-picker.js';
 import { searchResults, openSearchCard, MODES } from './content-search.js';
-import { titleCard, notifyField, watchButton, posterSrc, fitDescriptions, NOTIFY } from './title-card.js';
+import { titleCard, notifyField, subscriptionActions, posterSrc, fitDescriptions, NOTIFY } from './title-card.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -385,10 +385,6 @@ function followingCard(item, { event = null, today }) {
     const tv = item.kind === 'tv';
     const links = item.links || [];
     const kinopoiskUrl = links.find((l) => l.kind === 'info')?.url || item.kinopoiskUrl || null;
-    const unfollow =
-        item.id == null
-            ? ''
-            : `<button type="button" class="sheet-btn-danger-soft" data-action="mine-ask-unfollow"${busy ? ' disabled' : ''}>Unfollow</button>`;
     return titleCard(
         {
             kind: item.kind,
@@ -409,8 +405,8 @@ function followingCard(item, { event = null, today }) {
                 !event && tv && item.mode
                     ? notifyField({ name: 'mine-mode', current: item.mode, id: item.id, disabled: busy })
                     : '',
-            extra: '<p class="sheet-error" id="mine-card-error" role="alert" hidden></p>',
-            actions: watchButton(links) + unfollow
+            error: '<p class="sheet-error" id="mine-card-error" role="alert" hidden></p>',
+            actions: subscriptionActions(item, busy)
         }
     );
 }
@@ -424,10 +420,11 @@ function syncFollowingBusy(item, chatId) {
     const key = titleKey(item, chatId);
     if (!activeFollowing || titleKey(activeFollowing.item, activeFollowing.chatId) !== key) return;
     const busy = pendingModeSaves.has(key) || pendingUnfollows.has(key);
-    for (const control of all('#mine-card-body .mine-modes, #mine-card-body [data-action="mine-ask-unfollow"]')) {
+    const modal = activeFollowing.modal || CLOSE;
+    for (const control of all(`#${modal} .mine-modes, #${modal} [data-action="mine-ask-unfollow"]`)) {
         /** @type {HTMLFieldSetElement | HTMLButtonElement} */ (control).disabled = busy;
     }
-    const unfollowButton = document.querySelector('#mine-card-body [data-action="mine-ask-unfollow"]');
+    const unfollowButton = document.querySelector(`#${modal} [data-action="mine-ask-unfollow"]`);
     if (unfollowButton) {
         unfollowButton.toggleAttribute('aria-busy', pendingUnfollows.has(key));
         unfollowButton.textContent = pendingUnfollows.has(key) ? 'Unfollowing…' : 'Unfollow';
@@ -435,7 +432,15 @@ function syncFollowingBusy(item, chatId) {
 }
 
 function openFollowing(item, options = {}) {
-    const context = { item, event: null, today: state.list?.today, ...options, chatId: state.chatId };
+    const context = {
+        item,
+        event: null,
+        today: state.list?.today,
+        modal: CLOSE,
+        errorId: 'mine-card-error',
+        ...options,
+        chatId: state.chatId
+    };
     openCard(followingCard(item, context));
     activeFollowing = context;
 }
@@ -483,7 +488,9 @@ async function unfollow(context) {
     pendingUnfollows.add(key);
     syncFollowingBusy(item, chatId);
     const cardNow = cardVersion;
-    const error = $('mine-card-error');
+    const frame = $(context.modal)?.querySelector('.tc-scroll');
+    const sameCard = () => cardVersion === cardNow && $(context.modal)?.querySelector('.tc-scroll') === frame;
+    const error = $(context.errorId);
     if (error) error.hidden = true;
     try {
         await api(
@@ -491,13 +498,13 @@ async function unfollow(context) {
             { method: 'DELETE' }
         );
         if (state.chatId !== chatId) return;
-        if (cardVersion === cardNow) closeModal('mine-card-modal');
+        if (sameCard()) closeModal(context.modal);
         toast('Unfollowed', 'success');
         state.cal = null;
         state.list = null;
         await reload();
     } catch (err) {
-        const shown = cardVersion === cardNow && $('mine-card-error');
+        const shown = sameCard() && $(context.errorId);
         if (shown) {
             shown.textContent = err.message;
             shown.hidden = false;
@@ -514,7 +521,17 @@ function getAiredHistory() {
     return (airedHistory ||= createHistory({
         prefix: 'my-aired',
         fetchYear: (year) => api(chatPath('/aired' + (year ? '?year=' + year : ''))),
-        openTitle: openReleasedDetails
+        openTitle: (item, source) => {
+            item = { ...item, id: item.kind === 'tv' ? item.tmdbId : item.listId };
+            const context = { item, chatId: state.chatId, modal: 'released-modal', errorId: 'released-card-error' };
+            cardVersion += 1;
+            activeFollowing = context;
+            const key = titleKey(item, state.chatId);
+            openReleasedDetails(item, source, false, {
+                actions: subscriptionActions(item, pendingModeSaves.has(key) || pendingUnfollows.has(key)),
+                error: '<p class="sheet-error" id="released-card-error" role="alert" hidden></p>'
+            });
+        }
     }));
 }
 function resetAired() {

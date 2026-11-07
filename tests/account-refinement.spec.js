@@ -65,7 +65,8 @@ test.describe('shared cards and calendar unfollow', () => {
     });
 
     test('Following and Calendar share the title card: rows without data are left out', async ({ page }) => {
-        await mockPanel(page, { role: 'user' });
+        const panel = await mockPanel(page, { role: 'user' });
+        panel.account.calendar.items.filter(item => item.kind === 'movie' && item.overview).forEach(item => { item.overview = 'A long calendar overview. '.repeat(100); });
         await openSection(page, 'my-subs');
         await expect(page.locator('#my-subs-section h1')).toHaveText('Following');
         await page.locator('[data-action="mine-subs-tab"][data-tab="films"]').click();
@@ -74,18 +75,19 @@ test.describe('shared cards and calendar unfollow', () => {
         await expect(card.locator('.tc-head h2')).toBeVisible();
         await expect(card.locator('.tc-date')).toContainText('in 2 days');
         await expect(card.locator('.tc-overview')).toBeVisible();
+        await card.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(animation=>animation.finished)));
         const gap = await card.evaluate((el) => {
-            const above = el.querySelector('.tc-actions').previousElementSibling.getBoundingClientRect();
+            const above = el.querySelector('.tc-link').getBoundingClientRect();
             return el.querySelector('.tc-actions').getBoundingClientRect().top - above.bottom;
         });
-        expect(gap).toBeGreaterThanOrEqual(20);
+        expect(gap).toBe(8);
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-calendar');
         await page.locator('[data-action="mine-cal-what"][data-what="films"]').click();
         await page.locator('#my-calendar-body button.cal-row', { hasText: 'Дюна' }).click();
         await expect(card.locator('.tc-head h2')).toHaveText('Дюна: Часть третья');
         await expect(card.locator('.tc-rating')).toContainText('7.4');
-        // A long overview is cut at three lines, Show more opens it
+        // A long overview fills the available space; its inline link reveals the rest.
         const more = card.getByRole('button', { name: 'Show more', exact: true });
         await expect(more).toBeVisible();
         await more.click();

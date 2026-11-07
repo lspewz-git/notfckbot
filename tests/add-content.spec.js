@@ -201,7 +201,8 @@ test('a search title opens a card; cancelling preserves the query and results', 
     await result(page, 0).click();
     await expect(card(page)).toBeVisible();
     await expect(card(page).locator('#content-card-title')).toContainText('film title');
-    await expect(card(page).locator('.tc-overview')).toHaveText('A search description.');
+    await expect(card(page).locator('.tc-copy')).toHaveText('A search description.');
+    await expect(card(page).locator('.tc-more')).toBeHidden();
     await expect(card(page).locator('.mine-modes')).toHaveCount(0);
     await card(page).getByRole('button', { name: 'Cancel' }).click();
     await expect(card(page)).toBeHidden();
