@@ -78,13 +78,14 @@ const formatRuPremiere = (iso) =>
  * online cinemas, when that is another date or TMDB's is not Russia's).
  * @param {{ digital_release_date?: string | null, digital_release_country?: string | null }} data
  * @param {{ premiere?: string | null, digital?: string | null, services?: string[] }} [ru]
- * @param {{ markExpected?: Date }} [options] markExpected: "(ожидается)" on a digital date after it
+ * @param {{ markExpected?: Date, cinema?: boolean }} [options] markExpected: "(ожидается)" on a
+ *   digital date after it; cinema: false leaves out the premiere in Russia (the "online" message)
  * @returns {string[]} lines with HTML, each ending in a line break
  */
-function extraFilmDates(data, ru = {}, { markExpected } = {}) {
+function extraFilmDates(data, ru = {}, { markExpected, cinema = true } = {}) {
     const lines = [];
     const expected = (date) => (markExpected && new Date(date) > markExpected ? ' (ожидается)' : '');
-    if (ru.premiere) lines.push(`🎟 Премьера в России: <b>${formatRuPremiere(ru.premiere)}</b>\n`);
+    if (cinema && ru.premiere) lines.push(`🎟 Премьера в России: <b>${formatRuPremiere(ru.premiere)}</b>\n`);
     const tmdbDate = data.digital_release_date;
     const tmdbCountry = data.digital_release_country;
     if (tmdbDate) {
@@ -129,9 +130,12 @@ const getWatchLinks = ({ title, kinopoiskId, mediaType }) => {
     return links;
 };
 
-/** The links as an HTML block for a notification: watch links, a blank line, the info link. */
-const formatWatchLinks = (opts) => {
-    const links = getWatchLinks(opts);
+/**
+ * The links as an HTML block for a notification: watch links, a blank line, the info link.
+ * watch: false leaves only the info link (a film not online yet).
+ */
+const formatWatchLinks = ({ watch: withWatch = true, ...opts }) => {
+    const links = getWatchLinks(opts).filter((l) => withWatch || l.kind !== 'watch');
     // & must be an entity even inside href for Telegram's HTML parser
     const line = (l) => `${l.kind === 'watch' ? '▶️' : '🎬'} <a href="${l.url.replace(/&/g, '&amp;')}">${l.label}</a>`;
     const watch = links.filter((l) => l.kind === 'watch').map(line);
@@ -175,6 +179,7 @@ module.exports = {
     escapeHtml,
     formatRuDate,
     extraFilmDates,
+    COUNTRY_NAMES,
     premiereMonthOnly,
     formatDigitalDate,
     getWatchLinks,

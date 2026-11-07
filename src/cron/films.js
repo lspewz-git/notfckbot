@@ -3,18 +3,12 @@ const { Chat, Watchlist } = require('../db');
 const { getDetails, getDetailsCached, titleFacts } = require('../api/tmdb');
 const { findKinopoiskId, russianDates } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
-const { buildFilmMessage, heldLine } = require('./messages');
+const { buildFilmMessage, buildPremiereMessage, heldLine } = require('./messages');
+const { isOnline, premiereDue } = require('../film-release');
+const { todayIn } = require('../calendar');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
 const { log } = require('../log');
-
-/** Out once TMDB says Released, or once its release date has passed. */
-const isMovieReleased = (data, now = new Date()) => {
-    if (data.status === 'Released') return true;
-    if (!data.release_date) return false;
-    const releaseDate = new Date(data.release_date);
-    return !isNaN(releaseDate) && releaseDate <= now;
-};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -88,34 +82,46 @@ const checkWatchlistReleases = async (bot) => {
 
             await keepRussianDates(filmEntries, `movie_${filmId}`, data.imdb_id, now);
 
-            if (!isMovieReleased(data, now)) {
-                log.info(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}): not released yet.`);
-                continue;
-            }
-
-            // 🎉 Film is released! Notify all users waiting for it
-            log.info(`[Cron] Movie "${firstEntry.title}" (${tmdb_id}) is now available!`);
-            // A release happens once per film, so the ID is looked up here rather than ahead of time
-            const kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
-            const links = formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie' });
             // The Russian dates as kept just above: a Kinopoisk failing now doesn't drop them
             const ru = {
                 premiere: firstEntry.ru_premiere || null,
                 digital: firstEntry.ru_digital || null,
                 services: firstEntry.ru_services ? firstEntry.ru_services.split(', ') : []
             };
+            // Looked up only when a message is due, once per film
+            let kinopoiskId;
+            const linksFor = async (watch) => {
+                if (kinopoiskId === undefined) kinopoiskId = await findKinopoiskId(`movie_${filmId}`, data.imdb_id);
+                return formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie', watch });
+            };
 
+            // Each chat by its own day (time zone) and its premieres setting (src/film-release.js).
+            // A message that doesn't go out is queued by notify(), so it counts as sent either way
             for (const entry of filmEntries) {
-                const msg = buildFilmMessage({ entry, data, links, now, ru });
-                // A message that doesn't go out is queued by notify(), so the film counts as
-                // announced either way
+                const today = todayIn(entry.Chat.timezone, now);
+                if (isOnline(data, ru, today)) {
+                    log.info(`[Cron] Movie "${entry.title}" (${tmdb_id}) is online for chat ${entry.Chat.id}`);
+                    const msg = buildFilmMessage({ entry, data, links: await linksFor(true), now, ru });
+                    await notify(bot, entry.Chat.id, msg, {
+                        photo: entry.poster_url,
+                        about: entry.title,
+                        event: { detail: 'film', tmdb_id: entry.tmdb_id, title: entry.title },
+                        ...heldLine({ kind: 'film', title: entry.title })
+                    });
+                    await entry.update({ notified: true });
+                    continue;
+                }
+                const premiere = !entry.premiere_notified && premiereDue(data, ru, entry.Chat.premieres, today);
+                if (!premiere) continue;
+                log.info(`[Cron] Movie "${entry.title}" (${tmdb_id}): cinema premiere for chat ${entry.Chat.id}`);
+                const msg = buildPremiereMessage({ entry, data, premiere, links: await linksFor(false) });
                 await notify(bot, entry.Chat.id, msg, {
                     photo: entry.poster_url,
                     about: entry.title,
-                    event: { detail: 'film', tmdb_id: entry.tmdb_id, title: entry.title },
-                    ...heldLine({ kind: 'film', title: entry.title })
+                    event: { detail: 'film_premiere', tmdb_id: entry.tmdb_id, title: entry.title },
+                    ...heldLine({ kind: 'cinema', title: entry.title })
                 });
-                await entry.update({ notified: true });
+                await entry.update({ premiere_notified: true });
             }
         } catch (err) {
             tally('errors');
@@ -146,4 +152,4 @@ async function backfillFilmFacts() {
     if (byFilm.size) log.info(`[Stats] Film facts filled for ${byFilm.size - failed} of ${byFilm.size} films`);
 }
 
-module.exports = { checkWatchlistReleases, isMovieReleased, backfillFilmFacts };
+module.exports = { checkWatchlistReleases, backfillFilmFacts };

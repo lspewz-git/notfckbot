@@ -119,7 +119,9 @@ let savedChatSettings = '';
 function chatSettingsState() {
     return JSON.stringify([
         ...chatSettingsSwitches.map(switchOn),
-        ...['buttons', 'quiet-start', 'quiet-end', 'timezone'].map((name) => $field(`chat-settings-${name}`).value)
+        ...['buttons', 'quiet-start', 'quiet-end', 'timezone', 'premieres'].map(
+            (name) => $field(`chat-settings-${name}`).value
+        )
     ]);
 }
 
@@ -191,6 +193,7 @@ function openChatSettings(chat, label) {
     setSelectValue('chat-settings-quiet-start', String(quietOn ? chat.quiet_start : 23));
     setSelectValue('chat-settings-quiet-end', String(quietOn ? chat.quiet_end : 8));
     setSelectValue('chat-settings-timezone', chat.timezone || 'Europe/Moscow');
+    setSelectValue('chat-settings-premieres', ['all', 'ru'].includes(chat.premieres) ? chat.premieres : 'off');
     settingsSwitch('digest-week').setAttribute('aria-checked', String(Boolean(chat.digest_week)));
     settingsSwitch('digest-month').setAttribute('aria-checked', String(Boolean(chat.digest_month)));
     setQuietHoursEnabled(quietOn);
@@ -212,6 +215,7 @@ function openChatSettings(chat, label) {
         body.quiet_start = quietEnabled ? Number(start) : null;
         body.quiet_end = quietEnabled ? Number(end) : null;
         body.timezone = $field('chat-settings-timezone').value;
+        body.premieres = $field('chat-settings-premieres').value;
         body.digest_week = switchOn('digest-week');
         body.digest_month = switchOn('digest-month');
         const submitted = chatSettingsState();

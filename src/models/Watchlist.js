@@ -51,9 +51,16 @@ const Watchlist = sequelize.define('Watchlist', {
     countries: { type: DataTypes.STRING(40), allowNull: true },
     runtime: { type: DataTypes.INTEGER, allowNull: true },
     rating: { type: DataTypes.FLOAT, allowNull: true },
-    // Whether we have already sent the release notification
+    // Whether we have already sent the release notification (the film is online, src/film-release.js)
     notified: {
         type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    // Whether the cinema premiere message went out, for a chat with premieres on; the film stays
+    // waiting for its online release
+    premiere_notified: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
         defaultValue: false
     }
 });

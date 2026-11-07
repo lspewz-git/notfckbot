@@ -8,7 +8,8 @@
  *   from 06 UTC on (checks run at the hours UPDATE_INTERVAL_HOURS divides; .claude/notes/bot.md);
  * - the check sees only the day's last episode (src/cron/series.js): episodes out together give one
  *   message, about the last of them;
- * - a film goes out on the first check of its release day (00 UTC);
+ * - a film has no bell: its calendar row is the release date, while the bot writes when the film
+ *   is online (src/film-release.js), a date the calendar doesn't show;
  * - in the chat's quiet hours the message waits for their end (src/cron/held.js), so it can move to
  *   the next day.
  */
@@ -16,7 +17,6 @@ const { zoneOf, hasQuietHours } = require('../quiet');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 
 const EPISODE_READY_UTC_HOUR = 6;
-const FILM_SEND_UTC_HOUR = 0;
 
 /** The first update check at or after 06 UTC (may pass midnight: it is then the next day's) */
 function episodeSendHour(interval = UPDATE_INTERVAL_HOURS) {
@@ -29,7 +29,7 @@ function episodeSendHour(interval = UPDATE_INTERVAL_HOURS) {
  * episode of the series comes out the same day; `last`: the season's final episode
  */
 function messages(item) {
-    if (item.kind !== 'tv') return true;
+    if (item.kind !== 'tv') return false;
     if (item.lastOfDay === false) return false;
     const last = item.last ?? item.mark === 'finale';
     if (item.mode === 'episode') return true;
@@ -66,10 +66,7 @@ const nextDay = (day) => new Date(Date.parse(`${day}T00:00:00Z`) + 864e5).toISOS
  */
 function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) || !messages(item)) return null;
-    const tv = item.kind === 'tv';
-    const sendAt = new Date(
-        Date.parse(`${item.date}T00:00:00Z`) + (tv ? 24 + episodeSendHour(interval) : FILM_SEND_UTC_HOUR) * 36e5
-    );
+    const sendAt = new Date(Date.parse(`${item.date}T00:00:00Z`) + (24 + episodeSendHour(interval)) * 36e5);
     const { day, hour } = localOf(sendAt, chat?.timezone);
     if (!hasQuietHours(chat)) return day;
     const { quiet_start: start, quiet_end: end } = chat;

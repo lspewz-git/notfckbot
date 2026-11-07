@@ -7,6 +7,7 @@ const { searchMulti, getDetails, getDetailsCached } = require('../api/tmdb');
 const { findKinopoiskId, kinopoiskQuick } = require('../api/kinopoisk');
 const { Subscription, Watchlist } = require('../db');
 const ops = require('../chat-ops');
+const { todayIn } = require('../calendar');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
@@ -281,7 +282,8 @@ function register(bot) {
                     // The ID for the watch links (a film that is out) and the Russian dates (any film)
                     kinopoiskQuick(tmdbId, data.imdb_id)
                 ]);
-                return showCard(ctx, ctx.state.search, filmCard(data, { kinopoiskId, onWatchlist, ru }));
+                const today = todayIn(ctx.state.chatData && ctx.state.chatData.timezone);
+                return showCard(ctx, ctx.state.search, filmCard(data, { kinopoiskId, onWatchlist, ru, today }));
             }
 
             const sub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });

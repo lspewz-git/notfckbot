@@ -8,7 +8,7 @@ const { Series, Chat, PendingMessage } = require('../db');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { beginRun, endRun, getCronStatus, nextRunAt } = require('./status');
 const { checkSeriesUpdates, notifyNewEpisodes, notifyStatusChange, isSeasonComplete } = require('./series');
-const { checkWatchlistReleases, isMovieReleased } = require('./films');
+const { checkWatchlistReleases } = require('./films');
 const { buildSeriesMessages, buildFilmMessage } = require('./messages');
 const { flushPending } = require('./outbox');
 const { releaseHeld } = require('./held');
@@ -83,7 +83,6 @@ module.exports = {
     notifyNewEpisodes,
     notifyStatusChange,
     isSeasonComplete,
-    isMovieReleased,
     buildFilmMessage,
     nextRunAt
 };

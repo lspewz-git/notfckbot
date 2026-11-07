@@ -94,6 +94,26 @@ function digitalRelease(releaseDates) {
     return first || { date: null, country: null };
 }
 
+const LIMITED = 2;
+const THEATRICAL = 3;
+
+/**
+ * The earliest release of a type, anywhere or in one country: { date, country }, or nulls. Only
+ * the type asked for: a festival screening (1) or a limited run (2) is not a cinema release.
+ */
+function firstRelease(releaseDates, type, onlyCountry = null) {
+    const byCountry = (releaseDates && releaseDates.results) || [];
+    const first = byCountry
+        .filter((c) => !onlyCountry || c.iso_3166_1 === onlyCountry)
+        .flatMap((c) =>
+            (c.release_dates || [])
+                .filter((r) => r.type === type && r.release_date)
+                .map((r) => ({ date: r.release_date.slice(0, 10), country: c.iso_3166_1 }))
+        )
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return first || { date: null, country: null };
+}
+
 /** The digital release date alone. */
 const digitalReleaseDate = (releaseDates) => digitalRelease(releaseDates).date;
 
@@ -194,6 +214,14 @@ const fetchDetails = async (id, media_type, seasons = []) => {
             const digital = digitalRelease(data.release_dates);
             data.digital_release_date = digital.date;
             data.digital_release_country = digital.country;
+            // What src/film-release.js decides by: the first wide cinema release anywhere and in
+            // Russia, and the first digital release anywhere (shown above is Russia's or the US's)
+            const cinema = firstRelease(data.release_dates, THEATRICAL);
+            data.cinema_release_date = cinema.date;
+            data.cinema_release_country = cinema.country;
+            data.cinema_ru_date = firstRelease(data.release_dates, THEATRICAL, 'RU').date;
+            data.limited_release_date = firstRelease(data.release_dates, LIMITED).date;
+            data.digital_first_date = firstRelease(data.release_dates, DIGITAL).date;
         }
 
         return data;
@@ -305,6 +333,7 @@ module.exports = {
     searchMulti,
     digitalReleaseDate,
     digitalRelease,
+    firstRelease,
     getDetails,
     getDetailsCached,
     peekDetails,

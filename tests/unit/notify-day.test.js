@@ -16,8 +16,8 @@ test('the bell follows the mode: every episode, premiere and finale, or the fina
     assert.equal(ep(null), null, 'no subscription mode, no message');
 });
 
-test('a film goes out on its release day', () => {
-    assert.equal(notifyDay({ kind: 'movie', date: '2026-12-01' }, moscow), '2026-12-01');
+test('a film has no bell: the bot writes when it is online, not on its release date', () => {
+    assert.equal(notifyDay({ kind: 'movie', date: '2026-12-01' }, moscow), null);
     assert.equal(notifyDay({ kind: 'movie', date: 'soon' }, moscow), null);
 });
 

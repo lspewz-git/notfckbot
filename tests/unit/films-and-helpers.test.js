@@ -7,37 +7,31 @@ process.env.TZ = 'UTC';
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { isMovieReleased, buildFilmMessage } = require('../../src/cron');
-const { nextEpisodeFields } = require('../../src/api/tmdb');
+const { buildFilmMessage, buildPremiereMessage } = require('../../src/cron/messages');
+const { nextEpisodeFields, firstRelease } = require('../../src/api/tmdb');
 const { getWatchLinks, formatWatchLinks, formatDigitalDate, isFinishedStatus } = require('../../src/constants');
 
 const NOW = new Date('2026-10-12T12:00:00Z');
 
-describe('isMovieReleased', () => {
-    test('TMDB says Released', () => {
-        assert.equal(isMovieReleased({ status: 'Released', release_date: '2027-01-01' }, NOW), true);
-    });
-
-    test('the release date has passed (today counts)', () => {
-        assert.equal(isMovieReleased({ status: 'Post Production', release_date: '2026-10-01' }, NOW), true);
-        assert.equal(isMovieReleased({ status: 'Post Production', release_date: '2026-10-12' }, NOW), true);
-    });
-
-    test('not yet: a future date, no date, or a date TMDB garbled', () => {
-        assert.equal(isMovieReleased({ status: 'Post Production', release_date: '2027-06-30' }, NOW), false);
-        assert.equal(isMovieReleased({ status: 'In Production', release_date: '' }, NOW), false);
-        assert.equal(isMovieReleased({ status: 'Planned', release_date: 'soon' }, NOW), false);
-    });
-});
-
 describe('buildFilmMessage', () => {
     const entry = { title: 'Дюна & Co', year: 2026 };
 
-    test('title escaped, year, release date and the links', () => {
-        const msg = buildFilmMessage({ entry, data: { release_date: '2026-10-01' }, links: '<LINKS>', now: NOW });
+    test('"Фильм вышел", title escaped, year and the links; no cinema date', () => {
+        const msg = buildFilmMessage({
+            entry,
+            data: { release_date: '2026-08-01', digital_release_date: '2026-10-01' },
+            links: '<LINKS>',
+            now: NOW
+        });
+        assert.match(msg, /^🎬 <b>Фильм вышел!<\/b>/);
         assert.match(msg, /Дюна &amp; Co<\/b> \(2026\)/);
-        assert.match(msg, /Дата релиза: <b>1 октября 2026 г\.<\/b>/);
+        assert.doesNotMatch(msg, /Дата релиза|Премьера в России/);
         assert.ok(msg.endsWith('\n\n<LINKS>'));
+    });
+
+    test('no digital release known (45 days after the cinema): says the date is a guess', () => {
+        const msg = buildFilmMessage({ entry, data: { release_date: '2026-08-01' }, links: '', now: NOW });
+        assert.match(msg, /Даты цифрового релиза нет — обычно к этому сроку фильм уже онлайн/);
     });
 
     test('a digital release still ahead is marked as expected; a past one is not', () => {
@@ -59,16 +53,48 @@ describe('buildFilmMessage', () => {
         assert.doesNotMatch(past, /ожидается/);
     });
 
-    test('no digital date: no line for it; no release date: "уже вышел"', () => {
+    test('no date at all: no date lines, no year', () => {
         const msg = buildFilmMessage({ entry: { title: 'X' }, data: { status: 'Released' }, links: '', now: NOW });
-        assert.doesNotMatch(msg, /Цифровой релиз/);
-        assert.match(msg, /Дата релиза: <b>уже вышел<\/b>/);
+        assert.doesNotMatch(msg, /Цифровой релиз|Даты цифрового/);
         assert.doesNotMatch(msg, /\(\d{4}\)/);
     });
 
     test('the director, escaped', () => {
         const msg = buildFilmMessage({ entry, data: { director_name: 'A <B>' }, links: '', now: NOW });
         assert.match(msg, /Режиссер: <b>A &lt;B&gt;<\/b>/);
+    });
+});
+
+describe('buildPremiereMessage', () => {
+    test('the cinema release with its country, a promise to write again, the info link', () => {
+        const msg = buildPremiereMessage({
+            entry: { title: 'Как ограбить банк', year: 2026 },
+            data: { director_name: 'Дэвид Литч' },
+            premiere: { date: '2026-11-11', country: 'US' },
+            links: '<INFO>'
+        });
+        assert.match(msg, /^🎞 <b>Премьера в кино!<\/b>/);
+        assert.match(msg, /Дата релиза: <b>11 ноября 2026 г\.<\/b> \(США\)/);
+        assert.match(msg, /Онлайн фильма пока нет — напишу, когда выйдет\./);
+        assert.ok(msg.endsWith('\n\n<INFO>'));
+    });
+});
+
+describe('firstRelease', () => {
+    const dates = {
+        results: [
+            { iso_3166_1: 'US', release_dates: [{ type: 1, release_date: '2026-09-01T00:00:00.000Z' }] },
+            { iso_3166_1: 'US', release_dates: [{ type: 3, release_date: '2026-11-11T00:00:00.000Z' }] },
+            { iso_3166_1: 'RU', release_dates: [{ type: 3, release_date: '2026-11-19T00:00:00.000Z' }] },
+            { iso_3166_1: 'DE', release_dates: [{ type: 4, release_date: '2026-12-20T00:00:00.000Z' }] }
+        ]
+    };
+
+    test('the earliest of one type: a festival screening is not a cinema release', () => {
+        assert.deepEqual(firstRelease(dates, 3), { date: '2026-11-11', country: 'US' });
+        assert.deepEqual(firstRelease(dates, 3, 'RU'), { date: '2026-11-19', country: 'RU' });
+        assert.deepEqual(firstRelease(dates, 4), { date: '2026-12-20', country: 'DE' });
+        assert.deepEqual(firstRelease(null, 3), { date: null, country: null });
     });
 });
 

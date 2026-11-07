@@ -350,7 +350,7 @@ function dateBlock(item, event, today) {
                 bell,
                 note
             };
-        return { label: 'Digital release', value: dateText(event.date, { withYear: true }), when, bell, note };
+        return { label: 'Release', value: dateText(event.date, { withYear: true }), when, bell, note };
     }
     if (item.kind === 'tv') {
         if (item.finished) return { label: 'Status', value: 'The series has ended' };
@@ -370,12 +370,12 @@ function dateBlock(item, event, today) {
         .join(' · ');
     return item.date
         ? {
-              label: 'Digital release',
+              label: 'Release',
               value: dateText(item.date, { withYear: true }),
               when: today ? whenText(item.date, today) : '',
               note: ru
           }
-        : { label: 'Digital release', value: 'Date not known yet', note: ru };
+        : { label: 'Release', value: 'Date not known yet', note: ru };
 }
 
 /** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */
@@ -552,7 +552,7 @@ function calRow(item, index, today, sameDay) {
     const sub =
         item.kind === 'tv'
             ? [`S${item.season}E${item.episode}`, episodeName(item), MARKS[item.mark]].filter(Boolean).join(' · ')
-            : 'Digital release';
+            : 'Release';
     return (
         `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
         `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${thumb(item.poster, 'title-thumb cal-thumb')}` +
@@ -674,6 +674,15 @@ function settingChoices(data) {
             value: s.timezone,
             options: data.zones.map((z) => [z.id, `${z.city} +${z.offset}`])
         },
+        premieres: {
+            title: 'Cinema premieres',
+            value: ['all', 'ru'].includes(s.premieres) ? s.premieres : 'off',
+            options: [
+                ['all', 'Anywhere'],
+                ['ru', 'Russia only'],
+                ['off', 'Off']
+            ]
+        },
         buttons_mode: {
             title: "Who presses the bot's buttons",
             value: s.buttons_mode,
@@ -719,8 +728,11 @@ function settingsView(data) {
             : '<p class="group-help chat-settings-note">You can look at the settings; the group’s admins change them.</p>') +
         group(
             'Notifications',
-            pickRow('quiet', 'moon', 'Quiet hours') + pickRow('timezone', 'globe', 'Time zone'),
-            'In quiet hours notifications wait and come in the morning as one message.'
+            pickRow('quiet', 'moon', 'Quiet hours') +
+                pickRow('timezone', 'globe', 'Time zone') +
+                pickRow('premieres', 'clapperboard', 'Cinema premieres'),
+            'In quiet hours notifications wait and come in the morning as one message. ' +
+                "Films always come when they're online; premieres add a message on the cinema release day."
         ) +
         group(
             'Digests',

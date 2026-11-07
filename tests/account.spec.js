@@ -768,6 +768,21 @@ test("a group's settings: a member sees them, unchangeable; an admin's change is
     expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ digest_month: true });
 });
 
+test('cinema premieres: a row showing Off, picked from three choices and saved', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-settings');
+    const row = page.locator('[data-action="mine-pick"][data-name="premieres"]');
+    await expect(row.locator('.row-value')).toHaveText('Off');
+    await row.click();
+    const sheet = page.locator('#pick-modal');
+    await expect(sheet.locator('h3')).toHaveText('Cinema premieres');
+    await expect(sheet.locator('.pick-row')).toHaveText(['Anywhere', 'Russia only', 'Off']);
+    await expect(sheet.locator('.pick-row.selected')).toHaveText('Off');
+    await sheet.locator('.pick-row', { hasText: 'Russia only' }).click();
+    await expect(page.locator('.toast').last()).toHaveText('Saved');
+    expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ premieres: 'ru' });
+});
+
 test('signing out, or a session that ends, brings back the sign-in screen', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openSection(page, 'my-subs');

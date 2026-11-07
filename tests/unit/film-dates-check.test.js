@@ -99,7 +99,63 @@ test('the "film is out" message carries the stored Russian dates, even with Kino
     sent.length = 0;
     await checkWatchlistReleases({});
     assert.equal(sent.length, 1);
-    assert.match(sent[0].text, /Премьера в России: <b>15 января 2026 г\.<\/b>/);
+    assert.match(sent[0].text, /Фильм вышел!/);
     assert.match(sent[0].text, /Цифровой релиз в России: <b>27 февраля 2026 г\.<\/b> · Okko, START/);
+    details = NOT_OUT;
+});
+
+// A film in cinemas since two days ago, not online yet
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const IN_CINEMAS = () => ({
+    ...NOT_OUT,
+    status: 'Released',
+    release_date: daysAgo(2),
+    cinema_release_date: daysAgo(2),
+    cinema_release_country: 'US',
+    digital_release_date: null,
+    digital_first_date: null
+});
+
+test('cinema premiere: once, only to a chat that turned premieres on; the film keeps waiting', async () => {
+    details = IN_CINEMAS();
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ Chat: { id: 1, premieres: 'all' } }), row({ Chat: { id: 2, premieres: 'off' } })];
+    sent.length = 0;
+    await checkWatchlistReleases({});
+    assert.deepEqual(
+        sent.map((s) => s.chatId),
+        [1]
+    );
+    assert.match(sent[0].text, /Премьера в кино!/);
+    assert.match(sent[0].text, /\(США\)/);
+    assert.doesNotMatch(sent[0].text, /SSPoisk/, 'nothing to watch online yet');
+    assert.equal(rows[0].premiere_notified, true);
+    assert.equal(rows[0].notified, false);
+    assert.equal(rows[1].premiere_notified, undefined);
+
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1, 'not again on the next check');
+    details = NOT_OUT;
+});
+
+test('Russia only: no message for a release elsewhere', async () => {
+    details = IN_CINEMAS();
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ Chat: { id: 1, premieres: 'ru' } })];
+    sent.length = 0;
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 0);
+    details = NOT_OUT;
+});
+
+test('online: "Фильм вышел" to everyone, a chat already told of the premiere included', async () => {
+    details = { ...IN_CINEMAS(), digital_first_date: daysAgo(0), digital_release_date: daysAgo(0) };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ Chat: { id: 1, premieres: 'all' }, premiere_notified: true }), row({ Chat: { id: 2 } })];
+    sent.length = 0;
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 2);
+    assert.ok(sent.every((s) => /Фильм вышел!/.test(s.text)));
+    assert.ok(rows.every((r) => r.notified === true));
     details = NOT_OUT;
 });

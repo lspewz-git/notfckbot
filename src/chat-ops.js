@@ -6,6 +6,10 @@ const { Chat, Series, Subscription, Watchlist } = require('./db');
 const tmdb = require('./api/tmdb');
 const { ZONES, isHour } = require('./quiet');
 const { sentMarkOnEnable } = require('./cron/digests');
+// The update check's own rule, so a film added now is filed exactly as the check would announce it
+const { isOnline, premierePassed, PREMIERE_MODES } = require('./film-release');
+const kinopoisk = require('./api/kinopoisk');
+const { todayIn } = require('./calendar');
 const { NOTIFY_LABELS } = require('./constants');
 const { z } = require('./admin/validate');
 const events = require('./chat-events');
@@ -92,11 +96,10 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
     if (rows.some((r) => !r.notified)) throw new OpError(409, 'Film already in watchlist for this chat');
 
     details ||= await tmdb.getDetails(numericId, 'movie');
-    let isReleased = details.status === 'Released';
-    if (!isReleased && details.release_date) {
-        const releaseDate = new Date(details.release_date);
-        isReleased = !isNaN(releaseDate.getTime()) && releaseDate <= new Date();
-    }
+    // Russia's dates count too, as in the update check: a quick lookup (3 s at most, never throws)
+    const { ru } = await kinopoisk.kinopoiskQuick(fullTmdbId, details.imdb_id);
+    const today = todayIn(chat.timezone);
+    const isReleased = isOnline(details, ru, today);
     // A released film is stored straight into Released; one record there is enough
     if (isReleased && rows.length) throw new OpError(409, "Film is already in this chat's Released list");
 
@@ -106,7 +109,14 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
         year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
         premiere_digital: details.release_date || null,
         ...tmdb.titleFacts(details, 'movie'),
-        notified: waitingOnly ? false : isReleased
+        digital_date: details.digital_release_date || null,
+        digital_country: details.digital_release_country || null,
+        // What the lookup found; the update check asks Kinopoisk again on its next run
+        ru_premiere: ru.premiere || null,
+        ru_digital: ru.digital || null,
+        ru_services: ru.services && ru.services.length ? ru.services.join(', ') : null,
+        notified: waitingOnly ? false : isReleased,
+        premiere_notified: premierePassed(details, ru, today)
     };
     const [entry, created] = waitingOnly
         ? await Watchlist.findOrCreate({ where: { chatId, tmdb_id: fullTmdbId, notified: false }, defaults: fields })
@@ -138,7 +148,8 @@ const SETTING_FIELDS = [
     'quiet_end',
     'timezone',
     'digest_week',
-    'digest_month'
+    'digest_month',
+    'premieres'
 ];
 const QUIET = 'Quiet hours: two different hours from 0 to 23, or both off';
 const quietHour = z.union([z.null(), z.number().refine(isHour)], { error: QUIET }).optional();
@@ -154,6 +165,7 @@ const settingsSchema = z
             .optional(),
         digest_week: z.boolean({ error: 'Bad digest_week' }).optional(),
         digest_month: z.boolean({ error: 'Bad digest_month' }).optional(),
+        premieres: z.enum(PREMIERE_MODES, { error: 'Bad premieres' }).optional(),
         buttons_mode: z.enum(['owner', 'all'], { error: 'Bad buttons_mode' }).optional(),
         menu_enabled: z.boolean({ error: 'Bad menu_enabled' }).optional()
     })

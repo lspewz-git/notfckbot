@@ -8,6 +8,7 @@ const { ChatEvent } = require('./db');
 const events = require('./chat-events');
 const { zoneOf, hasQuietHours, pad } = require('./quiet');
 const { z } = require('./admin/validate');
+const { PREMIERE_LABELS } = require('./film-release');
 
 const KINDS = ['subscribed', 'mode', 'unsubscribed', 'film_added', 'film_removed', 'settings', 'bot_on', 'bot_off'];
 const KEEP_CHOICES = [7, 30, 90, 365];
@@ -40,6 +41,7 @@ const SHOWN = {
     timezone: ['Часовой пояс', (s) => `${zoneOf(s.timezone).city} (UTC+${zoneOf(s.timezone).offset})`],
     digest_week: ['Сводка недели', (s) => (s.digest_week ? 'по понедельникам в 10:00' : 'выключена')],
     digest_month: ['Сводка месяца', (s) => (s.digest_month ? '1-го числа в 10:00' : 'выключена')],
+    premieres: ['Премьеры в кино', (s) => PREMIERE_LABELS[s.premieres] || PREMIERE_LABELS.off],
     buttons_mode: [
         'Кнопки бота нажимают',
         (s) => (s.buttons_mode === 'all' ? 'все участники' : 'только тот, кто их вызвал')

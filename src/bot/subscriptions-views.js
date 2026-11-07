@@ -149,7 +149,7 @@ const buildSeriesCard = (series, notifyType, loc) => {
 };
 
 const buildMovieCard = (item, loc) => ({
-    text: `🎬 <b>${escapeHtml(item.title)}</b>${item.year ? ` (${item.year})` : ''}\n\n📅 Выход: ${formatDigitalDate(item.premiere_digital)}\n\nПришлю уведомление, когда фильм выйдет.`,
+    text: `🎬 <b>${escapeHtml(item.title)}</b>${item.year ? ` (${item.year})` : ''}\n\n📅 Выход: ${formatDigitalDate(item.premiere_digital)}\n\nПришлю уведомление, когда фильм выйдет онлайн.`,
     keyboard: Markup.inlineKeyboard([
         [
             Markup.button.callback('❌ Удалить', `subs_cm_${item.id}_${loc}`),

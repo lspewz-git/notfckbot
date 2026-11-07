@@ -184,7 +184,7 @@ function releasedDate(item) {
             : ''
     ];
     return {
-        label: d.release ? 'Release' : 'Digital release',
+        label: 'Release',
         value: main ? formatReleaseDate(main) : 'TBA',
         note: notes.filter(Boolean).join(' · ')
     };
