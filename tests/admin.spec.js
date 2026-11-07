@@ -74,7 +74,7 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 
-test('Released opens the shared title sheet with visible bottom links', async ({ page }) => {
+test('Released keeps its frame fixed and bottom links reachable in the shared scroll flow', async ({ page }) => {
     const loaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/history' && response.status() === 200);
     await goToSection(page, 'history');
     await loaded;
@@ -87,7 +87,21 @@ test('Released opens the shared title sheet with visible bottom links', async ({
     await first.click();
     const card = page.locator('#released-modal');
     await expect(card.locator('.tc-scroll')).toBeVisible();
-    await expect(card.locator('.tc-footer').getByRole('link', { name: 'Open on Kinopoisk' })).toBeInViewport({ ratio: 1 });
+    await expect(card.locator('#released-people')).not.toContainText('Loading chat information…');
+    await card.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+    await expect(card.locator('.tc-scroll > .tc-footer')).toHaveCount(1);
+    const frame = await card.locator('.title-sheet').boundingBox();
+    const link = card.locator('.tc-footer').getByRole('link', { name: 'Open on Kinopoisk' });
+    await link.scrollIntoViewIfNeeded();
+    // Native scroll extents round to CSS pixels; check all edges within one pixel plus the actual hit target.
+    await expect.poll(() => link.evaluate(el => {
+        const r = el.getBoundingClientRect(), clip = el.closest('.tc-scroll').getBoundingClientRect();
+        return {
+            inside: r.top >= clip.top - 1 && r.bottom <= clip.bottom + 1 && r.left >= clip.left - 1 && r.right <= clip.right + 1,
+            hittable: el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
+        };
+    })).toEqual({ inside: true, hittable: true });
+    expect(await card.locator('.title-sheet').boundingBox()).toEqual(frame);
     await expect(card.getByRole('button', { name: 'Unfollow', exact: true })).toHaveCount(0);
     await card.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(card).toBeHidden();

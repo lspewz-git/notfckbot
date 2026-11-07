@@ -66,7 +66,7 @@ test('selecting the current mode closes options without another save', async ({ 
     expect(panel.account.sent.filter(r => r.method === 'POST' && r.path.endsWith('/series'))).toHaveLength(0);
 });
 
-test('expanding Notify me grows the frame without squeezing the content', async ({ page }) => {
+test('expanding Notify me preserves the frame without squeezing the content', async ({ page }) => {
     await following(page);
     const card = page.locator('#mine-card-body');
     await card.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
@@ -78,8 +78,7 @@ test('expanding Notify me grows the frame without squeezing the content', async 
     const toggle = card.getByRole('button', { name: /Notify me/ });
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect.poll(async () => (await frame()).height).toBeGreaterThanOrEqual(before.height);
-    expect((await frame()).page).toBe(before.page);
+    await expect.poll(frame).toEqual(before);
     const first = card.locator('.tc-radio').first();
     await expect(first).toBeInViewport({ ratio: 1 });
     await first.click();
@@ -137,11 +136,7 @@ for (const section of ['Following fresh', 'Following after Notify', 'Calendar', 
         await more.click();
         const less = card.getByRole('button', { name: 'Show less', exact: true });
         await expect(less).toHaveAttribute('aria-expanded', 'true');
-        if (section === 'Admin details') await expect.poll(frame).toEqual(before);
-        else {
-            await expect.poll(async () => (await frame()).height).toBeGreaterThanOrEqual(before.height);
-            expect((await frame()).page).toBe(before.page);
-        }
+        await expect.poll(frame).toEqual(before);
         await less.click();
         await expect(more).toHaveAttribute('aria-expanded', 'false');
         await expect.poll(frame).toEqual(before);
@@ -244,7 +239,7 @@ test('actions follow expanded options without covering them at 390 by 844', asyn
     await card.getByRole('button', { name: /Notify me/ }).click();
     const options = card.locator('.tc-notify-options');
     await expect.poll(() => card.evaluate(el => {
-        const options = el.querySelector('.tc-scroll').getBoundingClientRect();
+        const options = el.querySelector('.tc-notify-options').getBoundingClientRect();
         const actions = el.querySelector('.tc-actions').getBoundingClientRect();
         const row = el.querySelector('.tc-radio');
         const r = row.getBoundingClientRect();
@@ -256,7 +251,7 @@ test('actions follow expanded options without covering them at 390 by 844', asyn
     await expect(options.getByRole('radio')).toHaveCount(3);
     if (process.env.SHEET_SCREENSHOTS) await card.screenshot({ path: testInfo.outputPath('notify-expanded.png') });
     await card.getByRole('button', { name: 'Show more', exact: true }).click();
-    await card.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await card.locator('.tc-scroll').evaluate(el => { el.scrollTop = el.scrollHeight; });
     await expect.poll(visibleActions).toBe(true);
 });
 

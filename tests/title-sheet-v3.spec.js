@@ -24,7 +24,7 @@ async function openCard(page, tab, options = {}) {
 }
 
 for (const tab of ['my-calendar','my-aired','my-subs']) {
-    test(`${tab} uses shared scroll body, bottom actions and inline description link`, async ({page}) => {
+    test(`${tab} uses a fixed frame, flowing actions and inline description link`, async ({page}) => {
         const {card} = await openCard(page,tab);
         await expect(card.locator('.tc-scroll')).toHaveCount(1);
         await expect(card.locator('.tc-footer .tc-link')).toBeVisible();
@@ -40,8 +40,10 @@ for (const tab of ['my-calendar','my-aired','my-subs']) {
         })).toEqual({inline:true,bottom:true,overflow:false});
         await card.getByRole('button',{name:'Show more',exact:true}).click();
         await expect.poll(async () => (await copy.textContent()).length).toBeGreaterThan(beforeText.length);
-        expect((await card.boundingBox()).height).toBeGreaterThanOrEqual(before.height);
+        expect(await card.boundingBox()).toEqual(before);
         await expect.poll(() => card.locator('.tc-scroll').evaluate(el => el.scrollHeight>el.clientHeight)).toBe(true);
+        await expect(card.locator('.tc-footer')).not.toBeInViewport();
+        await card.locator('.tc-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
         await expect(card.locator('.tc-footer').getByRole('button',{name:'Unfollow',exact:true})).toBeInViewport({ratio:1});
         await card.getByRole('button',{name:'Show less',exact:true}).click();
         await expect(copy).toHaveText(beforeText);
@@ -67,7 +69,8 @@ for (const count of [1,2,3,7]) {
             await card.locator('.tc-seasons-more').click();
             await expect(seasons).toHaveCount(count);
             expect((await card.locator('.tc-description').boundingBox()).height).toBeCloseTo(description.height,0);
-            expect((await card.boundingBox()).height).toBeGreaterThanOrEqual(frame.height);
+            expect(await card.boundingBox()).toEqual(frame);
+            await card.locator('.tc-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
             await expect(card.locator('.tc-footer')).toBeInViewport({ratio:1});
             await card.locator('.tc-seasons-more').click();
             await expect(seasons).toHaveCount(3);
@@ -95,7 +98,7 @@ for(const kind of ['series','films']) test(`Released ${kind} unfollows through t
     await expect(modal).toBeHidden();
 });
 
-test('phone swipe dismisses from header, description and footer without triggering actions',async({page,browserName})=>{
+test('phone short swipes return from every region; a half-height swipe dismisses without actions',async({page,browserName})=>{
     test.skip(browserName!=='chromium','CDP supplies real touch gestures; WebKit shares the handler');
     const {card,panel}=await openCard(page,'my-subs');
     const cdp=await page.context().newCDPSession(page);
@@ -107,8 +110,16 @@ test('phone swipe dismisses from header, description and footer without triggeri
         await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
         for(let step=1;step<=6;step++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+step*20}]});
         await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-        await expect(page.locator('#mine-card-modal'),selector).toBeHidden();
+        await expect(page.locator('#mine-card-modal'),selector).toBeVisible();
+        await expect.poll(()=>card.evaluate(el=>getComputedStyle(el).transform)).toBe('none');
     }
+    const rect=await card.locator('.tc-head').boundingBox();
+    const distance=(await card.boundingBox()).height*.55;
+    const x=rect.x+rect.width/2,y=rect.y+8;
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    for(let step=1;step<=10;step++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+distance*step/10}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await expect(page.locator('#mine-card-modal')).toBeHidden();
     expect(panel.account.sent.filter(r=>r.method==='DELETE')).toHaveLength(0);
     await expect(page.locator('#confirm-modal')).toBeHidden();
 });

@@ -423,7 +423,9 @@ export async function submitAddContent() {
     if (!selected || selected.added || adding) return;
     const item = selected;
     if (!item.chatId) {
-        closeModal('content-card-modal');
+        const session = dialogSession;
+        await closeModal('content-card-modal');
+        if (session !== dialogSession || selected !== item) return;
         toast('Choose a chat first', 'error');
         $('content-chat-field').querySelector('button').focus();
         return;

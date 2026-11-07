@@ -508,6 +508,7 @@ async function unfollow(context) {
         if (shown) {
             shown.textContent = err.message;
             shown.hidden = false;
+            shown.scrollIntoView({ block: 'nearest' });
         } else toast(err.message, 'error');
     } finally {
         pendingUnfollows.delete(key);

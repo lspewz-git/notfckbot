@@ -112,8 +112,7 @@ export function titleCard(
         overview +
         notify +
         extra +
-        '</div>' +
-        `<div class="tc-footer">${kinopoisk}${error}${actions ? `<div class="tc-actions">${actions}</div>` : ''}</div>`
+        `<div class="tc-footer">${kinopoisk}${error}${actions ? `<div class="tc-actions">${actions}</div>` : ''}</div></div>`
     );
 }
 

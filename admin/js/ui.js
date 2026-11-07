@@ -37,6 +37,7 @@ const openStack = [];
 
 /** Modal id -> the element that had focus when it opened, so it can be given back. */
 const focusBeforeOpen = new Map();
+const closing = new WeakMap();
 
 /** @param {HTMLElement} modal */
 function focusables(modal) {
@@ -119,6 +120,8 @@ function watch(modal) {
 export function openModal(id) {
     const modal = /** @type {HTMLDialogElement | null} */ ($(id));
     if (!modal) return;
+    // Finish a previous exit before reopening this reusable dialog. Its late promise cannot close it again.
+    closing.get(modal)?.finish();
     // Opened again while open (a dialog redrawn after saving): only focus is put back
     if (modal.open) return focusInside(modal);
     // Static card dialogs reuse their content element for another title; start at its natural height.
@@ -153,10 +156,39 @@ function focusInside(modal) {
     else content.focus({ preventScroll: true });
 }
 
-/** @param {string} id */
+/** @param {string} id
+ * @returns {Promise<void> | void} Resolves after an animated exit; other dialogs close synchronously.
+ */
 export function closeModal(id) {
     const modal = /** @type {HTMLDialogElement | null} */ ($(id));
     if (!modal || !modal.open) return;
+    if (closing.has(modal)) return closing.get(modal).done;
+    const sheet = /** @type {HTMLElement | null} */ (modal.querySelector('.title-sheet'));
+    if (sheet && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const slide = sheet.animate(
+            [{ transform: getComputedStyle(sheet).transform }, { transform: `translateY(${window.innerHeight}px)` }],
+            { duration: 260, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }
+        );
+        const fade = modal.animate([{ opacity: getComputedStyle(modal).opacity }, { opacity: 0 }], {
+            duration: 260,
+            easing: 'ease-in',
+            fill: 'forwards'
+        });
+        modal.inert = true;
+        const finish = () => {
+            if (closing.get(modal)?.finish !== finish) return;
+            closing.delete(modal);
+            modal.close();
+            slide.cancel();
+            fade.cancel();
+            sheet.style.removeProperty('transform');
+            modal.inert = false;
+            afterClose(modal);
+        };
+        const done = slide.finished.then(finish, finish);
+        closing.set(modal, { finish, done });
+        return done;
+    }
     modal.close();
     // The close event comes later; the stack and focus are settled now
     afterClose(modal);
@@ -200,7 +232,13 @@ export const clearReturnTo = () => {
 export function dismissChatModals() {
     if (!openStack.some((modal) => modal.hasAttribute('data-dismiss-stack'))) return false;
     clearReturnTo();
-    while (openStack.length) closeModal(topmostModal().id);
+    // Title-sheet exits are asynchronous; traverse a snapshot instead of waiting for stack removal.
+    const origin = focusBeforeOpen.get(openStack[0].id);
+    for (const modal of [...openStack].reverse()) {
+        // The last exit must restore the page control, not a field in an already closed parent.
+        focusBeforeOpen.set(modal.id, origin);
+        closeModal(modal.id);
+    }
     return true;
 }
 

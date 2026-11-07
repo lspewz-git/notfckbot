@@ -7,7 +7,7 @@ const pixels = (value) => Number.parseFloat(value) || 0;
 // Entry animations scale the frame; layout measurements must not include that transform.
 const height = (element) => element.offsetHeight;
 
-/** Size the frame from its collapsed contents; expansions consume height, never compress siblings. */
+/** Keep the frame fixed; expanded details and actions share the same scrolling flow. */
 export function fitTitleSheet(root) {
     const sheet = /** @type {HTMLElement | null} */ (
         root.matches?.('.title-sheet') ? root : root.querySelector('.title-sheet')
@@ -16,6 +16,7 @@ export function fitTitleSheet(root) {
     if (!sheet || !modal?.open) return;
     const scroll = /** @type {HTMLElement} */ (sheet.querySelector('.tc-scroll'));
     if (!scroll) return;
+    const scrollTop = scroll.scrollTop;
     let state = layouts.get(sheet);
     if (!state || state.scroll !== scroll) {
         state?.observer.disconnect();
@@ -75,7 +76,7 @@ export function fitTitleSheet(root) {
     const gap = pixels(getComputedStyle(scroll).rowGap);
     let current = Math.max(0, children.length - 1) * gap;
     for (const child of children)
-        if (child !== description) {
+        if (child !== description && child !== footer) {
             const css = getComputedStyle(child);
             current += height(child) + pixels(css.marginTop) + pixels(css.marginBottom);
         }
@@ -97,8 +98,7 @@ export function fitTitleSheet(root) {
         pixels(style.paddingBottom) +
         pixels(style.borderTopWidth) +
         pixels(style.borderBottomWidth);
-    const room = Math.max(24, base - insets - pixels(style.rowGap) - state.footer - state.fixed);
-    let textGrowth = 0;
+    const room = Math.max(24, base - insets - state.footer - state.fixed);
     if (description) {
         const text = /** @type {HTMLElement} */ (description.querySelector('.tc-overview'));
         const copy = text.querySelector('.tc-copy');
@@ -137,9 +137,9 @@ export function fitTitleSheet(root) {
         }
         const used = expanded ? text.scrollHeight : room;
         description.style.height = `${used}px`;
-        textGrowth = Math.max(0, used - room);
     }
-    sheet.style.height = `${Math.min(max, base + Math.max(0, current - state.fixed) + Math.max(0, footerHeight - state.footer) + textGrowth)}px`;
+    sheet.style.height = `${base}px`;
+    scroll.scrollTop = scrollTop;
 }
 
 /** The scrolling region and footer use one phone gesture, with a visible Close alternative. */
@@ -147,21 +147,44 @@ function setupSwipe(sheet, scroll, modal) {
     if (sheet.dataset.swipeReady) return;
     sheet.dataset.swipeReady = 'true';
     let drag = null;
+    let returning = null;
     let blockClickUntil = 0;
     const reset = () => {
+        returning?.cancel();
+        returning = null;
         sheet.style.removeProperty('transform');
         drag = null;
+    };
+    const settle = () => {
+        drag = null;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return reset();
+        const from = getComputedStyle(sheet).transform;
+        returning?.cancel();
+        const animation = sheet.animate([{ transform: from }, { transform: 'translateY(0)' }], {
+            duration: 280,
+            easing: 'cubic-bezier(.2,.7,.3,1)',
+            fill: 'forwards'
+        });
+        returning = animation;
+        animation.finished.then(
+            () => returning === animation && reset(),
+            () => {}
+        );
     };
     sheet.addEventListener('pointerdown', (event) => {
         scroll = sheet.querySelector('.tc-scroll');
         if (event.pointerType !== 'touch' || !event.isPrimary || topmostModal() !== modal) return reset();
+        const offset = returning ? new window.DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42 : 0;
+        reset();
+        if (offset) sheet.style.transform = `translateY(${offset}px)`;
         drag = {
             id: event.pointerId,
             x: event.clientX,
             y: event.clientY,
             start: scroll.scrollTop,
             inScroll: scroll.contains(event.target),
-            distance: 0,
+            offset,
+            distance: offset,
             moved: false
         };
     });
@@ -176,16 +199,19 @@ function setupSwipe(sheet, scroll, modal) {
         event.preventDefault();
         blockClickUntil = performance.now() + 500;
         if (drag.inScroll) scroll.scrollTop = Math.max(0, drag.start - dy);
-        drag.distance = Math.max(0, dy - (drag.inScroll ? drag.start : 0));
+        drag.distance = Math.max(0, drag.offset + dy - (drag.inScroll ? drag.start : 0));
         sheet.style.transform = `translateY(${drag.distance}px)`;
     });
     sheet.addEventListener('pointerup', (event) => {
         if (!drag || drag.id !== event.pointerId) return;
-        const dismiss = drag.distance >= Math.min(100, sheet.clientHeight * 0.15);
-        reset();
-        if (dismiss && topmostModal() === modal && !dismissChatModals()) closeModalReturning(modal.id);
+        const dismiss = drag.distance >= sheet.clientHeight * 0.5;
+        if (!drag.moved) return reset();
+        drag = null;
+        if (dismiss && topmostModal() === modal) {
+            if (!dismissChatModals()) closeModalReturning(modal.id);
+        } else settle();
     });
-    sheet.addEventListener('pointercancel', reset);
+    sheet.addEventListener('pointercancel', settle);
     sheet.addEventListener(
         'click',
         (event) => {
@@ -196,7 +222,7 @@ function setupSwipe(sheet, scroll, modal) {
         },
         true
     );
-    modal.addEventListener('close', reset);
+    modal.addEventListener('close', () => !modal.open && reset());
 }
 
 const refitOpen = () => document.querySelectorAll('dialog[open] .title-sheet').forEach(fitTitleSheet);
