@@ -961,9 +961,10 @@ export const accountActions = {
     'mine-search-open': () => {
         const from = visibleSection();
         if (from && from !== 'my-search') searchFrom = from;
-        const back = $('mine-search-back');
-        if (back) back.dataset.section = searchFrom;
-        window.setTimeout(() => $('mine-q')?.focus(), 0);
+        for (const id of ['mine-search-back', 'mine-search-cancel']) {
+            const back = $(id);
+            if (back) back.dataset.section = searchFrom;
+        }
     },
     'mine-search-close': () => {
         window.clearTimeout(searchTimer);
@@ -973,7 +974,10 @@ export const accountActions = {
         state.searchError = null;
         state.searching = false;
         const input = /** @type {HTMLInputElement | null} */ ($('mine-q'));
-        if (input) input.value = '';
+        if (input) {
+            input.value = '';
+            input.blur();
+        }
         showResults();
         syncSearchField();
     },

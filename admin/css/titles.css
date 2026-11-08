@@ -460,6 +460,18 @@
     margin: 0;
 }
 
+@media (max-width: 640px) {
+    .app-sheet.modal-sheet .title-sheet {
+        padding: 0;
+    }
+
+    .title-sheet .tc-scroll {
+        border-radius: inherit;
+        padding: var(--space-2) calc(var(--space-4) + var(--space-2))
+            calc(var(--space-6) + env(safe-area-inset-bottom, 0px)) var(--space-4);
+    }
+}
+
 @media (min-width: 641px) {
     .app-sheet.modal-sheet:has(.title-sheet) {
         align-items: flex-start;
@@ -1104,6 +1116,18 @@
     gap: var(--space-2);
 }
 
+.search-cancel {
+    flex: none;
+    min-height: 44px;
+    padding: 0 var(--space-1);
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-lg);
+    cursor: pointer;
+}
+
 .search-field {
     display: flex;
     flex: 1;
@@ -1136,7 +1160,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 15px;
+    font-size: var(--text-lg);
     outline: none;
 }
 

@@ -79,7 +79,8 @@ export function fitTitleSheet(root) {
     state.footer ??= footerHeight;
     const description = /** @type {HTMLElement | null} */ (sheet.querySelector('.tc-description'));
     const children = [...scroll.children].filter((el) => !el.hasAttribute('hidden'));
-    const gap = pixels(getComputedStyle(scroll).rowGap);
+    const scrollStyle = getComputedStyle(scroll);
+    const gap = pixels(scrollStyle.rowGap);
     let current = Math.max(0, children.length - 1) * gap;
     for (const child of children)
         if (child !== description && child !== footer) {
@@ -102,6 +103,8 @@ export function fitTitleSheet(root) {
     const insets =
         pixels(style.paddingTop) +
         pixels(style.paddingBottom) +
+        pixels(scrollStyle.paddingTop) +
+        pixels(scrollStyle.paddingBottom) +
         pixels(style.borderTopWidth) +
         pixels(style.borderBottomWidth);
     const room = phone

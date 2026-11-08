@@ -252,7 +252,11 @@ function setupDelegation() {
         if (subsTab) setTableTab('subs', subsTab);
         if (filmsTab) setTableTab('films', filmsTab);
         if (chatsTab) setTableTab('chats', chatsTab);
-        if (section) switchSection(section);
+        if (section) {
+            switchSection(section);
+            // iOS opens the keyboard only while handling the tap, after the field is visible.
+            if (action === 'mine-search-open') $('mine-q')?.focus({ preventScroll: true });
+        }
         // A dialog's cross (a sheet's too, not the poster's) ends the whole chat action flow
         const cross =
             el.classList.contains('modal-x') || (el.classList.contains('sheet-close') && close !== 'poster-modal');
