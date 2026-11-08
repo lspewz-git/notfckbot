@@ -424,6 +424,10 @@
     padding-inline-end: var(--space-2);
 }
 
+.tc-grabber {
+    display: none;
+}
+
 .title-sheet.tc-dragging {
     will-change: transform;
 }
@@ -463,6 +467,21 @@
 @media (max-width: 640px) {
     .app-sheet.modal-sheet .title-sheet {
         padding: 0;
+    }
+
+    .title-sheet .tc-grabber {
+        position: absolute;
+        z-index: 3;
+        top: var(--space-2);
+        left: 50%;
+        display: block;
+        width: calc(var(--space-8) + var(--space-1));
+        height: var(--space-1);
+        transform: translateX(-50%);
+        border-radius: var(--space-2);
+        background: var(--text-faint);
+        box-shadow: 0 0 0 var(--space-1) var(--surface-overlay);
+        pointer-events: none;
     }
 
     .title-sheet .tc-scroll {
