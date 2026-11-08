@@ -6,6 +6,28 @@ const events = require('../../src/chat-events');
 const ops = require('../../src/chat-ops');
 const kinopoisk = require('../../src/api/kinopoisk');
 
+test('digital settings accept booleans only and start without a historical backlog', async (t) => {
+    assert.equal(ops.settingsSchema.safeParse({ notify_digital: true }).success, true);
+    assert.equal(ops.settingsSchema.safeParse({ notify_digital: 'true' }).success, false);
+    const chat = {
+        id: 1,
+        timezone: 'Asia/Irkutsk',
+        notify_digital: false,
+        async update(fields) {
+            Object.assign(this, fields);
+        }
+    };
+    t.mock.method(Chat, 'findByPk', async () => chat);
+    t.mock.method(events, 'record', () => {});
+    await ops.updateSettings(1, { notify_digital: true });
+    assert.match(chat.digital_since, /^\d{4}-\d{2}-\d{2}$/);
+    const since = chat.digital_since;
+    await ops.updateSettings(1, { notify_digital: true });
+    assert.equal(chat.digital_since, since, 'saving an already enabled setting keeps its boundary');
+    await ops.updateSettings(1, { notify_digital: false });
+    assert.equal(chat.digital_since, null);
+});
+
 // No Kinopoisk unless a test gives one
 let kpDates = kinopoisk.NO_DATES;
 mock.method(kinopoisk, 'kinopoiskQuick', async () => ({ kinopoiskId: null, ru: kpDates }));
@@ -39,7 +61,12 @@ test('a repeated mode is silent; a changed mode records its actor and preserves 
 test('a released film goes to Released from the panel but an old bot action still queues it once', async (t) => {
     t.mock.method(Chat, 'findByPk', async () => ({ id: 1 }));
     t.mock.method(Watchlist, 'findAll', async () => []);
-    const details = { title: 'Film', status: 'Released', release_date: '2020-01-02' };
+    const details = {
+        title: 'Film',
+        status: 'Released',
+        release_date: '2020-01-02',
+        cinema_release_date: '2020-01-02'
+    };
     t.mock.method(tmdb, 'getDetails', async () => details);
     const create = t.mock.method(Watchlist, 'create', async (fields) => fields);
     let waiting;
@@ -59,7 +86,7 @@ test('a released film goes to Released from the panel but an old bot action stil
     assert.equal(record.mock.callCount(), 2, 'a duplicate bot callback adds no event');
 });
 
-test("adding a film: Russia's online date from Kinopoisk counts, as in the update check", async (t) => {
+test('adding a film: digital information does not change its cinema release status', async (t) => {
     const today = new Date().toISOString().slice(0, 10);
     t.mock.method(Chat, 'findByPk', async () => ({ id: 1, timezone: 'UTC' }));
     t.mock.method(Watchlist, 'findAll', async () => []);
@@ -68,7 +95,7 @@ test("adding a film: Russia's online date from Kinopoisk counts, as in the updat
     t.mock.method(tmdb, 'getDetails', async () => details);
     t.mock.method(Watchlist, 'create', async (fields) => fields);
     t.mock.method(events, 'record', () => {});
-    assert.equal((await ops.addFilm(1, '1')).isReleased, false);
+    assert.equal((await ops.addFilm(1, '1')).isReleased, true);
     kpDates = { ...kinopoisk.NO_DATES, digital: today, services: ['Okko'] };
     t.after(() => (kpDates = kinopoisk.NO_DATES));
     const { entry, isReleased } = await ops.addFilm(1, '1');
@@ -85,10 +112,10 @@ test('a film added after its cinema premiere gets no premiere message (nor again
     t.mock.method(tmdb, 'getDetails', async () => details);
     t.mock.method(Watchlist, 'create', async (fields) => fields);
     t.mock.method(events, 'record', () => {});
-    assert.equal((await ops.addFilm(1, '1')).entry.premiere_notified, true);
+    assert.equal((await ops.addFilm(1, '1')).entry.notified, true);
     details.cinema_release_date = '2999-01-01';
     details.release_date = '2999-01-01';
-    assert.equal((await ops.addFilm(1, '1')).entry.premiere_notified, false);
+    assert.equal((await ops.addFilm(1, '1')).entry.notified, false);
 });
 
 test('film removal retains the chat boundary and removes only that row by default', async (t) => {

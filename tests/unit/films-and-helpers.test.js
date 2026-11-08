@@ -7,7 +7,7 @@ process.env.TZ = 'UTC';
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildFilmMessage, buildPremiereMessage } = require('../../src/cron/messages');
+const { buildFilmMessage, buildDigitalMessage } = require('../../src/cron/messages');
 const { nextEpisodeFields, firstRelease } = require('../../src/api/tmdb');
 const { getWatchLinks, formatWatchLinks, formatDigitalDate, isFinishedStatus } = require('../../src/constants');
 
@@ -16,22 +16,33 @@ const NOW = new Date('2026-10-12T12:00:00Z');
 describe('buildFilmMessage', () => {
     const entry = { title: 'Дюна & Co', year: 2026 };
 
-    test('"Фильм вышел", title escaped, year and the links; no cinema date', () => {
+    test('digital expected status follows the chat-local day across UTC midnight', () => {
         const msg = buildFilmMessage({
             entry,
-            data: { release_date: '2026-08-01', digital_release_date: '2026-10-01' },
+            data: { cinema_release_date: '2026-11-09', digital_first_date: '2026-11-09' },
+            today: '2026-11-09',
+            now: new Date('2026-11-08T18:00:00Z'),
+            links: ''
+        });
+        assert.doesNotMatch(msg, /ожидается/);
+    });
+
+    test('"Фильм вышел", title escaped, year and the links; the selected cinema date', () => {
+        const msg = buildFilmMessage({
+            entry,
+            data: { release_date: '2026-08-01', cinema_release_date: '2026-08-01', digital_release_date: '2026-10-01' },
             links: '<LINKS>',
             now: NOW
         });
         assert.match(msg, /^🎬 <b>Фильм вышел!<\/b>/);
         assert.match(msg, /Дюна &amp; Co<\/b> \(2026\)/);
-        assert.doesNotMatch(msg, /Дата релиза|Премьера в России/);
+        assert.match(msg, /Дата релиза/);
         assert.ok(msg.endsWith('\n\n<LINKS>'));
     });
 
-    test('no digital release known (45 days after the cinema): says the date is a guess', () => {
+    test('no digital release known: says the date is unknown, without a forecast', () => {
         const msg = buildFilmMessage({ entry, data: { release_date: '2026-08-01' }, links: '', now: NOW });
-        assert.match(msg, /Даты цифрового релиза нет — обычно к этому сроку фильм уже онлайн/);
+        assert.match(msg, /Дата цифрового релиза неизвестна/);
     });
 
     test('a digital release still ahead is marked as expected; a past one is not', () => {
@@ -55,7 +66,7 @@ describe('buildFilmMessage', () => {
 
     test('no date at all: no date lines, no year', () => {
         const msg = buildFilmMessage({ entry: { title: 'X' }, data: { status: 'Released' }, links: '', now: NOW });
-        assert.doesNotMatch(msg, /Цифровой релиз|Даты цифрового/);
+        assert.match(msg, /Дата цифрового релиза неизвестна/);
         assert.doesNotMatch(msg, /\(\d{4}\)/);
     });
 
@@ -65,17 +76,17 @@ describe('buildFilmMessage', () => {
     });
 });
 
-describe('buildPremiereMessage', () => {
-    test('the cinema release with its country, a promise to write again, the info link', () => {
-        const msg = buildPremiereMessage({
-            entry: { title: 'Как ограбить банк', year: 2026 },
-            data: { director_name: 'Дэвид Литч' },
-            premiere: { date: '2026-11-11', country: 'US' },
+describe('buildDigitalMessage', () => {
+    test('the independent digital event has its own heading, date and country', () => {
+        const msg = buildDigitalMessage({
+            entry: { title: 'Film', year: 2026 },
+            data: { digital_first_date: '2026-11-11', digital_first_country: 'US' },
             links: '<INFO>'
         });
-        assert.match(msg, /^🎞 <b>Премьера в кино!<\/b>/);
-        assert.match(msg, /Дата релиза: <b>11 ноября 2026 г\.<\/b> \(США\)/);
-        assert.match(msg, /Онлайн фильма пока нет — напишу, когда выйдет\./);
+        assert.match(msg, /^💻 <b>Фильм вышел онлайн!/);
+        assert.match(msg, /11 ноября 2026 г/);
+        assert.match(msg, /США/);
+        assert.doesNotMatch(msg, /напишу, когда выйдет/);
         assert.ok(msg.endsWith('\n\n<INFO>'));
     });
 });

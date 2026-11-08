@@ -7,7 +7,7 @@ const tmdb = require('./api/tmdb');
 const { ZONES, isHour } = require('./quiet');
 const { sentMarkOnEnable } = require('./cron/digests');
 // The update check's own rule, so a film added now is filed exactly as the check would announce it
-const { isOnline, premierePassed, storedDates, PREMIERE_MODES } = require('./film-release');
+const { isReleased: filmIsReleased, isOnline, storedDates, RELEASE_RULE_VERSION } = require('./film-release');
 const kinopoisk = require('./api/kinopoisk');
 const { todayIn } = require('./calendar');
 const { NOTIFY_LABELS } = require('./constants');
@@ -99,7 +99,7 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
     // Russia's dates count too, as in the update check: a quick lookup (3 s at most, never throws)
     const { ru } = await kinopoisk.kinopoiskQuick(fullTmdbId, details.imdb_id);
     const today = todayIn(chat.timezone);
-    const isReleased = isOnline(details, ru, today);
+    const isReleased = filmIsReleased(details, ru, today);
     // A released film is stored straight into Released; one record there is enough
     if (isReleased && rows.length) throw new OpError(409, "Film is already in this chat's Released list");
 
@@ -107,17 +107,15 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
         title: details.title || details.original_title || 'Без названия',
         poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
         year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
-        premiere_digital: details.release_date || null,
         ...tmdb.titleFacts(details, 'movie'),
-        digital_date: details.digital_release_date || null,
-        digital_country: details.digital_release_country || null,
         // What the lookup found; the update check asks Kinopoisk again on its next run
         ru_premiere: ru.premiere || null,
         ru_digital: ru.digital || null,
         ru_services: ru.services && ru.services.length ? ru.services.join(', ') : null,
         ...storedDates(details, ru),
         notified: waitingOnly ? false : isReleased,
-        premiere_notified: premierePassed(details, ru, today)
+        digital_notified: isOnline(details, ru, today),
+        release_rule_version: RELEASE_RULE_VERSION
     };
     const [entry, created] = waitingOnly
         ? await Watchlist.findOrCreate({ where: { chatId, tmdb_id: fullTmdbId, notified: false }, defaults: fields })
@@ -150,7 +148,7 @@ const SETTING_FIELDS = [
     'timezone',
     'digest_week',
     'digest_month',
-    'premieres'
+    'notify_digital'
 ];
 const QUIET = 'Quiet hours: two different hours from 0 to 23, or both off';
 const quietHour = z.union([z.null(), z.number().refine(isHour)], { error: QUIET }).optional();
@@ -166,7 +164,7 @@ const settingsSchema = z
             .optional(),
         digest_week: z.boolean({ error: 'Bad digest_week' }).optional(),
         digest_month: z.boolean({ error: 'Bad digest_month' }).optional(),
-        premieres: z.enum(PREMIERE_MODES, { error: 'Bad premieres' }).optional(),
+        notify_digital: z.boolean({ error: 'Bad notify_digital' }).optional(),
         buttons_mode: z.enum(['owner', 'all'], { error: 'Bad buttons_mode' }).optional(),
         menu_enabled: z.boolean({ error: 'Bad menu_enabled' }).optional()
     })
@@ -195,6 +193,9 @@ async function updateSettings(chatId, body, who = {}, chat = null) {
     chat ||= await Chat.findByPk(chatId);
     if (!chat) throw new OpError(404, 'Chat not found');
     const before = settingsOf(chat);
+    if (changes.notify_digital === true && !chat.notify_digital) {
+        changes.digital_since = todayIn(changes.timezone || chat.timezone);
+    } else if (changes.notify_digital === false) changes.digital_since = null;
     // A digest turned on starts with the next one due, as in the bot (src/cron/digests.js)
     for (const which of ['week', 'month']) {
         if (changes[`digest_${which}`] && !chat[`digest_${which}`]) {

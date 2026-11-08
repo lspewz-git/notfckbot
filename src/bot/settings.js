@@ -8,7 +8,6 @@ const { ownerOf } = require('./access');
 const { getState, setState } = require('./state');
 const { ZONES, PRESETS, zoneOf, hasQuietHours, quietLabel, pad } = require('../quiet');
 const { updateSettings } = require('../chat-ops');
-const { PREMIERE_MODES, PREMIERE_LABELS } = require('../film-release');
 const events = require('../chat-events');
 
 const BUTTONS_LABEL = {
@@ -60,8 +59,13 @@ function settingsView(chat, settings) {
     ]);
     lines.push(`🌙 Тихие часы: <b>${quietLabel(settings) || 'выключены'}</b>`);
     rows.push([Markup.button.callback('🌙 Тихие часы', 'settings_quiet')]);
-    lines.push(`🎞 Премьеры в кино: <b>${PREMIERE_LABELS[settings.premieres] || PREMIERE_LABELS.off}</b>`);
-    rows.push([Markup.button.callback('🎞 Премьеры в кино', 'settings_premieres')]);
+    lines.push(`💻 Цифровые релизы: <b>${settings.notify_digital ? 'присылать' : 'не присылать'}</b>`);
+    rows.push([
+        Markup.button.callback(
+            settings.notify_digital ? '💻 Не присылать цифровые релизы' : '💻 Присылать цифровые релизы',
+            `settings_digital_${settings.notify_digital ? 'off' : 'on'}`
+        )
+    ]);
     lines.push(`📅 Сводка недели: <b>${settings.digest_week ? 'по понедельникам в 10:00' : 'выключена'}</b>`);
     rows.push([
         Markup.button.callback(
@@ -119,28 +123,6 @@ function quietView(settings) {
     if (on) rows.push([Markup.button.callback('Выключить', 'settings_quiet_off')]);
     for (let i = 0; i < presets.length; i += 2) rows.push(presets.slice(i, i + 2));
     rows.push([Markup.button.callback(`🕓 Часовой пояс: ${zone.city}`, 'settings_tz')]);
-    rows.push([Markup.button.callback('⬅️ К настройкам', 'settings_open')]);
-    return { text: lines.join('\n'), keyboard: Markup.inlineKeyboard(rows) };
-}
-
-const PREMIERE_BUTTONS = { all: '🌍 В любой стране', ru: '🇷🇺 Только в России', off: '🔕 Не присылать' };
-
-/** The cinema premieres screen: what it is, and the three choices with the chat's ticked. */
-function premieresView(settings) {
-    const current = PREMIERE_MODES.includes(settings.premieres) ? settings.premieres : 'off';
-    const lines = [
-        '🎞 <b>Премьеры в кино</b>',
-        '',
-        'Сообщу в день, когда фильм выходит в кинотеатрах. Когда он появится онлайн, напишу ещё раз — это приходит всегда.',
-        '',
-        `Сейчас: <b>${PREMIERE_LABELS[current]}</b>`
-    ];
-    const rows = ['all', 'ru', 'off'].map((mode) => [
-        Markup.button.callback(
-            mode === current ? `✅ ${PREMIERE_BUTTONS[mode].replace(/^\S+ /, '')}` : PREMIERE_BUTTONS[mode],
-            `settings_premieres_${mode}`
-        )
-    ]);
     rows.push([Markup.button.callback('⬅️ К настройкам', 'settings_open')]);
     return { text: lines.join('\n'), keyboard: Markup.inlineKeyboard(rows) };
 }
@@ -254,17 +236,12 @@ function register(bot) {
         await showView(ctx, settingsView(ctx.chat, settings));
     });
 
-    // Cinema premieres: anyone may look, only admins change (in a group)
-    bot.action('settings_premieres', async (ctx) => {
-        await ctx.answerCbQuery();
-        await showView(ctx, premieresView(ctx.state.chatData));
-    });
-    bot.action(/^settings_premieres_(all|ru|off)$/, async (ctx) => {
+    bot.action(/^settings_digital_(on|off)$/, async (ctx) => {
         if (!(await canChange(ctx))) return ctx.answerCbQuery(NOT_ADMIN, { show_alert: true });
-        const mode = ctx.match[1];
-        await change(ctx, { premieres: mode });
-        await ctx.answerCbQuery(`Премьеры в кино: ${PREMIERE_LABELS[mode]}`);
-        await showView(ctx, premieresView(ctx.state.chatData));
+        const on = ctx.match[1] === 'on';
+        await change(ctx, { notify_digital: on });
+        await ctx.answerCbQuery(`Цифровые релизы: ${on ? 'присылать' : 'не присылать'}`);
+        await showView(ctx, settingsView(ctx.chat, ctx.state.chatData));
     });
 
     // Whoever opened the screen closes it, or an admin; a member can't remove someone else's
@@ -290,4 +267,4 @@ function register(bot) {
     });
 }
 
-module.exports = { register, settingsView, quietView, zoneView, premieresView, canChange };
+module.exports = { register, settingsView, quietView, zoneView, canChange };

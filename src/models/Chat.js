@@ -55,13 +55,15 @@ const Chat = sequelize.define('Chat', {
         allowNull: false,
         defaultValue: false
     },
-    // A message on a film's cinema premiere besides the one when it is online (src/film-release.js):
-    // 'off', 'all' (the first cinema release anywhere) or 'ru' (in Russia only). Off until turned on
+    // Legacy cinema preference retained for a non-destructive schema transition; no longer acted on.
     premieres: {
         type: DataTypes.STRING(3),
         allowNull: false,
         defaultValue: 'off'
     },
+    notify_digital: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    // Enabling digital alerts starts with this chat-local day, without an old-release backlog.
+    digital_since: { type: DataTypes.STRING(10), allowNull: true },
     // The period last sent (the week's Monday, "2026-10-12"; the month, "2026-10"), so each goes once
     digest_week_sent: {
         type: DataTypes.STRING(10),

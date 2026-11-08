@@ -60,10 +60,10 @@ const films = () => [
         overview: 'A journey across the desert. '.repeat(18),
         ruPremiere: null,
         ruDigital: null,
-        cinema: { date: '2026-11-06', country: 'BE' },
+        release: { date: '2026-11-06', country: 'BE', countries: ['BE'] },
         cinemaRu: '2027-02-18',
-        online: { date: '2026-12-21', estimate: true, country: null },
-        premiere: null,
+        online: null,
+        notifyDigital: false,
         genres: 'Фантастика',
         links: [{ kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/index.php?kp_query=x' }]
     }
@@ -161,6 +161,7 @@ function accountState(options) {
             quiet_start: 23,
             quiet_end: 9,
             timezone: 'Europe/Moscow',
+            notify_digital: false,
             digest_week: true,
             digest_month: false
         }
@@ -234,7 +235,7 @@ const CALENDAR = {
             kind: 'movie',
             tmdbId: 'movie_6',
             listId: 6,
-            event: 'online',
+            event: 'release',
             estimate: false,
             country: 'US',
             title: 'Мегалополис',
@@ -246,9 +247,11 @@ const CALENDAR = {
             kind: 'movie',
             tmdbId: 'movie_7',
             listId: 7,
-            event: 'online',
-            estimate: true,
-            country: null,
+            event: 'release',
+            release: { date: '2026-11-06', country: 'BE', countries: ['BE'] },
+            online: null,
+            notifyDigital: false,
+            country: 'BE',
             genres: 'Фантастика',
             title: 'Дюна: Часть третья',
             overview: 'A journey across the desert. '.repeat(18),
@@ -484,6 +487,7 @@ function accountAnswer(state, req, url) {
                               rating: 7.4,
                               overview: 'A released film description. '.repeat(80),
                               ruPremiere: '2026-02-26',
+                              dates: state.airedFilmDates,
                               links: [
                                   { kind: 'watch', label: 'Watch on SSPoisk', url: 'https://www.sspoisk.ru/film/9/' },
                                   { kind: 'info', label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/film/9/' }

@@ -111,7 +111,7 @@ const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POS
 // --- Settings ---
 /** The chat's bot settings: who presses its buttons (groups only) and the bottom menu. */
 const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
-const chatSettingsSwitches = ['menu', 'quiet-toggle', 'digest-week', 'digest-month'];
+const chatSettingsSwitches = ['menu', 'quiet-toggle', 'digest-week', 'digest-month', 'digital'];
 const settingsSwitch = (name) => $(`chat-settings-${name}`);
 const switchOn = (name) => settingsSwitch(name).getAttribute('aria-checked') === 'true';
 let savedChatSettings = '';
@@ -119,9 +119,7 @@ let savedChatSettings = '';
 function chatSettingsState() {
     return JSON.stringify([
         ...chatSettingsSwitches.map(switchOn),
-        ...['buttons', 'quiet-start', 'quiet-end', 'timezone', 'premieres'].map(
-            (name) => $field(`chat-settings-${name}`).value
-        )
+        ...['buttons', 'quiet-start', 'quiet-end', 'timezone'].map((name) => $field(`chat-settings-${name}`).value)
     ]);
 }
 
@@ -193,7 +191,7 @@ function openChatSettings(chat, label) {
     setSelectValue('chat-settings-quiet-start', String(quietOn ? chat.quiet_start : 23));
     setSelectValue('chat-settings-quiet-end', String(quietOn ? chat.quiet_end : 8));
     setSelectValue('chat-settings-timezone', chat.timezone || 'Europe/Moscow');
-    setSelectValue('chat-settings-premieres', ['all', 'ru'].includes(chat.premieres) ? chat.premieres : 'off');
+    settingsSwitch('digital').setAttribute('aria-checked', String(Boolean(chat.notify_digital)));
     settingsSwitch('digest-week').setAttribute('aria-checked', String(Boolean(chat.digest_week)));
     settingsSwitch('digest-month').setAttribute('aria-checked', String(Boolean(chat.digest_month)));
     setQuietHoursEnabled(quietOn);
@@ -215,7 +213,7 @@ function openChatSettings(chat, label) {
         body.quiet_start = quietEnabled ? Number(start) : null;
         body.quiet_end = quietEnabled ? Number(end) : null;
         body.timezone = $field('chat-settings-timezone').value;
-        body.premieres = $field('chat-settings-premieres').value;
+        body.notify_digital = switchOn('digital');
         body.digest_week = switchOn('digest-week');
         body.digest_month = switchOn('digest-month');
         const submitted = chatSettingsState();

@@ -4,6 +4,11 @@ const { notifyDay } = require('../../src/account/notify-day');
 
 const moscow = { timezone: 'Europe/Moscow', quiet_start: null, quiet_end: null };
 
+test('film bells use the first cron slot after chat-local midnight, even on the previous UTC day', () => {
+    const irkutsk = { timezone: 'Asia/Irkutsk', quiet_start: 8, quiet_end: 4 };
+    assert.equal(notifyDay({ kind: 'movie', event: 'release', date: '2026-11-09' }, irkutsk), '2026-11-09');
+});
+
 test('the bell follows the mode: every episode, premiere and finale, or the finale only', () => {
     const ep = (mode, mark = '') => notifyDay({ kind: 'tv', date: '2026-11-12', mode, mark }, moscow);
     assert.equal(ep('episode'), '2026-11-13', 'an episode reaches the bot the day after its TMDB date');
@@ -16,13 +21,13 @@ test('the bell follows the mode: every episode, premiere and finale, or the fina
     assert.equal(ep(null), null, 'no subscription mode, no message');
 });
 
-test("a film's row (online, or a cinema premiere the chat asked for) goes out on its day", () => {
-    assert.equal(notifyDay({ kind: 'movie', event: 'online', date: '2026-12-01' }, moscow), '2026-12-01');
-    assert.equal(notifyDay({ kind: 'movie', event: 'cinema', date: '2026-11-11' }, moscow), '2026-11-11');
+test("a film's Release row has its main notification, independently of digital information", () => {
+    assert.equal(notifyDay({ kind: 'movie', event: 'online', date: '2026-12-01' }, moscow), null);
+    assert.equal(notifyDay({ kind: 'movie', event: 'cinema', date: '2026-11-11' }, moscow), null);
     assert.equal(
         notifyDay({ kind: 'movie', event: 'release', date: '2026-11-11' }, moscow),
-        null,
-        'no online date known: the release date is no message day'
+        '2026-11-11',
+        'the selected cinema release is the main message day'
     );
     assert.equal(notifyDay({ kind: 'movie', date: 'soon' }, moscow), null);
 });

@@ -10,6 +10,7 @@ const CHAT_FIELDS = ['id', 'username', 'type'];
 
 const router = require('express').Router();
 const { log } = require('../../log');
+const { releaseDate, onlineDate } = require('../../film-release');
 const { z, valid, text } = require('../validate');
 
 router.get('/api/series/:tmdbId', async (req, res) => {
@@ -59,10 +60,14 @@ router.get('/api/movie/:tmdbId', async (req, res) => {
         const ruRow = entries
             .filter((e) => e.ru_checked_at)
             .sort((a, b) => new Date(b.ru_checked_at) - new Date(a.ru_checked_at))[0];
+        const ru = { premiere: ruRow?.ru_premiere, digital: ruRow?.ru_digital };
+        const release = releaseDate(details, ru);
+        const digital = onlineDate(details, ru);
         const dates = {
-            release: details.release_date || null,
-            digital: details.digital_release_date || null,
-            digitalCountry: details.digital_release_country || null,
+            release: release?.date || null,
+            releaseCountries: release?.countries || [],
+            digital: digital?.date || null,
+            digitalCountry: digital?.country || null,
             ruPremiere: (ruRow && ruRow.ru_premiere) || null,
             ruDigital: (ruRow && ruRow.ru_digital) || null,
             ruServices: (ruRow && ruRow.ru_services) || null

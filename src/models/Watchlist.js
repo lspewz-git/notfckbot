@@ -3,8 +3,7 @@ const sequelize = require('../database');
 const Chat = require('./Chat');
 
 /**
- * Watchlist — tracks unreleased movies a user wants to be notified about.
- * The cron job checks premiere.digital and notifies when it arrives.
+ * Watchlist tracks each chat's main release and optional digital notification independently.
  */
 const Watchlist = sequelize.define('Watchlist', {
     id: {
@@ -30,27 +29,29 @@ const Watchlist = sequelize.define('Watchlist', {
         type: DataTypes.INTEGER,
         allowNull: true
     },
-    // Last known digital premiere date (ISO string). Null = not announced yet.
+    // Legacy column name: the selected main Release date, not necessarily a digital release.
     premiere_digital: {
         type: DataTypes.STRING,
         allowNull: true
     },
-    // The film's other dates, kept by the update check for the panel (shown, not acted on):
-    // TMDB's digital release and its country ("US"), every check; from Kinopoisk once a day,
+    // The film's known digital date and country, kept by the check; Kinopoisk once a day,
     // the premiere in Russia, the online release there and its cinemas ("Okko, START")
     digital_date: { type: DataTypes.STRING(10), allowNull: true },
     digital_country: { type: DataTypes.STRING(2), allowNull: true },
     ru_premiere: { type: DataTypes.STRING(10), allowNull: true },
     ru_digital: { type: DataTypes.STRING(10), allowNull: true },
     ru_services: { type: DataTypes.STRING, allowNull: true },
-    // From src/film-release.js storedDates(), for the calendar and the cards: the first wide cinema
-    // release (and its country), Russia's cinema release on TMDB, and when the film is online —
-    // online_estimate when that is the 45-day guess, not a digital release
+    // Selected Release and its countries; cinema_date is also the main date for digital-only films.
+    // online_estimate is retained to identify and clear legacy guesses, never generated now.
     cinema_date: { type: DataTypes.STRING(10), allowNull: true },
     cinema_country: { type: DataTypes.STRING(2), allowNull: true },
+    release_countries: { type: DataTypes.TEXT, allowNull: true },
     cinema_ru_date: { type: DataTypes.STRING(10), allowNull: true },
     online_date: { type: DataTypes.STRING(10), allowNull: true },
     online_estimate: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    digital_notified: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    // Zero marks existing rows, baselined silently by the first successful date refresh.
+    release_rule_version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     // When Kinopoisk was last asked; null = never
     ru_checked_at: { type: DataTypes.DATE, allowNull: true },
     // What the title is, for the chats' statistics (titleFacts() in src/api/tmdb.js); kept current
@@ -59,13 +60,12 @@ const Watchlist = sequelize.define('Watchlist', {
     countries: { type: DataTypes.STRING(40), allowNull: true },
     runtime: { type: DataTypes.INTEGER, allowNull: true },
     rating: { type: DataTypes.FLOAT, allowNull: true },
-    // Whether we have already sent the release notification (the film is online, src/film-release.js)
+    // Whether the main Release has been notified, or was already out when added/baselined.
     notified: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
-    // Whether the cinema premiere message went out, for a chat with premieres on; the film stays
-    // waiting for its online release
+    // Legacy mark retained so upgrading the schema does not drop existing columns.
     premiere_notified: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

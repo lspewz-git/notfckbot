@@ -10,6 +10,7 @@ const { knownKinopoiskId } = require('./api/kinopoisk');
 const { getWatchLinks } = require('./constants');
 const { parseSeasons, airedYear } = require('./cron/release-seasons');
 const { periodItems } = require('./calendar');
+const { releaseDate, onlineDate } = require('./film-release');
 
 // Enough to tell a drama from a cartoon; TMDB lists the main genre first
 const GENRES_SHOWN = 2;
@@ -59,6 +60,9 @@ async function entry({
     ruPremiere = null,
     ruDigital = null,
     ruServices = null,
+    releaseCountries = [],
+    digitalDate = null,
+    digitalCountry = null,
     listId = null,
     networks = ''
 }) {
@@ -68,6 +72,9 @@ async function entry({
     const id = kinopoiskId || knownKinopoiskId(tmdbId, peekDetails(numericId, mediaType)?.imdb_id || null);
     const links = getWatchLinks({ title, kinopoiskId: id, mediaType });
     const link = links.find((l) => l.kind === 'info');
+    const ru = { premiere: ruPremiere, digital: ruDigital };
+    const release = details && mediaType === 'movie' ? releaseDate(details, ru) : null;
+    const digital = details && mediaType === 'movie' ? onlineDate(details, ru) : null;
     return {
         tmdbId,
         ...(listId != null ? { listId } : {}),
@@ -79,9 +86,10 @@ async function entry({
         dates:
             mediaType === 'movie'
                 ? {
-                      release: details?.release_date || null,
-                      digital: details?.digital_release_date || date,
-                      digitalCountry: details?.digital_release_country || null,
+                      release: date || release?.date || null,
+                      releaseCountries: release?.date === date ? release.countries : releaseCountries,
+                      digital: digital?.date || digitalDate || null,
+                      digitalCountry: digital?.country || digitalCountry || null,
                       ruPremiere,
                       ruDigital,
                       ruServices
@@ -136,7 +144,12 @@ async function releaseHistory({ chatId = null, year = null, now = new Date() } =
                 date: f.premiere_digital,
                 ruPremiere: f.ru_premiere,
                 ruDigital: f.ru_digital,
-                ruServices: f.ru_services
+                ruServices: f.ru_services,
+                releaseCountries: f.release_countries
+                    ? f.release_countries.split(',')
+                    : [f.cinema_country].filter(Boolean),
+                digitalDate: f.online_estimate ? null : f.online_date || f.digital_date,
+                digitalCountry: f.digital_country
             });
     }
     const series = seriesRows.map((s) => ({

@@ -136,7 +136,14 @@ describe('the lines in the card and the message', () => {
     });
 
     test('the film card and the "film is out" message carry them', () => {
-        const film = { id: 7, title: 'Пчеловод 2', release_date: '2027-01-09', status: 'Post Production', ...data };
+        const film = {
+            id: 7,
+            title: 'Пчеловод 2',
+            release_date: '2027-01-09',
+            cinema_release_date: '2027-01-09',
+            status: 'Post Production',
+            ...data
+        };
         const card = filmCard(film, { today: '2026-10-18', ru });
         assert.match(card.caption, /Релиз: <b>9 января 2027 г\.<\/b>\n🎟 Премьера в России: <b>16 января 2027 г\.<\/b>/);
         assert.match(card.caption, /Цифровой релиз в России: <b>27 февраля 2027 г\.<\/b> · Okko/);
@@ -148,8 +155,8 @@ describe('the lines in the card and the message', () => {
             now: new Date('2027-01-10'),
             ru
         });
-        // Online: the digital releases only, not the cinema dates
-        assert.doesNotMatch(msg, /Дата релиза|Премьера в России/);
+        assert.match(msg, /Дата релиза/);
+        assert.doesNotMatch(msg, /Премьера в России/);
         assert.match(msg, /Цифровой релиз: <b>6 февраля 2027 г\.<\/b> \(США\) \(ожидается\)/);
     });
 });

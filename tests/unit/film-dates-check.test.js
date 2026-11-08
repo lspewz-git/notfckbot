@@ -43,6 +43,7 @@ const row = (fields = {}) => ({
     year: 2027,
     premiere_digital: '2027-01-13',
     notified: false,
+    release_rule_version: 1,
     Chat: { id: 1 },
     async update(changes) {
         Object.assign(this, changes);
@@ -54,6 +55,7 @@ let rows;
 beforeEach(() => {
     details = NOT_OUT;
     asked = 0;
+    sent.length = 0;
     ru = { premiere: '2027-01-16', digital: '2027-02-27', services: ['Okko', 'START'] };
     rows = [row(), row({ Chat: { id: 2 } })];
     mock.method(Watchlist, 'findAll', async () => rows);
@@ -91,7 +93,13 @@ test('Kinopoisk failing: the stored dates stay, and it is asked again on the nex
 });
 
 test('the "film is out" message carries the stored Russian dates, even with Kinopoisk failing then', async () => {
-    details = { ...NOT_OUT, release_date: '2026-01-13', status: 'Released', digital_release_date: null };
+    details = {
+        ...NOT_OUT,
+        release_date: '2026-01-13',
+        cinema_release_date: '2026-01-13',
+        status: 'Released',
+        digital_release_date: null
+    };
     rows = [
         row({ ru_premiere: '2026-01-15', ru_digital: '2026-02-27', ru_services: 'Okko, START', ru_checked_at: null })
     ];
@@ -116,46 +124,140 @@ const IN_CINEMAS = () => ({
     digital_first_date: null
 });
 
-test('cinema premiere: once, only to a chat that turned premieres on; the film keeps waiting', async () => {
+test('cinema release: once to every waiting chat, regardless of the old premiere setting', async () => {
     details = IN_CINEMAS();
     ru = { ...kinopoisk.NO_DATES, failed: true };
     rows = [row({ Chat: { id: 1, premieres: 'all' } }), row({ Chat: { id: 2, premieres: 'off' } })];
-    sent.length = 0;
     await checkWatchlistReleases({});
     assert.deepEqual(
         sent.map((s) => s.chatId),
-        [1]
+        [1, 2]
     );
-    assert.match(sent[0].text, /Премьера в кино!/);
-    assert.match(sent[0].text, /\(США\)/);
-    assert.doesNotMatch(sent[0].text, /SSPoisk/, 'nothing to watch online yet');
-    assert.equal(rows[0].premiere_notified, true);
-    assert.equal(rows[0].notified, false);
-    assert.equal(rows[1].premiere_notified, undefined);
-
-    await checkWatchlistReleases({});
-    assert.equal(sent.length, 1, 'not again on the next check');
-    details = NOT_OUT;
-});
-
-test('Russia only: no message for a release elsewhere', async () => {
-    details = IN_CINEMAS();
-    ru = { ...kinopoisk.NO_DATES, failed: true };
-    rows = [row({ Chat: { id: 1, premieres: 'ru' } })];
-    sent.length = 0;
-    await checkWatchlistReleases({});
-    assert.equal(sent.length, 0);
-    details = NOT_OUT;
-});
-
-test('online: "Фильм вышел" to everyone, a chat already told of the premiere included', async () => {
-    details = { ...IN_CINEMAS(), digital_first_date: daysAgo(0), digital_release_date: daysAgo(0) };
-    ru = { ...kinopoisk.NO_DATES, failed: true };
-    rows = [row({ Chat: { id: 1, premieres: 'all' }, premiere_notified: true }), row({ Chat: { id: 2 } })];
-    sent.length = 0;
+    assert.ok(sent.every((s) => /Фильм вышел!/.test(s.text)));
+    assert.match(sent[0].text, /Дата цифрового релиза неизвестна/);
+    assert.doesNotMatch(sent[0].text, /SSPoisk/);
+    assert.ok(rows.every((r) => r.notified));
     await checkWatchlistReleases({});
     assert.equal(sent.length, 2);
-    assert.ok(sent.every((s) => /Фильм вышел!/.test(s.text)));
-    assert.ok(rows.every((r) => r.notified === true));
-    details = NOT_OUT;
+});
+
+test('an opted-in digital alert still runs after the film is already in Released', async () => {
+    details = { ...IN_CINEMAS(), digital_first_date: daysAgo(0), digital_first_country: 'US' };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ notified: true, Chat: { id: 1, notify_digital: true, digital_since: daysAgo(0) } })];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].text, /Фильм вышел онлайн!/);
+    assert.equal(rows[0].digital_notified, true);
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1);
+});
+
+test('digital alerts default off, and enabling does not send a past-date backlog', async () => {
+    details = { ...IN_CINEMAS(), digital_first_date: daysAgo(1) };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [
+        row({ notified: true, Chat: { id: 1 } }),
+        row({ notified: true, Chat: { id: 2, notify_digital: true, digital_since: daysAgo(0) } })
+    ];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 0);
+    assert.ok(rows.every((r) => r.digital_notified));
+});
+
+test('a simultaneous cinema/digital release sends one combined notification', async () => {
+    details = { ...IN_CINEMAS(), digital_first_date: daysAgo(0) };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ Chat: { id: 1, notify_digital: true, digital_since: daysAgo(0) } })];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].text, /Фильм вышел!/);
+    assert.equal(rows[0].notified, true);
+    assert.equal(rows[0].digital_notified, true);
+});
+
+test('legacy rows are baselined silently, including past films not yet notified under the old online rule', async () => {
+    details = IN_CINEMAS();
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ release_rule_version: 0 })];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 0);
+    assert.equal(rows[0].notified, true);
+    assert.equal(rows[0].release_rule_version, 1);
+});
+
+test('legacy premature Released rows with future cinema dates are reopened without a message', async () => {
+    details = { ...NOT_OUT, status: 'Released', cinema_release_date: '2999-01-01' };
+    rows = [row({ release_rule_version: 0, notified: true })];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 0);
+    assert.equal(rows[0].notified, false);
+    assert.equal(rows[0].release_rule_version, 1);
+});
+
+test('startup date refresh never sends or silently consumes a new-rule pending alert', async () => {
+    details = IN_CINEMAS();
+    rows = [row()];
+    await checkWatchlistReleases(null, { datesOnly: true });
+    assert.equal(sent.length, 0);
+    assert.equal(rows[0].notified, false);
+});
+
+test('the date is evaluated in each chat timezone, and Released alone cannot send early', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-08T18:00:00Z') });
+    details = { ...IN_CINEMAS(), cinema_release_date: '2026-11-09' };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ Chat: { id: 1, timezone: 'UTC' } }), row({ Chat: { id: 2, timezone: 'Asia/Irkutsk' } })];
+    await checkWatchlistReleases({});
+    assert.deepEqual(
+        sent.map((s) => s.chatId),
+        [2]
+    );
+});
+
+test('duplicate waiting rows send one primary event and one later digital event per chat', async () => {
+    details = IN_CINEMAS();
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row(), row()];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1);
+    assert.ok(rows.every((r) => r.notified));
+    details = { ...IN_CINEMAS(), digital_first_date: daysAgo(0) };
+    rows.forEach((r) => {
+        r.Chat.notify_digital = true;
+        r.Chat.digital_since = daysAgo(0);
+    });
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 2);
+    assert.ok(rows.every((r) => r.digital_notified));
+});
+
+test('a missing source date does not erase historical dates or reopen an already notified film', async () => {
+    details = { title: 'Film', status: 'Released', release_dates: { results: [] } };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [
+        row({
+            notified: true,
+            release_rule_version: 0,
+            premiere_digital: '2020-01-01',
+            cinema_date: '2020-01-01',
+            cinema_country: 'US'
+        })
+    ];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 0);
+    assert.equal(rows[0].notified, true);
+    assert.equal(rows[0].premiere_digital, '2020-01-01');
+    assert.equal(rows[0].cinema_date, '2020-01-01');
+});
+
+test('digital-only primary release includes digital information once, without a second opt-in alert', async () => {
+    details = { status: 'Released', digital_first_date: daysAgo(0), digital_first_country: 'US' };
+    ru = { ...kinopoisk.NO_DATES, failed: true };
+    rows = [row({ Chat: { id: 1, notify_digital: true, digital_since: daysAgo(0) } })];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].text, /Фильм вышел!/);
+    assert.equal(rows[0].notified, true);
+    assert.equal(rows[0].digital_notified, true);
 });

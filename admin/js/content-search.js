@@ -101,7 +101,8 @@ export function searchItem(r) {
         poster: r.poster_path || null,
         overview: r.overview || '',
         rating: r.vote_average || null,
-        released: r.media_type === 'movie' && Boolean(date) && date <= new Date().toISOString().slice(0, 10),
+        // A search date alone may be a festival. Only a server-confirmed flag says it is out.
+        released: r.media_type === 'movie' && r.released === true,
         added: false
     };
 }

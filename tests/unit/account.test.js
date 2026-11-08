@@ -1086,8 +1086,20 @@ test('the API: calendar includes cached film metadata and tolerates a cache miss
     t.mock.method(Chat, 'findByPk', async () => ({ type: 'private', timezone: 'Europe/Moscow' }));
     t.mock.method(Subscription, 'findAll', async () => []);
     t.mock.method(Watchlist, 'findAll', async () => [
-        { id: 101, tmdb_id: 'movie_10', title: 'With metadata', premiere_digital: '2099-12-30' },
-        { id: 102, tmdb_id: 'movie_11', title: 'Without metadata', premiere_digital: '2099-12-31' }
+        {
+            id: 101,
+            tmdb_id: 'movie_10',
+            title: 'With metadata',
+            premiere_digital: '2099-12-30',
+            cinema_date: '2099-12-30'
+        },
+        {
+            id: 102,
+            tmdb_id: 'movie_11',
+            title: 'Without metadata',
+            premiere_digital: '2099-12-31',
+            cinema_date: '2099-12-31'
+        }
     ]);
     const peeks = [];
     t.mock.method(tmdb, 'peekDetails', (id, kind) => {

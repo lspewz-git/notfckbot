@@ -92,7 +92,7 @@ describe('the cards', () => {
         assert.deepEqual(buttons(view), [['❌ Удалить', '⬅️ К списку']]);
     });
 
-    test("a waiting film: in cinemas, Russia's cinemas and online, the estimate explained", () => {
+    test('a waiting film: selected Release and known digital date; legacy guesses are hidden', () => {
         const row = {
             id: 9,
             title: 'Как ограбить банк',
@@ -105,10 +105,10 @@ describe('the cards', () => {
             online_estimate: true
         };
         const card = views.buildMovieCard(row, '0').text;
-        assert.match(card, /🎞 В кино: <b>11 ноября 2026 г\.<\/b> \(Бельгия\)/);
+        assert.match(card, /📅 Релиз: <b>11 ноября 2026 г\.<\/b> \(Бельгия\)/);
         assert.match(card, /В кино в России: <b>18 февраля 2027 г\.<\/b>/);
-        assert.match(card, /💻 Онлайн: <b>примерно 26 декабря 2026 г\.<\/b>/);
-        assert.match(card, /обычно через 45 дней после кино/);
+        assert.match(card, /Дата цифрового релиза неизвестна/);
+        assert.doesNotMatch(card, /примерно|45 дней/);
 
         const exact = views.buildMovieCard(
             {
@@ -120,7 +120,7 @@ describe('the cards', () => {
             },
             '0'
         ).text;
-        assert.match(exact, /💻 Онлайн: <b>23 декабря 2026 г\.<\/b> \(США\)/);
+        assert.match(exact, /💻 Цифровой релиз: <b>23 декабря 2026 г\.<\/b> \(США\)/);
         assert.doesNotMatch(exact, /примерно|45 дней/);
     });
 

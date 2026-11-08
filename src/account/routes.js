@@ -25,7 +25,7 @@ const QRCode = require('qrcode');
 const { confirmation } = require('./confirmation');
 const { lruCache } = require('../lru');
 const { notifyDays } = require('./notify-day');
-const { rowPremiere, onlineCountry, ruCinemaDate } = require('../film-release');
+const { rowRelease, onlineCountry, ruCinemaDate, isReleased: filmIsReleased } = require('../film-release');
 const confirmationCooldown = lruCache({ max: 2000, ttl: 60000 });
 
 /** A refusal from src/chat-ops.js with its own status; anything else is a 500 without details. */
@@ -485,14 +485,11 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
                 date: f.premiere_digital,
                 ruPremiere: f.ru_premiere,
                 ruDigital: f.ru_digital,
-                // The card's two dates (src/film-release.js); the bell on the cinema one only for
-                // a chat with premieres on, as in the calendar
-                cinema: f.cinema_date ? { date: f.cinema_date, country: f.cinema_country } : null,
+                ruServices: f.ru_services,
+                release: rowRelease(f),
                 cinemaRu: ruCinemaDate(f),
-                online: f.online_date
-                    ? { date: f.online_date, estimate: Boolean(f.online_estimate), country: onlineCountry(f) }
-                    : null,
-                premiere: f.premiere_notified ? null : rowPremiere(f, chat?.premieres),
+                online: f.online_date && !f.online_estimate ? { date: f.online_date, country: onlineCountry(f) } : null,
+                notifyDigital: Boolean(chat?.notify_digital && !f.digital_notified),
                 genres: f.genres,
                 links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
             }))
@@ -561,10 +558,11 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
     const query = valid(z.object({ q: text('Enter a title') }), req.query, res);
     if (!query) return;
     try {
-        const [results, subs, films] = await Promise.all([
+        const [results, subs, films, chat] = await Promise.all([
             tmdb.searchMulti(query.q.slice(0, 100)),
             Subscription.findAll({ where: { chatId: req.chatId }, attributes: ['seriesId'] }),
-            Watchlist.findAll({ where: { chatId: req.chatId, notified: false }, attributes: ['tmdb_id'] })
+            Watchlist.findAll({ where: { chatId: req.chatId, notified: false }, attributes: ['tmdb_id'] }),
+            Chat.findByPk(req.chatId)
         ]);
         const have = new Set([...subs.map((s) => s.seriesId), ...films.map((f) => f.tmdb_id)]);
         res.json(
@@ -580,7 +578,11 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
                     overview: r.overview || '',
                     rating: r.vote_average || null,
                     released:
-                        r.media_type === 'movie' && Boolean(date) && date <= new Date().toISOString().slice(0, 10),
+                        r.media_type === 'movie' &&
+                        Boolean(
+                            tmdb.peekDetails(r.id, 'movie') &&
+                            filmIsReleased(tmdb.peekDetails(r.id, 'movie'), {}, todayIn(chat?.timezone))
+                        ),
                     added: have.has(id)
                 };
             })
@@ -622,7 +624,7 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
         const chat = await Chat.findByPk(req.chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
         const p = listPeriod(chat.timezone);
-        const { items, failed } = await periodItems(req.chatId, p.from, p.to, { premieres: chat.premieres });
+        const { items, failed } = await periodItems(req.chatId, p.from, p.to, { digitalAlerts: chat.notify_digital });
         const bells = notifyDays(items, chat);
         res.json({
             ...p,
@@ -639,9 +641,18 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
                     networks: i.networks,
                     ruPremiere: i.ruPremiere,
                     ruDigital: i.ruDigital,
+                    ruServices: i.ruServices,
+                    cinemaRu: i.cinemaRu,
                     ...(i.kind === 'tv'
                         ? { season: i.season, episode: i.episode, mark: i.mark, name: i.name }
-                        : { event: i.event, estimate: i.estimate, country: i.country }),
+                        : {
+                              event: i.event,
+                              country: i.country,
+                              countries: i.countries,
+                              release: i.release,
+                              online: i.online,
+                              notifyDigital: i.notifyDigital
+                          }),
                     overview: i.overview || metadata.overview,
                     rating: metadata.rating,
                     seasons: metadata.seasons,

@@ -6,6 +6,7 @@
  */
 import { api } from './api.js';
 import { createHistory } from './history.js';
+import { countryName } from './format.js';
 import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
@@ -268,25 +269,13 @@ const seriesNote = (s) => {
 };
 
 /** "Belgium" for "BE"; the code itself where the browser has no name for it */
-const countryName = (code) => {
-    try {
-        return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
-    } catch {
-        return code;
-    }
-};
 
-/** A film's online date in words: "about 26 Dec 2026" when it is the 45-day estimate */
-const onlineText = (online) => `${online.estimate ? 'about ' : ''}${dateText(online.date, { withYear: true })}`;
-
-const filmNote = (f) =>
-    f.online
-        ? `Online ${onlineText(f.online)}`
-        : f.date
-          ? `Release ${dateText(f.date, { withYear: true })}`
-          : 'Release date unknown';
-
-const ESTIMATE_NOTE = 'No digital date yet: usually 45 days after cinemas.';
+const releaseCountries = (release) =>
+    (release?.countries?.length ? release.countries : [release?.country].filter(Boolean)).map(countryName).join(', ');
+const filmNote = (film) =>
+    film.release?.date || film.date
+        ? `Release ${dateText(film.release?.date || film.date, { withYear: true })}${releaseCountries(film.release) ? ` · ${releaseCountries(film.release)}` : ''}`
+        : 'Release date unknown';
 
 function subsView() {
     const list = state.list;
@@ -363,16 +352,7 @@ function dateBlock(item, event, today) {
                 bell,
                 note
             };
-        const cinema = event.event === 'cinema';
-        const where = event.country ? ` · ${countryName(event.country)}` : '';
-        return {
-            label: cinema ? 'In cinemas' : event.event === 'release' ? 'Release' : 'Online',
-            icon: cinema ? 'clapperboard' : 'tv',
-            value: `${event.estimate ? 'About ' : ''}${dateText(event.date, { withYear: true })}${where}`,
-            when,
-            bell,
-            note: [event.estimate ? ESTIMATE_NOTE : '', note].filter(Boolean).join(' ')
-        };
+        return filmDates(item, today, event);
     }
     if (item.kind === 'tv') {
         if (item.finished) return { label: 'Status', value: 'The series has ended' };
@@ -388,37 +368,51 @@ function dateBlock(item, event, today) {
 }
 
 /**
- * A film's two dates: in cinemas (with Russia's when known) and online, the exact digital date or
- * the estimate. The bell where the bot writes: online always, the cinema premiere only for a chat
- * with premieres on (item.premiere).
+ * Existing date blocks shared by Following and Calendar: main Release and known digital release.
  */
-function filmDates(item, today) {
-    const ruCinema = item.cinemaRu;
-    // The premiere the chat follows when it has one (Russia's in "Russia only"), else the first
-    const shown = item.premiere || item.cinema || (item.date ? { date: item.date, country: null } : null);
-    const cinema = {
-        label: 'In cinemas',
+function filmDates(item, today, event = null) {
+    const release =
+        item.release || (item.date ? { date: item.date, country: item.country, countries: item.countries } : null);
+    const countries = releaseCountries(release);
+    const note =
+        event?.notifyOn && event.notifyOn !== release?.date
+            ? `The bot messages you on ${dateText(event.notifyOn)}`
+            : '';
+    const main = {
+        label: 'Release',
         icon: 'clapperboard',
-        value: shown
-            ? `${dateText(shown.date, { withYear: true })}${shown.country ? ` · ${countryName(shown.country)}` : ''}`
-            : 'Date not known yet',
-        note: ruCinema && shown?.country !== 'RU' ? `In Russia ${dateText(ruCinema, { withYear: true })}` : '',
-        bell: Boolean(item.premiere),
-        when: item.premiere && today ? whenText(item.premiere.date, today) : ''
+        value: release
+            ? `${dateText(release.date, { withYear: true })}${countries ? ` · ${countries}` : ''}`
+            : 'Date unknown',
+        note: [
+            item.cinemaRu && !release?.countries?.includes('RU') && release?.country !== 'RU'
+                ? `In Russia ${dateText(item.cinemaRu, { withYear: true })}`
+                : '',
+            note
+        ]
+            .filter(Boolean)
+            .join(' '),
+        bell: Boolean(release && (!event || event.notifyOn)),
+        when: release && today ? whenText(release.date, today) : ''
     };
-    const online = item.online
-        ? {
-              label: 'Online',
-              icon: 'tv',
-              value: `${item.online.estimate ? 'About ' : ''}${dateText(item.online.date, { withYear: true })}${item.online.country ? ` · ${countryName(item.online.country)}` : ''}`,
-              note: item.online.estimate
-                  ? `${ESTIMATE_NOTE} The bot messages you then.`
-                  : 'The bot messages you on this day.',
-              bell: true,
-              when: today ? whenText(item.online.date, today) : ''
-          }
-        : { label: 'Online', icon: 'tv', value: 'Date not known yet', note: 'The bot messages you when it is online.' };
-    return [cinema, online];
+    const online = item.online && !item.online.estimate ? item.online : null;
+    const digitalNote =
+        item.ruDigital && (item.ruDigital !== online?.date || online?.country !== 'RU')
+            ? `In Russia ${dateText(item.ruDigital, { withYear: true })}${item.ruServices ? ` · ${item.ruServices}` : ''}`
+            : item.ruDigital === online?.date && online?.country === 'RU'
+              ? item.ruServices || ''
+              : '';
+    const digital = {
+        label: 'Digital release',
+        icon: 'tv',
+        note: digitalNote,
+        value: online
+            ? `${dateText(online.date, { withYear: true })}${online.country ? ` · ${countryName(online.country)}` : ''}`
+            : 'Date unknown',
+        bell: Boolean(item.notifyDigital && online),
+        when: online && today ? whenText(online.date, today) : ''
+    };
+    return [main, digital];
 }
 
 /** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */
@@ -595,13 +589,7 @@ function calRow(item, index, today, sameDay) {
     const sub =
         item.kind === 'tv'
             ? [`S${item.season}E${item.episode}`, episodeName(item), MARKS[item.mark]].filter(Boolean).join(' · ')
-            : item.event === 'cinema'
-              ? 'In cinemas'
-              : item.event === 'release'
-                ? 'Release'
-                : item.estimate
-                  ? 'Online · estimate'
-                  : 'Online';
+            : `Release${releaseCountries(item.release || item) ? ` · ${releaseCountries(item.release || item)}` : ''}`;
     return (
         `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
         `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${thumb(item.poster, 'title-thumb cal-thumb')}` +
@@ -723,15 +711,6 @@ function settingChoices(data) {
             value: s.timezone,
             options: data.zones.map((z) => [z.id, `${z.city} +${z.offset}`])
         },
-        premieres: {
-            title: 'Cinema premieres',
-            value: ['all', 'ru'].includes(s.premieres) ? s.premieres : 'off',
-            options: [
-                ['all', 'Anywhere'],
-                ['ru', 'Russia only'],
-                ['off', 'Off']
-            ]
-        },
         buttons_mode: {
             title: "Who presses the bot's buttons",
             value: s.buttons_mode,
@@ -779,9 +758,15 @@ function settingsView(data) {
             'Notifications',
             pickRow('quiet', 'moon', 'Quiet hours') +
                 pickRow('timezone', 'globe', 'Time zone') +
-                pickRow('premieres', 'clapperboard', 'Cinema premieres'),
+                toggleRow(
+                    'notify_digital',
+                    'tv',
+                    'Digital releases',
+                    'Also notify about the digital release',
+                    s.notify_digital
+                ),
             'In quiet hours notifications wait and come in the morning as one message. ' +
-                "Films always come when they're online; premieres add a message on the cinema release day."
+                'Films follow the first release worldwide, or in Russia for Russian films. Digital alerts are optional.'
         ) +
         group(
             'Digests',

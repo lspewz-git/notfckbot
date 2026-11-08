@@ -43,7 +43,7 @@ test('a group: choose who presses the buttons and the menu, then save', async ({
             quiet_start: null,
             quiet_end: null,
             timezone: 'Europe/Moscow',
-            premieres: 'off',
+            notify_digital: false,
             digest_week: false,
             digest_month: false
         }
@@ -64,7 +64,7 @@ test('a private chat has no "who presses" choice: only the menu is sent', async 
             quiet_start: null,
             quiet_end: null,
             timezone: 'Europe/Moscow',
-            premieres: 'off',
+            notify_digital: false,
             digest_week: false,
             digest_month: false
         }
@@ -133,12 +133,12 @@ test('digests: weekly and monthly go with Save', async ({ page }) => {
     expect(panel.lastSettings.body).toMatchObject({ digest_week: true, digest_month: true });
 });
 
-test('cinema premieres: off by default, Russia only goes with Save', async ({ page }) => {
+test('digital releases: off by default, enabled only with Save', async ({ page }) => {
     const panel = await mockPanel(page);
     await openSettings(page, 101);
-    await expect(page.locator('#chat-settings-premieres')).toHaveValue('off');
-    await pick(page, 'chat-settings-premieres', 'Russia only');
+    await expect(page.locator('#chat-settings-digital')).toHaveAttribute('aria-checked', 'false');
+    await page.locator('#chat-settings-digital').click();
     await page.locator('#chat-settings-save').click();
     await expect(page.locator('.toast', { hasText: 'Settings saved' })).toBeVisible();
-    expect(panel.lastSettings.body).toMatchObject({ premieres: 'ru' });
+    expect(panel.lastSettings.body).toMatchObject({ notify_digital: true });
 });

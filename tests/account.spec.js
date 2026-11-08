@@ -734,8 +734,7 @@ test('calendar: a film card counts down, expands its description and leaves miss
     await body.getByRole('tab', { name: 'Films', exact: true }).click();
     await body.locator('button.cal-row', { hasText: 'Дюна: Часть третья' }).click();
     const card = page.locator('#mine-card-modal');
-    // The calendar's row is the film's online date, here the estimate
-    await expect(card.locator('.tc-date-value')).toHaveText('About Nov 6, 2026');
+    await expect(card.locator('.tc-date-value')).toHaveText(['Nov 6, 2026 · Belgium', 'Date unknown']);
     await expect(card.locator('.tc-date-when')).toHaveText('in 2 days');
     await expect(card.locator('.tc-rating')).toContainText('7.4');
     const clamped = () =>
@@ -784,19 +783,14 @@ test("a group's settings: a member sees them, unchangeable; an admin's change is
     expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ digest_month: true });
 });
 
-test('cinema premieres: a row showing Off, picked from three choices and saved', async ({ page }) => {
+test('digital release notifications are off by default and can be enabled', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-settings');
-    const row = page.locator('[data-action="mine-pick"][data-name="premieres"]');
-    await expect(row.locator('.row-value')).toHaveText('Off');
-    await row.click();
-    const sheet = page.locator('#pick-modal');
-    await expect(sheet.locator('h3')).toHaveText('Cinema premieres');
-    await expect(sheet.locator('.pick-row')).toHaveText(['Anywhere', 'Russia only', 'Off']);
-    await expect(sheet.locator('.pick-row.selected')).toHaveText('Off');
-    await sheet.locator('.pick-row', { hasText: 'Russia only' }).click();
-    await expect(page.locator('.toast').last()).toHaveText('Saved');
-    expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ premieres: 'ru' });
+    const toggle = page.getByRole('switch', { name: 'Digital releases', exact: true });
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ notify_digital: true });
 });
 
 test('signing out, or a session that ends, brings back the sign-in screen', async ({ page }) => {
@@ -960,7 +954,7 @@ test('Chat settings: the chat on a card that opens the chats, rows with icon til
         'href',
         '/vendor/lucide.svg#moon'
     );
-    await expect(body.locator('.group-row-static .row-meta')).toHaveText(['Mondays at 10:00', 'On the 1st at 10:00']);
+    await expect(body.locator('.group-row-static .row-meta')).toHaveText(['Also notify about the digital release', 'Mondays at 10:00', 'On the 1st at 10:00']);
     for (const title of await body.locator('.group-title').all())
         expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
 
@@ -1362,31 +1356,31 @@ test('a long chat name in the chip ends in an ellipsis at 180px', async ({ page 
     expect(sizes.ellipsis).toBe('ellipsis');
 });
 
-test('a waiting film shows both dates: in cinemas and online, the bell on online; the calendar row says which', async ({
+test('a waiting film shows Release and digital information, with the main bell on Release', async ({
     page
 }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-subs');
     await page.locator('#my-subs-body [role="tab"]', { hasText: 'Films' }).click();
     const row = page.locator('#my-subs-body button.title-row', { hasText: 'Дюна: Часть третья' });
-    await expect(row.locator('.row-meta')).toHaveText('Online about Dec 21, 2026');
+    await expect(row.locator('.row-meta')).toHaveText('Release Nov 6, 2026 · Belgium');
     await row.click();
     const dates = page.locator('#mine-card-modal .tc-date');
     await expect(dates).toHaveCount(2);
-    await expect(dates.nth(0).locator('.tc-date-label').first()).toHaveText('In cinemas');
+    await expect(dates.nth(0).locator('.tc-date-label').first()).toHaveText('Release');
     await expect(dates.nth(0).locator('.tc-date-value')).toHaveText('Nov 6, 2026 · Belgium');
     await expect(dates.nth(0)).toContainText('In Russia Feb 18, 2027');
-    await expect(dates.nth(0).locator('.tc-bell')).toHaveCount(0);
-    await expect(dates.nth(1).locator('.tc-date-value')).toHaveText('About Dec 21, 2026');
-    await expect(dates.nth(1)).toContainText('usually 45 days after cinemas');
-    await expect(dates.nth(1).locator('.tc-bell')).toHaveCount(1);
+    await expect(dates.nth(0).locator('.tc-bell')).toHaveCount(1);
+    await expect(dates.nth(1).locator('.tc-date-value')).toHaveText('Date unknown');
+    await expect(dates.nth(1).locator('.tc-date-label').first()).toHaveText('Digital release');
+    await expect(dates.nth(1).locator('.tc-bell')).toHaveCount(0);
     await page.keyboard.press('Escape');
 
     await openMine(page, 'my-calendar');
     const body = page.locator('#my-calendar-body');
     await body.getByRole('tab', { name: 'Films', exact: true }).click();
     await expect(body.locator('button.cal-row', { hasText: 'Дюна: Часть третья' }).locator('.row-meta')).toHaveText(
-        'Online · estimate'
+        'Release · Belgium'
     );
-    await expect(body.locator('button.cal-row', { hasText: 'Мегалополис' }).locator('.row-meta')).toHaveText('Online');
+    await expect(body.locator('button.cal-row', { hasText: 'Мегалополис' }).locator('.row-meta')).toHaveText('Release · United States');
 });

@@ -220,8 +220,12 @@ const fetchDetails = async (id, media_type, seasons = []) => {
             data.cinema_release_date = cinema.date;
             data.cinema_release_country = cinema.country;
             data.cinema_ru_date = firstRelease(data.release_dates, THEATRICAL, 'RU').date;
-            data.limited_release_date = firstRelease(data.release_dates, LIMITED).date;
-            data.digital_first_date = firstRelease(data.release_dates, DIGITAL).date;
+            const limited = firstRelease(data.release_dates, LIMITED);
+            data.limited_release_date = limited.date;
+            data.limited_release_country = limited.country;
+            const firstDigital = firstRelease(data.release_dates, DIGITAL);
+            data.digital_first_date = firstDigital.date;
+            data.digital_first_country = firstDigital.country;
         }
 
         return data;

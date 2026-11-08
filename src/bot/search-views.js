@@ -3,11 +3,18 @@
  * calls — so search.js decides how to put them on screen and tests can check them directly.
  */
 const { Markup } = require('telegraf');
-const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates } = require('../constants');
+const {
+    NOTIFY_LABELS_SHORT,
+    isFinishedStatus,
+    escapeHtml,
+    formatRuDate,
+    extraFilmDates,
+    countryName
+} = require('../constants');
 const { watchButtonRows } = require('./keyboards');
 const { pluralWord: plural } = require('../words');
 // The release check's own rule, so the card never says "out" before the notification does
-const { isOnline } = require('../film-release');
+const { isReleased, isOnline, releaseDate } = require('../film-release');
 
 // Results per page: enough to spot the right one at a glance, few enough to fit a phone screen
 const PER_PAGE = 5;
@@ -119,7 +126,7 @@ function seriesCard(data, { subscribedMode = null } = {}) {
  * and "add to the watchlist" (or a note that it's there).
  * Both with the premiere in Russia and the digital releases when known (extraFilmDates).
  * @param {object} data TMDB film details
- * "Out" is the update check's rule (src/film-release.js): online, not just in cinemas.
+ * "Out" is the update check's selected Release rule (src/film-release.js).
  * @param {{ kinopoiskId?: number | null, onWatchlist?: boolean, today?: string, ru?: object }} [opts]
  *   ru: Kinopoisk's Russian dates (russianDates); today: "YYYY-MM-DD" in the chat's time zone
  */
@@ -129,21 +136,24 @@ function filmCard(
 ) {
     const name = data.title || data.original_title || 'Без названия';
     const kindLine = data.director_name ? `Фильм · режиссёр ${data.director_name}` : 'Фильм';
-    const released = isOnline(data, ru, today);
-    const date = formatRuDate(data.release_date);
-    const cinema = data.cinema_release_date && data.cinema_release_date.slice(0, 10) <= today;
+    const released = isReleased(data, ru, today);
+    const release = releaseDate(data, ru);
+    const date = formatRuDate(release?.date);
+    const country = release?.countries.length
+        ? ` (${release.countries.map(countryName).map(escapeHtml).join(', ')})`
+        : '';
 
     let dates;
     let rows;
-    const more = extraFilmDates(data, ru).join('');
+    const extras = extraFilmDates(data, ru, { today });
+    const more =
+        extras.join('') +
+        (!extras.some((line) => line.includes('Цифровой релиз')) ? '💻 Дата цифрового релиза неизвестна\n' : '');
     if (released) {
-        dates = `✅ Уже вышел${date ? ` — <b>${date}</b>` : ''}\n` + more;
-        rows = watchButtonRows({ title: name, kinopoiskId, mediaType: 'movie' });
+        dates = `✅ Уже вышел${date ? ` — <b>${date}</b>${country}` : ''}\n` + more;
+        rows = watchButtonRows({ title: name, kinopoiskId, mediaType: 'movie', watch: isOnline(data, ru, today) });
     } else {
-        dates =
-            `📅 Релиз: <b>${date || 'дата не объявлена'}</b>\n` +
-            (cinema ? '🎞 Уже в кино, онлайн пока нет\n' : '') +
-            more;
+        dates = `📅 Релиз: <b>${date || 'дата не объявлена'}</b>${country}\n` + more;
         rows = onWatchlist ? [] : [[Markup.button.callback('📌 В список ожидания', `watchlist_add_movie_${data.id}`)]];
     }
     rows.push(backRow);
@@ -151,8 +161,8 @@ function filmCard(
     const footer = released
         ? ''
         : onWatchlist
-          ? '\n📌 Уже в вашем списке ожидания — пришлю уведомление, когда выйдет онлайн.'
-          : '\nДобавить в список ожидания? Как только выйдет онлайн — пришлю уведомление.';
+          ? '\n📌 Уже в вашем списке ожидания — пришлю уведомление о релизе.'
+          : '\nДобавить в список ожидания? Как только выйдет — пришлю уведомление.';
     return {
         caption: cardHead(name, yearOf(data), kindLine) + dates + overviewBlock(data.overview) + footer,
         keyboard: Markup.inlineKeyboard(rows),

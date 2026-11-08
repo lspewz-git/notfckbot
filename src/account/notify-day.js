@@ -8,8 +8,8 @@
  *   from 06 UTC on (checks run at the hours UPDATE_INTERVAL_HOURS divides; .claude/notes/bot.md);
  * - the check sees only the day's last episode (src/cron/series.js): episodes out together give one
  *   message, about the last of them;
- * - a film goes out on the first check (00 UTC) of its calendar rows' days: online, and the cinema
- *   premiere, which is a row only for a chat with premieres on (src/calendar.js periodItems);
+ * - a film's selected Release goes out once its chat-local date has come and TMDB says Released;
+ *   its calendar bell is the earliest expected day, since the status may update later;
  * - in the chat's quiet hours the message waits for their end (src/cron/held.js), so it can move to
  *   the next day.
  */
@@ -17,7 +17,6 @@ const { zoneOf, hasQuietHours } = require('../quiet');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 
 const EPISODE_READY_UTC_HOUR = 6;
-const FILM_SEND_UTC_HOUR = 0;
 
 /** The first update check at or after 06 UTC (may pass midnight: it is then the next day's) */
 function episodeSendHour(interval = UPDATE_INTERVAL_HOURS) {
@@ -30,8 +29,7 @@ function episodeSendHour(interval = UPDATE_INTERVAL_HOURS) {
  * episode of the series comes out the same day; `last`: the season's final episode
  */
 function messages(item) {
-    // A film without a known online date sits on its release date, when the bot doesn't write
-    if (item.kind !== 'tv') return item.event !== 'release';
+    if (item.kind !== 'tv') return item.event === 'release';
     if (item.lastOfDay === false) return false;
     const last = item.last ?? item.mark === 'finale';
     if (item.mode === 'episode') return true;
@@ -69,9 +67,19 @@ const nextDay = (day) => new Date(Date.parse(`${day}T00:00:00Z`) + 864e5).toISOS
 function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) || !messages(item)) return null;
     const tv = item.kind === 'tv';
-    const sendAt = new Date(
-        Date.parse(`${item.date}T00:00:00Z`) + (tv ? 24 + episodeSendHour(interval) : FILM_SEND_UTC_HOUR) * 36e5
-    );
+    const midnight = Date.parse(`${item.date}T00:00:00Z`);
+    let sendAt = new Date(midnight + (24 + episodeSendHour(interval)) * 36e5);
+    if (!tv) {
+        const every = Number.isInteger(interval) && interval > 0 ? interval : 3;
+        // Cron hours restart at UTC midnight; a chat's first slot may be on the previous UTC day.
+        for (let hour = -24; hour < 48; hour += 1) {
+            const candidate = new Date(midnight + hour * 36e5);
+            if (candidate.getUTCHours() % every === 0 && localOf(candidate, chat?.timezone).day === item.date) {
+                sendAt = candidate;
+                break;
+            }
+        }
+    }
     const { day, hour } = localOf(sendAt, chat?.timezone);
     if (!hasQuietHours(chat)) return day;
     const { quiet_start: start, quiet_end: end } = chat;

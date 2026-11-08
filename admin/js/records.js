@@ -5,7 +5,7 @@ import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
-import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, MODE_LABELS } from './format.js';
+import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, countryName, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
 import { description, titleRating } from './content-search.js';
 import { titleCard, fitDescriptions, watchButton } from './title-card.js';
@@ -129,12 +129,14 @@ function filmDates(d) {
     const row = (label, iso, note, format = formatReleaseDate) =>
         iso ? `<dt>${label}</dt><dd>${escapeHtml(format(iso))}${note ? ` · ${escapeHtml(note)}` : ''}</dd>` : '';
     return (
-        row('Release', d.release) +
+        (row('Release', d.release, (d.releaseCountries || []).map(countryName).join(', ')) ||
+            '<dt>Release</dt><dd>Date unknown</dd>') +
         row('Premiere in Russia', d.ruPremiere, null, formatPremiereRu) +
         (d.digital && !(d.digitalCountry === 'RU' && d.digital === d.ruDigital)
-            ? row('Digital', d.digital, d.digitalCountry)
+            ? row('Digital release', d.digital, d.digitalCountry)
             : '') +
-        row('Digital in Russia', d.ruDigital, d.ruServices)
+        row('Digital in Russia', d.ruDigital, d.ruServices) +
+        (!d.digital && !d.ruDigital ? '<dt>Digital release</dt><dd>Date unknown</dd>' : '')
     );
 }
 
@@ -171,23 +173,33 @@ function releasedDate(item) {
             note: more.map((season) => `Season ${season}: ${formatReleaseDate(premiere(season))}`).join(' · ')
         };
     }
-    const d = item.dates || { digital: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital };
-    const main = d.release || d.digital;
-    if (!main && !d.ruPremiere && !d.ruDigital) return null;
-    const notes = [
-        d.digital && d.release && d.digital !== d.release
-            ? `Digital ${formatReleaseDate(d.digital)}${d.digitalCountry ? ` · ${d.digitalCountry}` : ''}`
-            : '',
-        d.ruPremiere ? `Premiere in Russia ${formatPremiereRu(d.ruPremiere)}` : '',
-        d.ruDigital
-            ? `Digital in Russia ${formatReleaseDate(d.ruDigital)}${d.ruServices ? ` · ${d.ruServices}` : ''}`
-            : ''
+    const d = item.dates || { release: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital };
+    const countries = (d.releaseCountries || []).map(countryName).join(', ');
+    const digital = d.digital || d.ruDigital;
+    const digitalCountry = d.digital ? d.digitalCountry : d.ruDigital ? 'RU' : null;
+    const digitalNote =
+        d.ruDigital && (d.ruDigital !== digital || digitalCountry !== 'RU')
+            ? `In Russia ${formatReleaseDate(d.ruDigital)}${d.ruServices ? ` · ${d.ruServices}` : ''}`
+            : d.ruDigital === digital && digitalCountry === 'RU'
+              ? d.ruServices || ''
+              : '';
+    return [
+        {
+            label: 'Release',
+            icon: 'clapperboard',
+            value: d.release ? `${formatReleaseDate(d.release)}${countries ? ` · ${countries}` : ''}` : 'Date unknown',
+            note:
+                d.ruPremiere && !d.releaseCountries?.includes('RU') ? `In Russia ${formatPremiereRu(d.ruPremiere)}` : ''
+        },
+        {
+            label: 'Digital release',
+            icon: 'tv',
+            value: digital
+                ? `${formatReleaseDate(digital)}${digitalCountry ? ` · ${countryName(digitalCountry)}` : ''}`
+                : 'Date unknown',
+            note: digitalNote
+        }
     ];
-    return {
-        label: 'Release',
-        value: main ? formatReleaseDate(main) : 'TBA',
-        note: notes.filter(Boolean).join(' · ')
-    };
 }
 
 let releasedRequest = 0;
@@ -279,7 +291,7 @@ export const openFilmDetails = (tmdbId, source = null) => {
     return openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
         const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
-        const dates = filmDates({ ...data.dates, release: data.dates?.release || data.release_date });
+        const dates = filmDates(data.dates || {});
         const chats = data.chats || [];
         const waiting = chats.filter((c) => !c.notified);
         const notified = chats.filter((c) => c.notified);

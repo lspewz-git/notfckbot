@@ -10,7 +10,7 @@ const { startAdminServer } = require('./admin');
 const { warmDetailsCache } = require('./warm-cache');
 const { backfillReleaseSeasons } = require('./cron/release-seasons');
 const { backfillAiredEpisodes } = require('./cron/aired-episodes');
-const { backfillFilmFacts } = require('./cron/films');
+const { backfillFilmFacts, checkWatchlistReleases } = require('./cron/films');
 const { startAlerts, markShutdown, lastShutdown } = require('./alerts/watch');
 const { getVersion } = require('./admin/version');
 const { waitForTelegram, telegramReady } = require('./telegram-ready');
@@ -73,6 +73,7 @@ async function start() {
             .then(backfillReleaseSeasons)
             .catch((err) => log.error(`[History] Backfill failed: ${err.message}`))
             .then(backfillFilmFacts)
+            .then(() => checkWatchlistReleases(null, { datesOnly: true }))
             .catch((err) => log.error(`[Stats] Backfill failed: ${err.message}`));
 
         startBot();

@@ -14,7 +14,7 @@ const {
     premiereMonthOnly,
     countryName
 } = require('../constants');
-const { onlineCountry } = require('../film-release');
+const { onlineCountry, rowRelease } = require('../film-release');
 
 const SUBS_PER_PAGE = 8;
 const EMPTY_SUBS_TEXT = 'У вас пока нет подписок. Нажмите 🔍 <b>Поиск</b> или используйте /search!';
@@ -54,30 +54,25 @@ const itemLine = (item) => {
     const title = escapeHtml(item.title);
     if (item.kind === 'series') return `• ${title} — ${NOTIFY_LABELS[item.notifyType] || item.notifyType}`;
     const year = item.year ? ` (${item.year})` : '';
-    if (item.online) return `• ${title}${year} — 💻 ${item.estimate ? 'примерно ' : ''}${formatRuDate(item.online)}`;
     return `• ${title}${year} — 📅 ${formatDigitalDate(item.date)}`;
 };
 
 const countryOf = (code) => (code ? ` (${escapeHtml(countryName(code))})` : '');
 
 /**
- * A waiting film's two dates (src/film-release.js, kept on its row): in cinemas, Russia's when
- * known, and online — the digital date or the 45-day estimate, when the notification comes.
+ * A waiting film's selected release and independently known digital date.
  */
 function filmDateLines(row) {
     const lines = [];
-    const cinema = row.cinema_date || row.premiere_digital;
-    lines.push(`🎞 В кино: <b>${formatDigitalDate(cinema)}</b>${row.cinema_date ? countryOf(row.cinema_country) : ''}`);
+    const release = rowRelease(row);
+    const cinema = release?.date;
+    const countries = release?.countries.map(countryName).map(escapeHtml).join(', ');
+    lines.push(`📅 Релиз: <b>${formatDigitalDate(cinema)}</b>${countries ? ` (${countries})` : ''}`);
     const kp = row.ru_premiere && !premiereMonthOnly(row.ru_premiere) ? row.ru_premiere : null;
     const ruCinema = kp || row.cinema_ru_date || row.ru_premiere;
     if (ruCinema && row.cinema_country !== 'RU') lines.push(`🇷🇺 В кино в России: <b>${formatRuPremiere(ruCinema)}</b>`);
-    if (!row.online_date) lines.push('💻 Онлайн: <b>дата не объявлена</b>');
-    else if (row.online_estimate) {
-        lines.push(
-            `💻 Онлайн: <b>примерно ${formatRuDate(row.online_date)}</b>`,
-            '<i>Даты цифрового релиза пока нет — обычно через 45 дней после кино.</i>'
-        );
-    } else lines.push(`💻 Онлайн: <b>${formatRuDate(row.online_date)}</b>${countryOf(onlineCountry(row))}`);
+    if (!row.online_date || row.online_estimate) lines.push('💻 Дата цифрового релиза неизвестна');
+    else lines.push(`💻 Цифровой релиз: <b>${formatRuDate(row.online_date)}</b>${countryOf(onlineCountry(row))}`);
     return lines;
 }
 

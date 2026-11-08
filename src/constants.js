@@ -93,9 +93,10 @@ const formatRuPremiere = (iso) =>
  *   digital date after it; cinema: false leaves out the premiere in Russia (the "online" message)
  * @returns {string[]} lines with HTML, each ending in a line break
  */
-function extraFilmDates(data, ru = {}, { markExpected, cinema = true } = {}) {
+function extraFilmDates(data, ru = {}, { markExpected, today, cinema = true } = {}) {
     const lines = [];
-    const expected = (date) => (markExpected && new Date(date) > markExpected ? ' (ожидается)' : '');
+    const expected = (date) =>
+        (today ? date.slice(0, 10) > today : markExpected && new Date(date) > markExpected) ? ' (ожидается)' : '';
     if (cinema && ru.premiere) lines.push(`🎟 Премьера в России: <b>${formatRuPremiere(ru.premiere)}</b>\n`);
     const tmdbDate = data.digital_release_date;
     const tmdbCountry = data.digital_release_country;

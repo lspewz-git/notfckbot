@@ -2353,14 +2353,25 @@
                         </fieldset>
                     </div>
                     <div class="field-block chat-setting">
-                        <label class="field-label" for="chat-settings-premieres">Cinema premieres</label>
-                        <select id="chat-settings-premieres" class="select-field">
-                            <option value="off">Off</option>
-                            <option value="all">Anywhere</option>
-                            <option value="ru">Russia only</option>
-                        </select>
+                        <div class="settings-switch-heading">
+                            <span id="chat-settings-digital-label"
+                                ><strong>Digital releases</strong><br /><small
+                                    >Also notify about the digital release</small
+                                ></span
+                            >
+                            <button
+                                type="button"
+                                id="chat-settings-digital"
+                                class="switch"
+                                role="switch"
+                                aria-checked="false"
+                                aria-labelledby="chat-settings-digital-label"
+                            >
+                                <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                            </button>
+                        </div>
                         <p class="field-hint">
-                            Films always come when they're online. Premieres add a message on the cinema release day.
+                            Films follow the first release worldwide, or in Russia for Russian films.
                         </p>
                     </div>
                     <div class="field-block chat-setting">

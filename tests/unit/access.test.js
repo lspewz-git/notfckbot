@@ -149,6 +149,21 @@ test('the settings screen and its buttons: anyone sees them, only admins change 
     assert.equal(rows.get(GROUP).buttons_mode, 'all');
 });
 
+test('digital release settings are guarded for members and can be switched by admins', async () => {
+    const message = await callUp(someone());
+    const admin = someone();
+    memberStatus[admin] = 'administrator';
+    assert.match(await press(someone(), message, 'settings_digital_on'), /только её админы/);
+    assert.equal(Boolean(rows.get(GROUP).notify_digital), false);
+    assert.equal(await press(admin, message, 'settings_digital_on'), null);
+    assert.equal(rows.get(GROUP).notify_digital, true);
+    assert.match(rows.get(GROUP).digital_since, /^\d{4}-\d{2}-\d{2}$/);
+    const otherAdmin = someone();
+    memberStatus[otherAdmin] = 'administrator';
+    assert.equal(await press(otherAdmin, message, 'settings_digital_off'), null);
+    assert.equal(rows.get(GROUP).notify_digital, false);
+});
+
 test('/menu_off in a group: refused for a member, done for an admin', async () => {
     const send = (userId, text) =>
         bot.handleUpdate({

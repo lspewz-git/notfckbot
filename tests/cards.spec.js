@@ -119,7 +119,8 @@ test("a film card lists the film's dates, TBA when none is known", async ({ page
     await page.keyboard.press('Escape');
     await page.locator('#upcoming-list [data-id="movie_3"]').click();
     await expect(card(page).locator('#detail-title')).toHaveText('No Date Yet');
-    await expect(dates.locator('dd')).toHaveText(['TBA']);
+    await expect(dates.locator('dt')).toHaveText(['Release', 'Digital release']);
+    await expect(dates.locator('dd')).toHaveText(['Date unknown', 'Date unknown']);
 });
 
 test('on a phone a small poster sits beside the title, the description under both at full width', async ({ page }) => {

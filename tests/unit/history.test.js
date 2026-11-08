@@ -299,8 +299,8 @@ describe('releaseHistory', () => {
         assert.equal(h.series[0].overview, 'Shared release overview');
         assert.equal(h.series[0].rating, 8.4);
         assert.equal(h.series[0].seasonCount, 5);
-        assert.equal(h.films[0].dates.release, '2026-02-01');
-        assert.equal(h.films[0].dates.digital, '2026-03-01');
+        assert.equal(h.films[0].dates.release, '2026-03-01');
+        assert.equal(h.films[0].dates.digital, '2026-03-02');
         assert.equal(h.films[0].dates.ruServices, 'Service A');
         assert.deepEqual(seasonRequests, []);
     });
@@ -483,8 +483,8 @@ describe('the year view', () => {
         { tmdb_id: 'tv_6', title: 'Дом', kinopoisk_id: null, release_seasons: '2024:2', last_season: 3 }
     ];
     const FILMS = [
-        { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01' },
-        { tmdb_id: 'movie_8', title: 'Будущее', premiere_digital: '2027-05-01' }
+        { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-03-01', cinema_date: '2026-03-01' },
+        { tmdb_id: 'movie_8', title: 'Будущее', premiere_digital: '2027-05-01', cinema_date: '2027-05-01' }
     ];
     beforeEach(() => {
         mock.method(Subscription, 'findAll', async () => SERIES.map((s) => ({ Series: s })));

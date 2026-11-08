@@ -66,9 +66,9 @@ const SERIES = {
     release_seasons: '2025:1;2026:2'
 };
 const FILMS = [
-    { id: 71, tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16' },
-    { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16' }, // the same film twice
-    { tmdb_id: 'movie_8', title: 'Позже', premiere_digital: '2026-12-01' }
+    { id: 71, tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16', cinema_date: '2026-10-16' },
+    { tmdb_id: 'movie_7', title: 'Дюна', premiere_digital: '2026-10-16', cinema_date: '2026-10-16' }, // the same film twice
+    { tmdb_id: 'movie_8', title: 'Позже', premiere_digital: '2026-12-01', cinema_date: '2026-12-01' }
 ];
 
 beforeEach(() => {
@@ -88,51 +88,33 @@ test('calendar items carry full-unfollow film ids and the series notification mo
     assert.equal(items.find((item) => item.kind === 'tv').mode, 'season');
 });
 
-test('a film: online always (estimate marked), the cinema premiere only for a chat with premieres on', async (t) => {
+test('a film always has one cinema Release row, with digital information kept as an addition', async (t) => {
     const film = {
         id: 90,
         tmdb_id: 'movie_9',
         title: 'Как ограбить банк',
-        premiere_digital: '2026-11-11',
         cinema_date: '2026-11-11',
         cinema_country: 'BE',
-        cinema_ru_date: '2027-02-18',
+        release_countries: 'BE,FR',
+        premiere_digital: '2026-11-11',
         online_date: '2026-12-26',
-        online_estimate: true
+        online_estimate: false,
+        digital_date: '2026-12-26',
+        digital_country: 'US'
     };
     t.mock.method(Watchlist, 'findAll', async () => [film]);
     t.mock.method(Subscription, 'findAll', async () => []);
-    const rows = async (premieres) =>
-        (await calendar.periodItems(10, '2026-11-01', '2027-02-28', { premieres })).items.map((i) => [
-            i.date,
-            i.event,
-            i.estimate,
-            i.country
-        ]);
-    assert.deepEqual(await rows('off'), [['2026-12-26', 'online', true, null]]);
-    assert.deepEqual(await rows('all'), [
-        ['2026-11-11', 'cinema', false, 'BE'],
-        ['2026-12-26', 'online', true, null]
-    ]);
-    // Russia's cinemas come after the online date: the bot sends "Фильм вышел" then, no premiere
-    assert.deepEqual(await rows('ru'), [['2026-12-26', 'online', true, null]]);
-    film.online_date = '2027-03-01';
-    assert.deepEqual((await rows('ru'))[0], ['2027-02-18', 'cinema', false, 'RU']);
-    film.online_date = '2026-12-26';
-
-    // The year history counts films by their release date
-    const history = await calendar.periodItems(10, '2026-11-01', '2027-02-28', {
-        filmsByRelease: true,
-        premieres: 'all'
-    });
-    assert.deepEqual(
-        history.items.map((i) => [i.date, i.event]),
-        [['2026-11-11', 'release']]
-    );
-
-    const p = { kind: 'm', from: '2026-12-01', to: '2026-12-31', today: '2026-11-07' };
-    const { items } = await calendar.periodItems(10, p.from, p.to, { premieres: 'off' });
-    assert.match(calendar.calendarText(p, { items, failed: 0 }), /💻 Как ограбить банк — онлайн \(примерно\)/);
+    for (const digitalAlerts of [false, true]) {
+        const { items } = await calendar.periodItems(10, '2026-11-01', '2027-02-28', { digitalAlerts });
+        assert.equal(items.length, 1);
+        assert.equal(items[0].event, 'release');
+        assert.equal(items[0].date, '2026-11-11');
+        assert.deepEqual(items[0].countries, ['BE', 'FR']);
+        assert.deepEqual(items[0].online, { date: '2026-12-26', country: 'US' });
+        assert.equal(items[0].notifyDigital, digitalAlerts);
+    }
+    film.online_estimate = true;
+    assert.equal((await calendar.periodItems(10, '2026-11-01', '2027-02-28')).items[0].online, null);
 });
 
 describe('dates', () => {

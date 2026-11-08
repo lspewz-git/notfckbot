@@ -3,8 +3,8 @@ const { Chat, Watchlist } = require('../db');
 const { getDetails, getDetailsCached, titleFacts } = require('../api/tmdb');
 const { findKinopoiskId, russianDates } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
-const { buildFilmMessage, buildPremiereMessage, heldLine } = require('./messages');
-const { isOnline, premiereDue, storedDates } = require('../film-release');
+const { buildFilmMessage, buildDigitalMessage, heldLine } = require('./messages');
+const { isReleased, isOnline, storedDates, initialReleaseState, RELEASE_RULE_VERSION } = require('../film-release');
 const { todayIn } = require('../calendar');
 const { tally } = require('./status');
 const { notify } = require('./outbox');
@@ -31,10 +31,9 @@ async function keepRussianDates(entries, tmdbId, imdbId, now) {
     for (const entry of entries) await entry.update(fields);
 }
 
-const checkWatchlistReleases = async (bot) => {
-    // Load all unnotified watchlist entries with their chat
+const checkWatchlistReleases = async (bot, { datesOnly = false } = {}) => {
+    // Released rows still need fresh dates and may be waiting for an independent digital alert.
     const entries = await Watchlist.findAll({
-        where: { notified: false },
         include: [{ model: Chat }]
     });
 
@@ -61,20 +60,15 @@ const checkWatchlistReleases = async (bot) => {
 
             // The date was stored once, when the film was added — often before TMDB had
             // one. Keep it (and the year) current so the panel and the bot can show it.
-            const freshDate = data.release_date || null;
+            const freshDate = storedDates(data).premiere_digital;
             const freshYear = freshDate ? parseInt(freshDate.slice(0, 4), 10) : null;
             // Titles change too, e.g. "Мстители: Судный день" -> "Мстители: Доктор Дум"
             const freshTitle = data.title || null;
             const facts = titleFacts(data, 'movie');
             for (const entry of filmEntries) {
                 const changes = {};
-                if (entry.premiere_digital !== freshDate) changes.premiere_digital = freshDate;
                 if (freshYear && entry.year !== freshYear) changes.year = freshYear;
                 if (freshTitle && entry.title !== freshTitle) changes.title = freshTitle;
-                if ((entry.digital_date || null) !== (data.digital_release_date || null))
-                    changes.digital_date = data.digital_release_date || null;
-                if ((entry.digital_country || null) !== (data.digital_release_country || null))
-                    changes.digital_country = data.digital_release_country || null;
                 for (const [k, v] of Object.entries(facts))
                     if (String(entry[k] ?? '') !== String(v ?? '')) changes[k] = v;
                 if (Object.keys(changes).length) await entry.update(changes);
@@ -93,9 +87,17 @@ const checkWatchlistReleases = async (bot) => {
             for (const entry of filmEntries) {
                 const changes = Object.fromEntries(
                     Object.entries(stored).filter(
-                        ([k, v]) => (entry[k] ?? null) !== v && !(k === 'online_estimate' && Boolean(entry[k]) === v)
+                        ([k, v]) =>
+                            (entry[k] ?? null) !== v &&
+                            !(k === 'online_estimate' && Boolean(entry[k]) === v) &&
+                            !(
+                                entry.notified &&
+                                !stored.premiere_digital &&
+                                ['premiere_digital', 'cinema_date', 'cinema_country', 'release_countries'].includes(k)
+                            )
                     )
                 );
+                if (stored.premiere_digital) changes.year = Number(stored.premiere_digital.slice(0, 4));
                 if (Object.keys(changes).length) await entry.update(changes);
             }
             // Looked up only when a message is due, once per film
@@ -105,33 +107,55 @@ const checkWatchlistReleases = async (bot) => {
                 return formatWatchLinks({ title: firstEntry.title, kinopoiskId, mediaType: 'movie', watch });
             };
 
-            // Each chat by its own day (time zone) and its premieres setting (src/film-release.js).
+            // Each chat uses its own day. The first successful refresh of a legacy row is silent.
             // A message that doesn't go out is queued by notify(), so it counts as sent either way
+            const migrated = new Set();
+            const byChat = new Map();
             for (const entry of filmEntries) {
+                if (!entry.Chat) continue;
+                if ((entry.release_rule_version || 0) < RELEASE_RULE_VERSION) {
+                    await entry.update(initialReleaseState(data, ru, todayIn(entry.Chat.timezone, now), entry));
+                    migrated.add(entry);
+                }
+                const key = String(entry.Chat.id);
+                if (!byChat.has(key)) byChat.set(key, []);
+                byChat.get(key).push(entry);
+            }
+            for (const group of byChat.values()) {
+                const active = group.filter((entry) => !migrated.has(entry));
+                if (datesOnly || !active.length) continue;
+                const entry = active[0];
+                const updateGroup = async (fields) => {
+                    for (const row of group) await row.update(fields);
+                };
                 const today = todayIn(entry.Chat.timezone, now);
-                if (isOnline(data, ru, today)) {
-                    log.info(`[Cron] Movie "${entry.title}" (${tmdb_id}) is online for chat ${entry.Chat.id}`);
-                    const msg = buildFilmMessage({ entry, data, links: await linksFor(true), now, ru });
+                const online = isOnline(data, ru, today);
+                if (active.some((row) => !row.notified) && isReleased(data, ru, today)) {
+                    log.info(`[Cron] Movie "${entry.title}" (${tmdb_id}) released for chat ${entry.Chat.id}`);
+                    const msg = buildFilmMessage({ entry, data, links: await linksFor(online), now, today, ru });
                     await notify(bot, entry.Chat.id, msg, {
                         photo: entry.poster_url,
                         about: entry.title,
                         event: { detail: 'film', tmdb_id: entry.tmdb_id, title: entry.title },
                         ...heldLine({ kind: 'film', title: entry.title })
                     });
-                    await entry.update({ notified: true });
+                    // A same-day digital event is included in this message, without a second alert.
+                    await updateGroup({ notified: true, ...(online ? { digital_notified: true } : {}) });
+                }
+                if (!online || active.every((row) => row.digital_notified)) continue;
+                const since = entry.Chat.digital_since || today;
+                if (!entry.Chat.notify_digital || stored.online_date < since) {
+                    await updateGroup({ digital_notified: true });
                     continue;
                 }
-                const premiere = !entry.premiere_notified && premiereDue(data, ru, entry.Chat.premieres, today);
-                if (!premiere) continue;
-                log.info(`[Cron] Movie "${entry.title}" (${tmdb_id}): cinema premiere for chat ${entry.Chat.id}`);
-                const msg = buildPremiereMessage({ entry, data, premiere, links: await linksFor(false) });
+                const msg = buildDigitalMessage({ entry, data, ru, links: await linksFor(true) });
                 await notify(bot, entry.Chat.id, msg, {
                     photo: entry.poster_url,
                     about: entry.title,
-                    event: { detail: 'film_premiere', tmdb_id: entry.tmdb_id, title: entry.title },
-                    ...heldLine({ kind: 'cinema', title: entry.title })
+                    event: { detail: 'film_digital', tmdb_id: entry.tmdb_id, title: entry.title },
+                    ...heldLine({ kind: 'digital', title: entry.title })
                 });
-                await entry.update({ premiere_notified: true });
+                await updateGroup({ digital_notified: true });
             }
         } catch (err) {
             tally('errors');
@@ -142,7 +166,7 @@ const checkWatchlistReleases = async (bot) => {
 
 /**
  * After a start, in the background: what each film is (genres, rating, length) for the chats'
- * statistics, where it isn't stored yet. Films already out are no longer looked at by the check.
+ * statistics, where it isn't stored yet. The regular check also refreshes already released films.
  */
 async function backfillFilmFacts() {
     const entries = await Watchlist.findAll({ where: { genres: null } });

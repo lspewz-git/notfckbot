@@ -1,6 +1,6 @@
 /** The notification texts the update check sends. Pure: no Telegram, database or network. */
 const { isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates, countryName } = require('../constants');
-const { onlineDate } = require('../film-release');
+const { onlineDate, releaseDate } = require('../film-release');
 
 /**
  * The three series notifications, as sent to subscribers. Exported so the admin
@@ -33,40 +33,47 @@ const filmHead = (entry, data) =>
     `🍿 <b>${escapeHtml(entry.title)}</b>${entry.year ? ` (${entry.year})` : ''}\n` +
     (data.director_name ? `🎬 Режиссер: <b>${escapeHtml(data.director_name)}</b>\n` : '');
 
-const NO_DIGITAL_DATE = '💻 Даты цифрового релиза нет — обычно к этому сроку фильм уже онлайн\n';
+const NO_DIGITAL_DATE = '💻 Дата цифрового релиза неизвестна\n';
 
 /**
- * The "film is out" message for one watchlist entry: it goes out when the film is online
- * (src/film-release.js), with the digital releases; without one, a note that the date is a guess.
+ * The cinema release message, with a known digital date as additional information only.
  * @param {{ entry: object, data: object, links: string, now?: Date, ru?: object }} parts
  *   ru: Kinopoisk's Russian dates (russianDates)
  */
-function buildFilmMessage({ entry, data, links, now = new Date(), ru = {} }) {
+function buildFilmMessage({ entry, data, links, now = new Date(), today, ru = {} }) {
     const online = onlineDate(data, ru);
-    const dates = extraFilmDates(data, ru, { markExpected: now, cinema: false }).join('');
+    const release = releaseDate(data, ru);
+    const countries = release?.countries.map(countryName).map(escapeHtml).join(', ');
+    const dates = extraFilmDates(
+        {
+            ...data,
+            digital_release_date: online?.country === 'RU' && online.date === ru.digital ? null : online?.date,
+            digital_release_country: online?.country
+        },
+        ru,
+        { markExpected: now, today, cinema: false }
+    ).join('');
     return (
         `🎬 <b>Фильм вышел!</b>\n\n` +
         filmHead(entry, data) +
-        (dates || (online && online.fallback ? NO_DIGITAL_DATE : '')) +
+        (release ? `📅 Дата релиза: <b>${formatRuDate(release.date)}</b>${countries ? ` (${countries})` : ''}\n` : '') +
+        (dates || NO_DIGITAL_DATE) +
         '\n' +
         links
     );
 }
 
 /**
- * The cinema premiere message, for a chat with premieres on: the release it is about, with its
- * country, and the info link only — there is nothing to watch online yet.
- * @param {{ entry: object, data: object, premiere: { date: string, country: string | null },
- *   links: string }} parts links: the info links (formatWatchLinks of kind 'info')
+ * The independent digital release message, only for chats that opted in.
  */
-function buildPremiereMessage({ entry, data, premiere, links }) {
-    const country = premiere.country ? ` (${escapeHtml(countryName(premiere.country))})` : '';
+function buildDigitalMessage({ entry, data, ru = {}, links }) {
+    const online = onlineDate(data, ru);
+    const country = online?.country ? ` (${escapeHtml(countryName(online.country))})` : '';
     return (
-        `🎞 <b>Премьера в кино!</b>\n\n` +
+        `💻 <b>Фильм вышел онлайн!</b>\n\n` +
         filmHead(entry, data) +
-        `📅 Дата релиза: <b>${formatRuDate(premiere.date)}</b>${country}\n\n` +
-        'Онлайн фильма пока нет — напишу, когда выйдет.' +
-        (links ? `\n\n${links}` : '')
+        `📅 Цифровой релиз: <b>${formatRuDate(online?.date) || 'дата неизвестна'}</b>${country}\n\n` +
+        links
     );
 }
 
@@ -96,7 +103,7 @@ function buildTestMessage(mode, { title, season, episode, episodeName, links, fi
 
 /**
  * A held notification's line in the list that comes after quiet hours, and its button.
- * @param {{ kind: 'episode' | 'premiere' | 'complete' | 'status' | 'film' | 'cinema', title: string,
+ * @param {{ kind: 'episode' | 'premiere' | 'complete' | 'status' | 'film' | 'digital', title: string,
  *   season?: number, episode?: number, episodeName?: string, status?: string }} what
  * @returns {{ line: string, label: string }}
  */
@@ -121,8 +128,8 @@ function heldLine({ kind, title, season, episode, episodeName, status }) {
                   : 'сериал завершён';
             return { line: `📺 <b>${t}</b> — ${what}`, label: title };
         }
-        case 'cinema':
-            return { line: `🎞 <b>${t}</b> — премьера в кино`, label: title };
+        case 'digital':
+            return { line: `💻 <b>${t}</b> — вышел онлайн`, label: title };
         default:
             return { line: `🎬 <b>${t}</b> — фильм вышел`, label: title };
     }
@@ -133,7 +140,7 @@ module.exports = {
     buildSeriesMessages,
     buildStatusMessage,
     buildFilmMessage,
-    buildPremiereMessage,
+    buildDigitalMessage,
     buildTestMessage,
     TEST_MODES,
     EPISODE_MODES,

@@ -2,6 +2,15 @@
 
 import { escapeHtml } from './dom.js';
 
+/** A country code in the panel's language, falling back to the code itself. */
+export function countryName(code) {
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
+    } catch {
+        return code;
+    }
+}
+
 export function chatLabel(chat) {
     if (chat.username) return chat.username;
     return chat.type === 'private' ? 'Unknown user' : 'Unnamed group';

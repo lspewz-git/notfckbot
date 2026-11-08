@@ -125,6 +125,7 @@ describe('filmCard', () => {
         id: 7,
         title: 'Курьер',
         release_date: '2026-12-18',
+        cinema_release_date: '2026-12-18',
         status: 'Post Production',
         director_name: 'Режиссёр',
         overview: '',
@@ -147,7 +148,7 @@ describe('filmCard', () => {
 
     test('out already: where to watch, straight to the Kinopoisk page when its ID is known', () => {
         const card = filmCard(
-            { ...upcoming, release_date: '2019-11-08', status: 'Released' },
+            { ...upcoming, release_date: '2019-11-08', cinema_release_date: '2019-11-08', status: 'Released' },
             { now, kinopoiskId: 42 }
         );
         assert.match(card.caption, /Уже вышел — <b>8 ноября 2019 г\.<\/b>/);

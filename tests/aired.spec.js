@@ -40,7 +40,12 @@ for(const kind of ['series','films'])test(`personal Released ${kind} opens the s
     const card=page.locator('#released-modal');
     await expect(card).toBeVisible();
     await expect(card.locator('.tc-rating')).toContainText(kind==='series'?'8.6':'7.4');
-    await expect(card.locator(kind==='series'?'.tc-premieres':'.tc-date')).toContainText(kind==='series'?'28 Dec':'26 Feb 2026');
+    await expect(card.locator(kind==='series'?'.tc-premieres':'.tc-date').first()).toContainText(kind==='series'?'28 Dec':'26 Feb 2026');
+    if(kind==='films') {
+        await expect(card.locator('.tc-date')).toHaveCount(2);
+        await expect(card.locator('.tc-date').nth(1)).toContainText('Digital release');
+        await expect(card.locator('.tc-date').nth(1)).toContainText('Date unknown');
+    }
     await expect(card.locator('.mine-modes')).toHaveCount(0);
     await expect(card.getByRole('link',{name:'Watch on SSPoisk'})).toBeVisible();
     await expect(card.getByRole('button',{name:'Unfollow',exact:true})).toBeVisible();
