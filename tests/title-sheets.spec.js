@@ -78,7 +78,11 @@ test('expanding Notify me preserves the frame without squeezing the content', as
     const toggle = card.getByRole('button', { name: /Notify me/ });
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect.poll(frame).toEqual(before);
+    await expect.poll(frame).toEqual({ ...before, height: isPhone(page) ? before.height : expect.any(Number) });
+    if (!isPhone(page)) {
+        expect(before.height).toBeLessThan(page.viewportSize().height * 0.7);
+        expect((await frame()).height).toBeGreaterThan(before.height + 100);
+    }
     const first = card.locator('.tc-radio').first();
     await expect(first).toBeInViewport({ ratio: 1 });
     await first.click();
@@ -136,7 +140,7 @@ for (const section of ['Following fresh', 'Following after Notify', 'Calendar', 
         await more.click();
         const less = card.getByRole('button', { name: 'Show less', exact: true });
         await expect(less).toHaveAttribute('aria-expanded', 'true');
-        await expect.poll(frame).toEqual(before);
+        await expect.poll(frame).toEqual({ ...before, height: isPhone(page) || section === 'Admin details' ? before.height : expect.any(Number) });
         await less.click();
         await expect(more).toHaveAttribute('aria-expanded', 'false');
         await expect.poll(frame).toEqual(before);

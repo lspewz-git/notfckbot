@@ -49,6 +49,7 @@ function focusables(modal) {
 }
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
+export const isPhoneTitleSheet = () => window.matchMedia('(max-width: 640px)').matches;
 
 /** Preserve a card's outer frame while its details expand in the scrolling content. */
 export function preserveModalFrame(control) {
@@ -165,12 +166,16 @@ export function closeModal(id) {
     if (closing.has(modal)) return closing.get(modal).done;
     const sheet = /** @type {HTMLElement | null} */ (modal.querySelector('.title-sheet'));
     if (sheet && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const phone = isPhoneTitleSheet();
         const slide = sheet.animate(
-            [{ transform: getComputedStyle(sheet).transform }, { transform: `translateY(${window.innerHeight}px)` }],
-            { duration: 260, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }
+            [
+                { transform: getComputedStyle(sheet).transform },
+                { transform: phone ? `translateY(${window.innerHeight}px)` : 'scale(0.97)' }
+            ],
+            { duration: phone ? 260 : 150, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }
         );
         const fade = modal.animate([{ opacity: getComputedStyle(modal).opacity }, { opacity: 0 }], {
-            duration: 260,
+            duration: phone ? 260 : 150,
             easing: 'ease-in',
             fill: 'forwards'
         });

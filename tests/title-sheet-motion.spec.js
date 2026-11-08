@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
-const { openSection, watchConsole } = require('./helpers');
+const { openSection, watchConsole, isPhone } = require('./helpers');
 
 watchConsole();
 
@@ -24,7 +24,8 @@ test('description expansion preserves the frame and reading position while actio
     const before = await measure();
     const actions = await card.locator('.tc-footer').boundingBox();
     await card.getByRole('button', { name: 'Show more', exact: true }).click();
-    await expect.poll(measure).toEqual(before);
+    await expect.poll(measure).toEqual({ ...before, height: isPhone(page) ? before.height : expect.any(Number) });
+    if (!isPhone(page)) expect((await measure()).height).toBeGreaterThan(before.height);
     expect((await card.locator('.tc-footer').boundingBox()).y).toBeGreaterThan(actions.y + 200);
     await expect(card.locator('.tc-footer')).not.toBeInViewport();
     await card.locator('.tc-scroll').evaluate(el => { el.scrollTop = el.scrollHeight; });
@@ -53,7 +54,8 @@ async function drag(card, fraction, cancel = false) {
     }, { fraction, cancel });
 }
 
-test('a drag below half returns smoothly; a drag above half animates out before closing', async ({ page }) => {
+test('a drag below half returns smoothly; a drag above half animates out before closing', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'Phone-only dismissal');
     const card = await following(page);
     const modal = page.locator('#mine-card-modal');
     const top = (await card.boundingBox()).y;
@@ -101,9 +103,23 @@ test('closing an entire title-preview stack restores its original keyboard focus
     await expect(opener).toBeFocused();
 });
 
-test('reduced motion closes immediately and short pulls stay open', async ({ page }) => {
+test('reduced motion closes immediately and short pulls stay open', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'Phone-only dismissal');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const card = await following(page);
     expect((await drag(card, 0.49)).open).toBe(true);
     expect((await drag(card, 0.51)).open).toBe(false);
+});
+
+test('desktop exit shrinks in place instead of sliding down', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Desktop-only exit');
+    await following(page);
+    const frames = await page.evaluate(async () => {
+        const { closeModal } = await import('/js/ui.js');
+        closeModal('mine-card-modal');
+        return document.querySelector('#mine-card-body').getAnimations().flatMap(a => a.effect.getKeyframes()).map(f => f.transform).filter(Boolean);
+    });
+    expect(frames).toContain('scale(0.97)');
+    expect(frames.some(f => f.includes('translateY'))).toBe(false);
+    await expect(page.locator('#mine-card-modal')).toBeHidden();
 });

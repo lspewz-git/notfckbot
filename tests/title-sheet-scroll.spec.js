@@ -5,6 +5,7 @@ const { openSection, watchConsole } = require('./helpers');
 watchConsole();
 
 async function openLongCard(page) {
+    await page.setViewportSize({ width: 390, height: 844 });
     const panel = await mockPanel(page, { role: 'user' });
     panel.account.series[0].overview = 'Native scrolling should keep its momentum and leave room for the scrollbar. '.repeat(140);
     await openSection(page, 'my-subs');

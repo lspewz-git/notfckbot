@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
-const { openSection, openProfilePage, watchConsole } = require('./helpers');
+const { openSection, openProfilePage, watchConsole, isPhone } = require('./helpers');
 
 watchConsole({ignore:/Failed to load resource.*503/});
 const OVERVIEW = 'A long description with enough space to read every detail. '.repeat(80);
@@ -40,7 +40,7 @@ for (const tab of ['my-calendar','my-aired','my-subs']) {
         })).toEqual({inline:true,bottom:true,overflow:false});
         await card.getByRole('button',{name:'Show more',exact:true}).click();
         await expect.poll(async () => (await copy.textContent()).length).toBeGreaterThan(beforeText.length);
-        expect(await card.boundingBox()).toEqual(before);
+        expect(await card.boundingBox()).toEqual({ ...before, height: isPhone(page) ? before.height : expect.any(Number) });
         await expect.poll(() => card.locator('.tc-scroll').evaluate(el => el.scrollHeight>el.clientHeight)).toBe(true);
         await expect(card.locator('.tc-footer')).not.toBeInViewport();
         await card.locator('.tc-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
@@ -69,7 +69,7 @@ for (const count of [1,2,3,7]) {
             await card.locator('.tc-seasons-more').click();
             await expect(seasons).toHaveCount(count);
             expect((await card.locator('.tc-description').boundingBox()).height).toBeCloseTo(description.height,0);
-            expect(await card.boundingBox()).toEqual(frame);
+            expect(await card.boundingBox()).toEqual({ ...frame, height: isPhone(page) ? frame.height : expect.any(Number) });
             await card.locator('.tc-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
             await expect(card.locator('.tc-footer')).toBeInViewport({ratio:1});
             await card.locator('.tc-seasons-more').click();
@@ -100,6 +100,7 @@ for(const kind of ['series','films']) test(`Released ${kind} unfollows through t
 
 test('phone short swipes return from every region; a half-height swipe dismisses without actions',async({page,browserName})=>{
     test.skip(browserName!=='chromium','CDP supplies real touch gestures; WebKit shares the handler');
+    await page.setViewportSize({ width: 390, height: 844 });
     const {card,panel}=await openCard(page,'my-subs');
     const cdp=await page.context().newCDPSession(page);
     await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true});

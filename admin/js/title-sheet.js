@@ -1,5 +1,5 @@
 /** Layout and phone gestures shared by every title-card entry point. */
-import { closeModalReturning, dismissChatModals, topmostModal } from './ui.js';
+import { closeModalReturning, dismissChatModals, isPhoneTitleSheet, topmostModal } from './ui.js';
 
 const layouts = new WeakMap();
 const copies = new WeakMap();
@@ -21,7 +21,8 @@ export function fitTitleSheet(root) {
     let state = layouts.get(sheet);
     if (!state || state.scroll !== scroll) {
         state?.observer.disconnect();
-        state = { scroll, width: 0, fixed: null, footer: null, observer: null, pending: false };
+        state = { scroll, width: 0, viewport: 0, fixed: null, footer: null, observer: null, pending: false };
+        modal.style.removeProperty('--title-top');
         layouts.set(sheet, state);
         state.observer = new window.ResizeObserver((entries) => {
             if (
@@ -49,9 +50,13 @@ export function fitTitleSheet(root) {
         );
         setupSwipe(sheet, scroll, modal);
     }
-    if (Math.abs(sheet.clientWidth - state.width) > 1) {
+    const phone = isPhoneTitleSheet();
+    const viewport = window.visualViewport?.height || window.innerHeight;
+    if (Math.abs(sheet.clientWidth - state.width) > 1 || viewport !== state.viewport) {
         state.width = sheet.clientWidth;
+        state.viewport = viewport;
         state.fixed = state.footer = null;
+        modal.style.removeProperty('--title-top');
     }
     for (const label of sheet.querySelectorAll('.tc-season-label')) {
         label.classList.remove('tc-no-calendar');
@@ -99,7 +104,11 @@ export function fitTitleSheet(root) {
         pixels(style.paddingBottom) +
         pixels(style.borderTopWidth) +
         pixels(style.borderBottomWidth);
-    const room = Math.max(24, base - insets - state.footer - state.fixed);
+    const room = phone
+        ? Math.max(24, base - insets - state.footer - state.fixed)
+        : description
+          ? pixels(getComputedStyle(description.querySelector('.tc-overview')).lineHeight) * 3
+          : 0;
     if (description) {
         const text = /** @type {HTMLElement} */ (description.querySelector('.tc-overview'));
         const copy = text.querySelector('.tc-copy');
@@ -136,10 +145,17 @@ export function fitTitleSheet(root) {
             }
             copy.textContent = prefix(low);
         }
-        const used = expanded ? text.scrollHeight : room;
+        const used = expanded || !phone ? text.scrollHeight : room;
         description.style.height = `${used}px`;
     }
-    sheet.style.height = `${base}px`;
+    sheet.style.height = phone ? `${base}px` : 'auto';
+    if (!phone && !modal.style.getPropertyValue('--title-top')) {
+        // Centre once; disclosure grows downwards without moving the reading position.
+        modal.style.setProperty(
+            '--title-top',
+            `${Math.round(Math.max(pixels(modalStyle.paddingBottom), (modal.clientHeight - height(sheet)) / 2))}px`
+        );
+    }
     scroll.scrollTop = scrollTop;
 }
 
@@ -195,6 +211,7 @@ function setupSwipe(sheet, scroll, modal) {
     sheet.addEventListener(
         'touchstart',
         (event) => {
+            if (!isPhoneTitleSheet()) return;
             if (event.touches.length !== 1) {
                 return interrupt();
             }

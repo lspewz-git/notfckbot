@@ -460,9 +460,19 @@
     margin: 0;
 }
 
-@media (min-width: 761px) {
+@media (min-width: 641px) {
+    .app-sheet.modal-sheet:has(.title-sheet) {
+        align-items: flex-start;
+        padding-top: var(--title-top, var(--space-8));
+    }
+
     .app-sheet.modal-sheet .title-sheet {
-        max-height: calc(100svh - var(--top-inset) - var(--space-8));
+        height: auto;
+        max-height: calc(100svh - var(--title-top, var(--space-8)) - var(--space-8));
+    }
+
+    .title-sheet .tc-footer {
+        margin-top: 0;
     }
 }
 
