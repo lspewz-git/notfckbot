@@ -71,7 +71,7 @@ test('dragging from the grabber closes the phone sheet', async ({ page, browserN
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
     for (let i = 1; i <= 10; i++) {
         await cdp.send('Input.dispatchTouchEvent', {
-            type: 'touchMove', touchPoints: [{ x, y: y + frame.height * 0.55 * i / 10 }]
+            type: 'touchMove', touchPoints: [{ x, y: y + frame.height * 0.35 * i / 10 }]
         });
     }
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });

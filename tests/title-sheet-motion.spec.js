@@ -54,19 +54,19 @@ async function drag(card, fraction, cancel = false) {
     }, { fraction, cancel });
 }
 
-test('a drag below half returns smoothly; a drag above half animates out before closing', async ({ page, isMobile }) => {
+test('a drag below 30% returns smoothly; a drag above 30% animates out before closing', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'Phone-only dismissal');
     const card = await following(page);
     const modal = page.locator('#mine-card-modal');
     const top = (await card.boundingBox()).y;
-    const short = await drag(card, 0.49);
+    const short = await drag(card, 0.29);
     expect(short.open).toBe(true);
     expect(short.released).toBeGreaterThan(top + 100);
     await expect.poll(async () => Math.round((await card.boundingBox()).y)).toBe(Math.round(top));
     const canceled = await drag(card, 0.6, true);
     expect(canceled.open).toBe(true);
     await expect.poll(async () => Math.round((await card.boundingBox()).y)).toBe(Math.round(top));
-    const long = await drag(card, 0.51);
+    const long = await drag(card, 0.31);
     expect(long.open).toBe(true);
     expect(long.released).toBeGreaterThan(top + 100);
     await expect(modal).toBeHidden();
@@ -107,8 +107,8 @@ test('reduced motion closes immediately and short pulls stay open', async ({ pag
     test.skip(!isMobile, 'Phone-only dismissal');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const card = await following(page);
-    expect((await drag(card, 0.49)).open).toBe(true);
-    expect((await drag(card, 0.51)).open).toBe(false);
+    expect((await drag(card, 0.29)).open).toBe(true);
+    expect((await drag(card, 0.31)).open).toBe(false);
 });
 
 test('desktop exit shrinks in place instead of sliding down', async ({ page, isMobile }) => {

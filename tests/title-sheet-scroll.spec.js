@@ -94,7 +94,7 @@ test('small diagonal jitter does not abandon a downward dismissal', async ({ pag
     const x = r.x + r.width / 2, y = r.y + 50;
     await touch('touchStart', x, y);
     await touch('touchMove', x + 2, y + 1);
-    for (let i = 1; i <= 12; i++) await touch('touchMove', x + 3, y + r.height * 0.56 * i / 12);
+    for (let i = 1; i <= 12; i++) await touch('touchMove', x + 3, y + r.height * 0.36 * i / 12);
     await touch('touchEnd');
     await expect(page.locator('#mine-card-modal')).toBeHidden();
 });

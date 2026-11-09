@@ -277,7 +277,7 @@ function setupSwipe(sheet, scroll, modal) {
             drag = null;
             return;
         }
-        const dismiss = drag.distance >= drag.height * 0.5;
+        const dismiss = drag.distance >= drag.height * 0.3;
         drag = null;
         sheet.classList.remove('tc-dragging');
         if (dismiss && topmostModal() === modal) {

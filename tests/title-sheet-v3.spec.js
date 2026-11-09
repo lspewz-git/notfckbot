@@ -98,7 +98,7 @@ for(const kind of ['series','films']) test(`Released ${kind} unfollows through t
     await expect(modal).toBeHidden();
 });
 
-test('phone short swipes return from every region; a half-height swipe dismisses without actions',async({page,browserName})=>{
+test('phone short swipes return from every region; a swipe beyond 30% dismisses without actions',async({page,browserName})=>{
     test.skip(browserName!=='chromium','CDP supplies real touch gestures; WebKit shares the handler');
     await page.setViewportSize({ width: 390, height: 844 });
     const {card,panel}=await openCard(page,'my-subs');
@@ -115,7 +115,7 @@ test('phone short swipes return from every region; a half-height swipe dismisses
         await expect.poll(()=>card.evaluate(el=>getComputedStyle(el).transform)).toBe('none');
     }
     const rect=await card.locator('.tc-head').boundingBox();
-    const distance=(await card.boundingBox()).height*.55;
+    const distance=(await card.boundingBox()).height*.35;
     const x=rect.x+rect.width/2,y=rect.y+8;
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
     for(let step=1;step<=10;step++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+distance*step/10}]});
