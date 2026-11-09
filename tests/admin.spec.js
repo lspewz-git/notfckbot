@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { isNarrow, isPhone, watchConsole, openSection } = require('./helpers');
+const { isNarrow, isPhone, watchConsole, openSection, openProfilePage } = require('./helpers');
 
 /**
  * Read-only checks against a running panel. Dialogs are opened and dismissed;
@@ -72,6 +72,48 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     // "TG" when fine, "TG: ERR" when not
     await expect(page.locator('#health-tg')).toHaveText(/^TG(: ERR)?$/);
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
+});
+
+test('Hidden chats matches the shared design and dismisses on phones without changing preferences', async ({ page, isMobile }) => {
+    await openProfilePage(page, 'my-profile');
+    await page.locator('[data-action="profile-visibility"]').click();
+    const modal = page.locator('#visibility-modal');
+    const frame = modal.locator('.visibility-sheet');
+    await expect(frame).toBeVisible();
+    await frame.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+    await expect(modal.locator('h3')).toHaveText('Hidden chats');
+    expect(await page.locator('#visibility-list > li > .group-row').count()).toBeGreaterThan(0);
+    const box = await frame.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize().height + 1);
+    if (isMobile) {
+        await expect(frame.locator('.visibility-grabber')).toBeVisible();
+        async function pull(ratio) {
+            return frame.evaluate((el, ratio) => {
+                const target = el.querySelector('h3');
+                const top = el.getBoundingClientRect().top;
+                const point = clientY => ({ identifier: 8, target, clientX: 140, clientY });
+                const start = point(top + 44), end = point(top + 44 + el.clientHeight * ratio);
+                let moved;
+                for (const [type, touch, ended] of [['touchstart', start, false], ['touchmove', end, false], ['touchend', end, true]]) {
+                    const event = new Event(type, { bubbles: true, cancelable: true });
+                    Object.defineProperties(event, { touches: { value: ended ? [] : [touch] }, changedTouches: { value: [touch] } });
+                    target.dispatchEvent(event);
+                    if (type === 'touchmove') moved = el.getBoundingClientRect().top;
+                }
+                return { moved, released: el.getBoundingClientRect().top };
+            }, ratio);
+        }
+        const short = await pull(0.29);
+        expect(short.moved).toBeGreaterThan(box.y + 30);
+        expect(Math.abs(short.moved - short.released)).toBeLessThan(1);
+        await expect.poll(async () => Math.round((await frame.boundingBox()).y)).toBe(Math.round(box.y));
+        await pull(0.31);
+    } else {
+        await expect(frame.locator('.visibility-grabber')).toBeHidden();
+        await frame.getByRole('button', { name: 'Close', exact: true }).click();
+    }
+    await expect(modal).toBeHidden();
 });
 
 test('Released keeps its frame fixed and bottom links reachable in the shared scroll flow', async ({ page }) => {

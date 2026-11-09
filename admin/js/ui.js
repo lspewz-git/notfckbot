@@ -164,7 +164,7 @@ export function closeModal(id) {
     const modal = /** @type {HTMLDialogElement | null} */ ($(id));
     if (!modal || !modal.open) return;
     if (closing.has(modal)) return closing.get(modal).done;
-    const sheet = /** @type {HTMLElement | null} */ (modal.querySelector('.title-sheet'));
+    const sheet = /** @type {HTMLElement | null} */ (modal.querySelector('.title-sheet, .visibility-sheet'));
     if (sheet && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const phone = isPhoneTitleSheet();
         const slide = sheet.animate(

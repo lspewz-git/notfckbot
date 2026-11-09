@@ -48,7 +48,7 @@ export function fitTitleSheet(root) {
             },
             { once: true }
         );
-        setupSwipe(sheet, scroll, modal);
+        setupSheetSwipe(sheet, scroll, modal);
     }
     const phone = isPhoneTitleSheet();
     const viewport = window.visualViewport?.height || window.innerHeight;
@@ -163,7 +163,7 @@ export function fitTitleSheet(root) {
 }
 
 /** Native content scrolling owns its whole gesture; only a downward pull from the top moves the sheet. */
-function setupSwipe(sheet, scroll, modal) {
+export function setupSheetSwipe(sheet, scroll, modal, scrollSelector = '.tc-scroll') {
     if (swipes.get(modal)?.sheet === sheet) return;
     swipes.get(modal)?.reset();
     let drag = null;
@@ -219,7 +219,7 @@ function setupSwipe(sheet, scroll, modal) {
                 return interrupt();
             }
             if (topmostModal() !== modal || modal.inert) return;
-            scroll = sheet.querySelector('.tc-scroll');
+            scroll = sheet.querySelector(scrollSelector);
             const offset = returning ? new window.DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42 : 0;
             reset();
             blockClickUntil = 0;

@@ -11,6 +11,7 @@ import { avatar, initial } from './pick-sheet.js';
 import { chatList, chatHint, selectChat, setChatHidden, chatAvatar, setOwnName } from './account.js';
 import { setDevicesOwner, loadDevices } from './devices.js';
 import { DEFAULT_PERSONAL_SECTION } from './navigation.js';
+import { setupSheetSwipe } from './title-sheet.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -156,13 +157,13 @@ function visibilityRows() {
             const own = c.type === 'private';
             const title = escapeHtml(c.title);
             return (
-                `<div class="action-row profile-visibility-row">${chatAvatar(c)}` +
-                `<span class="action-text"><span class="action-title">${title}</span>` +
-                `<span class="action-desc">${own ? 'Always visible' : c.hidden ? 'Hidden' : 'Visible'}</span></span>` +
+                `<li><div class="group-row group-row-static chat-row profile-visibility-row">${chatAvatar(c)}` +
+                `<span class="row-text"><span class="row-name">${title}</span>` +
+                `<span class="row-meta">${own ? 'Always visible' : c.hidden ? 'Hidden' : 'Visible'}</span></span>` +
                 (own
-                    ? `<span class="pick-check">${icon('check')}</span>`
+                    ? `<span class="row-check visibility-check">${icon('check')}</span>`
                     : `<button type="button" class="switch" role="switch" aria-label="Show ${title}" aria-checked="${!c.hidden}" ${visibilitySaving.has(c.id) ? 'disabled aria-busy="true"' : ''} data-action="profile-visibility-toggle" data-id="${escapeHtml(c.id)}"><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button>`) +
-                '</div>'
+                '</div></li>'
             );
         })
         .join('');
@@ -171,6 +172,8 @@ function visibilityRows() {
 function openVisibility() {
     $('visibility-list').innerHTML = visibilityRows();
     openModal('visibility-modal');
+    const modal = $('visibility-modal');
+    setupSheetSwipe(modal.querySelector('.visibility-sheet'), $('visibility-list'), modal, '#visibility-list');
 }
 
 async function toggleVisibility(button) {
@@ -200,7 +203,7 @@ async function toggleVisibility(button) {
                 el.setAttribute('aria-checked', String(!chat?.hidden));
                 el.disabled = false;
                 el.removeAttribute('aria-busy');
-                el.closest('.profile-visibility-row').querySelector('.action-desc').textContent = chat?.hidden
+                el.closest('.profile-visibility-row').querySelector('.row-meta').textContent = chat?.hidden
                     ? 'Hidden'
                     : 'Visible';
             }
