@@ -1198,15 +1198,17 @@ function botHandlers() {
     return handlers;
 }
 
-test('sign-in digits are unique among live codes and sign the page in from the bot without a question', async () => {
+test('sign-in digits are unique among live codes and sign the page in from the bot without a question', async (t) => {
     const starts = Array.from({ length: 300 }, () => auth.startCode());
     assert.equal(new Set(starts.map((s) => s.check)).size, starts.length, 'no two live codes share the digits');
     for (const s of starts) auth.cancelCode(s.code, s.secret);
 
     // Digits of a page just closed aren't given out again: sent late, they can't sign a stranger's page in
     const freed = new Set(starts.map((s) => s.check));
+    const next = Array.from({ length: 300 }, () => auth.startCode());
+    t.after(() => next.forEach((s) => auth.cancelCode(s.code, s.secret)));
     assert.equal(
-        Array.from({ length: 300 }, () => auth.startCode()).some((s) => freed.has(s.check)),
+        next.some((s) => freed.has(s.check)),
         false
     );
 

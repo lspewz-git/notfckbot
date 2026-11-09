@@ -91,6 +91,30 @@ describe('the Russian dates from Kinopoisk', () => {
             ru: kinopoisk.NO_DATES
         });
     });
+
+    test('quick ID lookup preserves an outage, including its cached failure', async (t) => {
+        let requests = 0;
+        t.mock.method(axios, 'get', async () => {
+            requests++;
+            throw new Error('Synthetic lookup outage');
+        });
+        const expected = { kinopoiskId: null, ru: { ...kinopoisk.NO_DATES, failed: true } };
+        assert.deepEqual(await kinopoisk.kinopoiskQuick('movie_1006', 'tt1006'), expected);
+        const firstRequests = requests;
+        assert.ok(firstRequests > 0);
+        assert.deepEqual(await kinopoisk.kinopoiskQuick('movie_1006', 'tt1006'), expected);
+        assert.equal(requests, firstRequests, 'the cached outage keeps its failure flag');
+    });
+
+    test('a confirmed missing ID stays an empty result rather than an outage', async (t) => {
+        t.mock.method(axios, 'get', async (url) => ({
+            data: url.includes('wikidata') ? { results: { bindings: [] } } : { items: [] }
+        }));
+        assert.deepEqual(await kinopoisk.kinopoiskQuick('movie_1007', 'tt1007'), {
+            kinopoiskId: null,
+            ru: kinopoisk.NO_DATES
+        });
+    });
 });
 
 describe("TMDB's digital release", () => {

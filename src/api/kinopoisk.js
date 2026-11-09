@@ -236,9 +236,9 @@ async function kinopoiskQuick(tmdbId, imdbId, ms = 3000) {
     let settled = { kinopoiskId: null, ru: NO_DATES };
     let complete = false;
     const lookup = (async () => {
-        const kinopoiskId = await findKinopoiskId(tmdbId, imdbId);
-        settled = { kinopoiskId, ru: NO_DATES };
-        const ru = kinopoiskId ? await russianDates(kinopoiskId) : NO_DATES;
+        const { id: kinopoiskId, failed } = await lookupKinopoiskId(tmdbId, imdbId);
+        settled = { kinopoiskId, ru: failed ? { ...NO_DATES, failed: true } : NO_DATES };
+        const ru = kinopoiskId ? await russianDates(kinopoiskId) : settled.ru;
         settled = { kinopoiskId, ru };
         complete = true;
     })().catch(() => {});

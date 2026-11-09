@@ -5,6 +5,8 @@ const express = require('express');
 const { listenForTest } = require('./http-server');
 const tmdb = require('../../src/api/tmdb');
 const kinopoisk = require('../../src/api/kinopoisk');
+const axios = require('axios');
+const realKinopoiskQuick = kinopoisk.kinopoiskQuick;
 const { Chat, Watchlist } = require('../../src/db');
 const { buildFilmMessage } = require('../../src/cron/messages');
 const { formatWatchLinks } = require('../../src/constants');
@@ -12,13 +14,16 @@ const { formatWatchLinks } = require('../../src/constants');
 let data;
 let ru;
 let pending;
+let useRealLookup;
 let sent;
 let base;
 let close;
 const NOW = Date.parse('2026-11-09T20:30:00Z');
 const TODAY = '2026-11-10'; // Asia/Irkutsk is already on the next calendar day.
 mock.method(kinopoisk, 'findKinopoiskIdQuick', async () => 123);
-mock.method(kinopoisk, 'kinopoiskQuick', async () => ({ kinopoiskId: 123, ru, pending }));
+mock.method(kinopoisk, 'kinopoiskQuick', async (...args) =>
+    useRealLookup ? realKinopoiskQuick(...args) : { kinopoiskId: 123, ru, pending }
+);
 
 before(async () => {
     const app = express();
@@ -41,10 +46,19 @@ for (const [digital, source] of [
     ['2026-11-10', 'pending'],
     ['2026-11-10', 'failed'],
     [null, 'empty'],
-    [null, 'pending-untracked']
+    [null, 'pending-untracked'],
+    ['2026-11-10', 'failed-id'],
+    [null, 'empty-id']
 ]) {
     test(`film test uses recipient day and Russian dates, digital=${digital}, source=${source}`, async (t) => {
         t.mock.timers.enable({ apis: ['Date'], now: NOW });
+        useRealLookup = source.endsWith('-id');
+        if (useRealLookup) {
+            t.mock.method(axios, 'get', async (url) => {
+                if (source === 'failed-id') throw new Error('Synthetic lookup outage');
+                return { data: url.includes('wikidata') ? { results: { bindings: [] } } : { items: [] } };
+            });
+        }
         t.mock.method(Chat, 'findByPk', async () => ({ timezone: 'Asia/Irkutsk' }));
         data = {
             title: 'Russian film',
@@ -65,17 +79,21 @@ for (const [digital, source] of [
                 ? null
                 : { ru_premiere: stored.premiere, ru_digital: stored.digital, ru_services: 'START' }
         );
-        const expectedRu = source === 'pending' || source === 'failed' ? stored : ru;
+        const expectedRu = ['pending', 'failed', 'failed-id'].includes(source) ? stored : ru;
         t.mock.method(tmdb, 'getDetails', async () => data);
         const response = await fetch(`${base}/api/test-notification`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chatId: 1, mode: 'film', filmId: 'movie_7' })
+            body: JSON.stringify({
+                chatId: 1,
+                mode: 'film',
+                filmId: useRealLookup ? `movie_900${source === 'failed-id' ? 1 : 2}` : 'movie_7'
+            })
         });
         assert.equal(response.status, 200);
         const links = formatWatchLinks({
             title: data.title,
-            kinopoiskId: 123,
+            kinopoiskId: useRealLookup ? null : 123,
             mediaType: 'movie',
             watch: digital === TODAY
         });
