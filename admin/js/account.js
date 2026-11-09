@@ -12,7 +12,7 @@ import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { pickFrom, avatar, initial } from './pick-sheet.js';
 import { searchResults, openSearchCard, MODES } from './content-search.js';
-import { titleCard, notifyField, subscriptionActions, posterSrc, fitDescriptions, NOTIFY } from './title-card.js';
+import { titleCard, notifyField, subscriptionActions, titleThumb, fitDescriptions, NOTIFY } from './title-card.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -211,13 +211,6 @@ export function chatsFailed(message) {
 
 // --- Pieces ---
 
-const thumb = (path, cls = 'title-thumb') => {
-    const src = posterSrc(path);
-    return src
-        ? `<img class="${cls}" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
-        : `<span class="${cls} title-thumb-empty" aria-hidden="true"></span>`;
-};
-
 /** EmptyState: an icon in a circle, a title, one line */
 const empty = (title, body, iconName = 'bookmark') =>
     `<div class="empty-state"><span class="empty-icon">${ICON(iconName)}</span>` +
@@ -253,7 +246,7 @@ const noChats = () =>
 
 /** A title in a list: poster, name, one line, an optional badge, the chevron */
 const titleRow = ({ action, id, poster, title, note, badge = '' }) =>
-    `<li><button type="button" class="group-row title-row" data-action="${action}" data-id="${escapeHtml(id)}">${thumb(poster)}` +
+    `<li><button type="button" class="group-row title-row" data-action="${action}" data-id="${escapeHtml(id)}">${titleThumb(poster)}` +
     `<span class="row-text"><span class="row-name">${escapeHtml(title)}</span><span class="row-meta">${escapeHtml(note)}</span></span>` +
     `${badge ? `<span class="row-badge">${escapeHtml(badge)}</span>` : ''}<span class="row-chevron">${CHEVRON_RIGHT}</span></button></li>`;
 
@@ -595,7 +588,7 @@ function calRow(item, index, today, sameDay) {
         : escapeHtml(sub);
     return (
         `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
-        `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${thumb(item.poster, 'title-thumb cal-thumb')}` +
+        `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${titleThumb(item.poster, 'title-thumb cal-thumb')}` +
         `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta${extra ? ' cal-meta-countries' : ''}">${meta}</span></span>` +
         `<span class="cal-when">${item.notifyOn ? BELL : ''}<span>${whenText(item.date, today)}</span></span></button></li>`
     );

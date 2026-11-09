@@ -74,6 +74,21 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
 });
 
+test('admin title details use the shared sheet without changing records', async ({ page }) => {
+    await page.locator('#popular-list [data-action="series"]').first().click();
+    const modal = page.locator('#detail-modal');
+    await expect(modal.locator('#detail-title')).not.toHaveText('Loading details…', { timeout: 20_000 });
+    await expect(modal.locator('#detail-title')).not.toHaveText('Failed to load details.');
+    await expect(modal.locator('.title-sheet .tc-scroll')).toBeVisible();
+    await expect(modal.locator('.detail-people')).toBeVisible();
+    const link = modal.getByRole('link', { name: 'Open on Kinopoisk' });
+    await expect(link).toHaveAttribute('href', /^https:\/\/www\.kinopoisk\.ru\//);
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeInViewport();
+    await modal.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(modal).toBeHidden();
+});
+
 test('header Account links and the shared settings sheet work without saving', async ({ page, isMobile }) => {
     for (const section of ['my-calendar', 'my-aired', 'my-subs']) {
         await openSection(page, section);

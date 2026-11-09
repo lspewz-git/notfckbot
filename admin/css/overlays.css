@@ -365,78 +365,10 @@ html:has(.modal[open]) {
     outline: none;
 }
 
-/* Series / film card */
-.detail {
-    display: grid;
-    grid-template-columns: 9.5rem minmax(0, 1fr);
-    gap: var(--space-5);
-    align-items: start;
-}
-
-.detail-poster {
-    width: 100%;
-    aspect-ratio: 2 / 3;
-    object-fit: cover;
-    border-radius: var(--radius);
-    background: var(--surface-2);
-}
-
-.detail-poster[hidden] {
-    display: none;
-}
-
-.detail:has(.detail-poster[hidden]) {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.detail-meta {
-    margin-top: var(--space-1);
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-}
-
-/* A film's dates in its dialog: the list without the room a service dialog keeps for its rows */
-.detail-dates {
-    min-height: 0;
-    margin-bottom: var(--space-3);
-}
-
-.detail-dates[hidden] {
-    display: none;
-}
-
-/* Kinopoisk: a quiet button with the brand mark, between the description and the chats */
-.kp-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--control-h);
-    margin-bottom: var(--space-5);
-    padding: 0 var(--space-3) 0 10px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
-    text-decoration: none;
-    transition: background-color 0.15s ease;
-}
-
-.kp-link:hover {
-    background: var(--surface-3);
-}
-
 .kp-logo {
     flex: 0 0 auto;
     width: 18px;
     height: 18px;
-}
-
-.kp-out {
-    width: 14px;
-    height: 14px;
-    color: var(--text-dim);
 }
 
 /* Who is subscribed / waiting: one row per chat; a long list scrolls inside the card */
@@ -479,58 +411,10 @@ html:has(.modal[open]) {
     font-size: var(--text-sm);
 }
 
-.detail-desc {
-    margin: var(--space-3) 0 var(--space-4);
-    font-size: var(--text-sm);
-    line-height: 1.6;
-}
-
 .detail-loading {
     padding: var(--space-6) 0;
     color: var(--text-dim);
     text-align: center;
-}
-
-/* A phone: a small poster beside the title and its meta line, and everything else under them at
-   the full width, so the description isn't squeezed into a column a few words wide. The body's
-   children join the card's grid for that (display: contents) */
-@media (max-width: 560px) {
-    .detail {
-        grid-template-columns: 3.5rem minmax(0, 1fr);
-        gap: 0 var(--space-3);
-        align-items: center;
-    }
-
-    .detail-body {
-        display: contents;
-    }
-
-    .detail-poster {
-        grid-row: 1 / span 2;
-    }
-
-    .detail-body > * {
-        grid-column: 1 / -1;
-    }
-
-    .detail-body > #detail-title,
-    .detail-body > .detail-meta {
-        grid-column: 2;
-    }
-
-    /* The two lines together, centred on the poster */
-    .detail-body > #detail-title {
-        align-self: end;
-    }
-
-    .detail-body > .detail-meta {
-        align-self: start;
-    }
-
-    /* No poster: the body as it is, one column */
-    .detail:has(.detail-poster[hidden]) .detail-body {
-        display: block;
-    }
 }
 
 /* Header buttons are 32px; a finger gets 44. */

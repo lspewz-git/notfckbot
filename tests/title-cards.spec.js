@@ -94,12 +94,12 @@ test('Serials and Movies show clickable posters, round add controls and release 
         const poster = row.locator(isPhone(page) ? '.cell-compact .title-poster' : '.title-with-poster .title-poster');
         await expect(poster.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
         await poster.click();
-        await expect(page.locator('#detail-dates')).toContainText(date);
-        await expect(page.locator('#detail-meta .title-rating')).toContainText(section === 'subs' ? '8.4' : '7.1');
-        const star = page.locator('#detail-meta .title-rating svg');
+        await expect(page.locator('#detail-body .tc-scroll')).toContainText(date);
+        await expect(page.locator('#detail-modal .tc-rating')).toContainText(section === 'subs' ? '8.4' : '7.1');
+        const star = page.locator('#detail-modal .tc-rating svg');
         await expect(star.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
         await expect.poll(() => star.evaluate((el) => el.getBBox().width)).toBeGreaterThan(10);
-        await expect(page.locator('#detail-meta')).not.toContainText('⭐');
+        await expect(page.locator('#detail-modal .tc-facts')).not.toContainText('⭐');
         await page.locator('#detail-modal [data-close="detail-modal"]').click();
     }
 });
@@ -124,15 +124,16 @@ test('long descriptions expand, collapse and reset when another card opens, with
         isPhone(page) ? '#watchlist-body .compact-title' : '#watchlist-body .title-with-poster .link-text'
     );
     await titles.first().click();
-    const desc = page.locator('#detail-desc');
+    const desc = page.locator('#detail-modal .tc-description');
     const toggle = desc.getByRole('button', { name: 'Show more' });
-    expect(Array.from(await desc.locator('[data-description-short]').innerText()).length).toBeLessThanOrEqual(300);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(desc.locator('.tc-overview')).not.toHaveClass(/is-open/);
     await toggle.click();
-    await expect(desc.locator('[data-description-full]')).toHaveText(overview);
+    await expect(desc.locator('.tc-copy')).toHaveText(overview);
     await expect(desc.locator('img')).toHaveCount(0);
     await expect(desc.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
     await desc.getByRole('button', { name: 'Show less' }).click();
-    await expect(desc.locator('[data-description-full]')).toBeHidden();
+    await expect(desc.locator('.tc-overview')).not.toHaveClass(/is-open/);
     await desc.getByRole('button', { name: 'Show more' }).click();
     await page.locator('#detail-modal [data-close="detail-modal"]').click();
     await titles.nth(1).click();
@@ -146,6 +147,6 @@ test('short descriptions stay visible without an expander', async ({ page }) => 
         .locator(isPhone(page) ? '#subs-body .compact-title' : '#subs-body .title-with-poster .link-text')
         .first()
         .click();
-    await expect(page.locator('#detail-desc')).toHaveText('A test series.');
-    await expect(page.locator('#detail-desc button')).toHaveCount(0);
+    await expect(page.locator('#detail-modal .tc-copy')).toHaveText('A test series.');
+    await expect(page.locator('#detail-modal .tc-description').getByRole('button', { name: 'Show more' })).toBeHidden();
 });

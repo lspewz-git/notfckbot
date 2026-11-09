@@ -1,22 +1,17 @@
 /** Acting on one subscription or watchlist entry. */
 
-import { $, $field, $img, setText, escapeHtml } from './dom.js';
+import { $, $field, setText, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
 import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, countryName, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
-import { description, titleRating } from './content-search.js';
 import { titleCard, fitDescriptions, watchButton } from './title-card.js';
 
-/** "/abc.jpg" -> the same TMDB poster, fetched by our server (see /api/poster). */
-const posterUrl = (path) => (path ? `/api/poster/w342${path}` : '');
-
-/** Reuse the visible list image, including its already downloaded size. */
-function sourcePoster(source) {
-    return source?.closest('tr, .history-item')?.querySelector('.title-poster img')?.getAttribute('src') || '';
-}
+/** Keep artwork already shown in the list when the detail response has none. */
+const sourcePoster = (source) =>
+    source?.closest('tr, .history-item')?.querySelector('.title-poster img')?.getAttribute('src') || '';
 
 /**
  * One group of chats on a card: "Subscribers · 2", then a row per chat with its name and
@@ -40,7 +35,7 @@ function peopleGroup(label, rows) {
  * button change width and jump.
  */
 function setKinopoiskLink(url, direct) {
-    const link = /** @type {HTMLAnchorElement} */ ($('detail-kp'));
+    const link = /** @type {HTMLAnchorElement} */ ($('detail-body').querySelector('.tc-link'));
     link.href = url;
     link.title = direct ? '' : 'Kinopoisk search by title';
 }
@@ -55,109 +50,80 @@ async function fillKinopoisk(type, id, title, request) {
     try {
         const kp = await api(`/kinopoisk/${type}/${id}`);
         // Without an ID the server's link is a search too; the one above already has the title
-        if (request === detailRequest && kp.id) setKinopoiskLink(kp.url, true);
+        if (request === detailRequest && $('detail-modal').hasAttribute('open') && kp.id)
+            setKinopoiskLink(kp.url, true);
     } catch {
         // The search link stays
     }
 }
 
-/**
- * Opens the card and fills it from `load()`.
- * @param {() => Promise<{ title: string, meta: string, desc: string, people: string, poster: string,
- *   dates?: string, url?: string, peopleLoad?: () => Promise<string>, kinopoisk?: { type: 'tv' | 'movie', id: string } }>} load
- */
+/** One shared title card, filled only by the latest open request. */
 let detailRequest = 0;
 
 async function openDetails(load) {
-    // Only the latest card may fill the dialog: a slow earlier response is dropped
     const request = ++detailRequest;
-    $('detail-loading').innerText = 'Loading details…';
-    $('detail-loading').style.display = 'block';
-    $('detail-ready').style.display = 'none';
+    const modal = $('detail-modal');
+    const body = $('detail-body');
+    const fill = (html) => {
+        const focused = body.contains(document.activeElement);
+        body.innerHTML = html;
+        if (focused) body.focus({ preventScroll: true });
+    };
+    body.innerHTML = titleCard(
+        { kind: 'tv', title: 'Loading details…' },
+        { titleId: 'detail-title', close: 'detail-modal' }
+    );
     openModal('detail-modal');
-
     try {
-        const card = await load();
-        if (request !== detailRequest) return;
-        setText('detail-title', card.title);
-        $('detail-meta').innerHTML = card.meta;
-        $('detail-desc').innerHTML = description(card.desc);
-        $('detail-people').innerHTML = card.people;
-        $('detail-people').hidden = !card.people;
-        const dates = $('detail-dates');
-        dates.innerHTML = card.dates || '';
-        dates.hidden = !card.dates;
-
-        const img = $img('detail-poster');
-        img.loading = 'eager';
-        img.hidden = !card.poster;
-        img.onerror = () => {
-            img.hidden = true;
-        };
-        img.src = card.poster;
-
-        $('detail-loading').style.display = 'none';
-        $('detail-ready').style.display = '';
-        if (card.url) setKinopoiskLink(card.url, !card.url.includes('kp_query='));
-        else if (card.kinopoisk) fillKinopoisk(card.kinopoisk.type, card.kinopoisk.id, card.title, request);
-        if (card.peopleLoad) {
-            const fill = (html) => {
-                if (request !== detailRequest) return;
-                $('detail-people').innerHTML = html;
-                $('detail-people').hidden = !html;
-            };
-            card.peopleLoad()
-                .then(fill)
-                .catch(() => fill('<p class="people-none">Chat information unavailable.</p>'));
-        }
-    } catch (e) {
-        if (request === detailRequest) $('detail-loading').innerText = 'Failed to load details.';
+        const { people, kinopoisk, ...card } = await load();
+        if (request !== detailRequest || !modal.hasAttribute('open')) return;
+        const url = `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(card.title)}`;
+        fill(
+            titleCard(
+                { ...card, kinopoiskUrl: url },
+                {
+                    titleId: 'detail-title',
+                    close: 'detail-modal',
+                    extra: `<div class="detail-people">${people}</div>`
+                }
+            )
+        );
+        setKinopoiskLink(url, false);
+        fitDescriptions(body);
+        fillKinopoisk(kinopoisk.type, kinopoisk.id, card.title, request);
+    } catch {
+        if (request !== detailRequest || !modal.hasAttribute('open')) return;
+        fill(
+            titleCard(
+                { kind: 'tv', title: 'Failed to load details.' },
+                { titleId: 'detail-title', close: 'detail-modal' }
+            )
+        );
+        fitDescriptions(body);
     }
 }
 
-function seasonDates(seasons, premieres) {
-    return seasons
-        .filter(Boolean)
-        .map(
-            (season) =>
-                `<dt>Season ${escapeHtml(season)} premiere</dt><dd>${escapeHtml(formatReleaseDate(premieres.find((s) => s.season === season)?.date))}</dd>`
-        )
-        .join('');
-}
-
-function filmDates(d) {
-    const row = (label, iso, note, format = formatReleaseDate) =>
-        iso ? `<dt>${label}</dt><dd>${escapeHtml(format(iso))}${note ? ` · ${escapeHtml(note)}` : ''}</dd>` : '';
+/** Chat information is the only admin-only part of a title card. */
+function titlePeople(details, tv) {
+    if (tv) {
+        const subs = details.subscribers || [];
+        return subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>';
+    }
+    const chats = details.chats || [];
+    const waiting = chats.filter((chat) => !chat.notified);
+    const notified = chats.filter((chat) => chat.notified);
     return (
-        (row('Release', d.release, (d.releaseCountries || []).map(countryName).join(', ')) ||
-            '<dt>Release</dt><dd>Date unknown</dd>') +
-        row('Premiere in Russia', d.ruPremiere, null, formatPremiereRu) +
-        (d.digital && !(d.digitalCountry === 'RU' && d.digital === d.ruDigital)
-            ? row('Digital release', d.digital, d.digitalCountry)
-            : '') +
-        row('Digital in Russia', d.ruDigital, d.ruServices) +
-        (!d.digital && !d.ruDigital ? '<dt>Digital release</dt><dd>Date unknown</dd>' : '')
+        (waiting.length ? peopleGroup('Waiting for release', waiting) : '') +
+            (notified.length ? peopleGroup('Already notified', notified) : '') ||
+        '<p class="people-none">No chat has this film on its list.</p>'
     );
 }
 
 /** Private enrichment never holds up the common public Released card. */
 async function releasedPeople(item) {
     const tv = item.kind === 'tv';
-    let people;
     const details = await api(`/${tv ? 'series' : 'movie'}/${item.tmdbId}`);
-    if (tv) {
-        const subs = details.subscribers || [];
-        people = subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>';
-    } else {
-        const chats = details.chats || [];
-        const waiting = chats.filter((chat) => !chat.notified),
-            notified = chats.filter((chat) => chat.notified);
-        people =
-            (waiting.length ? peopleGroup('Waiting for release', waiting) : '') +
-                (notified.length ? peopleGroup('Already notified', notified) : '') ||
-            '<p class="people-none">No chat has this film on its list.</p>';
-    }
-    return people;
+    return titlePeople(details, tv);
 }
 
 /** The date block of a released title: its season's premiere, or a film's release */
@@ -264,51 +230,48 @@ export const openSeriesDetails = (tmdbId, source = null) => {
     const poster = sourcePoster(source);
     const released = source?.closest('[data-release-year]');
     const year = released?.dataset.releaseYear;
-    const seasons = (released?.dataset.releaseSeasons || '').split(',').map(Number);
+    const seasons = (released?.dataset.releaseSeasons || '').split(',').map(Number).filter(Boolean);
     return openDetails(async () => {
         const data = await api(`/series/${tmdbId}`);
-        const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
-        const subs = data.subscribers || [];
         return {
-            title: data.name,
-            meta: `${rating} · ${escapeHtml(data.number_of_seasons)} season${data.number_of_seasons === 1 ? '' : 's'}`,
-            desc: data.overview,
-            dates: year
-                ? seasonDates(
-                      seasons,
-                      (data.seasons || []).map((s) => ({ season: s.season_number, date: s.air_date }))
-                  ) || `<dt>Season premiere in ${escapeHtml(year)}</dt><dd>None listed</dd>`
-                : `<dt>Premiere</dt><dd>${escapeHtml(formatReleaseDate(data.first_air_date))}</dd>`,
-            people: subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>',
-            poster: poster || posterUrl(data.poster_path),
+            kind: 'tv',
+            title: data.name || data.original_name,
+            seasons: data.number_of_seasons,
+            rating: data.vote_average,
+            overview: data.overview,
+            date: {
+                label: year ? `Season premiere in ${year}` : 'Premiere',
+                value: year ? 'None listed' : formatReleaseDate(data.first_air_date)
+            },
+            premieres: year
+                ? seasons.map((season) => ({
+                      season,
+                      date: (data.seasons || []).find((s) => s.season_number === season)?.air_date
+                  }))
+                : [],
+            people: titlePeople(data, true),
+            poster: poster || data.poster_path,
             kinopoisk: { type: 'tv', id: String(tmdbId).replace('tv_', '') }
         };
     });
 };
 
-export const openFilmDetails = (tmdbId, source = null) => {
-    const poster = sourcePoster(source);
-    return openDetails(async () => {
+export const openFilmDetails = (tmdbId, source = null) =>
+    openDetails(async () => {
         const data = await api(`/movie/${tmdbId}`);
-        const rating = titleRating(data.vote_average) || 'Not rated on TMDB yet';
-        const dates = filmDates(data.dates || {});
-        const chats = data.chats || [];
-        const waiting = chats.filter((c) => !c.notified);
-        const notified = chats.filter((c) => c.notified);
-        const people =
-            (waiting.length ? peopleGroup('Waiting for release', waiting) : '') +
-            (notified.length ? peopleGroup('Already notified', notified) : '');
         return {
+            kind: 'movie',
             title: data.title || data.original_title,
-            meta: `${rating} · ${escapeHtml(data.status || 'Unknown status')}`,
-            dates: dates || '<dt>Release</dt><dd>TBA</dd>',
-            desc: data.overview,
-            people: people || '<p class="people-none">No chat has this film on its list.</p>',
-            poster: poster || posterUrl(data.poster_path),
+            year: (data.dates?.release || data.release_date || '').slice(0, 4) || null,
+            status: data.status || 'Unknown status',
+            rating: data.vote_average,
+            overview: data.overview,
+            date: releasedDate({ kind: 'movie', dates: data.dates || {} }),
+            people: titlePeople(data, false),
+            poster: sourcePoster(source) || data.poster_path,
             kinopoisk: { type: 'movie', id: String(tmdbId).replace('movie_', '') }
         };
     });
-};
 
 export function openModeModal(key) {
     const sub = subsByKey.get(key);

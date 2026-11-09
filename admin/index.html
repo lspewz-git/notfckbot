@@ -1975,36 +1975,11 @@
             </div>
         </dialog>
 
-        <!-- Series Detail Modal -->
-        <dialog id="detail-modal" class="modal" aria-labelledby="detail-title">
-            <div class="modal-content modal-wide">
-                <div id="detail-loading" class="detail-loading">Loading details…</div>
-                <div id="detail-ready" class="detail" style="display: none">
-                    <img id="detail-poster" class="detail-poster" src="" alt="" />
-                    <div class="detail-body">
-                        <h3 id="detail-title">Title</h3>
-                        <p id="detail-meta" class="detail-meta"></p>
-                        <p id="detail-desc" class="detail-desc"></p>
-                        <!-- A film's dates (records.js); a series has none -->
-                        <dl id="detail-dates" class="kv-list detail-dates" hidden></dl>
-                        <!-- A search link at first; records.js points it at the title once its ID is known -->
-                        <a
-                            id="detail-kp"
-                            class="kp-link"
-                            href="https://www.kinopoisk.ru/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <svg class="kp-logo" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>
-                            <span>Open on Kinopoisk</span>
-                            <svg class="icon kp-out" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#arrow-up-right" />
-                            </svg>
-                        </a>
-                        <div id="detail-people" class="detail-people"></div>
-                    </div>
-                </div>
-                <button data-close="detail-modal" class="modal-x" aria-label="Close">
+        <!-- Admin title details use the same title sheet as personal pages. -->
+        <dialog id="detail-modal" class="modal app-sheet modal-sheet" aria-labelledby="detail-title">
+            <div class="modal-content modal-narrow sheet-content title-sheet" id="detail-body">
+                <h2 id="detail-title" class="detail-loading">Loading details…</h2>
+                <button data-close="detail-modal" class="sheet-close" aria-label="Close">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
                 </button>
             </div>

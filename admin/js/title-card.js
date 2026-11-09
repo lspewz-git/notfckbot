@@ -19,6 +19,14 @@ export function posterSrc(path, size = 'w185') {
     return file ? `/api/poster/${size}${file}` : '';
 }
 
+/** The same poster thumbnail in search, Following and Calendar. */
+export function titleThumb(path, cls = 'title-thumb') {
+    const src = posterSrc(path);
+    return src
+        ? `<img class="${cls}" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
+        : `<span class="${cls} title-thumb-empty" aria-hidden="true"></span>`;
+}
+
 export const NOTIFY = {
     episode: { short: 'Every episode', long: 'Every episode' },
     first_and_full: { short: 'Ep. 1 + season', long: 'Episode 1 and the whole season' },
@@ -70,7 +78,7 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
  * @param {{
  *   kind: string, title: string, poster?: string | null, seasons?: number | null, year?: string | number | null,
  *   rating?: number | null, genres?: string | null, networks?: string | null, overview?: string | null,
- *   kinopoiskUrl?: string | null,
+ *   kinopoiskUrl?: string | null, status?: string | null,
  *   premieres?: { season: number, date?: string | null }[],
  *   date?: DateBlock | DateBlock[] | null
  * }} t
@@ -87,7 +95,7 @@ export function titleCard(
     const poster = src
         ? `<button type="button" class="tc-poster" data-action="poster-view" data-src="${escapeHtml(big)}" data-thumb="${escapeHtml(src)}" data-title="${escapeHtml(t.title)}" aria-label="Open the poster of ${escapeHtml(t.title)}"><img src="${escapeHtml(src)}" alt="" decoding="async" /></button>`
         : '<span class="tc-poster tc-poster-empty" aria-hidden="true"></span>';
-    const about = [t.genres, t.networks].filter(Boolean).join(' · ');
+    const about = [t.genres, t.networks, t.status].filter(Boolean).join(' · ');
     // One date block, or several (a film: in cinemas and online)
     const date = (Array.isArray(t.date) ? t.date : t.date ? [t.date] : [])
         .map(

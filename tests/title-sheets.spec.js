@@ -141,14 +141,14 @@ for (const section of ['Following fresh', 'Following after Notify', 'Calendar', 
         await more.click();
         const less = card.getByRole('button', { name: 'Show less', exact: true });
         await expect(less).toHaveAttribute('aria-expanded', 'true');
-        await expect.poll(frame).toEqual({ ...before, height: isPhone(page) || section === 'Admin details' ? before.height : expect.any(Number) });
+        await expect.poll(frame).toEqual({ ...before, height: isPhone(page) ? before.height : expect.any(Number) });
         await less.click();
         await expect(more).toHaveAttribute('aria-expanded', 'false');
         await expect.poll(frame).toEqual(before);
     });
 }
 
-test('reopening a static detail card restores its natural height for new content', async ({ page }) => {
+test('reopening a shared detail card resets its content and collapsed description', async ({ page }) => {
     const options = { overview: 'A long description. '.repeat(90) };
     await mockPanel(page, options);
     await openSection(page, 'watchlist');
@@ -162,8 +162,10 @@ test('reopening a static detail card restores its natural height for new content
     await page.keyboard.press('Escape');
     options.overview = 'A short description.';
     await opener.click();
-    await expect(page.locator('#detail-desc')).toHaveText(options.overview);
-    await expect.poll(async () => (await card.boundingBox()).height).toBeLessThan(before);
+    await expect(page.locator('#detail-modal .tc-copy')).toHaveText(options.overview);
+    await expect(card.getByRole('button', { name: 'Show more', exact: true })).toBeHidden();
+    if (isPhone(page)) await expect.poll(async () => (await card.boundingBox()).height).toBe(before);
+    else await expect.poll(async () => (await card.boundingBox()).height).toBeLessThan(before);
 });
 
 test('notification options support the keyboard and reduced motion', async ({ page }) => {

@@ -50,18 +50,6 @@
     border-radius: 50%;
 }
 
-.description-toggle {
-    position: relative;
-    padding: var(--space-1) 0;
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: var(--space-1);
-    cursor: pointer;
-}
-
 @media (pointer: coarse) {
     .title-with-poster .link-text {
         display: inline-flex;
@@ -73,10 +61,6 @@
         content: '';
         position: absolute;
         inset: 0 calc(-1 * var(--space-2));
-    }
-
-    .description-toggle {
-        min-height: var(--control-h);
     }
 }
 

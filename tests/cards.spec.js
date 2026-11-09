@@ -28,12 +28,12 @@ test("a series card lists who is subscribed, with each chat's mode", async ({ pa
     await expect(rows.filter({ hasText: 'alice' })).toContainText('Every episode');
     await expect(rows.filter({ hasText: 'bob' })).toContainText('Whole season');
     await expect(rows.filter({ hasText: 'Movie Club' })).toContainText('Every episode');
-    await expect(card(page).locator('#detail-meta .title-rating')).toHaveText('8.4/ 10 · TMDB');
-    const ratingIcon = card(page).locator('#detail-meta .title-rating svg');
+    await expect(card(page).locator('.tc-rating')).toHaveText('8.4/ 10 · TMDB');
+    const ratingIcon = card(page).locator('.tc-rating svg');
     await expect(ratingIcon.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
     await expect.poll(() => ratingIcon.evaluate(el => el.getBBox().width)).toBeGreaterThan(10);
-    await expect(card(page).locator('#detail-dates dt')).toHaveText('Premiere');
-    await expect(card(page).locator('#detail-dates dd')).toHaveText('15 Jul 2016');
+    await expect(card(page).locator('.tc-date-text > .tc-date-label:first-child')).toHaveText('Premiere');
+    await expect(card(page).locator('.tc-date-value')).toHaveText('15 Jul 2016');
 });
 
 test("the Kinopoisk button opens the title's page in a new tab", async ({ page }) => {
@@ -67,7 +67,7 @@ test('a film card splits chats into waiting and already notified', async ({ page
     await expect(card(page).locator('#detail-title')).toHaveText('Dune');
     await expect(card(page).locator('.people-group h4')).toHaveText(['Already notified · 1']);
     await expect(card(page).locator('.people-group li')).toContainText('alice');
-    await expect(card(page).locator('#detail-kp')).toHaveAttribute('href', /\/film\/435\/$/);
+    await expect(card(page).locator('.tc-link')).toHaveAttribute('href', /\/film\/435\/$/);
 
     await page.keyboard.press('Escape');
     await page.locator('#upcoming-list [data-id="movie_1"]').click();
@@ -81,7 +81,7 @@ test("the Kinopoisk button keeps its size when the title's page replaces the sea
     await mockPanel(page, { kinopoiskHold });
     await openSeriesCard(page);
 
-    const button = card(page).locator('#detail-kp');
+    const button = card(page).locator('.tc-link');
     await expect(button).toHaveAttribute('href', /kp_query=Stranger%20Things/);
     // The dialog scales in as it opens; measure once it has settled
     const settled = () => page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
@@ -106,28 +106,29 @@ test("a film card lists the film's dates, TBA when none is known", async ({ page
     await mockPanel(page, { upcoming });
 
     await page.locator('#upcoming-list [data-id="movie_5"]').click();
-    const dates = card(page).locator('#detail-dates');
-    await expect(dates.locator('dt')).toHaveText(['Release', 'Premiere in Russia', 'Digital in Russia']);
-    await expect(dates).toContainText('15 Jan 2027 · Okko');
+    const dates = card(page).locator('.tc-scroll');
+    await expect(dates.locator('.tc-date-text > .tc-date-label:first-child')).toHaveText(['Release', 'Digital release']);
+    await expect(card(page).locator('.tc-scroll')).toContainText('15 Jan 2027');
+    await expect(card(page).locator('.tc-scroll')).toContainText('Okko');
     // The release date moved from the line under the title to the list
-    await expect(card(page).locator('#detail-meta')).not.toContainText('Nov');
+    await expect(card(page).locator('.tc-facts')).not.toContainText('Nov');
 
     await page.keyboard.press('Escape');
     await page.locator('#upcoming-list [data-id="movie_4"]').click();
-    await expect(dates.locator('dd').nth(1)).toHaveText('Feb 2027');
+    await expect(dates.first()).toContainText('Feb 2027');
 
     await page.keyboard.press('Escape');
     await page.locator('#upcoming-list [data-id="movie_3"]').click();
     await expect(card(page).locator('#detail-title')).toHaveText('No Date Yet');
-    await expect(dates.locator('dt')).toHaveText(['Release', 'Digital release']);
-    await expect(dates.locator('dd')).toHaveText(['Date unknown', 'Date unknown']);
+    await expect(dates.locator('.tc-date-text > .tc-date-label:first-child')).toHaveText(['Release', 'Digital release']);
+    await expect(dates.locator('.tc-date-value')).toHaveText(['Date unknown', 'Date unknown']);
 });
 
-test('on a phone a small poster sits beside the title, the description under both at full width', async ({ page }) => {
+test('on a phone the shared poster sits beside the title, the description under both at full width', async ({ page }) => {
     test.skip(page.viewportSize().width > 560, 'the phone layout');
     await mockPanel(page, { poster: true });
     await openSeriesCard(page);
-    const poster = card(page).locator('#detail-poster');
+    const poster = card(page).locator('.tc-poster');
     await expect(poster).toBeVisible();
     const settled = () => page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
     await settled();
@@ -135,11 +136,12 @@ test('on a phone a small poster sits beside the title, the description under bot
         [
             poster,
             card(page).locator('#detail-title'),
-            card(page).locator('#detail-meta'),
-            card(page).locator('#detail-desc')
+            card(page).locator('.tc-facts'),
+            card(page).locator('.tc-description')
         ].map((l) => l.boundingBox())
     );
-    expect(p.width).toBeLessThanOrEqual(60);
+    expect(p.width).toBeGreaterThan(0);
+    expect(p.width).toBeLessThan(140);
     expect(title.x).toBeGreaterThan(p.x + p.width);
     expect(meta.x).toBe(title.x);
     expect(desc.y).toBeGreaterThanOrEqual(p.y + p.height - 1);

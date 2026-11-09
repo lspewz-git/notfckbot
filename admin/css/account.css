@@ -932,24 +932,6 @@ button.search-result-open:hover .mine-row-title {
     line-height: 1.5;
 }
 
-.title-rating {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    color: var(--text-secondary);
-    vertical-align: middle;
-}
-
-.title-rating strong {
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
-
-.mine-card-head .title-rating {
-    margin-block: var(--space-1);
-}
-
 .mine-release-date {
     display: flex;
     flex-wrap: wrap;

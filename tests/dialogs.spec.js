@@ -51,7 +51,7 @@ test('a toast shown while a dialog is open is drawn above it, and stays after it
     await expect(toast).toBeVisible();
     expect(await onTop(toast)).toBe(true);
 
-    await page.locator('#detail-modal .modal-x').click();
+    await page.locator('#detail-modal .sheet-close').click();
     await expect(page.locator('#detail-modal')).toBeHidden();
     await expect(toast).toBeVisible();
     expect(await onTop(toast)).toBe(true);
@@ -164,7 +164,7 @@ test('on a touch screen closing a dialog leaves no focus ring on what opened it'
     await page.locator('.tab-item[data-section="subs"]').tap();
     await page.locator('#subs-body .compact-title').first().tap();
     await expect(page.locator('#detail-modal')).toBeVisible();
-    await page.locator('#detail-modal .modal-x').tap();
+    await page.locator('#detail-modal .sheet-close').tap();
     await expect(page.locator('#detail-modal')).toBeHidden();
     expect(await rings(page)).toBe(0);
 

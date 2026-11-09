@@ -248,7 +248,7 @@ const PIXEL = Buffer.from(
  * change what the next poll sees (e.g. `panel.subs.push(...)`).
  *
  * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
- *   hold?: Promise<void>, kinopoiskHold?: Promise<void>,
+ *   hold?: Promise<void>, kinopoiskHold?: Promise<void>, apiHold?: Record<string, Promise<void>>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
  *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
  *   recap?: (n: number) => Buffer, recapStatus?: object, recapLooks?: object, recapReady?: object,
@@ -1026,6 +1026,7 @@ async function mockPanel(page, options = {}) {
             if (!marked && !url.pathname.startsWith('/api/poster/'))
                 return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
             if (options.hold) await options.hold;
+            if (options.apiHold?.[url.pathname]) await options.apiHold[url.pathname];
             if (options.failing && options.failing.includes(url.pathname))
                 return route.fulfill({ status: 500, json: { error: 'Test failure' } });
             const answer = await handler(route.request());

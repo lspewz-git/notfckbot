@@ -56,7 +56,7 @@ import { pickActions } from './pick-sheet.js';
 import { profileActions, setupProfile } from './profile.js';
 import { titleCardActions, setupPosterViewer } from './title-card.js';
 import { deviceActions } from './devices.js';
-import { setupSearchForms, toggleDescription } from './content-search.js';
+import { setupSearchForms } from './content-search.js';
 import { chatPickerActions } from './chat-picker.js';
 import { setupNavigation, DEFAULT_PERSONAL_SECTION } from './navigation.js';
 import { syncTelegramBack } from './tg-back.js';
@@ -183,7 +183,6 @@ function startTimer() {
 // Generated markup carries data-* attributes only, so nothing has to be
 // reachable from the global scope and no value ends up inside executable code.
 const CLICK_ACTIONS = {
-    'description-toggle': toggleDescription,
     'chat-actions': (el) => openChatActions(el.dataset.id),
     'view-admin': () => switchSection(lastSection.admin),
     'view-mine': () => switchSection(lastSection.mine),
