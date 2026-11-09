@@ -299,8 +299,8 @@ function removeOwn() {
 export const passwordActions = {
     'password-open': () => openPasswordRow(),
     // Change from the sheet: the sheet goes, the form takes its place
-    'password-change': () => {
-        closeModal('password-sheet');
+    'password-change': async () => {
+        await closeModal('password-sheet');
         openOwn();
     },
     'password-remove-own': () => removeOwn(),

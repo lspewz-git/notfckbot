@@ -108,7 +108,7 @@ export function titleCard(
         ? `<a class="tc-link" href="${escapeHtml(t.kinopoiskUrl)}" target="_blank" rel="noopener noreferrer">${KP_LOGO}<span>Open on Kinopoisk</span>${icon('external-link')}</a>`
         : '';
     return (
-        '<span class="tc-grabber" aria-hidden="true"></span>' +
+        '<span class="sheet-grabber tc-grabber" aria-hidden="true"></span>' +
         (close
             ? `<button type="button" class="sheet-close" data-close="${close}" aria-label="Close">${icon('x')}</button>`
             : '') +

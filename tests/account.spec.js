@@ -69,7 +69,7 @@ test('a Mini App opened from a group hidden in the menu still opens that group',
     await mockPanel(page, { path, signedOut: true, role: 'user', miniAppChat: '-100', groupHidden: true });
     await expect(profileButton(page, 'my-calendar')).toContainText('Киноклуб');
     await profileButton(page, 'my-calendar').click();
-    await expect(page.locator('#pick-modal .pick-row.selected')).toContainText('Киноклуб');
+    await expect(page.locator('#my-profile-body .chat-row[aria-pressed="true"]')).toContainText('Киноклуб');
 });
 
 test('the chat chip names the open chat on every tab; the Account tab shows its avatar', async ({ page }) => {
@@ -911,7 +911,7 @@ test('Account settings: who is signed in, the role, and signing out on other dev
     await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
 });
 
-test('the chat chip opens the chats; the choice shows on every page', async ({ page, isMobile }) => {
+test('the header opens Account without a chevron; the chosen chat shows on every page', async ({ page, isMobile }) => {
     const panel = await mockPanel(page, { role: 'user' });
     const chip = profileButton(page, 'my-calendar');
     await expect(chip).toContainText('My account');
@@ -924,13 +924,18 @@ test('the chat chip opens the chats; the choice shows on every page', async ({ p
     expect(await chip.evaluate((el) => el.getBoundingClientRect().height)).toBe(36);
     if (isMobile) expect(hits).toEqual([true, true]);
     await chip.click();
-    const rows = page.locator('#pick-modal .pick-row');
+    await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
+    await expect(chip.locator('use[href$="#chevron-down"]')).toHaveCount(0);
+    await expect(chip).toHaveAttribute('href', '#my-profile');
+    await expect(page.locator('#pick-modal')).toBeHidden();
+    const rows = page.locator('#my-profile-body [data-action="profile-chat"]');
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText('Private chat');
-    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(rows.nth(0)).toHaveAttribute('aria-pressed', 'true');
     await expect(rows.nth(1)).toContainText('Group · view only');
     await rows.nth(1).click();
     await expect(page.locator('#pick-modal')).toBeHidden();
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
     await expect(chip).toContainText('Киноклуб');
     await openMine(page, 'my-calendar');
     await expect(page.locator('#my-calendar-section .mine-chat-chip')).toContainText('Киноклуб');
@@ -960,7 +965,7 @@ test('Chat settings: the chat on a card that opens the chats, rows with icon til
     await body.locator('[data-action="mine-pick"][data-name="quiet"]').click();
     const sheet = page.locator('#pick-modal');
     await expect(sheet).toHaveClass(/app-sheet/);
-    await expect(sheet.locator('.sheet-grabber')).toHaveCount(0);
+    await expect(sheet.locator('.sheet-grabber')).toHaveCount(1);
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
 

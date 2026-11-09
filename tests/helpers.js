@@ -54,6 +54,8 @@ async function openSection(page, section) {
     } else {
         await page.locator('.tab-item[data-open="more-modal"]').click();
         await page.locator(`#more-modal [data-section="${section}"]`).click();
+        // Keyboard focus can move to the section only after its outgoing sheet leaves the top layer.
+        await expect(page.locator('#more-modal')).toBeHidden();
     }
 }
 
@@ -63,13 +65,16 @@ async function openSettingsTab(page, tab) {
 }
 
 /** An account page's chat: its chip at the top, then the chat in the list it opens. */
-/** The chat chip at the top of a personal tab (redesign v2): it opens the chats sheet */
-const profileButton = (page, section) => page.locator(`#${section}-section [data-action="chat-switch"]`);
+/** The chat chip at the top of a personal tab links to Account. */
+const profileButton = (page, section) => page.locator(`#${section}-section [data-chat-picker] [data-section="my-profile"]`);
 
 async function pickChat(page, section, title) {
-    await profileButton(page, section).click();
-    await page.locator('#pick-modal .pick-row', { hasText: title }).click();
-    await expect(page.locator('#pick-modal')).toBeHidden();
+    const header = profileButton(page, section);
+    if (await header.count()) await header.click();
+    else await openAccount(page);
+    await page.locator('#my-profile-body [data-action="profile-chat"]', { hasText: title }).click();
+    if (section === 'my-settings') await openProfilePage(page, section);
+    else await openSection(page, section);
 }
 
 /** The Account tab: the tab bar's Account, the rail's, or an admin header's chip */

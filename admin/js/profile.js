@@ -2,7 +2,7 @@
  * The Account tab (`#my-profile`, the redesign of 06.11 instead of the old profile menu): who is
  * signed in, the chats to switch between, the settings pages and Sign out. And the Account settings
  * page's own group: who is signed in (the password group under it is password.js, the Devices row
- * devices.js). The chat chip in the tabs' headers opens only the chats (account.js).
+ * devices.js). The chat chip in the tabs' headers links to this Account tab (account.js).
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
@@ -11,7 +11,6 @@ import { avatar, initial } from './pick-sheet.js';
 import { chatList, chatHint, selectChat, setChatHidden, chatAvatar, setOwnName } from './account.js';
 import { setDevicesOwner, loadDevices } from './devices.js';
 import { DEFAULT_PERSONAL_SECTION } from './navigation.js';
-import { setupSheetSwipe } from './title-sheet.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -172,8 +171,6 @@ function visibilityRows() {
 function openVisibility() {
     $('visibility-list').innerHTML = visibilityRows();
     openModal('visibility-modal');
-    const modal = $('visibility-modal');
-    setupSheetSwipe(modal.querySelector('.visibility-sheet'), $('visibility-list'), modal, '#visibility-list');
 }
 
 async function toggleVisibility(button) {

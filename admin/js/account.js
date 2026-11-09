@@ -1,6 +1,6 @@
 /**
  * The user's own chats inside the panel (src/account/routes.js): Calendar, Released, Following, the
- * title search and Chat settings for the chat picked with the chip at the top of each tab (the
+ * title search and Chat settings for the chat picked on Account (the
  * redesign, 06.11). Every signed-in user has these; an admin has the rest of the panel too. In
  * English like the panel (a language switch comes later).
  */
@@ -11,7 +11,6 @@ import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { pickFrom, avatar, initial } from './pick-sheet.js';
-import { chatChip } from './chat-picker.js';
 import { searchResults, openSearchCard, MODES } from './content-search.js';
 import { titleCard, notifyField, subscriptionActions, posterSrc, fitDescriptions, NOTIFY } from './title-card.js';
 export { MODES };
@@ -136,19 +135,17 @@ export async function setChatHidden(id, hidden) {
 }
 
 /**
- * The chat at the top of each tab: a chip with its avatar and name that opens the chats
- * (`chat-switch`). Without a chat yet (loading, failed) it shows My account
+ * The chat at the top of each tab links to Account, like the navigation's Account entry.
+ * Without a chat yet (loading, failed) it shows My account.
  */
 function showChatChips() {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
     const name = chat ? chat.title : 'My account';
-    const html = chatChip({
-        title: name,
-        accent: !chat || chat.type === 'private',
-        action: 'chat-switch',
-        label: `Current chat: ${name}. Switch chat`,
-        letterOf: !chat || chat.type === 'private' ? ownName || name : name
-    });
+    const own = !chat || chat.type === 'private';
+    const html =
+        `<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="Account: ${escapeHtml(name)}">` +
+        avatar(own ? ownName || name : name, own) +
+        `<span class="mine-chat-chip-name">${escapeHtml(name)}</span></a>`;
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
     for (const holder of all('[data-profile-chat]')) holder.textContent = name;
     showTabChat(chat);

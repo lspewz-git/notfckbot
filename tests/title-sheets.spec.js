@@ -31,8 +31,9 @@ test('title sheet has a compact header and centered Kinopoisk logo', async ({ pa
             logo: [logo.width, logo.height, Math.round(logo.left - link.left), Math.round(logo.top + logo.height / 2 - link.top - link.height / 2)],
             overflow: el.scrollWidth > el.clientWidth
         };
-    })).toEqual({ padding: '8px', top: 16, close: [44, 44, 8, 8], link: [44, '14px', 'border-box'], logo: [20, 20, 13, 0], overflow: false });
-    await expect(page.locator('.sheet-grabber')).toHaveCount(0);
+    // Phones keep the approved full-edge scroll padding inside .tc-scroll; the poster inset stays 16px.
+    })).toEqual({ padding: isPhone(page) ? '0px' : '8px', top: 16, close: [44, 44, 8, 8], link: [44, '14px', 'border-box'], logo: [20, 20, 13, 0], overflow: false });
+    await expect(card.locator('.sheet-grabber')).toHaveCount(1);
 });
 
 test('notification choice starts collapsed, saves, updates summary and collapses again', async ({ page }) => {
@@ -259,7 +260,7 @@ test('actions follow expanded options without covering them at 390 by 844', asyn
     await expect.poll(visibleActions).toBe(true);
 });
 
-test('Session and Password headers start at the top; Escape and scrim dismiss', async ({ page }) => {
+test('Session and Password headers clear the phone grabber; Escape and scrim dismiss', async ({ page, isMobile }) => {
     await mockPanel(page, { role: 'user', hasPassword: true });
     for (const type of ['session', 'password']) {
         await openProfilePage(page, 'my-account');
@@ -272,8 +273,10 @@ test('Session and Password headers start at the top; Escape and scrim dismiss', 
         await expect.poll(() => modal.locator('.sheet-content').evaluate(el => {
             const tile = el.querySelector('.row-tile-xl').getBoundingClientRect();
             return { top: Math.round(tile.top - el.getBoundingClientRect().top - el.clientTop), width: tile.width, height: tile.height };
-        })).toEqual({ top: 16, width: 48, height: 48 });
-        await expect(modal.locator('.sheet-grabber')).toHaveCount(0);
+        })).toEqual({ top: isMobile ? 28 : 16, width: 48, height: 48 });
+        await expect(modal.locator('.sheet-grabber')).toHaveCount(1);
+        if (isMobile) await expect(modal.locator('.sheet-grabber')).toBeVisible();
+        else await expect(modal.locator('.sheet-grabber')).toBeHidden();
         if (type === 'session') await page.keyboard.press('Escape');
         else await modal.click({ position: { x: 2, y: 2 } });
         await expect(modal).toBeHidden();

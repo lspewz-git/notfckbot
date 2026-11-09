@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { isNarrow, isPhone, watchConsole, openSection, openProfilePage } = require('./helpers');
+const { isNarrow, isPhone, watchConsole, openSection, openProfilePage, profileButton } = require('./helpers');
 
 /**
  * Read-only checks against a running panel. Dialogs are opened and dismissed;
@@ -72,6 +72,39 @@ test('dashboard renders counters, health and popularity', async ({ page }) => {
     // "TG" when fine, "TG: ERR" when not
     await expect(page.locator('#health-tg')).toHaveText(/^TG(: ERR)?$/);
     await expect(page.locator('#popular-list .popular-item:not(.skeleton-item)').first()).toBeVisible();
+});
+
+test('header Account links and the shared settings sheet work without saving', async ({ page, isMobile }) => {
+    for (const section of ['my-calendar', 'my-aired', 'my-subs']) {
+        await openSection(page, section);
+        const header = profileButton(page, section);
+        await expect(header).toHaveAttribute('href', '#my-profile');
+        await expect(header.locator('svg')).toHaveCount(0);
+        await header.click();
+        await expect(page.locator('#my-profile-section')).toHaveClass(/active/);
+        await expect(page.locator('dialog[open]')).toHaveCount(0);
+    }
+    await openProfilePage(page, 'my-settings');
+    await page.locator('[data-action="mine-pick"][data-name="quiet"]').click();
+    const modal = page.locator('#pick-modal'), frame = modal.locator('.modal-content');
+    await frame.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+    await expect(frame.locator('.sheet-grabber')).toHaveCount(1);
+    if (isMobile) {
+        await expect(frame.locator('.sheet-grabber')).toBeVisible();
+        await frame.evaluate(el => {
+            const target = el.querySelector('h3'), top = el.getBoundingClientRect().top;
+            for (const [type, dy, ended] of [['touchstart', 0, false], ['touchmove', el.clientHeight * 0.35, false], ['touchend', el.clientHeight * 0.35, true]]) {
+                const touch = { identifier: 11, target, clientX: 140, clientY: top + 44 + dy };
+                const event = new Event(type, { bubbles: true, cancelable: true });
+                Object.defineProperties(event, { touches: { value: ended ? [] : [touch] }, changedTouches: { value: [touch] } });
+                target.dispatchEvent(event);
+            }
+        });
+    } else {
+        await expect(frame.locator('.sheet-grabber')).toBeHidden();
+        await frame.getByRole('button', { name: 'Close', exact: true }).click();
+    }
+    await expect(modal).toBeHidden();
 });
 
 test('Hidden chats matches the shared design and dismisses on phones without changing preferences', async ({ page, isMobile }) => {

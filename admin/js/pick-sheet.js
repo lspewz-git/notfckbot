@@ -70,11 +70,11 @@ export function pickFrom({ title, options, value, onPick, admin = false }) {
 
 /** Click handlers, merged into app.js's delegation like the other modules' */
 export const pickActions = {
-    pick: (el) => {
+    pick: async (el) => {
         const picked = values[Number(el.dataset.index)];
         const done = onPicked;
         onPicked = null;
-        closeModal('pick-modal');
+        await closeModal('pick-modal');
         if (done && picked !== undefined) done(picked);
     }
 };

@@ -31,7 +31,8 @@ for (const role of ['admin', 'user']) {
         const panel = await mockPanel(page, { role, groupAdmin: true, path: '/#my-subs' });
         if (process.env.PICK_SCREENSHOTS && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
         const sheet = page.locator('#pick-modal');
-        await profileButton(page, 'my-subs').click();
+        await openProfilePage(page, 'my-settings');
+        await page.locator('#my-settings-body .chat-card').click();
         const close = await checkHeader(sheet);
         if (isMobile) await expect(sheet.locator('.modal-content')).toHaveCSS('border-bottom-left-radius', '0px');
         await expect(sheet.locator('#pick-admin')).toBeVisible({ visible: role === 'admin' });

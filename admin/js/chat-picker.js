@@ -55,10 +55,10 @@ export const chatPickerActions = {
         $field('pick-query').dispatchEvent(new Event('input', { bubbles: true }));
         $field('pick-query').focus({ preventScroll: true });
     },
-    'chat-picker-select': (el) => {
+    'chat-picker-select': async (el) => {
         const done = choose;
         choose = null;
-        closeModal('pick-modal');
+        await closeModal('pick-modal');
         if (done) done(el.dataset.id);
     }
 };

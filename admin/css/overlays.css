@@ -1,3 +1,37 @@
+/* Every phone bottom sheet shares the same decorative drag indicator. */
+.sheet-grabber {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .modal-sheet .sheet-grabber {
+        position: absolute;
+        z-index: 3;
+        top: var(--space-2);
+        left: 50%;
+        display: block;
+        width: calc(var(--space-8) + var(--space-1));
+        height: var(--space-1);
+        transform: translateX(-50%);
+        border-radius: var(--space-2);
+        background: var(--text-faint);
+        box-shadow: 0 0 0 var(--space-1) var(--surface-overlay);
+        pointer-events: none;
+    }
+
+    .modal-sheet:not(:has(.title-sheet)) .modal-content {
+        padding-top: var(--space-5);
+    }
+
+    .modal-sheet:not(:has(.title-sheet)) .sheet-close {
+        top: var(--space-5);
+    }
+}
+
+.modal-sheet .modal-content.tc-dragging {
+    will-change: transform;
+}
+
 /* Toasts */
 .toast-container {
     position: fixed;

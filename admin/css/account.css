@@ -610,7 +610,7 @@ body.signed-out .tabbar {
     flex-wrap: wrap;
 }
 
-/* The chat: a small chip that opens the list of chats (pick-sheet.js) */
+/* Chat chips: headers link to Account; form controls open a chat picker. */
 .mine-chat-chip {
     display: inline-flex;
     align-items: center;
@@ -1175,10 +1175,10 @@ button.search-result-open:hover .mine-row-title {
 #pick-modal.chat-picker .modal-content {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
 }
 
-#pick-modal.chat-picker #pick-list {
+#pick-modal #pick-list {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -1244,6 +1244,7 @@ button.search-result-open:hover .mine-row-title {
 #pick-modal.app-sheet .modal-content {
     display: flex;
     flex-direction: column;
+    overflow: visible;
 }
 
 @media (min-width: 641px) {

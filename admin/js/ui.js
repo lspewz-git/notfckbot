@@ -38,6 +38,7 @@ const openStack = [];
 /** Modal id -> the element that had focus when it opened, so it can be given back. */
 const focusBeforeOpen = new Map();
 const closing = new WeakMap();
+const swipes = new WeakMap();
 
 /** @param {HTMLElement} modal */
 function focusables(modal) {
@@ -121,8 +122,20 @@ function watch(modal) {
 export function openModal(id) {
     const modal = /** @type {HTMLDialogElement | null} */ ($(id));
     if (!modal) return;
-    // Finish a previous exit before reopening this reusable dialog. Its late promise cannot close it again.
-    closing.get(modal)?.finish();
+    // A direct dialog swap finishes outgoing exits before the new dialog takes focus.
+    // No delayed opener may survive an Escape pressed during that transition.
+    for (const previous of [...openStack]) closing.get(previous)?.finish();
+    // Renderers may replace a sheet's contents while it is open; restore its shared indicator too.
+    if (modal.classList.contains('modal-sheet')) {
+        const sheet = modal.querySelector('.modal-content');
+        if (!sheet.querySelector('.sheet-grabber')) {
+            const grabber = document.createElement('span');
+            grabber.className = 'sheet-grabber';
+            grabber.setAttribute('aria-hidden', 'true');
+            sheet.prepend(grabber);
+        }
+        setupSheetSwipe(sheet, modal);
+    }
     // Opened again while open (a dialog redrawn after saving): only focus is put back
     if (modal.open) return focusInside(modal);
     // Static card dialogs reuse their content element for another title; start at its natural height.
@@ -164,7 +177,12 @@ export function closeModal(id) {
     const modal = /** @type {HTMLDialogElement | null} */ ($(id));
     if (!modal || !modal.open) return;
     if (closing.has(modal)) return closing.get(modal).done;
-    const sheet = /** @type {HTMLElement | null} */ (modal.querySelector('.title-sheet, .visibility-sheet'));
+    const sheet = /** @type {HTMLElement | null} */ (
+        modal.querySelector('.title-sheet, .visibility-sheet') ||
+            (isPhoneTitleSheet() && modal.classList.contains('modal-sheet')
+                ? modal.querySelector('.modal-content')
+                : null)
+    );
     if (sheet && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const phone = isPhoneTitleSheet();
         const slide = sheet.animate(
@@ -331,4 +349,143 @@ export function setupKeyboardWatch() {
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', () => window.requestAnimationFrame(update));
     update();
+}
+
+/** Native content scrolling owns its whole gesture; only a downward pull from the top moves the sheet. */
+function setupSheetSwipe(sheet, modal) {
+    if (swipes.get(modal)?.sheet === sheet) return;
+    swipes.get(modal)?.reset();
+    let drag = null;
+    let returning = null;
+    let blockClickUntil = 0;
+    const reset = () => {
+        returning?.cancel();
+        returning = null;
+        sheet.style.removeProperty('transform');
+        sheet.classList.remove('tc-dragging');
+        drag = null;
+    };
+    const settle = () => {
+        drag = null;
+        sheet.classList.remove('tc-dragging');
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return reset();
+        const from = getComputedStyle(sheet).transform;
+        returning?.cancel();
+        const animation = sheet.animate([{ transform: from }, { transform: 'translateY(0)' }], {
+            duration: 280,
+            easing: 'cubic-bezier(.2,.7,.3,1)',
+            fill: 'forwards'
+        });
+        returning = animation;
+        animation.finished.then(
+            () => returning === animation && reset(),
+            () => {}
+        );
+    };
+    const interrupt = () => {
+        if (drag?.mode === 'drag') settle();
+        else drag = null;
+    };
+    swipes.set(modal, { sheet, reset, interrupt });
+    if (!modal.dataset.sheetSwipeWatched) {
+        modal.dataset.sheetSwipeWatched = 'true';
+        // A second finger can land on the exposed backdrop, outside the moving sheet.
+        modal.addEventListener(
+            'touchstart',
+            (event) => {
+                if (event.touches.length > 1) swipes.get(modal)?.interrupt();
+            },
+            { capture: true, passive: true }
+        );
+        // These modal listeners refer only to its current sheet, not every replaced card.
+        modal.addEventListener('close', () => !modal.open && swipes.get(modal)?.reset());
+    }
+    sheet.addEventListener(
+        'touchstart',
+        (event) => {
+            if (!isPhoneTitleSheet()) return;
+            if (event.touches.length !== 1) {
+                return interrupt();
+            }
+            if (topmostModal() !== modal || modal.inert) return;
+            const offset = returning ? new window.DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42 : 0;
+            reset();
+            blockClickUntil = 0;
+            if (offset) {
+                sheet.style.transform = `translateY(${offset}px)`;
+                sheet.classList.add('tc-dragging');
+            }
+            let scrolled = false;
+            for (let node = event.target; node; node = node.parentElement) {
+                if (node.scrollTop > 1) scrolled = true;
+                if (node === sheet) break;
+            }
+            const touch = event.touches[0];
+            drag = {
+                id: touch.identifier,
+                x: touch.clientX,
+                y: touch.clientY,
+                offset,
+                distance: offset,
+                height: sheet.clientHeight,
+                mode: offset > 0 ? 'drag' : scrolled ? 'native' : null
+            };
+        },
+        { passive: true }
+    );
+    sheet.addEventListener(
+        'touchmove',
+        (event) => {
+            if (!drag) return;
+            if (event.touches.length !== 1) return interrupt();
+            if (drag.mode === 'native') return;
+            const touch = event.touches[0];
+            if (touch.identifier !== drag.id) return;
+            if (topmostModal() !== modal) return settle();
+            const dx = touch.clientX - drag.x;
+            const dy = touch.clientY - drag.y;
+            if (drag.mode !== 'drag') {
+                // Ignore small direction jitter before committing to either scrolling or dismissal.
+                if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+                if (dy <= 0 || Math.abs(dx) > Math.abs(dy) || !event.cancelable) {
+                    drag.mode = 'native';
+                    return;
+                }
+                drag.mode = 'drag';
+                sheet.classList.add('tc-dragging');
+            }
+            if (!event.cancelable) return settle();
+            event.preventDefault();
+            blockClickUntil = performance.now() + 500;
+            drag.distance = Math.max(0, drag.offset + dy);
+            // No layout reads or scrollTop writes on movement: content keeps the browser's scrolling/inertia.
+            sheet.style.transform = `translate3d(0, ${drag.distance}px, 0)`;
+        },
+        { passive: false }
+    );
+    sheet.addEventListener('touchend', (event) => {
+        if (!drag || ![...event.changedTouches].some((touch) => touch.identifier === drag.id)) return;
+        if (event.touches.length) return interrupt();
+        if (drag.mode !== 'drag') {
+            drag = null;
+            return;
+        }
+        const dismiss = drag.distance >= drag.height * 0.3;
+        drag = null;
+        sheet.classList.remove('tc-dragging');
+        if (dismiss && topmostModal() === modal) {
+            if (!dismissChatModals()) closeModalReturning(modal.id);
+        } else settle();
+    });
+    sheet.addEventListener('touchcancel', interrupt);
+    sheet.addEventListener(
+        'click',
+        (event) => {
+            if (performance.now() < blockClickUntil) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        },
+        true
+    );
 }
