@@ -64,11 +64,14 @@ const checkWatchlistReleases = async (bot, { datesOnly = false } = {}) => {
             const freshYear = freshDate ? parseInt(freshDate.slice(0, 4), 10) : null;
             // Titles change too, e.g. "Мстители: Судный день" -> "Мстители: Доктор Дум"
             const freshTitle = data.title || null;
+            // Reuse the details response; missing artwork must not erase a stored poster.
+            const freshPoster = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
             const facts = titleFacts(data, 'movie');
             for (const entry of filmEntries) {
                 const changes = {};
                 if (freshYear && entry.year !== freshYear) changes.year = freshYear;
                 if (freshTitle && entry.title !== freshTitle) changes.title = freshTitle;
+                if (freshPoster && entry.poster_url !== freshPoster) changes.poster_url = freshPoster;
                 for (const [k, v] of Object.entries(facts))
                     if (String(entry[k] ?? '') !== String(v ?? '')) changes[k] = v;
                 if (Object.keys(changes).length) await entry.update(changes);

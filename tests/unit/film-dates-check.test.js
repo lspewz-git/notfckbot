@@ -33,7 +33,7 @@ mock.method(kinopoisk, 'russianDates', async () => {
 // The "film is out" message, recorded instead of sent
 const outbox = require('../../src/cron/outbox');
 const sent = [];
-mock.method(outbox, 'notify', async (bot, chatId, text) => sent.push({ chatId, text }));
+mock.method(outbox, 'notify', async (bot, chatId, text, options) => sent.push({ chatId, text, photo: options.photo }));
 
 const { checkWatchlistReleases } = require('../../src/cron/films');
 
@@ -72,6 +72,64 @@ test("the film's rows get TMDB's digital release and Kinopoisk's Russian dates",
         assert.ok(r.ru_checked_at instanceof Date);
     }
     assert.equal(asked, 1, 'once for the film, not per chat');
+});
+
+test('posters fill missing rows and refresh changed rows across chats, including already notified films', async (t) => {
+    details = { ...NOT_OUT, poster_path: '/newPoster.jpg' };
+    const poster = 'https://image.tmdb.org/t/p/w500/newPoster.jpg';
+    rows = [
+        row({ poster_url: null }),
+        row({ poster_url: 'https://image.tmdb.org/t/p/w500/oldPoster.jpg', notified: true, Chat: { id: 2 } }),
+        row({ poster_url: poster, notified: true, Chat: { id: 3 } })
+    ];
+    const updates = rows.map((r) => t.mock.method(r, 'update'));
+    const callsBefore = tmdb.getDetails.mock.callCount();
+    await checkWatchlistReleases({});
+    assert.ok(rows.every((r) => r.poster_url === poster));
+    assert.equal(tmdb.getDetails.mock.callCount() - callsBefore, 1, 'reuse the one details request per film');
+    assert.deepEqual(
+        updates.map((update) => update.mock.calls.filter(({ arguments: [changes] }) => 'poster_url' in changes).length),
+        [1, 1, 0]
+    );
+    await checkWatchlistReleases({});
+    assert.deepEqual(
+        updates.map((update) => update.mock.calls.filter(({ arguments: [changes] }) => 'poster_url' in changes).length),
+        [1, 1, 0],
+        'an unchanged poster is not written again'
+    );
+    assert.equal(sent.length, 0);
+});
+
+test('an empty TMDB poster never erases a stored poster', async (t) => {
+    const poster = 'https://image.tmdb.org/t/p/w500/oldPoster.jpg';
+    rows = [row({ poster_url: poster }), row({ poster_url: null, Chat: { id: 2 } })];
+    const updates = rows.map((r) => t.mock.method(r, 'update'));
+    for (const poster_path of [null, undefined, '']) {
+        details = { ...NOT_OUT, poster_path };
+        await checkWatchlistReleases({});
+        assert.equal(rows[0].poster_url, poster);
+        assert.equal(rows[1].poster_url, null);
+    }
+    assert.ok(
+        updates.every((update) => update.mock.calls.every(({ arguments: [changes] }) => !('poster_url' in changes)))
+    );
+});
+
+test('startup refresh fills missing posters without sending notifications', async () => {
+    details = { ...NOT_OUT, poster_path: '/newPoster.jpg' };
+    rows = [row({ poster_url: null })];
+    await checkWatchlistReleases(null, { datesOnly: true });
+    assert.equal(rows[0].poster_url, 'https://image.tmdb.org/t/p/w500/newPoster.jpg');
+    assert.equal(rows[0].notified, false);
+    assert.equal(sent.length, 0);
+});
+
+test('film notifications use the refreshed poster in the same check', async () => {
+    details = { ...IN_CINEMAS(), poster_path: '/newPoster.jpg' };
+    rows = [row({ poster_url: null })];
+    await checkWatchlistReleases({});
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].photo, 'https://image.tmdb.org/t/p/w500/newPoster.jpg');
 });
 
 test('asked again only a day later', async () => {
