@@ -67,6 +67,58 @@ test('Ёлки 13 keeps Dec 10 Release in Following and Calendar, with an explic
     }
 });
 
+for (const { countries, label } of [
+    { countries: ['US'], label: 'United States' },
+    { countries: ['JP', 'CN', 'US'], label: 'Japan, China, United States' },
+    { countries: ['JP', 'CN', 'US', 'FR', 'GB', 'DE', 'KR'], label: 'Japan, China, United States +4' }
+]) {
+    test(`Calendar Release shows a compact label for ${countries.length} countries`, async ({ page }, info) => {
+        const panel = await mockPanel(page, { role: 'user' });
+        const release = { date: '2026-12-10', country: countries[0], countries };
+        panel.account.calendar.items = [
+            {
+                kind: 'movie',
+                tmdbId: 'movie_55',
+                listId: 55,
+                title: 'International film',
+                date: release.date,
+                release,
+                online: null,
+                event: 'release',
+                notifyOn: release.date
+            }
+        ];
+        await openSection(page, 'my-calendar');
+        await page.locator('#my-calendar-body [role="tab"]', { hasText: 'Films' }).click();
+        const row = page.locator('#my-calendar-body .cal-row', { hasText: 'International film' });
+        await expect(row.locator('.row-meta')).toHaveText(`Release · ${label}`);
+        expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+        if (countries.length > 3) {
+            const meta = await row.locator('.row-meta').boundingBox();
+            const more = await row.locator('.cal-meta-more').boundingBox();
+            expect(more.x).toBeGreaterThanOrEqual(meta.x);
+            expect(more.x + more.width).toBeLessThanOrEqual(meta.x + meta.width + 1);
+        }
+        if (process.env.CAPTURE_FILM_UI && countries.length > 3) {
+            await row.screenshot({ path: path.resolve(`previews/release-countries-row-${info.project.name}.png`) });
+        }
+        await row.click();
+        const card = page.locator('#mine-card-modal');
+        await expect(card.locator('.tc-date-value').first()).toHaveText(`Dec 10, 2026 · ${label}`);
+        expect(
+            await card
+                .locator('.tc-date')
+                .first()
+                .evaluate((el) => el.scrollWidth <= el.clientWidth)
+        ).toBe(true);
+        if (process.env.CAPTURE_FILM_UI && countries.length > 3) {
+            await card.locator('.title-sheet').screenshot({
+                path: path.resolve(`previews/release-countries-card-${info.project.name}.png`)
+            });
+        }
+    });
+}
+
 test('Released keeps a distinct Russian digital date and attaches its service to Russia', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     panel.account.airedFilmDates = {

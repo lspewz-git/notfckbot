@@ -285,6 +285,20 @@
     min-height: 64px;
 }
 
+.cal-row .cal-meta-countries {
+    display: flex;
+    gap: 4px;
+}
+
+.cal-meta-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cal-meta-more {
+    flex-shrink: 0;
+}
+
 .cal-day {
     display: flex;
     flex: none;

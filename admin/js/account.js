@@ -268,10 +268,11 @@ const seriesNote = (s) => {
     return 'Next episode date unknown';
 };
 
-/** "Belgium" for "BE"; the code itself where the browser has no name for it */
-
-const releaseCountries = (release) =>
-    (release?.countries?.length ? release.countries : [release?.country].filter(Boolean)).map(countryName).join(', ');
+const releaseCountries = (release, withCount = true) => {
+    const countries = release?.countries?.length ? release.countries : [release?.country].filter(Boolean);
+    const names = countries.slice(0, 3).map(countryName).join(', ');
+    return withCount && countries.length > 3 ? `${names} +${countries.length - 3}` : names;
+};
 const filmNote = (film) =>
     film.release?.date || film.date
         ? `Release ${dateText(film.release?.date || film.date, { withYear: true })}${releaseCountries(film.release) ? ` · ${releaseCountries(film.release)}` : ''}`
@@ -586,14 +587,19 @@ const calWhatOf = (kind) => (kind === 'movie' ? 'films' : 'series');
 const BELL = `<span class="cal-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${ICON('bell')}</span>`;
 
 function calRow(item, index, today, sameDay) {
+    const release = item.release || item;
+    const extra = item.kind === 'movie' ? Math.max(0, (release.countries?.length || 0) - 3) : 0;
     const sub =
         item.kind === 'tv'
             ? [`S${item.season}E${item.episode}`, episodeName(item), MARKS[item.mark]].filter(Boolean).join(' · ')
-            : `Release${releaseCountries(item.release || item) ? ` · ${releaseCountries(item.release || item)}` : ''}`;
+            : `Release${releaseCountries(release, false) ? ` · ${releaseCountries(release, false)}` : ''}`;
+    const meta = extra
+        ? `<span class="cal-meta-label">${escapeHtml(sub)}</span> <span class="cal-meta-more">+${extra}</span>`
+        : escapeHtml(sub);
     return (
         `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
         `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${thumb(item.poster, 'title-thumb cal-thumb')}` +
-        `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta">${escapeHtml(sub)}</span></span>` +
+        `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta${extra ? ' cal-meta-countries' : ''}">${meta}</span></span>` +
         `<span class="cal-when">${item.notifyOn ? BELL : ''}<span>${whenText(item.date, today)}</span></span></button></li>`
     );
 }
