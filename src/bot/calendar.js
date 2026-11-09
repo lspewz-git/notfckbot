@@ -5,6 +5,7 @@
  * One message, edited in place.
  */
 const { Markup } = require('telegraf');
+const { editView } = require('./message-view');
 const { period, periodItems, calendarText, addMonths, MONTHS_TITLE } = require('../calendar');
 
 // The previous and the next week or month; further is a click-through nobody needs
@@ -74,9 +75,7 @@ function register(bot) {
         await ctx.answerCbQuery();
         // A digest's buttons keep it a digest (no way back to a menu nobody here called up)
         const view = await calendarView(ctx.state.chatData, kind, offset, { digest: isDigest(ctx) });
-        await ctx.editMessageText(view.text, { parse_mode: 'HTML', ...NO_PREVIEW, ...view.keyboard }).catch((err) => {
-            if (!/not modified/.test(err.message)) throw err;
-        });
+        await editView(ctx, view, NO_PREVIEW);
     });
 }
 

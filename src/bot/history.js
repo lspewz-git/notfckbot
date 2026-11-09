@@ -4,6 +4,7 @@
  * /history. One message; the year buttons switch it in place.
  */
 const { Markup } = require('telegraf');
+const { editView } = require('./message-view');
 const { escapeHtml } = require('../constants');
 const { releaseHistory, upcomingHistory } = require('../history');
 const { todayIn } = require('../calendar');
@@ -138,10 +139,7 @@ function register(bot) {
         await ctx.answerCbQuery();
         if (!ctx.state.chatData) return;
         const view = await yearView(ctx.state.chatData, Number(ctx.match[1]), { digest: isDigest(ctx) });
-        await ctx.editMessageText(view.text, { parse_mode: 'HTML', ...NO_PREVIEW, ...view.keyboard }).catch((err) => {
-            // The same year pressed again
-            if (!/not modified/.test(err.message)) throw err;
-        });
+        await editView(ctx, view, NO_PREVIEW);
     });
 }
 

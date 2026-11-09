@@ -199,6 +199,42 @@ test('query → list → page 2 → card → back → card → subscribe, always
     assert.ok(db.series.has('tv_3'), 'the series is saved on subscribing');
 });
 
+test('edit errors keep the search message and release its button guard for the next press', async () => {
+    const bot = fakeBot();
+    const chat = fakeChat();
+    const ctxFor = chat.ctxFor;
+    let editError = null;
+    chat.ctxFor = (message, extra) => {
+        const ctx = ctxFor(message, extra);
+        const edit = ctx.editMessageText;
+        ctx.editMessageText = async (...args) => {
+            if (editError) throw editError;
+            return edit(...args);
+        };
+        return ctx;
+    };
+    const userCtx = chat.ctxFor(null, { message: { text: 'курьер' } });
+    require('../../src/bot/state').setState(userCtx, { state: 'waiting_for_search' });
+    await bot.onText()(userCtx, async () => {});
+    const original = only(chat);
+
+    editError = new Error('Bad Request: message is not modified');
+    await press(bot, chat, original.id, 'page_1');
+    assert.deepEqual(only(chat), original);
+    editError = new Error('Bad Request: message to edit not found');
+    await assert.rejects(press(bot, chat, original.id, 'page_1'), (caught) => caught === editError);
+    assert.deepEqual(only(chat), original);
+    editError = null;
+    await press(bot, chat, original.id, 'page_1');
+    assert.equal(only(chat).id, original.id);
+    assert.match(
+        only(chat)
+            .buttons.map((b) => b.text)
+            .join(' '),
+        /2 \/ 2/
+    );
+});
+
 test('adding a film from its photo card replaces the card with the confirmation', async () => {
     const bot = fakeBot();
     const chat = fakeChat();

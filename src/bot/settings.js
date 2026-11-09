@@ -4,6 +4,7 @@
  */
 const { Markup } = require('telegraf');
 const { mainMenu } = require('./keyboards');
+const { editView: showView } = require('./message-view');
 const { ownerOf } = require('./access');
 const { getState, setState } = require('./state');
 const { ZONES, PRESETS, zoneOf, hasQuietHours, quietLabel, pad } = require('../quiet');
@@ -141,12 +142,6 @@ function zoneView(settings) {
         keyboard: Markup.inlineKeyboard(rows)
     };
 }
-
-/** Puts a view in place of the settings message; an unchanged one is no error. */
-const showView = (ctx, view) =>
-    ctx.editMessageText(view.text, { parse_mode: 'HTML', ...view.keyboard }).catch((err) => {
-        if (!/not modified/.test(err.message)) throw err;
-    });
 
 /** Applies a change from the buttons and notes it in the chat's change log (src/chat-changes.js). */
 async function change(ctx, values) {

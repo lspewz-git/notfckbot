@@ -11,6 +11,7 @@ const { todayIn } = require('../calendar');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
+const { editView } = require('./message-view');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
 const { recordOwner, ownerOf } = require('./access');
 const events = require('../chat-events');
@@ -83,14 +84,8 @@ async function searchGuard(ctx, next) {
 async function showText(ctx, text, keyboard) {
     const current = ctx.callbackQuery && ctx.callbackQuery.message;
     if (current && !current.photo) {
-        try {
-            await ctx.editMessageText(text, { parse_mode: 'HTML', ...keyboard });
-            return current;
-        } catch (err) {
-            // "message is not modified": the same page pressed again
-            if (/not modified/.test(err.message)) return current;
-            throw err;
-        }
+        await editView(ctx, { text, keyboard });
+        return current;
     }
     if (current) await ctx.deleteMessage().catch(() => {});
     return ctx.reply(text, { parse_mode: 'HTML', ...keyboard });

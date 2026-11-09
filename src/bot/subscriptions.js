@@ -7,6 +7,7 @@ const { Chat, Series, Subscription, Watchlist } = require('../db');
 const { NOTIFY_LABELS, isFinishedStatus } = require('../constants');
 const { getState, setState } = require('./state');
 const { mainMenu } = require('./keyboards');
+const { editView } = require('./message-view');
 const events = require('../chat-events');
 const ops = require('../chat-ops');
 const { log } = require('../log');
@@ -52,15 +53,6 @@ const loadSubscriptionItems = async (chatId) => {
         active: [...series.filter((s) => !isFinishedStatus(s.status)), ...movies],
         archived: series.filter((s) => isFinishedStatus(s.status))
     };
-};
-
-const editView = async (ctx, { text, keyboard }) => {
-    try {
-        await ctx.editMessageText(text, { parse_mode: 'HTML', ...keyboard });
-    } catch (error) {
-        // Re-rendering an unchanged view is harmless; anything else is a real failure.
-        if (!String(error.description || error.message).includes('message is not modified')) throw error;
-    }
 };
 
 // Re-render the list a card belongs to (settings page or archive page). A list that has
