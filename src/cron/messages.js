@@ -1,6 +1,6 @@
 /** The notification texts the update check sends. Pure: no Telegram, database or network. */
 const { isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates, countryName } = require('../constants');
-const { onlineDate, releaseDate } = require('../film-release');
+const { onlineDate, releaseDate, worldwideRelease } = require('../film-release');
 
 /**
  * The three series notifications, as sent to subscribers. Exported so the admin
@@ -43,7 +43,10 @@ const NO_DIGITAL_DATE = '💻 Дата цифрового релиза неиз�
 function buildFilmMessage({ entry, data, links, now = new Date(), today, ru = {} }) {
     const online = onlineDate(data, ru);
     const release = releaseDate(data, ru);
-    const countries = release?.countries.map(countryName).map(escapeHtml).join(', ');
+    const countryCodes = release?.countries || [];
+    const countryNames = countryCodes.slice(0, 3).map(countryName).map(escapeHtml).join(', ');
+    const countries = countryCodes.length > 3 ? `${countryNames} +${countryCodes.length - 3}` : countryNames;
+    const where = release && worldwideRelease(data)?.date === release.date ? 'мировой прокат' : countries;
     const dates = extraFilmDates(
         {
             ...data,
@@ -56,7 +59,7 @@ function buildFilmMessage({ entry, data, links, now = new Date(), today, ru = {}
     return (
         `🎬 <b>Фильм вышел!</b>\n\n` +
         filmHead(entry, data) +
-        (release ? `📅 Дата релиза: <b>${formatRuDate(release.date)}</b>${countries ? ` (${countries})` : ''}\n` : '') +
+        (release ? `📅 Дата релиза: <b>${formatRuDate(release.date)}</b>${where ? ` (${where})` : ''}\n` : '') +
         (dates || NO_DIGITAL_DATE) +
         '\n' +
         links

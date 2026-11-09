@@ -7,7 +7,7 @@ process.env.TZ = 'UTC';
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildFilmMessage, buildDigitalMessage } = require('../../src/cron/messages');
+const { buildFilmMessage, buildDigitalMessage, buildTestMessage } = require('../../src/cron/messages');
 const { nextEpisodeFields, firstRelease } = require('../../src/api/tmdb');
 const { getWatchLinks, formatWatchLinks, formatDigitalDate, isFinishedStatus } = require('../../src/constants');
 
@@ -15,6 +15,60 @@ const NOW = new Date('2026-10-12T12:00:00Z');
 
 describe('buildFilmMessage', () => {
     const entry = { title: 'Дюна & Co', year: 2026 };
+
+    for (const type of [2, 3]) {
+        test(`compact release geography in real and test notifications for theatrical type ${type}`, () => {
+            const codes =
+                'AL AR AT BE BO BR CH CN CR CZ DE EC ES FI FO FR GB GH GP GR GT HN HU ID IE IL IT KR LA LU LV MA MK MT MX NI NO PE PH SE SI TW UA UY VE XK'.split(
+                    ' '
+                );
+            const data = {
+                release_dates: {
+                    results: codes.map((iso_3166_1) => ({
+                        iso_3166_1,
+                        release_dates: [{ type, release_date: '2026-07-29' }]
+                    }))
+                },
+                digital_first_date: '2026-10-06',
+                digital_first_country: 'CA'
+            };
+            const real = buildFilmMessage({ entry, data, links: '<LINKS>', now: NOW });
+            const releaseLine =
+                `📅 Дата релиза: <b>29 июля 2026 г.</b> ` +
+                (type === 3 ? '(мировой прокат)' : '(Албания, Аргентина, Австрия +43)');
+            assert.equal(
+                real.split('\n').find((line) => line.startsWith('📅')),
+                releaseLine
+            );
+            assert.match(real, /Цифровой релиз: <b>6 октября 2026 г\.<\/b> \(Канада\)/);
+            assert.doesNotMatch(real, /Бельгия|Косово/);
+            const preview = buildTestMessage('film', { film: { entry, data }, links: '<LINKS>' });
+            assert.equal(preview, '🧪 <b>[Тестовое уведомление]</b>\n\n' + real);
+        });
+    }
+
+    for (const [codes, expected] of [
+        [[], ''],
+        [['US'], ' (США)'],
+        [['CN', 'JP', 'US'], ' (Китай, Япония, США)']
+    ]) {
+        test(`compact countries keeps ${codes.length} countries without a counter`, () => {
+            const data = {
+                cinema_release_date: '2026-07-29',
+                release_dates: {
+                    results: codes.map((iso_3166_1) => ({
+                        iso_3166_1,
+                        release_dates: [{ type: 3, release_date: '2026-07-29' }]
+                    }))
+                }
+            };
+            const msg = buildFilmMessage({ entry, data, links: '', now: NOW });
+            assert.equal(
+                msg.split('\n').find((line) => line.startsWith('📅')),
+                `📅 Дата релиза: <b>29 июля 2026 г.</b>${expected}`
+            );
+        });
+    }
 
     test('digital expected status follows the chat-local day across UTC midnight', () => {
         const msg = buildFilmMessage({

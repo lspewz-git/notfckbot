@@ -1,5 +1,6 @@
 /** Shared film policy: actual theatrical release, with an independent known digital release. */
 const { premiereMonthOnly } = require('./constants');
+const { countries } = require('countries-list');
 
 const RELEASE_RULE_VERSION = 1;
 
@@ -35,6 +36,29 @@ function firstOf(events) {
         )
     ].sort();
     return { date, country: countries[0] || null, countries };
+}
+
+/** Display heuristic only: at least 10 markets in 3 regions during 7 calendar days. */
+function worldwideRelease(data) {
+    const regions = new Set(['AF', 'AS', 'EU', 'NA', 'OC', 'SA']);
+    const events = eventsOf(data, [3]).filter(
+        ({ country }) => Object.hasOwn(countries, country) && regions.has(countries[country].continent)
+    );
+    const starts = [...new Set(events.map((event) => event.date))].sort();
+    for (const date of starts) {
+        const end = Date.parse(date) + 6 * 24 * 60 * 60 * 1000;
+        const codes = [
+            ...new Set(
+                events
+                    .filter((event) => event.date >= date && Date.parse(event.date) <= end)
+                    .map((event) => event.country)
+            )
+        ].sort();
+        if (codes.length >= 10 && new Set(codes.map((code) => countries[code].continent)).size >= 3) {
+            return { date, countries: codes };
+        }
+    }
+    return null;
 }
 
 function isRussian(data) {
@@ -132,6 +156,7 @@ const onlineCountry = (row) =>
     !row.online_estimate && row.online_date === row.digital_date ? row.digital_country || null : null;
 
 module.exports = {
+    worldwideRelease,
     releaseDate,
     isReleased,
     onlineDate,
