@@ -10,6 +10,7 @@ import { toast, openModal, showConfirm } from './ui.js';
 import { avatar, initial } from './pick-sheet.js';
 import { chatList, chatHint, selectChat, setChatHidden, chatAvatar, setOwnName } from './account.js';
 import { setDevicesOwner, loadDevices } from './devices.js';
+import { DEFAULT_PERSONAL_SECTION } from './navigation.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
@@ -79,7 +80,7 @@ function chatsGroup() {
             .map((c) => {
                 const on = c.id === chatId;
                 return (
-                    `<li><button type="button" class="group-row chat-row" data-action="profile-chat" data-id="${escapeHtml(c.id)}" aria-pressed="${on}">` +
+                    `<li><button type="button" class="group-row chat-row" data-action="profile-chat" data-section="${DEFAULT_PERSONAL_SECTION}" data-id="${escapeHtml(c.id)}" aria-pressed="${on}">` +
                     chatAvatar(c) +
                     `<span class="row-text"><span class="row-name">${escapeHtml(c.title)}</span>` +
                     `<span class="row-meta">${escapeHtml(chatHint(c))}</span></span>` +

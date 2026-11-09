@@ -66,10 +66,17 @@ const REFRESH_SECONDS = 10;
 // --- Navigation ---
 
 let activeSection = 'dashboard';
+let activeView = 'admin';
 
 // An admin has two views: the admin panel and "My account" (their own chats, what a user sees).
-// The open section sets the view; each view reopens on the section it was left on
-const viewOf = (id) => (id.startsWith('my-') && !document.body.classList.contains('system-account') ? 'mine' : 'admin');
+// Shared account pages keep the current view; chat tabs explicitly enter personal mode.
+const SHARED_ACCOUNT_PAGES = ['my-profile', 'my-account', 'my-devices', 'my-settings'];
+const viewOf = (id) => {
+    if (document.body.classList.contains('system-account')) return 'admin';
+    if (document.body.classList.contains('role-user')) return 'mine';
+    if (SHARED_ACCOUNT_PAGES.includes(id)) return activeView;
+    return id.startsWith('my-') ? 'mine' : 'admin';
+};
 const lastSection = { admin: 'dashboard', mine: DEFAULT_PERSONAL_SECTION };
 // Opened from the Account tab, not tabs of their own: a view never reopens on them
 const ACCOUNT_PAGES = ['my-account', 'my-settings', 'my-devices', 'my-search'];
@@ -92,12 +99,13 @@ function switchSection(id) {
         return;
     }
     activeSection = id;
-    if (!ACCOUNT_PAGES.includes(id)) lastSection[viewOf(id)] = id;
-    document.body.classList.toggle('view-mine', viewOf(id) === 'mine');
+    activeView = viewOf(id);
+    if (!ACCOUNT_PAGES.includes(id) && !SHARED_ACCOUNT_PAGES.includes(id)) lastSection[activeView] = id;
+    document.body.classList.toggle('view-mine', activeView === 'mine');
     setSection(id);
     // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
     // not pushed: Back still leaves the panel instead of stepping through its tabs
-    window.history.replaceState(null, '', `#${id}`);
+    window.history.replaceState({ view: activeView }, '', `#${id}`);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
     syncTelegramBack();
     // Each section opens at its top: the page keeps one scroll position for all of them, and the
@@ -343,6 +351,7 @@ function sectionFromHash(role) {
  * on the dashboard and a user's on Calendar, the first personal tab.
  */
 function afterSignIn(role) {
+    activeView = role === 'admin' && window.history.state?.view !== 'mine' ? 'admin' : 'mine';
     // Opened from a group (a Mini App or a group's sign-in link): that chat's Calendar
     const start = !launchedInChat() && role === 'admin' ? activeSection : DEFAULT_PERSONAL_SECTION;
     switchSection(sectionFromHash(role) || start);

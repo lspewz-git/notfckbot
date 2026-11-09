@@ -38,10 +38,12 @@ test('the Account tab picks a chat for the personal pages and Admin panel return
     await openSection(page, 'logs');
     await adminProfile(page).click();
     await page.locator('#my-profile-body .chat-row', { hasText: 'Киноклуб' }).click();
+    await expect(page.locator('#my-calendar-section')).toBeVisible();
     await expect(page.locator('#my-profile-body .chat-row', { hasText: 'Киноклуб' })).toHaveAttribute(
         'aria-pressed',
         'true'
     );
+    await openSection(page, 'my-profile');
     await page.locator('#my-profile-body [data-action="view-admin"]').click();
     await expect(page.locator('#logs-section')).toBeVisible();
     await adminProfile(page).click();

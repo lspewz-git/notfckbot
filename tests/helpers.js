@@ -35,6 +35,10 @@ function watchConsole({ ignore } = {}) {
 
 /** Opens a section from the sidebar, the tab bar, or the More sheet for those without a tab. */
 async function openSection(page, section) {
+    if (['my-calendar', 'my-aired', 'my-subs'].includes(section) && !(await page.locator('body').evaluate((el) => el.classList.contains('view-mine')))) {
+        if (!(await page.locator('#my-profile-section').isVisible())) await openAccount(page);
+        await page.locator('#my-profile-body .chat-row[aria-pressed="true"]').click();
+    }
     if (section === 'recap') {
         await openSection(page, 'tools');
         await page.locator('#tools-section [data-section="recap"]').click();

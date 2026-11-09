@@ -229,10 +229,7 @@ async function openMine(page, section, { admin = false } = {}) {
     }
     // An admin reaches the personal tabs through the Account tab (their headers' chip)
     if (admin) await page.locator('.section.active [data-admin-profile] a').click();
-    if (!isNarrow(page)) {
-        return page.locator(`.nav-item[data-section="${section}"]`).click();
-    }
-    return page.locator(`.tab-item[data-section="${section}"]`).click();
+    return openSection(page, section);
 }
 
 for (const options of [{ signedOut: true }, { role: 'user' }, {}]) {
@@ -854,9 +851,11 @@ test('the Account tab: who is signed in, the chats, both settings pages and Sign
 
     // A chat row switches the chat
     await body.locator('.chat-row', { hasText: 'Киноклуб' }).click();
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
     await expect(body.locator('.chat-row', { hasText: 'Киноклуб' })).toHaveAttribute('aria-pressed', 'true');
     await expect(profileButton(page, 'my-subs')).toContainText('Киноклуб');
 
+    await openProfilePage(page, 'my-profile');
     await body.getByRole('button', { name: 'Sign out' }).click();
     await page.locator('#confirm-modal').getByRole('button', { name: 'Cancel', exact: true }).click();
     expect(panel.account.sent.some((r) => r.path === '/api/logout')).toBe(false);
