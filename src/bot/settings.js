@@ -53,7 +53,7 @@ function settingsView(chat, settings) {
     lines.push(`⌨️ Нижнее меню: <b>${menuOn ? 'включено' : 'выключено'}</b>`);
     rows.push([
         Markup.button.callback(
-            menuOn ? '⌨️ Выключить нижнее меню' : '⌨️ Включить нижнее меню',
+            menuOn ? '⌨️ Выключить меню' : '⌨️ Включить меню',
             `settings_menu_${menuOn ? 'off' : 'on'}`
         )
     ]);
@@ -62,21 +62,21 @@ function settingsView(chat, settings) {
     lines.push(`💻 Цифровые релизы: <b>${settings.notify_digital ? 'присылать' : 'не присылать'}</b>`);
     rows.push([
         Markup.button.callback(
-            settings.notify_digital ? '💻 Не присылать цифровые релизы' : '💻 Присылать цифровые релизы',
+            settings.notify_digital ? '💻 Выключить цифровые релизы' : '💻 Включить цифровые релизы',
             `settings_digital_${settings.notify_digital ? 'off' : 'on'}`
         )
     ]);
     lines.push(`📅 Сводка недели: <b>${settings.digest_week ? 'по понедельникам в 10:00' : 'выключена'}</b>`);
     rows.push([
         Markup.button.callback(
-            settings.digest_week ? '📅 Не присылать сводку недели' : '📅 Присылать сводку по понедельникам',
+            settings.digest_week ? '📅 Выключить сводку недели' : '📅 Включить сводку недели',
             `settings_digest_week_${settings.digest_week ? 'off' : 'on'}`
         )
     ]);
     lines.push(`🗓 Сводка месяца: <b>${settings.digest_month ? '1-го числа в 10:00' : 'выключена'}</b>`);
     rows.push([
         Markup.button.callback(
-            settings.digest_month ? '🗓 Не присылать сводку месяца' : '🗓 Присылать сводку 1-го числа',
+            settings.digest_month ? '🗓 Выключить сводку месяца' : '🗓 Включить сводку месяца',
             `settings_digest_month_${settings.digest_month ? 'off' : 'on'}`
         )
     ]);
