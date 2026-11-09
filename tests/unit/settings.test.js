@@ -3,6 +3,7 @@
  * checked before anything is written (src/admin/routes/settings.js), and no restart around an
  * update check (src/admin/restart.js). Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, before, after, beforeEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -105,7 +106,7 @@ describe('restartBlock', () => {
 
 describe('POST /api/settings', () => {
     let base;
-    let server;
+    let close;
     let app;
     const oldPanelProxyIp = process.env.PANEL_PROXY_IP;
     const bot = { telegram: { token: '123:old', options: {} } };
@@ -115,13 +116,10 @@ describe('POST /api/settings', () => {
         app.use(express.json());
         app.set('bot', bot);
         app.use(require('../../src/admin/routes/settings'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => {
-        server.close();
+    after(async () => {
+        await close();
         if (oldPanelProxyIp === undefined) delete process.env.PANEL_PROXY_IP;
         else process.env.PANEL_PROXY_IP = oldPanelProxyIp;
     });

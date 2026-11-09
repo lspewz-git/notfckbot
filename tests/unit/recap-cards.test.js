@@ -4,6 +4,7 @@
  * temporary folder, the database and the chat's figures are stand-ins; the drawing is real.
  * Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -328,17 +329,14 @@ describe('backgrounds', () => {
 
 describe('the API', () => {
     let base;
-    let server;
+    let close;
     before(async () => {
         const app = express();
         app.use(express.json());
         app.use(require('../../src/admin/routes/recap-cards'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => server.close());
+    after(() => close());
 
     const uploadFile = (bytes, type = 'image/png', name = 'pic.png') => {
         const form = new FormData();

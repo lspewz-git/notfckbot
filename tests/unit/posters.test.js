@@ -3,6 +3,7 @@
  * disk; a failed or broken download stores nothing; the sweep drops what nobody opened for
  * months. TMDB is stubbed, the cache is a temporary folder. Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, mock, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -27,18 +28,16 @@ mock.method(axios, 'get', async () => {
 const JPEG = { 'content-type': 'image/jpeg' };
 const ok = () => ({ headers: JPEG, data: Readable.from([IMAGE.subarray(0, 8), IMAGE.subarray(8)]) });
 
-let server;
+let close;
 let base;
 before(async () => {
     const app = express();
     app.get('/api/poster/:size/:file', (req, res) => servePoster(req.params.size, req.params.file, res));
-    await new Promise((resolve) => {
-        server = app.listen(0, resolve);
-    });
-    base = `http://127.0.0.1:${server.address().port}/api/poster`;
+    ({ base, close } = await listenForTest(app));
+    base += '/api/poster';
 });
-after(() => {
-    server.close();
+after(async () => {
+    await close();
     fs.rmSync(DIR, { recursive: true, force: true });
 });
 beforeEach(() => {

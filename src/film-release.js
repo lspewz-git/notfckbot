@@ -155,6 +155,19 @@ const ruCinemaDate = (row) => dayOf(row.cinema_ru_date);
 const onlineCountry = (row) =>
     !row.online_estimate && row.online_date === row.digital_date ? row.digital_country || null : null;
 
+/** Stored film dates shown by both the account list and calendar; no release decisions or writes. */
+function rowFilmDates(row, digitalAlerts = false) {
+    return {
+        release: rowRelease(row),
+        cinemaRu: ruCinemaDate(row),
+        online: row.online_date && !row.online_estimate ? { date: row.online_date, country: onlineCountry(row) } : null,
+        notifyDigital: Boolean(digitalAlerts && !row.digital_notified),
+        ruPremiere: row.ru_premiere,
+        ruDigital: row.ru_digital,
+        ruServices: row.ru_services
+    };
+}
+
 module.exports = {
     worldwideRelease,
     releaseDate,
@@ -166,5 +179,6 @@ module.exports = {
     rowRelease,
     ruCinemaDate,
     onlineCountry,
+    rowFilmDates,
     RELEASE_RULE_VERSION
 };

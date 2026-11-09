@@ -3,6 +3,7 @@
  * (src/cron/outbox.js), the list that goes out when they end (src/cron/held.js), and the bot's
  * screens for them (src/bot/settings.js). Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -288,7 +289,7 @@ test("the panel's time zones are the server's", () => {
 describe('PATCH /api/chat/:id/settings', () => {
     const express = require('express');
     let base;
-    let server;
+    let close;
     let saved;
 
     const patch = (body) =>
@@ -302,10 +303,7 @@ describe('PATCH /api/chat/:id/settings', () => {
         const app = express();
         app.use(express.json());
         app.use(require('../../src/admin/routes/records'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
         mock.method(Chat, 'findByPk', async () => ({
             ...chat({ quiet_start: null, quiet_end: null, digest_week: false, digest_month: false }),
             get() {
@@ -347,7 +345,7 @@ describe('PATCH /api/chat/:id/settings', () => {
                 assert.equal(saved, null);
             }
         } finally {
-            server.close();
+            await close();
         }
     });
 });

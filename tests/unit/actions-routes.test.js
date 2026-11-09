@@ -5,17 +5,17 @@
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
+const { listenForTest } = require('./http-server');
 
-let server;
-after(() => server && server.close());
+let close;
+after(() => close?.());
 
 test('there is no endpoint that wipes the database', async () => {
     const app = express();
     app.use(express.json());
     app.use(require('../../src/admin/routes/actions'));
-    await new Promise((resolve) => {
-        server = app.listen(0, resolve);
-    });
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/clear-all`, { method: 'POST' });
+    const listening = await listenForTest(app);
+    close = listening.close;
+    const res = await fetch(`${listening.base}/api/clear-all`, { method: 'POST' });
     assert.equal(res.status, 404);
 });

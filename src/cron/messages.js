@@ -93,10 +93,11 @@ const TEST_PREFIX = '🧪 <b>[Тестовое уведомление]</b>\n\n';
  * The real message for `mode`, marked as a test.
  * @param {string} mode one of TEST_MODES
  * @param {{ title?: string, season?: number, episode?: number, episodeName?: string, links?: string,
- *   film?: { entry: object, data: object } }} parts what that mode's message is made of
+ *   film?: { entry: object, data: object, ru?: object, now?: Date, today?: string } }} parts
+ *   what that mode's message is made of
  */
 function buildTestMessage(mode, { title, season, episode, episodeName, links, film }) {
-    if (mode === 'film') return TEST_PREFIX + buildFilmMessage({ entry: film.entry, data: film.data, links });
+    if (mode === 'film') return TEST_PREFIX + buildFilmMessage({ ...film, links });
     if (STATUS_MODES[mode]) return TEST_PREFIX + buildStatusMessage(title, STATUS_MODES[mode]);
     const messages = buildSeriesMessages({ title, season, episode, episodeName, links });
     const real =

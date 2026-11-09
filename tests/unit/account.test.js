@@ -1135,6 +1135,59 @@ test('the API: calendar includes cached film metadata and tolerates a cache miss
     assert.equal(list.body.films[0].overview, response.body.items[0].overview);
 });
 
+test('film dates agree in list and calendar, hiding estimates and already-sent digital bells', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const chat = { type: 'private', timezone: 'Europe/Moscow', notify_digital: false };
+    const film = {
+        id: 101,
+        tmdb_id: 'movie_10',
+        title: 'Film',
+        cinema_date: '2099-12-30',
+        cinema_country: 'FR',
+        release_countries: 'FR,GB',
+        cinema_ru_date: '2100-01-07',
+        online_date: '2100-02-01',
+        digital_date: '2100-02-01',
+        digital_country: 'RU',
+        ru_premiere: '2100-01-07',
+        ru_digital: '2100-02-01',
+        ru_services: 'START'
+    };
+    t.mock.method(Chat, 'findByPk', async () => chat);
+    t.mock.method(Subscription, 'findAll', async () => []);
+    t.mock.method(Watchlist, 'findAll', async () => [film]);
+    t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => undefined);
+    const cookie = await signIn(call, 7);
+    for (const [enabled, notified, estimate] of [
+        [false, false, false],
+        [true, false, false],
+        [true, true, false],
+        [true, false, true]
+    ]) {
+        chat.notify_digital = enabled;
+        film.digital_notified = notified;
+        film.online_estimate = estimate;
+        const expected = {
+            release: { date: '2099-12-30', country: 'FR', countries: ['FR', 'GB'] },
+            cinemaRu: '2100-01-07',
+            online: estimate ? null : { date: '2100-02-01', country: 'RU' },
+            notifyDigital: enabled && !notified,
+            ruPremiere: '2100-01-07',
+            ruDigital: '2100-02-01',
+            ruServices: 'START'
+        };
+        for (const path of ['list', 'calendar']) {
+            const response = await call('GET', `/api/account/chats/7/${path}`, { cookie });
+            assert.equal(response.status, 200);
+            const rows = path === 'list' ? response.body.films : response.body.items;
+            assert.equal(rows.length, 1);
+            const dates = Object.fromEntries(Object.keys(expected).map((key) => [key, rows[0][key]]));
+            assert.deepEqual(dates, expected, path);
+        }
+    }
+});
+
 function botHandlers() {
     const handlers = { commands: {}, actions: [], on: {} };
     require('../../src/bot/login').register({

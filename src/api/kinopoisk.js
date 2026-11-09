@@ -229,20 +229,23 @@ const datesCache = lruCache({ max: CACHE_MAX, ttl: DATES_TTL_MS, fetchMethod: fe
 /**
  * For the bot's card: the Kinopoisk ID and then the dates, given up on after `ms` in all, so a
  * slow Kinopoisk never holds the card back (it then shows TMDB's dates only).
- * @returns {Promise<{ kinopoiskId: number | null, ru: typeof NO_DATES }>}
+ * @returns {Promise<{ kinopoiskId: number | null, ru: typeof NO_DATES, pending?: true }>}
+ *   pending: the lookup has not completed, so an empty date is not a confirmed absence
  */
 async function kinopoiskQuick(tmdbId, imdbId, ms = 3000) {
     let settled = { kinopoiskId: null, ru: NO_DATES };
+    let complete = false;
     const lookup = (async () => {
         const kinopoiskId = await findKinopoiskId(tmdbId, imdbId);
         settled = { kinopoiskId, ru: NO_DATES };
         const ru = kinopoiskId ? await russianDates(kinopoiskId) : NO_DATES;
         settled = { kinopoiskId, ru };
+        complete = true;
     })().catch(() => {});
     let timer;
     await Promise.race([lookup, new Promise((resolve) => (timer = setTimeout(resolve, ms)))]);
     clearTimeout(timer);
-    return settled;
+    return complete ? settled : { ...settled, pending: true };
 }
 
 /** For the admin health badge. */

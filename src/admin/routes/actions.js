@@ -1,9 +1,11 @@
 /** Panel-wide actions: broadcast, run the update check, test notification. */
-const { Chat, Series } = require('../../db');
+const { Chat, Series, Watchlist } = require('../../db');
 const { checkUpdates } = require('../../cron');
 const { buildTestMessage, TEST_MODES, EPISODE_MODES, STATUS_MODES } = require('../../cron/messages');
 const { formatWatchLinks } = require('../../constants');
-const { findKinopoiskIdQuick } = require('../../api/kinopoisk');
+const { findKinopoiskIdQuick, kinopoiskQuick } = require('../../api/kinopoisk');
+const { todayIn } = require('../../calendar');
+const { isOnline, releaseDate } = require('../../film-release');
 const tmdb = require('../../api/tmdb');
 const { deliver } = require('../../delivery');
 const { isLeft } = require('../../bot-status');
@@ -72,17 +74,36 @@ router.post('/api/trigger-check', async (req, res) => {
 // --- Test notifications ---
 // Every alert the bot sends can be tried out; the texts come from buildTestMessage (cron/messages.js)
 /** A film's "out now" test: the details the release check would have, and its poster. */
-async function filmTest(filmId) {
+async function filmTest(filmId, chatId) {
     const numericId = String(filmId).replace('movie_', '');
     if (!/^\d+$/.test(numericId)) throw Object.assign(new Error('Bad film id'), { status: 400 });
-    const data = await tmdb.getDetails(numericId, 'movie');
+    const [data, chat] = await Promise.all([tmdb.getDetails(numericId, 'movie'), Chat.findByPk(chatId)]);
     const title = data.title || data.original_title;
-    const entry = { title, year: data.release_date ? parseInt(data.release_date.slice(0, 4), 10) : null };
-    const kinopoiskId = await findKinopoiskIdQuick(`movie_${numericId}`, data.imdb_id, 2000);
-    const links = formatWatchLinks({ title, kinopoiskId, mediaType: 'movie' });
+    const lookup = await kinopoiskQuick(`movie_${numericId}`, data.imdb_id, 2000);
+    const { kinopoiskId } = lookup;
+    let ru = lookup.ru;
+    if (lookup.pending || ru.failed) {
+        // Like the update check, keep the last known dates when Kinopoisk cannot answer.
+        const stored = await Watchlist.findOne({
+            where: { tmdb_id: `movie_${numericId}` },
+            order: [['ru_checked_at', 'DESC']]
+        });
+        if (stored) {
+            ru = {
+                premiere: stored.ru_premiere || null,
+                digital: stored.ru_digital || null,
+                services: stored.ru_services ? stored.ru_services.split(', ') : []
+            };
+        }
+    }
+    const now = new Date();
+    const today = todayIn(chat?.timezone, now);
+    const date = releaseDate(data, ru)?.date || data.release_date;
+    const entry = { title, year: date ? parseInt(date.slice(0, 4), 10) : null };
+    const links = formatWatchLinks({ title, kinopoiskId, mediaType: 'movie', watch: isOnline(data, ru, today) });
     return {
         title,
-        msg: buildTestMessage('film', { film: { entry, data }, links }),
+        msg: buildTestMessage('film', { film: { entry, data, ru, now, today }, links }),
         posterUrl: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null
     };
 }
@@ -179,7 +200,7 @@ router.post('/api/test-notification', async (req, res) => {
     try {
         const { title, msg, posterUrl } =
             mode === 'film'
-                ? await filmTest(filmId)
+                ? await filmTest(filmId, chatId)
                 : await seriesTest(seriesId, mode, { season, episode, episodeName });
 
         const result = await deliver(bot, chatId, msg, { photo: posterUrl });

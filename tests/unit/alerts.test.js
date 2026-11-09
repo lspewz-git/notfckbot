@@ -4,6 +4,7 @@
  * told when it's back, how the last run ended, and the panel's API refusing bad input. The
  * database is stubbed, .env and the shutdown mark are temporary files. Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, before, after, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -654,17 +655,14 @@ describe('rules in the panel', () => {
 
 describe("the panel's API", () => {
     let base;
-    let server;
+    let close;
     before(async () => {
         const app = express();
         app.use(express.json());
         app.use(require('../../src/admin/routes/alerts'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => server.close());
+    after(() => close());
 
     const call = (method, url, body) =>
         fetch(`${base}${url}`, {

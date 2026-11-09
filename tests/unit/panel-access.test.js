@@ -4,6 +4,7 @@
  * sign-up and the system account's password go to .env and process.env at once; an admin removes
  * someone's password. The database is stubbed, .env a temporary file. Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -52,7 +53,7 @@ after(() => {
 });
 
 describe('/api/access', () => {
-    let server;
+    let close;
     let base;
     // The signed-in admin, as the guard sets it
     let user;
@@ -65,12 +66,9 @@ describe('/api/access', () => {
         });
         app.set('bot', { telegram: { sendMessage: async (chatId, text) => notices.push({ chatId, text }) } });
         app.use(require('../../src/admin/routes/access'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => server.close());
+    after(() => close());
 
     beforeEach(() => {
         fs.writeFileSync(process.env.ENV_FILE, 'BOT_TOKEN=x\n');

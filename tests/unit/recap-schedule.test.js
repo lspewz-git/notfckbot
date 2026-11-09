@@ -4,6 +4,7 @@
  * the panel's Stop turns it off. The clock is a parameter, the database and the queue stand-ins,
  * .env a temporary file. Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -412,19 +413,16 @@ describe('sending by the clock', () => {
 });
 
 describe('the API', () => {
-    let server;
+    let close;
     let base;
     before(async () => {
         const app = express();
         app.use(express.json());
         app.use(require('../../src/admin/routes/recap-schedule'));
         app.use(require('../../src/admin/routes/recap'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => server.close());
+    after(() => close());
 
     const call = async (method, url, body) => {
         const res = await fetch(base + url, {

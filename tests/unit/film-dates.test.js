@@ -78,8 +78,18 @@ describe('the Russian dates from Kinopoisk', () => {
         mock.method(axios, 'get', () => new Promise(() => {}));
         const started = Date.now();
         const quick = await kinopoisk.kinopoiskQuick('movie_999', 'tt999', 50);
-        assert.deepEqual(quick, { kinopoiskId: null, ru: kinopoisk.NO_DATES });
+        assert.deepEqual(quick, { kinopoiskId: null, ru: kinopoisk.NO_DATES, pending: true });
         assert.ok(Date.now() - started < 1000);
+    });
+
+    test('a completed lookup with no Russian dates is not marked pending', async (t) => {
+        t.mock.method(axios, 'get', async (url) => ({
+            data: url.includes('wikidata') ? { results: { bindings: [{ kp: { value: '105' } }] } } : { items: [] }
+        }));
+        assert.deepEqual(await kinopoisk.kinopoiskQuick('movie_1005', null), {
+            kinopoiskId: 105,
+            ru: kinopoisk.NO_DATES
+        });
     });
 });
 

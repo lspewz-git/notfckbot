@@ -4,6 +4,7 @@
  * the row. The database, the cards and Telegram are stand-ins.
  * Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, beforeEach, afterEach, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
@@ -425,18 +426,15 @@ describe('who gets it', () => {
 
 describe('the API', () => {
     let base;
-    let server;
+    let close;
     before(async () => {
         const app = express();
         app.use(express.json());
         app.set('bot', albumBot());
         app.use(require('../../src/admin/routes/recap'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => server.close());
+    after(() => close());
 
     const post = (path, body) =>
         fetch(`${base}${path}`, {

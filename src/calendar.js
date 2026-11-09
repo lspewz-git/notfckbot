@@ -11,7 +11,7 @@ const { parseAired } = require('./cron/aired-episodes');
 const { zoneOf } = require('./quiet');
 const { escapeHtml, isFinishedStatus } = require('./constants');
 const { plural } = require('./words');
-const { rowRelease, onlineCountry, ruCinemaDate } = require('./film-release');
+const { rowFilmDates } = require('./film-release');
 
 // --- Dates as "YYYY-MM-DD" strings: TMDB's air dates are days, not moments ---
 
@@ -273,7 +273,8 @@ async function periodItems(chatId, from, to, { digitalAlerts = false } = {}) {
     // One Release event, independent of the chat's optional digital notification setting.
     const seenFilms = new Set();
     for (const f of films) {
-        const release = rowRelease(f);
+        const dates = rowFilmDates(f, digitalAlerts);
+        const release = dates.release;
         const rows = [release && { ...release, event: 'release', estimate: false }];
         for (const row of rows) {
             const date = row && row.date && String(row.date).slice(0, 10);
@@ -287,18 +288,12 @@ async function periodItems(chatId, from, to, { digitalAlerts = false } = {}) {
                 estimate: row.estimate,
                 country: row.country,
                 countries: row.countries,
-                release,
-                cinemaRu: ruCinemaDate(f),
-                online: f.online_date && !f.online_estimate ? { date: f.online_date, country: onlineCountry(f) } : null,
-                notifyDigital: Boolean(digitalAlerts && !f.digital_notified),
+                ...dates,
                 tmdbId: f.tmdb_id,
                 listId: f.id,
                 title: f.title,
                 poster: f.poster_url || null,
-                genres: f.genres,
-                ruPremiere: f.ru_premiere,
-                ruDigital: f.ru_digital,
-                ruServices: f.ru_services
+                genres: f.genres
             });
         }
     }

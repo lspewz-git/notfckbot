@@ -3,13 +3,14 @@
  * gets 400 and its message before anything is looked up, stored or sent; a good request goes
  * through as before. The database models are stubbed. Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, mock, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const { Chat, Subscription, Watchlist } = require('../../src/db');
 
 let base;
-let server;
+let close;
 let updated;
 let destroyed;
 before(async () => {
@@ -19,12 +20,9 @@ before(async () => {
     app.use(require('../../src/admin/routes/records'));
     app.use(require('../../src/admin/routes/actions'));
     app.use(require('../../src/admin/routes/details'));
-    await new Promise((resolve) => {
-        server = app.listen(0, resolve);
-    });
-    base = `http://127.0.0.1:${server.address().port}`;
+    ({ base, close } = await listenForTest(app));
 });
-after(() => server.close());
+after(() => close());
 
 beforeEach(() => {
     updated = null;

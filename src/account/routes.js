@@ -25,7 +25,7 @@ const QRCode = require('qrcode');
 const { confirmation } = require('./confirmation');
 const { lruCache } = require('../lru');
 const { notifyDays } = require('./notify-day');
-const { rowRelease, onlineCountry, ruCinemaDate, isReleased: filmIsReleased } = require('../film-release');
+const { rowFilmDates, isReleased: filmIsReleased } = require('../film-release');
 const confirmationCooldown = lruCache({ max: 2000, ttl: 60000 });
 
 /** A refusal from src/chat-ops.js with its own status; anything else is a 500 without details. */
@@ -483,13 +483,7 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
                 poster: posterPath(f.poster_url),
                 year: f.year,
                 date: f.premiere_digital,
-                ruPremiere: f.ru_premiere,
-                ruDigital: f.ru_digital,
-                ruServices: f.ru_services,
-                release: rowRelease(f),
-                cinemaRu: ruCinemaDate(f),
-                online: f.online_date && !f.online_estimate ? { date: f.online_date, country: onlineCountry(f) } : null,
-                notifyDigital: Boolean(chat?.notify_digital && !f.digital_notified),
+                ...rowFilmDates(f, chat?.notify_digital),
                 genres: f.genres,
                 links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
             }))

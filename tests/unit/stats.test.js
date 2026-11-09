@@ -3,6 +3,7 @@
  * charts built from them (src/admin/routes/stats.js). The database is stubbed.
  * Run: npm run test:unit
  */
+const { listenForTest } = require('./http-server');
 const { test, describe, mock, beforeEach, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
@@ -50,17 +51,14 @@ describe('counting by day', () => {
 
 describe('the API', () => {
     let base;
-    let server;
+    let close;
 
     before(async () => {
         const app = express();
         app.use(require('../../src/admin/routes/stats'));
-        await new Promise((resolve) => {
-            server = app.listen(0, resolve);
-        });
-        base = `http://127.0.0.1:${server.address().port}`;
+        ({ base, close } = await listenForTest(app));
     });
-    after(() => server.close());
+    after(() => close());
 
     beforeEach(async () => {
         mock.method(DailyStat, 'findOrCreate', async () => {});
