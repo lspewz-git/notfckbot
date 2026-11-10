@@ -39,10 +39,11 @@ function miniAppUser(initData, token, now = Date.now()) {
         const user = telegramUser.parse(JSON.parse(fields.get('user') || 'null'));
         // Where it was opened: a `t.me/<bot>?startapp=c<chat id>` link names the chat; otherwise a
         // group launch carries only Telegram's chat_instance (both are signed with the rest)
-        const start = /^c(-?\d{1,20})$/.exec(fields.get('start_param') || '');
+        const start = /^c(-?\d{1,20})(?:_((?:tv|movie)_[1-9]\d{0,9}))?$/.exec(fields.get('start_param') || '');
         const instance = fields.get('chat_instance') || '';
         return {
             startChat: start ? start[1] : null,
+            title: start?.[2] || null,
             chatInstance: /^-?\d{1,30}$/.test(instance) ? instance : null,
             launchId: hash,
             expiresAt: new Date((Number(authDate) + MAX_AGE_SECONDS + 1) * 1000),

@@ -7,7 +7,7 @@
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
-import { setChats, chatsFailed, resetChatChoice } from './account.js';
+import { setChats, chatsFailed, resetChatChoice, setLaunchTitle } from './account.js';
 import { signInForm, submitSignIn, setMe } from './password.js';
 import { setProfile } from './profile.js';
 import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
@@ -306,7 +306,8 @@ export async function startSession(preferredChat = null, { current = () => true,
             initData: launchData || miniApp?.initData || null,
             platform: platform || miniApp?.platform || null,
             next: miniApp?.next ?? null,
-            chat: miniApp?.chat ?? null
+            chat: miniApp?.chat ?? null,
+            title: miniApp?.title ?? null
         };
     }
     const initData = miniApp?.initData;
@@ -318,6 +319,7 @@ export async function startSession(preferredChat = null, { current = () => true,
             // Opened from a group: its page first (the chat list still decides whether it may be opened)
             // Kept on miniApp: a retry after a failed /account/me no longer has the launch data
             miniApp.chat = signedIn?.chatId ? String(signedIn.chatId) : null;
+            miniApp.title = signedIn?.title || null;
             // Spent: a later sign-in screen here offers to reopen the app for new launch data
             miniApp.initData = null;
             miniApp.next = 'reopen';
@@ -348,6 +350,10 @@ export async function startSession(preferredChat = null, { current = () => true,
     setMe(me.user);
     setProfile(me.user);
     resetChatChoice();
+    if (!me.user.system && setLaunchTitle(preferredChat, miniApp?.title)) {
+        window.history.replaceState(null, '', '/#my-subs');
+    }
+    if (miniApp) miniApp.title = null;
     document.body.classList.toggle('role-user', me.user.role !== 'admin');
     // The system account has a profile, but no Telegram chats.
     document.body.classList.toggle('system-account', Boolean(me.user.system));

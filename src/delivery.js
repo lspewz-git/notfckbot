@@ -71,7 +71,7 @@ function withTimeout(promise, ms) {
  * @param {object} bot Telegraf instance
  * @param {number | string} chatId
  * @param {string} text HTML
- * @param {{ photo?: string | null, extra?: object, wait?: (ms: number) => Promise<void> }} [options]
+ * @param {{ photo?: string | null, extra?: object | ((chatId: number | string) => object), wait?: (ms: number) => Promise<void> }} [options]
  *   extra: more of Telegram's send options, e.g. a keyboard (Markup.inlineKeyboard(…))
  * @returns {Promise<{ status: 'sent' | 'gone' | 'rejected' | 'failed', error?: string }>}
  *   gone: the chat is unreachable; rejected: Telegram refused the message; failed: Telegram or
@@ -88,7 +88,12 @@ async function deliver(bot, chatId, text, { photo = null, extra = {}, wait = sle
         if (silent >= 2) poster = null;
     };
     return followingMove(chatId, (id) =>
-        withRetries(() => sendOnce(bot, id, text, poster, extra), wait, TRY_TIMEOUT_MS, { onNoAnswer: dropPoster })
+        withRetries(
+            () => sendOnce(bot, id, text, poster, typeof extra === 'function' ? extra(id) : extra),
+            wait,
+            TRY_TIMEOUT_MS,
+            { onNoAnswer: dropPoster }
+        )
     );
 }
 

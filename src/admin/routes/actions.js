@@ -2,6 +2,7 @@
 const { Chat, Series, Watchlist } = require('../../db');
 const { checkUpdates } = require('../../cron');
 const { buildTestMessage, TEST_MODES, EPISODE_MODES, STATUS_MODES } = require('../../cron/messages');
+const { notificationButton } = require('../../app-links');
 const { formatWatchLinks } = require('../../constants');
 const { findKinopoiskIdQuick, kinopoiskQuick } = require('../../api/kinopoisk');
 const { todayIn } = require('../../calendar');
@@ -203,7 +204,16 @@ router.post('/api/test-notification', async (req, res) => {
                 ? await filmTest(filmId, chatId)
                 : await seriesTest(seriesId, mode, { season, episode, episodeName });
 
-        const result = await deliver(bot, chatId, msg, { photo: posterUrl });
+        const target =
+            mode === 'film'
+                ? `movie_${String(filmId).replace(/^movie_/, '')}`
+                : EPISODE_MODES.includes(mode)
+                  ? `tv_${String(seriesId).replace(/^tv_/, '')}`
+                  : null;
+        const result = await deliver(bot, chatId, msg, {
+            photo: posterUrl,
+            extra: (id) => notificationButton(bot, id, target)
+        });
         if (result.status !== 'sent') throw new Error(result.error);
 
         log.info(`[Admin] Test notification sent to chat ${chatId} for "${title}" (mode: ${mode})`);

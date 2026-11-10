@@ -16,6 +16,7 @@ let ru;
 let pending;
 let useRealLookup;
 let sent;
+let sentExtra;
 let base;
 let close;
 const NOW = Date.parse('2026-11-09T20:30:00Z');
@@ -29,9 +30,16 @@ before(async () => {
     const app = express();
     app.use(express.json());
     app.set('bot', {
+        botInfo: { username: 'notfckbot', has_main_web_app: true },
         telegram: {
-            sendPhoto: async (_id, _photo, extra) => (sent = extra.caption),
-            sendMessage: async (_id, text) => (sent = text)
+            sendPhoto: async (_id, _photo, extra) => {
+                sentExtra = extra;
+                sent = extra.caption;
+            },
+            sendMessage: async (_id, text, extra) => {
+                sentExtra = extra;
+                sent = text;
+            }
         }
     });
     app.use(require('../../src/admin/routes/actions'));
@@ -91,6 +99,10 @@ for (const [digital, source] of [
             })
         });
         assert.equal(response.status, 200);
+        const target = useRealLookup ? `movie_900${source === 'failed-id' ? 1 : 2}` : 'movie_7';
+        assert.deepEqual(sentExtra.reply_markup.inline_keyboard, [
+            [{ text: 'Открыть WebApp', url: `https://t.me/notfckbot?startapp=c1_${target}` }]
+        ]);
         const links = formatWatchLinks({
             title: data.title,
             kinopoiskId: useRealLookup ? null : 123,

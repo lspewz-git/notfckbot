@@ -116,7 +116,7 @@ router.post('/api/login/miniapp', challengeLimit, async (req, res) => {
         await devices
             .remember(req, res, user.userId, { trusted: true })
             .catch((err) => log.warn(`[Account] Remembering the device failed: ${err.message}`));
-        res.json({ success: true, chatId: await launchChat(user) });
+        res.json({ success: true, chatId: await launchChat(user), ...(user.title ? { title: user.title } : {}) });
     } catch (err) {
         fail(res, err);
     }
@@ -445,7 +445,26 @@ const titleMetadata = (tmdbId) => {
     };
 };
 
+const filmItem = (f, chat) => ({
+    id: f.id,
+    tmdbId: f.tmdb_id,
+    ...titleMetadata(f.tmdb_id),
+    title: f.title,
+    poster: posterPath(f.poster_url),
+    year: f.year,
+    date: f.premiere_digital,
+    ...rowFilmDates(f, chat?.notify_digital),
+    genres: f.genres,
+    links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
+});
+
 router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
+    const query = valid(
+        z.object({ title: idOf(/^(tv|movie)_[1-9]\d{0,9}$/, 'Bad title id').optional() }),
+        req.query,
+        res
+    );
+    if (!query) return;
     try {
         const [subs, films, chat] = await Promise.all([
             Subscription.findAll({ where: { chatId: req.chatId }, include: [Series] }),
@@ -471,22 +490,24 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
                 links: linksOf(s.title, s.kinopoisk_id, 'tv')
             }))
             .sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+        // Released films have left the waiting list, but their notification still opens their card.
+        let linkedTitle = null;
+        if (query.title?.startsWith('movie_')) {
+            const film = await Watchlist.findOne({
+                where: { chatId: req.chatId, tmdb_id: query.title },
+                order: [['id', 'DESC']]
+            });
+            if (film) linkedTitle = { ...filmItem(film, chat), kind: 'movie' };
+        } else if (query.title) {
+            const item = series.find((s) => s.id === query.title);
+            if (item) linkedTitle = { ...item, kind: 'tv' };
+        }
         res.json({
             access: req.access,
             today: todayIn(chat?.timezone),
             series,
-            films: films.map((f) => ({
-                id: f.id,
-                tmdbId: f.tmdb_id,
-                ...titleMetadata(f.tmdb_id),
-                title: f.title,
-                poster: posterPath(f.poster_url),
-                year: f.year,
-                date: f.premiere_digital,
-                ...rowFilmDates(f, chat?.notify_digital),
-                genres: f.genres,
-                links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
-            }))
+            films: films.map((f) => filmItem(f, chat)),
+            ...(query.title ? { linkedTitle } : {})
         });
     } catch (err) {
         fail(res, err);

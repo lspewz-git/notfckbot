@@ -66,6 +66,13 @@ const state = {
 
 /** The signed-in person's name (profile.js): their private chat's avatar shows its first letter */
 let ownName = '';
+/** @type {{ chatId: string, title: string } | null} One verified notification launch. */
+let launchTitle = null;
+
+export function setLaunchTitle(chatId, title) {
+    launchTitle = chatId && /^(tv|movie)_[1-9]\d{0,9}$/.test(title || '') ? { chatId: String(chatId), title } : null;
+    return Boolean(launchTitle);
+}
 
 /** A chat's avatar: a group's own letter, the person's for their private chat ("My account") */
 export const chatAvatar = (c) => (c.type === 'private' ? avatar(ownName || c.title, true) : avatar(c.title));
@@ -83,10 +90,15 @@ const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${
  * the chat picked last time; only a Mini App opened from a group (`preferred`) opens that group.
  */
 export function setChats(chats, preferred = null) {
+    preferred ||= launchTitle?.chatId || null;
     state.chats = chats;
     const ids = chats.filter((c) => !c.hidden).map((c) => c.id);
     // A named chat opens even when hidden from the menu: hiding only tidies the list, access stays
     const named = preferred && chats.some((c) => c.id === String(preferred));
+    if (launchTitle && (!named || launchTitle.chatId !== String(preferred))) {
+        launchTitle = null;
+        toast('This chat is no longer available.');
+    }
     state.chatId = named ? String(preferred) : ids[0] || null;
     state.chatsError = null;
     state.list = null;
@@ -109,6 +121,7 @@ export const chatHint = (c) =>
 
 /** Show the stable account choice while the new session's chats are loading. */
 export function resetChatChoice() {
+    launchTitle = null;
     state.chats = null;
     state.chatId = null;
     showChatChips();
@@ -182,6 +195,7 @@ function openChatSwitch() {
 /** Another chat picked: every section shows it, and the open one loads it */
 export async function selectChat(id) {
     if (id === state.chatId) return;
+    launchTitle = null;
     state.chatId = id;
     state.list = null;
     state.cal = null;
@@ -830,9 +844,24 @@ export async function loadMine(section) {
             await getAiredHistory().load();
         } else if (section === 'my-subs') {
             if (!state.list) body.innerHTML = loading();
-            const list = await api(chatPath('/list'));
+            const target = launchTitle?.chatId === chatNow ? launchTitle : null;
+            const list = await api(chatPath(`/list${target ? `?title=${encodeURIComponent(target.title)}` : ''}`));
             if (stale()) return;
             state.list = list;
+            if (target && launchTitle === target) {
+                launchTitle = null;
+                if (visibleSection() === section) {
+                    if (list.linkedTitle) {
+                        state.subsTab =
+                            list.linkedTitle.kind === 'movie'
+                                ? 'films'
+                                : list.linkedTitle.finished
+                                  ? 'archive'
+                                  : 'series';
+                        openFollowing(list.linkedTitle);
+                    } else toast('This title is no longer followed in this chat.');
+                }
+            }
             body.innerHTML = subsView();
         } else if (section === 'my-calendar') {
             if (!body.querySelector('.mine-cal-bar')) body.innerHTML = calendarView(null);

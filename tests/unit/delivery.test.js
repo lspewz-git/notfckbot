@@ -222,12 +222,17 @@ describe('the outbox', () => {
         }
     }
 
-    test('a message that did not go out is queued; a blocked chat is not', async () => {
+    test('a message that did not go out is queued; a blocked chat is not', async (t) => {
+        t.mock.method(require('../../src/chat-events'), 'record', () => {});
         // Real pauses would slow the test: the network fails at once on every try
         const down = scriptedBot([networkError(), networkError(), networkError()]);
         mock.timers.enable({ apis: ['setTimeout'] });
         try {
-            const sending = notify(down, 10, 'S2E4', { photo: 'p.jpg', about: 'Severance' });
+            const sending = notify(down, 10, 'S2E4', {
+                photo: 'p.jpg',
+                about: 'Severance',
+                event: { detail: 'episode', tmdb_id: 'tv_100' }
+            });
             await runPauses();
             assert.equal((await sending).status, 'failed');
         } finally {
@@ -239,6 +244,7 @@ describe('the outbox', () => {
                 chatId: 10,
                 text: 'S2E4',
                 photo: 'p.jpg',
+                app_target: 'tv_100',
                 about: 'Severance',
                 error: 'connect ETIMEDOUT 149.154.167.220:443'
             }

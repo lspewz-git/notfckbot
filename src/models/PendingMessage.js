@@ -20,6 +20,8 @@ const PendingMessage = sequelize.define('PendingMessage', {
         type: DataTypes.STRING(500),
         allowNull: true
     },
+    // Rebuild the button with the current chat id when retrying, including after migration.
+    app_target: { type: DataTypes.STRING(32), allowNull: true },
     // What it is about (a title) and why it last failed: the dashboard lists the queue
     about: {
         type: DataTypes.STRING(255),

@@ -29,6 +29,7 @@ const HeldNotification = sequelize.define('HeldNotification', {
         type: DataTypes.STRING(500),
         allowNull: true
     },
+    app_target: { type: DataTypes.STRING(32), allowNull: true },
     // When the list with it went out; null while held
     sentAt: {
         type: DataTypes.DATE,

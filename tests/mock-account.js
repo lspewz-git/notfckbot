@@ -111,6 +111,7 @@ function accountState(options) {
         miniAppTries: 0,
         // The chat the Mini App sign-in names (opened from a group)
         miniAppChat: options.miniAppChat || null,
+        miniAppTitle: options.miniAppTitle || null,
         // Statuses /api/account/me answers with first, one per request
         meFails: /** @type {number[]} */ ([...(options.meFails || [])]),
         // Signed in as the system account (not a Telegram user)
@@ -153,6 +154,7 @@ function accountState(options) {
         ],
         series: series(),
         films: films(),
+        releasedFilms: options.releasedFilms || [],
         calendar: structuredClone(CALENDAR),
         unfollowError: false,
         settings: {
@@ -336,7 +338,7 @@ function accountAnswer(state, req, url) {
         const fail = state.miniAppFails.shift();
         if (fail) return { status: fail, body: { error: `Mini App sign-in failed (${fail})` } };
         state.signedIn = true;
-        return { success: true, chatId: state.miniAppChat };
+        return { success: true, chatId: state.miniAppChat, title: state.miniAppTitle };
     }
     if (!state.signedIn) return { status: 401, body: { error: 'Sign in to the panel.' } };
     if (p === '/api/account/activity') return { success: true };
@@ -412,11 +414,18 @@ function accountAnswer(state, req, url) {
         return { hidden: chat.hidden };
     }
     if (rest === '/list') {
+        const target = url.searchParams.get('title');
+        const linked = target?.startsWith('movie_')
+            ? [...state.films, ...state.releasedFilms].find((f) => f.tmdbId === target)
+            : state.series.find((s) => s.id === target);
         return {
             access: { edit: true, settings: chat.settings },
             today: state.calendar.today,
             series: state.series,
-            films: state.films
+            films: state.films,
+            ...(target
+                ? { linkedTitle: linked ? { ...linked, kind: target.startsWith('movie_') ? 'movie' : 'tv' } : null }
+                : {})
         };
     }
     if (rest === '/series' && method === 'POST') {

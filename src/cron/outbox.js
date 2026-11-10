@@ -12,6 +12,7 @@ const { isLeft } = require('../bot-status');
 const { tally, noteFailure } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { log } = require('../log');
+const { notificationTarget, notificationButton } = require('../app-links');
 
 // A day of checks, however often they run, or two days on the calendar: past that the news is stale
 const MAX_ATTEMPTS = Math.ceil(24 / UPDATE_INTERVAL_HOURS);
@@ -79,7 +80,7 @@ async function notify(bot, chatId, text, { photo = null, about = '', line = '', 
     // A chat that blocked the bot or took it out (src/bot-status.js) isn't tried: it would only
     // fail. Its subscriptions stay, and news goes out again once it is back
     if (isLeft(await chatSettings(chatId))) return { status: 'left' };
-    const result = await send(bot, chatId, text, { photo, about, line, label });
+    const result = await send(bot, chatId, text, { photo, about, line, label, target: notificationTarget(event) });
     if (event) events.record(chatId, { kind: 'notified', ...event, outcome: outcomeOf(result) });
     return result;
 }
@@ -90,17 +91,26 @@ function outcomeOf(result) {
     return result.status === 'failed' ? 'queued' : 'failed';
 }
 
-async function send(bot, chatId, text, { photo, about, line, label }) {
+async function send(bot, chatId, text, { photo, about, line, label, target }) {
     if (line && isQuietNow(await chatSettings(chatId))) {
         try {
-            await HeldNotification.create({ chatId, line, label: label || about || 'Уведомление', text, photo });
+            await HeldNotification.create({
+                chatId,
+                line,
+                label: label || about || 'Уведомление',
+                text,
+                photo,
+                ...(target ? { app_target: target } : {})
+            });
             return { status: 'held' };
         } catch (err) {
             // Better at night than never
             log.error(`[Cron] Couldn't hold a notification for chat ${chatId}, sending it now: ${err.message}`);
         }
     }
-    const result = unreachable ? QUEUED : await deliver(bot, chatId, text, { photo });
+    const result = unreachable
+        ? QUEUED
+        : await deliver(bot, chatId, text, { photo, extra: (id) => notificationButton(bot, id, target) });
     if (result !== QUEUED && result.status === 'failed') unreachable = await stopSending(bot, result);
     // Where it went: a group that became a supergroup on the way has its new id
     const to = result.chatId || chatId;
@@ -127,6 +137,7 @@ async function send(bot, chatId, text, { photo, about, line, label }) {
             chatId: to,
             text,
             photo,
+            ...(target ? { app_target: target } : {}),
             about: clip(about, 255),
             error: clip(result.error, 500)
         });
@@ -192,7 +203,10 @@ async function flushPending(bot, now = new Date()) {
         // A retry after a failed one goes as text: the poster may be why it failed (each poster try
         // that gets no answer costs 30 s)
         const photo = message.attempts ? null : message.photo;
-        const result = await deliver(bot, message.chatId, message.text, { photo });
+        const result = await deliver(bot, message.chatId, message.text, {
+            photo,
+            extra: (id) => notificationButton(bot, id, message.app_target)
+        });
         if (result.status === 'failed') {
             unreachable = await stopSending(bot, result);
             await message.update({ attempts: message.attempts + 1, error: clip(result.error, 500) });

@@ -640,6 +640,11 @@ test('Mini App sign-in names the chat it was opened from', async (t) => {
     assert.equal(await chatOf({ start_param: 'other', chat_instance: 'x' }), null);
     assert.equal(await chatOf({}), null);
     assert.deepEqual(lookups, [{ chat_instance: '-555' }, { chat_instance: '-999' }]);
+    const titleLaunch = await call('POST', '/api/login/miniapp', {
+        body: { initData: data({ start_param: 'c-100777_movie_7' }) },
+        https: true
+    });
+    assert.deepEqual(titleLaunch.body, { success: true, chatId: '-100777', title: 'movie_7' });
 
     // The Devices list names the session by Telegram's platform and the web view's system
     sessions.clear();
@@ -962,6 +967,40 @@ test("the API: a chat the user isn't in is closed; a member can't change a group
     assert.equal(sent.length, 2);
     // The change log is the panel admins' only, even for a group's admin
     assert.equal((await call('GET', '/api/account/chats/-1/changes', { cookie: admin })).status, 404);
+});
+
+test('notification title lookup includes released films, keeps the waiting list intact and enforces chat access', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private' }));
+    t.mock.method(Subscription, 'findAll', async () => [
+        { notify_type: 'season', Series: { tmdb_id: 'tv_100', title: 'Show', status: 'Ended' } }
+    ]);
+    t.mock.method(Watchlist, 'findAll', async () => []);
+    const lookups = [];
+    t.mock.method(Watchlist, 'findOne', async (options) => {
+        lookups.push(options.where);
+        return options.where.tmdb_id === 'movie_7'
+            ? { id: 7, chatId: '7', tmdb_id: 'movie_7', title: 'Released film', notified: true }
+            : null;
+    });
+    t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => null);
+    t.mock.method(require('../../src/api/kinopoisk'), 'knownKinopoiskId', () => null);
+    const cookie = await signIn(call, 7);
+    const get = (suffix) => call('GET', `/api/account/chats/7/list${suffix}`, { cookie });
+    const response = await get('?title=movie_7');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.films, []);
+    assert.equal(response.body.linkedTitle.title, 'Released film');
+    assert.equal(response.body.linkedTitle.kind, 'movie');
+    assert.deepEqual(lookups, [{ chatId: '7', tmdb_id: 'movie_7' }]);
+    assert.equal((await get('?title=tv_100')).body.linkedTitle.finished, true);
+    assert.equal((await get('?title=movie_8')).body.linkedTitle, null);
+    assert.equal((await get('?title=invalid')).status, 400);
+    assert.equal((await get('')).body.linkedTitle, undefined);
+    const count = lookups.length;
+    assert.equal((await call('GET', '/api/account/chats/99/list?title=movie_7', { cookie })).status, 403);
+    assert.equal(lookups.length, count, 'an inaccessible chat never loads the title');
 });
 
 test('the API: a film is removed only from the chat in the path', async (t) => {
