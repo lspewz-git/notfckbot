@@ -289,7 +289,8 @@ function register(bot) {
         }
     });
 
-    bot.action(/^sub_set_([a-z0-9_]+)_(episode|season|first_and_full)$/, searchGuard, async (ctx) => {
+    // The id's shape is fixed: callback data can be sent by hand, and "tv_1_2" would become its own series row
+    bot.action(/^sub_set_(tv_[1-9]\d{0,9})_(episode|season|first_and_full)$/, searchGuard, async (ctx) => {
         const tmdbId = ctx.match[1];
         const notifyType = ctx.match[2];
         const chatId = ctx.chat.id;
@@ -336,7 +337,7 @@ function register(bot) {
     // Watchlist add
     // ============================================================
 
-    bot.action(/^watchlist_add_([a-z0-9_]+)$/, searchGuard, async (ctx) => {
+    bot.action(/^watchlist_add_(movie_[1-9]\d{0,9})$/, searchGuard, async (ctx) => {
         const tmdbId = ctx.match[1];
         const [mediaType, filmId] = tmdbId.split('_');
         try {

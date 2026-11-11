@@ -32,6 +32,18 @@ test('a broken value already in .env: a direct connection, not an error on every
     assert.ok(getProxyAgent(), 'a good value afterwards is picked up');
 });
 
+test('certificates stay verified through the proxy: the bot token and the TMDB key go this way', () => {
+    for (const url of ['socks5://127.0.0.1:1080', 'http://127.0.0.1:3128', 'https://proxy.example:443']) {
+        process.env.TMDB_PROXY_URL = url;
+        const agent = getProxyAgent();
+        assert.ok(agent, url);
+        // Where each agent keeps what it hands to tls.connect: for the site, the proxy and the SOCKS hop
+        for (const key of ['options', 'connectOpts', 'socketOptions']) {
+            assert.notEqual(agent[key]?.rejectUnauthorized, false, `${url}: ${key} turns verification off`);
+        }
+    }
+});
+
 test('the password never leaves the server, and an empty password field keeps the saved one', () => {
     assert.equal(redactProxyUrl('socks5://user:secret@10.0.0.5:1080'), 'socks5://user@10.0.0.5:1080');
     const kept = withSavedPassword('socks5h://user@10.0.0.5:1080', 'socks5://user:secret@10.0.0.5:1080');

@@ -461,3 +461,22 @@ test('a private prompt keeps the reply keyboard it is given', async () => {
     await askForQuery(ctx, keyboard);
     assert.equal(extra, keyboard);
 });
+
+test('button data sent by hand: only a plain series or film id reaches subscribing and the waiting list', () => {
+    const bot = fakeBot();
+    const handled = (data) =>
+        [...bot.actions].some(([trigger]) => (typeof trigger === 'string' ? trigger === data : trigger.test(data)));
+    assert.equal(handled('sub_set_tv_3_season'), true);
+    assert.equal(handled('watchlist_add_movie_1'), true);
+    for (const data of [
+        'sub_set_tv_1_2_episode',
+        'sub_set_movie_550_episode',
+        'sub_set_person_1_episode',
+        'sub_set_tv_0_episode',
+        'watchlist_add_tv_1399',
+        'watchlist_add_movie_1_2',
+        'watchlist_add_person_1'
+    ]) {
+        assert.equal(handled(data), false, data);
+    }
+});

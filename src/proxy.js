@@ -41,8 +41,10 @@ function proxyUrlProblem(url) {
 /** Build an agent for an arbitrary URL. Returns null for an unusable value. */
 const buildProxyAgent = (url) => {
     if (!url) return null;
-    if (url.startsWith('socks')) return new SocksProxyAgent(url, { rejectUnauthorized: false });
-    if (url.startsWith('http')) return new HttpsProxyAgent(url, { rejectUnauthorized: false });
+    // Certificates stay verified: the bot token and the TMDB key travel through this agent, and a
+    // proxy (or anyone on the way to it) that could swap the certificate would read them
+    if (url.startsWith('socks')) return new SocksProxyAgent(url);
+    if (url.startsWith('http')) return new HttpsProxyAgent(url);
     return null;
 };
 

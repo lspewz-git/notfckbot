@@ -24,6 +24,9 @@ class OpError extends Error {
 }
 
 const NOTIFY_TYPES = Object.keys(NOTIFY_LABELS);
+// The only shapes a stored title id takes, whoever asks (the bot's buttons, the panel, the account pages)
+const SERIES_ID = /^tv_[1-9]\d{0,9}$/;
+const FILM_ID = /^movie_[1-9]\d{0,9}$/;
 
 /**
  * Subscribes a chat to a series, or changes the mode of its subscription.
@@ -31,6 +34,8 @@ const NOTIFY_TYPES = Object.keys(NOTIFY_LABELS);
  */
 async function subscribe(chatId, tmdbId, notifyType, who = {}, details = null) {
     const fullId = String(tmdbId).startsWith('tv_') ? String(tmdbId) : `tv_${tmdbId}`;
+    // One row per series: "tv_1_2" would be a second row for series 1 that the update check asks TMDB about
+    if (!SERIES_ID.test(fullId)) throw new OpError(400, 'Bad series id');
     const chat = await Chat.findByPk(chatId);
     if (!chat) throw new OpError(404, 'Chat not found');
 
@@ -85,12 +90,13 @@ async function unsubscribe(chatId, seriesId, who = {}) {
 
 /** Puts a film on a chat's list: one still to come waits for its release, one already out goes to Released. */
 async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly = false } = {}) {
-    const chat = await Chat.findByPk(chatId);
-    if (!chat) throw new OpError(404, 'Chat not found');
-
     // Rows are stored as "movie_<id>": the request may send either form
     const numericId = String(tmdbId).replace('movie_', '');
     const fullTmdbId = `movie_${numericId}`;
+    if (!FILM_ID.test(fullTmdbId)) throw new OpError(400, 'Bad film id');
+    const chat = await Chat.findByPk(chatId);
+    if (!chat) throw new OpError(404, 'Chat not found');
+
     // The bot's waiting-list action keeps its findOrCreate semantics, even for an old card.
     const rows = waitingOnly ? [] : await Watchlist.findAll({ where: { chatId, tmdb_id: fullTmdbId } });
     if (rows.some((r) => !r.notified)) throw new OpError(409, 'Film already in watchlist for this chat');

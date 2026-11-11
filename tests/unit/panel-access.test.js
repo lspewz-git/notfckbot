@@ -18,7 +18,7 @@ const KEYS = ['OPEN_SIGNUP', 'SYSTEM_LOGIN', 'SYSTEM_PASSWORD_HASH', 'ENV_FILE']
 const savedEnv = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 process.env.ENV_FILE = path.join(DIR, '.env');
 
-const { Chat, AccountSession, AccountPassword, LoginLink, PanelRole } = require('../../src/db');
+const { Chat, AccountSession, AccountPassword, AccountDevice, LoginLink, PanelRole } = require('../../src/db');
 const { matches } = require('../../src/account/password');
 
 const CHATS = ['1', '7', '9'];
@@ -28,6 +28,7 @@ const panelRoles = new Map();
 const destroyed = [];
 const passwords = new Set();
 const notices = [];
+let olderDevices = 0;
 const stubs = [
     mock.method(Chat, 'findOne', async ({ where }) => (CHATS.includes(where.id) ? { id: where.id } : null)),
     mock.method(PanelRole, 'findByPk', async (id) =>
@@ -40,6 +41,8 @@ const stubs = [
     }),
     mock.method(AccountSession, 'create', async (row) => row),
     mock.method(LoginLink, 'destroy', async () => 0),
+    // The user's devices first seen more than a day ago, other than the one asking
+    mock.method(AccountDevice, 'count', async () => olderDevices),
     mock.method(AccountPassword, 'destroy', async ({ where }) => Number(passwords.delete(String(where.userId))))
 ];
 
@@ -57,11 +60,15 @@ describe('/api/access', () => {
     let base;
     // The signed-in admin, as the guard sets it
     let user;
+    // The browser asking, as the guard sets it: first seen long ago unless a test says otherwise
+    let device;
     before(async () => {
         const app = express();
         app.use(express.json());
         app.use((req, res, next) => {
             req.user = user;
+            req.device = device;
+            req.deviceId = 'this-browser';
             next();
         });
         app.set('bot', { telegram: { sendMessage: async (chatId, text) => notices.push({ chatId, text }) } });
@@ -76,6 +83,8 @@ describe('/api/access', () => {
         panelRoles.clear();
         panelRoles.set('1', 'admin');
         user = { id: 'session-1', userId: '1', role: 'admin', system: false };
+        device = { firstSeen: 0 };
+        olderDevices = 0;
         destroyed.length = 0;
         passwords.clear();
         notices.length = 0;
@@ -178,5 +187,36 @@ describe('/api/access', () => {
         assert.equal(String(notices[0].chatId), '7');
         assert.match(notices[0].text, /Администратор панели удалил ваш пароль/);
         assert.equal((await call('DELETE', undefined, '/api/access/abc/password')).status, 400);
+    });
+
+    test('a device signed in today changes no role, sign-up or password while an older device exists', async () => {
+        // A sign-in the admin was talked into: cancelling it must leave nothing behind
+        device = { firstSeen: Date.now() - 60 * 1000 };
+        olderDevices = 1;
+        panelRoles.set('7', 'user');
+        passwords.add('7');
+        const refused = [
+            await call('POST', { userId: '7', role: 'admin' }),
+            await call('PUT', { open: true }, '/api/access/signup'),
+            await call('PUT', { password: 'system-pass' }, '/api/access/system-password'),
+            await call('DELETE', undefined, '/api/access/7/password')
+        ];
+        for (const res of refused) {
+            assert.equal(res.status, 403);
+            assert.match(res.body.error, /one day after its first sign-in/);
+        }
+        assert.equal(panelRoles.get('7'), 'user');
+        assert.equal(passwords.has('7'), true);
+        assert.equal(envFile(), 'BOT_TOKEN=x\n', '.env untouched');
+        assert.equal(process.env.SYSTEM_PASSWORD_HASH, undefined);
+        assert.deepEqual(destroyed, []);
+        assert.equal((await call('GET')).status, 200, 'reading stays open');
+
+        // The only device the admin has, and the system account (no Telegram to sign in again with): not held back
+        olderDevices = 0;
+        assert.equal((await call('POST', { userId: '7', role: 'admin' })).status, 200);
+        olderDevices = 1;
+        user = { id: 'session-0', userId: '0', role: 'admin', system: true };
+        assert.equal((await call('PUT', { open: true }, '/api/access/signup')).status, 200);
     });
 });

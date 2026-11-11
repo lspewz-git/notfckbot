@@ -30,8 +30,27 @@ const ACCESS = z.object({
     role: z.enum(['admin', 'user', 'none'], { error: 'Pick admin, user or none' })
 });
 
+/**
+ * Who gets in and with which password is not changed from a device first seen today, as in My account
+ * (src/account/devices.js): a sign-in someone was talked into would otherwise outlive its cancelling,
+ * by setting the system account's password or making another admin.
+ */
+async function settledDevice(req, res, next) {
+    try {
+        const refusal = await devices.freshRefusal(req);
+        if (refusal) {
+            log.warn(`[Access] User ${req.user.userId} refused ${req.method} ${req.path}: a device signed in today`);
+            return res.status(403).json({ error: refusal });
+        }
+        next();
+    } catch (err) {
+        log.error(`[Access] Device check failed: ${err.message}`);
+        res.status(500).json({ error: 'Device check failed. Try again.' });
+    }
+}
+
 /** Body: { userId, role: 'admin' | 'user' | 'none' }. Answers the person's role as the list shows it. */
-router.post('/api/access', async (req, res) => {
+router.post('/api/access', settledDevice, async (req, res) => {
     const body = valid(ACCESS, req.body, res);
     if (!body) return;
     const { userId, role } = body;
@@ -55,7 +74,7 @@ router.post('/api/access', async (req, res) => {
 });
 
 /** Body: { open: boolean }. Closing it signs out nobody: the people without a role just can't get in. */
-router.put('/api/access/signup', (req, res) => {
+router.put('/api/access/signup', settledDevice, (req, res) => {
     const body = valid(z.object({ open: z.boolean({ error: 'Bad value' }) }), req.body, res);
     if (!body) return;
     try {
@@ -71,7 +90,7 @@ router.put('/api/access/signup', (req, res) => {
 });
 
 /** Body: { password }. The system account's other sessions end. */
-router.put('/api/access/system-password', async (req, res) => {
+router.put('/api/access/system-password', settledDevice, async (req, res) => {
     const body = valid(z.object({ password: password.PASSWORD }), req.body, res);
     if (!body) return;
     try {
@@ -97,14 +116,11 @@ router.put('/api/access/system-password', async (req, res) => {
  * Someone's password removed, as when it may have leaked: their sessions end too (an admin's own,
  * but the one making the request), and the bot tells them.
  */
-router.delete('/api/access/:userId/password', async (req, res) => {
+router.delete('/api/access/:userId/password', settledDevice, async (req, res) => {
     const params = valid(z.object({ userId: USER_ID }), req.params, res);
     if (!params) return;
     try {
         const self = params.userId === String(req.user.userId);
-        // One's own, from a device just signed in: the same wait as in My account (src/account/devices.js)
-        const refusal = self ? await devices.freshRefusal(req) : null;
-        if (refusal) return res.status(403).json({ error: refusal });
         if (await password.removePassword(params.userId)) {
             await endOtherSessions(params.userId, self ? req.user.id : null);
             if (!self) password.notifyPassword(req.app.get('bot'), params.userId, 'removed-by-admin');

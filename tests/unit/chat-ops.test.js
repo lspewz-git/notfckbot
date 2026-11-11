@@ -129,3 +129,22 @@ test('film removal retains the chat boundary and removes only that row by defaul
     assert.equal(destroy.mock.callCount(), 1);
     assert.equal(record.mock.callCount(), 1);
 });
+
+test('a title id of another shape is refused before anything is read or saved', async (t) => {
+    const chat = t.mock.method(Chat, 'findByPk', async () => ({ id: 1 }));
+    const details = t.mock.method(tmdb, 'getDetails', async () => ({ id: 1 }));
+    const series = t.mock.method(Series, 'findOrCreate', async () => [{}, true]);
+    const film = t.mock.method(Watchlist, 'findOrCreate', async () => [{}, true]);
+    // "tv_1_2" would be a second row for series 1, asked about at TMDB on every update check
+    for (const id of ['tv_1_2', 'tv_movie_550', 'tv_person_1', 'tv_0', 'tv_', 'tv_12345678901', '1 OR 1']) {
+        await assert.rejects(ops.subscribe(1, id, 'episode'), { status: 400, message: 'Bad series id' }, id);
+    }
+    for (const id of ['tv_1399', 'movie_1_2', 'movie_0', 'movie_', 'person_1']) {
+        await assert.rejects(
+            ops.addFilm(1, id, {}, { details: { id: 1 }, waitingOnly: true }),
+            { status: 400, message: 'Bad film id' },
+            id
+        );
+    }
+    for (const stub of [chat, details, series, film]) assert.equal(stub.mock.callCount(), 0);
+});
