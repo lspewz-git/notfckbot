@@ -13,6 +13,7 @@ const { promisify } = require('util');
 const { AccountPassword, Chat } = require('../db');
 const { startSession, startCode, invalidateCodes } = require('./auth');
 const roles = require('./roles');
+const { systemMiss } = require('./signin-watch');
 const { deliver } = require('../delivery');
 const { z } = require('../admin/validate');
 const { log } = require('../log');
@@ -105,6 +106,8 @@ async function signInWithPassword(login, password, now = Date.now(), device = nu
     }
     if (!(await matches(password, hash))) {
         log.warn(`[Account] Wrong password for ${system ? 'the system account' : `user ${userId}`}`);
+        // Not waited for: the answer to a wrong password takes the same time either way
+        if (system) systemMiss(device, now).catch((err) => log.error(`[Account] Sign-in alert failed: ${err.message}`));
         return null;
     }
     if (system) {

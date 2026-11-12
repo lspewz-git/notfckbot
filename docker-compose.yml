@@ -27,7 +27,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # The process runs as root inside (the project folder is root's on the host), but without root's
+    # kernel privileges: it reads and writes its own files, listens on 3000/3001, and nothing more
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
+      NODE_ENV: production
       BOT_TOKEN: ${BOT_TOKEN}
       DB_HOST: db
       IS_DOCKER: "true"

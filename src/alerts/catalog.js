@@ -86,14 +86,23 @@ const EVENTS = [
         title: 'Restarted',
         label: 'Restarted from the panel or a deploy'
     },
-    { key: 'low_memory', group: 'bot', critical: false, title: 'Low memory', label: 'Server running low on memory' }
+    { key: 'low_memory', group: 'bot', critical: false, title: 'Low memory', label: 'Server running low on memory' },
+    // Ten wrong passwords in an hour, from any addresses (src/account/signin-watch.js)
+    {
+        key: 'system_signin',
+        group: 'security',
+        critical: true,
+        title: 'System password guessed at',
+        label: 'Wrong system password, many times'
+    }
 ];
 
 const GROUPS = [
     { key: 'check', title: 'Update check' },
     { key: 'services', title: 'Services' },
     { key: 'sending', title: 'Sending' },
-    { key: 'bot', title: 'Bot' }
+    { key: 'bot', title: 'Bot' },
+    { key: 'security', title: 'Security' }
 ];
 
 const KEYS = EVENTS.map((e) => e.key);

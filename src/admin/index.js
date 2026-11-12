@@ -20,6 +20,9 @@ const { sweepChanges } = require('../chat-changes');
 const { log } = require('../log');
 
 const app = express();
+// Node's own parser: every query here is flat (?year=2026&q=…), and the nested one (qs) has known
+// ways to be slowed down by a crafted string, read before anyone has signed in
+app.set('query parser', 'simple');
 const PORT = 3000;
 const REDIRECT_PORT = 3001;
 

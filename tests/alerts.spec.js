@@ -26,7 +26,7 @@ test('a row per recipient: what it gets in a word, and whether the bot can reach
     await openAlerts(page);
     await expect(row(page, 'alice').locator('.alert-sum')).toHaveText(/Everything/);
     await expect(row(page, 'alice').locator('.alert-meta')).toHaveText('Last alert 2 h ago');
-    await expect(row(page, 'Movie Club').locator('.alert-sum')).toHaveText(/2 of 14/);
+    await expect(row(page, 'Movie Club').locator('.alert-sum')).toHaveText(/2 of 15/);
     await expect(row(page, 'Movie Club').locator('.alert-meta')).toHaveText("Can't reach: Removed from group · 28 Oct");
     await expect(row(page, 'Movie Club').locator('.alert-tag')).toHaveText('group');
     // The rows hold no switches however many events there are: those are in the dialog
@@ -42,7 +42,7 @@ test('a switch in the dialog makes the choice custom; Save keeps exactly what is
     await row(page, 'alice').click();
     await expect(dialog(page)).toBeVisible();
     await expect(dialog(page).locator('[data-preset="all"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(dialog(page).locator('.alert-event[aria-checked="true"]')).toHaveCount(14);
+    await expect(dialog(page).locator('.alert-event[aria-checked="true"]')).toHaveCount(15);
 
     await eventSwitch(page, 'Kinopoisk daily quota used up').click();
     await expect(dialog(page).locator('[data-preset="custom"]')).toHaveAttribute('aria-pressed', 'true');
@@ -55,9 +55,9 @@ test('a switch in the dialog makes the choice custom; Save keeps exactly what is
     await expect(dialog(page)).toBeHidden();
     const save = panel.alerts.saves.at(-1);
     expect(save.preset).toBe('custom');
-    expect(save.events).toHaveLength(13);
+    expect(save.events).toHaveLength(14);
     expect(save.events).not.toContain('kinopoisk_quota');
-    await expect(row(page, 'alice').locator('.alert-sum')).toHaveText(/13 of 14/);
+    await expect(row(page, 'alice').locator('.alert-sum')).toHaveText(/14 of 15/);
 });
 
 test('a preset turns on its events; Critical only saves without a list', async ({ page }) => {
