@@ -22,7 +22,7 @@
     "@ip-location-db/dbip-country-mmdb": "^2.3.2026060120",
     "@resvg/resvg-wasm": "^2.6.2",
     "axios": "^1.13.6",
-    "cacache": "^20.0.4",
+    "cacache": "^21.0.2",
     "compression": "^1.8.2",
     "countries-list": "3.4.1",
     "dotenv": "^17.3.1",
@@ -30,7 +30,7 @@
     "express-rate-limit": "^8.7.2",
     "https-proxy-agent": "^7.0.5",
     "lru-cache": "^11.5.3",
-    "mariadb": "2.5.6",
+    "mariadb": "3.5.5",
     "maxmind": "^5.0.8",
     "multer": "^2.5.0",
     "node-cron": "^4.2.1",
@@ -48,5 +48,10 @@
     "eslint": "^9.39.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "sequelize": {
+      "uuid": "^11.1.1"
+    }
   }
 }
