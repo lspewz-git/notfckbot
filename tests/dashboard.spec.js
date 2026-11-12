@@ -68,6 +68,82 @@ test('the banner is not rewritten when a refresh brings the same news', async ({
     expect(await page.evaluate(() => window.__bannerWrites)).toBe(0);
 });
 
+// Today 09:05 and 08:30 local time, so the dialog prints the time alone
+const at = (h, m) => new Date(new Date().setHours(h, m, 0, 0)).getTime();
+const PROXY_DOWN = {
+    problem: { since: at(9, 5), reason: 'timeout', checks: 2 },
+    recent: [{ since: at(8, 30), until: at(8, 31), reason: 'connection refused' }]
+};
+
+test('the banner says why and since when a single service fails', async ({ page }) => {
+    await mockPanel(page, { health: { proxy: 'error' }, healthProblems: { proxy: PROXY_DOWN } });
+    await expect(page.locator('#service-alert-text')).toHaveText(
+        'Proxy is reporting an error: timeout · since 09:05 · 2 checks in a row'
+    );
+});
+
+test('the proxy dialog shows the error, since when and the problems that ended', async ({ page }) => {
+    await mockPanel(page, { health: { proxy: 'error' }, healthProblems: { proxy: PROXY_DOWN } });
+    await page.route('**/api/config', (route) =>
+        route.fulfill({ json: { tmdbProxyUrl: 'socks5h://192.168.2.191:1070', proxyHasPassword: false } })
+    );
+    await page.locator('#health-proxy').click();
+    await expect(page.locator('#proxy-state')).toHaveText('● Not responding');
+    await expect(page.locator('#proxy-problem')).toHaveText(/Errortimeout\s*Failingsince 09:05 · 2 checks in a row/);
+    await expect(page.locator('#proxy-recent')).toContainText('Recent problems');
+    await expect(page.locator('#proxy-recent dt')).toHaveText('08:30');
+    await expect(page.locator('#proxy-recent dd')).toHaveText('connection refused · 1 min');
+});
+
+test('a dialog that finds the service working clears its stale badge and banner', async ({ page }) => {
+    await mockPanel(page, { health: { proxy: 'error' }, healthProblems: { proxy: PROXY_DOWN } });
+    await expect(page.locator('#service-alert')).toBeVisible();
+    await page.route('**/api/config', (route) =>
+        route.fulfill({ json: { tmdbProxyUrl: 'socks5h://192.168.2.191:1070', proxyHasPassword: false } })
+    );
+    // The fresh check the dialog asks for: working again, the problem moved to the recent ones
+    await page.route('**/api/health/proxy?fresh=1', (route) =>
+        route.fulfill({
+            json: {
+                proxy: 'ok',
+                problem: null,
+                recent: [{ since: at(9, 5), until: at(9, 7), reason: 'timeout' }, ...PROXY_DOWN.recent]
+            }
+        })
+    );
+    await page.locator('#health-proxy').click();
+    await expect(page.locator('#proxy-state')).toHaveText('● Working');
+    await expect(page.locator('#proxy-problem')).toBeHidden();
+    await expect(page.locator('#proxy-recent dd')).toHaveText(['timeout · 2 min', 'connection refused · 1 min']);
+    await expect(page.locator('#health-proxy')).toHaveText('Proxy');
+    await expect(page.locator('#service-alert')).toBeHidden();
+});
+
+test('a proxy that is off and had no problems shows no status', async ({ page }) => {
+    await mockPanel(page);
+    await page.locator('#health-proxy').click();
+    await expect(page.locator('#proxy-modal')).toBeVisible();
+    await expect(page.locator('#proxy-status')).toBeHidden();
+});
+
+test('a working service still lists its recent problems in its dialog', async ({ page }) => {
+    await mockPanel(page, {
+        healthProblems: {
+            telegram: { problem: null, recent: [{ since: at(8, 1), until: at(8, 2), reason: 'connection reset' }] }
+        }
+    });
+    await page.route('**/api/services/telegram', (route) =>
+        route.fulfill({ json: { name: 'telegram', label: 'Telegram Bot API', configured: true, masked: '12*****yz' } })
+    );
+    await page.route('**/api/services/telegram/check', (route) =>
+        route.fulfill({ json: { configured: true, ok: true, details: [['Bot', '@notfckbot']] } })
+    );
+    await page.locator('#health-tg').click();
+    await expect(page.locator('#service-state')).toHaveText('● Working');
+    await expect(page.locator('#service-recent dt')).toHaveText('08:01');
+    await expect(page.locator('#service-recent dd')).toHaveText('connection reset · 1 min');
+});
+
 test('"Run now" waits for the check and then shows its result', async ({ page }) => {
     await mockPanel(page);
     const run = page.locator('#run-check');

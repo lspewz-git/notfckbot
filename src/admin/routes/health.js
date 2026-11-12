@@ -69,13 +69,70 @@ const HEALTH_CHECKS = {
     }
 };
 
+const failedOf = (name, value) => value[name] === false || value[name] === 'error';
+
+// A failed check is asked once more after this pause: a single dropped connection (Telegram's
+// ECONNRESET came several times a day) is not an outage worth a red badge
+const RETRY_DELAY_MS = 1000;
+
+async function runCheck(name, bot) {
+    const first = await HEALTH_CHECKS[name](bot);
+    if (!failedOf(name, first)) return first;
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    return HEALTH_CHECKS[name](bot);
+}
+
+/**
+ * What the panel shows instead of a raw error: short words for the usual network failures,
+ * and never the bot token, which Telegraf's messages carry in the request URL.
+ * @param {string | undefined} reason
+ */
+function plainReason(reason) {
+    if (!reason) return 'no details';
+    if (/timeout|ETIMEDOUT|ESOCKETTIMEDOUT|aborted/i.test(reason)) return 'timeout';
+    if (/ECONNRESET|socket hang up/i.test(reason)) return 'connection reset';
+    if (/ECONNREFUSED/.test(reason)) return 'connection refused';
+    if (/ENOTFOUND|EAI_AGAIN/.test(reason)) return 'DNS lookup failed';
+    return reason.replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot…');
+}
+
+// The dialogs' "what went wrong": the problem going on now and the last few that ended, per service.
+// In memory: a restart starts the list over
+const MAX_RECENT = 3;
+const ongoing = new Map(); // name -> { since, reason, checks }
+const recent = new Map(); // name -> [{ since, until, reason }], newest first
+
+/**
+ * Notes one check's result and adds what the panel shows: `problem` (failing now: since when, why,
+ * how many checks in a row) and `recent` (ended problems).
+ */
+function track(name, value, now = Date.now()) {
+    const open = ongoing.get(name);
+    if (failedOf(name, value)) {
+        const reason = plainReason(value.reason);
+        ongoing.set(name, open ? { ...open, reason, checks: open.checks + 1 } : { since: now, reason, checks: 1 });
+    } else if (open) {
+        ongoing.delete(name);
+        recent.set(
+            name,
+            [{ since: open.since, until: now, reason: open.reason }, ...(recent.get(name) || [])].slice(0, MAX_RECENT)
+        );
+    }
+    return { ...value, problem: ongoing.get(name) || null, recent: recent.get(name) || [] };
+}
+
+const resetProblems = () => {
+    ongoing.clear();
+    recent.clear();
+};
+
 // Whether each check failed, as last seen, so the log gets one line per change rather than one
 // per poll: "[Health] KP: error (HTTP 401)" when it breaks, "[Health] KP: ok again" when it heals
 const LOG_NAMES = { telegram: 'TG', tmdb: 'TMDB', proxy: 'Proxy', kinopoisk: 'KP' };
 const lastFailed = new Map();
 
 function logChange(name, value) {
-    const failed = value[name] === false || value[name] === 'error';
+    const failed = failedOf(name, value);
     const before = lastFailed.get(name);
     lastFailed.set(name, failed);
     // The first check after a start only speaks up if something is wrong
@@ -85,30 +142,63 @@ function logChange(name, value) {
     else log.info(`[Health] ${LOG_NAMES[name]}: ${value[name] === 'off' ? 'off' : 'ok again'}`);
 }
 
+// name -> the number of the latest check started. A check overtaken by a newer one (the cache was
+// cleared while it ran) doesn't count: it would add a check to the row or reopen a healed problem
+const started = new Map();
+
 // name -> the check's answer; concurrent requests share one check
 const healthCache = lruCache({
     max: Object.keys(HEALTH_CHECKS).length,
     ttl: HEALTH_TTL_MS,
     fetchMethod: async (name, _stale, { context: bot }) => {
-        const value = await HEALTH_CHECKS[name](bot);
+        const mine = (started.get(name) || 0) + 1;
+        started.set(name, mine);
+        const value = await runCheck(name, bot);
+        if (started.get(name) !== mine) {
+            return { ...value, problem: ongoing.get(name) || null, recent: recent.get(name) || [] };
+        }
         logChange(name, value);
-        return value;
+        return track(name, value);
     }
 });
 const invalidateHealth = () => healthCache.clear();
 
-const checkHealth = (name, bot) => healthCache.fetch(name, { context: bot });
+/**
+ * @param {boolean} [fresh] check again instead of answering from the cache; a check already
+ *        running is joined, not doubled
+ */
+const checkHealth = (name, bot, fresh = false) => healthCache.fetch(name, { context: bot, forceRefresh: fresh });
 
-// One service: what the dashboard badges use, so each shows up as soon as it's known
+/** The panel gets the plain reason in `problem`; the raw one may hold the bot token. */
+const forPanel = (value, ...drop) => {
+    const out = { ...value };
+    for (const key of ['reason', ...drop]) delete out[key];
+    return out;
+};
+
+// One service: what the dashboard badges use, so each shows up as soon as it's known.
+// ?fresh=1 (a service's dialog opening) checks again instead of answering from the cache
 router.get('/api/health/:name', async (req, res) => {
-    if (!Object.hasOwn(HEALTH_CHECKS, req.params.name)) return res.status(404).json({ error: 'Unknown service' });
-    res.json(await checkHealth(req.params.name, req.app.get('bot')));
+    const { name } = req.params;
+    if (!Object.hasOwn(HEALTH_CHECKS, name)) return res.status(404).json({ error: 'Unknown service' });
+    res.json(forPanel(await checkHealth(name, req.app.get('bot'), req.query.fresh === '1')));
 });
 
-// All services at once (waits for the slowest)
+// All services at once (waits for the slowest); the problems are per service, so left out here
 router.get('/api/health', async (req, res) => {
     const parts = await Promise.all(Object.keys(HEALTH_CHECKS).map((name) => checkHealth(name, req.app.get('bot'))));
-    res.json(Object.assign({}, ...parts));
+    res.json(Object.assign({}, ...parts.map((part) => forPanel(part, 'problem', 'recent'))));
 });
 
-module.exports = { router, invalidateHealth, reasonOf, logChange, checkHealth };
+module.exports = {
+    router,
+    invalidateHealth,
+    reasonOf,
+    logChange,
+    checkHealth,
+    plainReason,
+    track,
+    resetProblems,
+    runCheck,
+    HEALTH_CHECKS
+};

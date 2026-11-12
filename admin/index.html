@@ -2549,6 +2549,12 @@
         <dialog id="proxy-modal" class="modal" aria-labelledby="proxy-modal-title">
             <div class="modal-content modal-medium">
                 <h3 id="proxy-modal-title">Proxy</h3>
+                <!-- The badge's check: working or why not, since when, problems that ended -->
+                <div id="proxy-status" hidden>
+                    <p class="modal-sub" id="proxy-state"></p>
+                    <dl id="proxy-problem" class="kv-list health-problem" hidden></dl>
+                    <div id="proxy-recent" class="health-recent-block" hidden></div>
+                </div>
                 <div class="proxy-note">
                     <p>
                         <strong>Covers</strong> everything the bot sends out — TMDB and the Telegram Bot API. Applied
@@ -2887,6 +2893,8 @@
                 <p class="modal-sub" id="service-state">Checking…</p>
 
                 <dl id="service-details" class="kv-list"></dl>
+                <!-- Problems that ended, from the badge's checks; hidden when there were none -->
+                <div id="service-recent" class="health-recent-block" hidden></div>
 
                 <div class="field-block">
                     <label class="field-label" for="service-token">Token</label>

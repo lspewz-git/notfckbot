@@ -5,12 +5,14 @@
  * parts and composes/parses it on the way in and out.
  */
 
-import { $, $field, target } from './dom.js';
+import { $, $field, target, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { mutate } from './data.js';
 import { toast, openModal, closeModal } from './ui.js';
 import { setSelectValue } from './select.js';
 import { composeProxyUrl, parseProxyUrl, describeTest } from './proxy-url.js';
+import { updateHealth } from './dashboard.js';
+import { checkNow, showRecent, sinceText } from './service-health.js';
 
 const FIELDS = ['proxy-host', 'proxy-port', 'proxy-user', 'proxy-pass'];
 
@@ -63,18 +65,67 @@ function fillForm(url) {
     syncForm();
 }
 
+// Each opening's number: an answer for an earlier opening is dropped
+let opening = 0;
+
+/**
+ * The saved proxy's state at the top of the dialog: "Checking…", "Working", or "Not responding"
+ * with the reason and since when; then the problems that ended. Nothing while it is off and
+ * nothing went wrong lately.
+ * @param {'checking' | object | null} h the answer of /api/health/proxy; null when it failed
+ */
+function renderStatus(h) {
+    const state = $('proxy-state');
+    const problemList = $('proxy-problem');
+    problemList.hidden = true;
+    if (h === 'checking') {
+        state.hidden = false;
+        state.textContent = 'Checking…';
+        state.className = 'modal-sub';
+    } else if (!h || h.proxy === 'off') {
+        state.hidden = true;
+    } else if (h.proxy === 'ok') {
+        state.hidden = false;
+        state.textContent = '● Working';
+        state.className = 'modal-sub state-ok';
+    } else {
+        state.hidden = false;
+        state.textContent = '● Not responding';
+        state.className = 'modal-sub state-error';
+        if (h.problem) {
+            problemList.innerHTML =
+                `<dt>Error</dt><dd>${escapeHtml(h.problem.reason)}</dd>` +
+                `<dt>Failing</dt><dd>${escapeHtml(sinceText(h.problem))}</dd>`;
+            problemList.hidden = false;
+        }
+    }
+    showRecent('proxy-recent', h && h !== 'checking' ? h.recent : []);
+    $('proxy-status').hidden = state.hidden && $('proxy-recent').hidden;
+}
+
 export async function openProxyModal() {
+    const mine = ++opening;
+    let saved = '';
     // Fill the form before showing it: opening first and filling after made the
     // host/port fields flash in and collapse once the saved mode arrived
     try {
         const cfg = await api('/config');
-        fillForm(cfg.tmdbProxyUrl || '');
+        saved = cfg.tmdbProxyUrl || '';
+        fillForm(saved);
         $field('proxy-pass').placeholder = cfg.proxyHasPassword ? '•••••• saved — leave empty to keep' : '';
     } catch (e) {
         toast('Could not load current proxy settings', 'error');
         syncForm();
     }
+    renderStatus(saved ? 'checking' : null);
     openModal('proxy-modal');
+
+    // Checked again now, so the badge and banner agree with what this dialog says
+    const h = await checkNow('proxy');
+    // An answer for an earlier opening may predate a proxy saved since: dropped
+    if (mine !== opening) return;
+    if (h) updateHealth(h);
+    renderStatus(h);
 }
 
 /** Both buttons need the same "is the form usable" check first. */
@@ -122,6 +173,9 @@ export function setupProxyForm() {
             { method: 'POST', body: { tmdbProxyUrl: url } },
             url ? 'Proxy enabled' : 'Proxy disabled — connecting directly'
         );
-        if (ok) closeModal('proxy-modal');
+        if (!ok) return;
+        // A check of the old proxy still running must not repaint the badge
+        opening += 1;
+        closeModal('proxy-modal');
     };
 }

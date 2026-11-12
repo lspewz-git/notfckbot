@@ -197,6 +197,38 @@
     word-break: break-word;
 }
 
+/* A service's problems (service and proxy dialogs): sized to their rows, not to the loading
+   placeholder the details list keeps room for */
+.kv-list.health-problem,
+.kv-list.health-recent {
+    min-height: 0;
+    margin-top: var(--space-3);
+}
+
+.kv-list.health-recent dd {
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
+.health-recent-title {
+    margin-top: var(--space-4);
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+
+.health-recent-title + .kv-list.health-recent {
+    margin-top: var(--space-2);
+}
+
+#proxy-status {
+    margin-bottom: var(--space-2);
+}
+
+.kv-list[hidden],
+#proxy-status [hidden] {
+    display: none;
+}
+
 .token-masked {
     display: block;
     padding: var(--space-2) var(--space-3);

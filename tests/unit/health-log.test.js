@@ -5,7 +5,17 @@
 const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { TelegramError } = require('telegraf');
-const { reasonOf, logChange } = require('../../src/admin/routes/health');
+const {
+    reasonOf,
+    logChange,
+    plainReason,
+    track,
+    resetProblems,
+    runCheck,
+    HEALTH_CHECKS,
+    checkHealth,
+    invalidateHealth
+} = require('../../src/admin/routes/health');
 const { log } = require('../../src/log');
 
 const logs = [];
@@ -51,5 +61,105 @@ describe('logChange', () => {
         logChange('proxy', { proxy: 'error', reason: 'connect ECONNREFUSED' });
         logChange('proxy', { proxy: 'off' });
         assert.deepEqual(logs, ['[Health] Proxy: error (connect ECONNREFUSED)', '[Health] Proxy: off']);
+    });
+});
+
+describe('plainReason', () => {
+    test('network failures in short words', () => {
+        assert.equal(plainReason('timeout of 5000ms exceeded'), 'timeout');
+        assert.equal(
+            plainReason(
+                'request to https://api.telegram.org/bot123456:AAbb_cc-dd/getMe failed, reason: read ECONNRESET'
+            ),
+            'connection reset'
+        );
+        assert.equal(plainReason('connect ECONNREFUSED 127.0.0.1:443'), 'connection refused');
+        assert.equal(plainReason(undefined), 'no details');
+    });
+
+    test('never the bot token', () => {
+        assert.equal(
+            plainReason('request to https://api.telegram.org/bot123456:AAbb_cc-dd/getMe failed, reason: odd'),
+            'request to https://api.telegram.org/bot…/getMe failed, reason: odd'
+        );
+    });
+});
+
+describe('track', () => {
+    beforeEach(resetProblems);
+
+    test('a failure opens a problem, more failures count, the next success moves it to recent', () => {
+        let v = track('telegram', { telegram: false, reason: 'read ECONNRESET' }, 1000);
+        assert.deepEqual(v.problem, { since: 1000, reason: 'connection reset', checks: 1 });
+        v = track('telegram', { telegram: false, reason: 'timeout' }, 61_000);
+        assert.deepEqual(v.problem, { since: 1000, reason: 'timeout', checks: 2 });
+        v = track('telegram', { telegram: true }, 121_000);
+        assert.equal(v.problem, null);
+        assert.deepEqual(v.recent, [{ since: 1000, until: 121_000, reason: 'timeout' }]);
+    });
+
+    test('keeps the last three, newest first; other services apart', () => {
+        for (let i = 1; i <= 4; i++) {
+            track('proxy', { proxy: 'error', reason: 'timeout' }, i * 100);
+            track('proxy', { proxy: 'ok' }, i * 100 + 50);
+        }
+        const v = track('proxy', { proxy: 'ok' }, 1000);
+        assert.deepEqual(
+            v.recent.map((p) => p.since),
+            [400, 300, 200]
+        );
+        assert.deepEqual(track('tmdb', { tmdb: true }).recent, []);
+    });
+
+    test('a proxy switched off ends its problem', () => {
+        track('proxy', { proxy: 'error', reason: 'timeout' }, 100);
+        const v = track('proxy', { proxy: 'off' }, 200);
+        assert.equal(v.problem, null);
+        assert.equal(v.recent.length, 1);
+    });
+});
+
+describe('runCheck', () => {
+    test('a single failure is asked again, and the second answer counts', async () => {
+        let calls = 0;
+        mock.method(HEALTH_CHECKS, 'tmdb', async () => (++calls === 1 ? { tmdb: false, reason: 'x' } : { tmdb: true }));
+        assert.deepEqual(await runCheck('tmdb'), { tmdb: true });
+        assert.equal(calls, 2);
+    });
+
+    test('a working service is asked once', async () => {
+        let calls = 0;
+        mock.method(HEALTH_CHECKS, 'kinopoisk', async () => (calls++, { kinopoisk: 'ok' }));
+        await runCheck('kinopoisk');
+        assert.equal(calls, 1);
+    });
+});
+
+describe('checkHealth', () => {
+    beforeEach(() => {
+        resetProblems();
+        invalidateHealth();
+    });
+
+    test('a fresh check joins one already running instead of counting twice', async () => {
+        let calls = 0;
+        mock.method(HEALTH_CHECKS, 'tmdb', async () => {
+            calls++;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            return { tmdb: true };
+        });
+        const [a, b] = await Promise.all([checkHealth('tmdb'), checkHealth('tmdb', null, true)]);
+        assert.equal(calls, 1);
+        assert.equal(a.tmdb, true);
+        assert.equal(b.tmdb, true);
+    });
+
+    test('a fresh check asks again once the cached answer is in', async () => {
+        let calls = 0;
+        mock.method(HEALTH_CHECKS, 'tmdb', async () => (calls++, { tmdb: true }));
+        await checkHealth('tmdb');
+        await checkHealth('tmdb');
+        await checkHealth('tmdb', null, true);
+        assert.equal(calls, 2);
     });
 });

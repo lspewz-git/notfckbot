@@ -4,6 +4,7 @@ import { $, all, setText, updateBadge, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { toast } from './ui.js';
 import { isUnchanged } from './render.js';
+import { sinceText } from './service-health.js';
 
 /**
  * A card's change: an arrow and the number, then what it compares with. Green when the change
@@ -82,6 +83,8 @@ export function updateStats(stats) {
 
 /** ok | error | off per service, for the banner; a service not yet answered is absent */
 const serviceState = {};
+/** The problem the server reports per service while it fails: { since, reason, checks } */
+const serviceProblem = {};
 const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', kinopoisk: 'KP', proxy: 'Proxy' };
 // The badge of each service; clicking one opens its dialog
 const SERVICE_BADGES = { telegram: 'health-tg', tmdb: 'health-tmdb', kinopoisk: 'health-kp', proxy: 'health-proxy' };
@@ -110,7 +113,12 @@ function renderServiceAlert() {
     action.dataset.badge = SERVICE_BADGES[failingKeys[0]];
     const names =
         failing.length === 1 ? failing[0] : `${failing.slice(0, -1).join(', ')} and ${failing[failing.length - 1]}`;
-    const text = `${names} ${failing.length === 1 ? 'is reporting an error' : 'are reporting errors'}`;
+    // One service: why and since when ("Proxy is reporting an error: timeout · since 22:37")
+    const problem = failing.length === 1 ? serviceProblem[failingKeys[0]] : null;
+    const text =
+        failing.length > 1
+            ? `${names} are reporting errors`
+            : `${names} is reporting an error${problem ? `: ${problem.reason} · ${sinceText(problem)}` : ''}`;
     // The banner is a live region: rewriting the same words would make screen readers repeat them
     const el = $('service-alert-text');
     if (el.textContent !== text) el.textContent = text;
@@ -124,6 +132,11 @@ export function openFailingService() {
 }
 
 export function updateHealth(h) {
+    // A single service's answer carries its problem; the all-services one doesn't
+    if ('problem' in h) {
+        const key = Object.keys(SERVICE_NAMES).find((k) => k in h);
+        if (key) serviceProblem[key] = h.problem;
+    }
     if ('telegram' in h) setService('telegram', 'health-tg', h.telegram ? 'ok' : 'error');
     if ('tmdb' in h) setService('tmdb', 'health-tmdb', h.tmdb ? 'ok' : 'error');
     if ('proxy' in h) setService('proxy', 'health-proxy', h.proxy === 'ok' || h.proxy === 'error' ? h.proxy : 'off');

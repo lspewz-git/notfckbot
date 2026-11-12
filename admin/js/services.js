@@ -10,8 +10,12 @@ import { $, $field, setText, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { toast, openModal, closeModal } from './ui.js';
 import { fetchData } from './data.js';
+import { updateHealth } from './dashboard.js';
+import { checkNow, showRecent, sinceText } from './service-health.js';
 
 let current = null;
+// Each opening's number: answers for an earlier one are dropped
+let opening = 0;
 
 const saveBtn = () => /** @type {HTMLButtonElement} */ ($('service-save'));
 
@@ -74,8 +78,13 @@ function renderInfo(info) {
     }
 }
 
-/** The slow part: whether the service accepts the token, and what it reports. */
-function renderCheck(check) {
+/**
+ * The slow part: whether the service accepts the token, and what it reports.
+ * @param {object} check
+ * @param {{ problem?: { since: number, reason: string, checks: number } | null } | null} [health]
+ *        the badge's own fresh check: since when the service has been failing
+ */
+function renderCheck(check, health = null) {
     if (!check.configured) return;
     const state = $('service-state');
     if (check.ok) {
@@ -92,9 +101,10 @@ function renderCheck(check) {
     state.className = 'modal-sub state-error';
     // The reason goes where the details would be, two rows like the loading placeholder,
     // so the dialog keeps its height
+    const problem = health && health.problem;
     renderDetails([
         ['Error', check.checkError || 'unreachable'],
-        ['Checked', new Date().toLocaleTimeString('en-GB')]
+        problem ? ['Failing', sinceText(problem)] : ['Checked', new Date().toLocaleTimeString('en-GB')]
     ]);
 }
 
@@ -125,8 +135,20 @@ export async function openServiceModal(name, known = {}) {
     $('service-current').classList.add('is-loading');
     $('service-current').innerHTML = '<span class="skeleton" style="width:8rem"></span>';
     setStatusLink(known.statusUrl, known.statusLabel);
+    showRecent('service-recent', []);
     openModal('service-modal');
     setEditing(false);
+
+    // The badge's check, asked again now: the badge and banner then agree with this dialog, and
+    // the answer brings since when it fails and the problems that ended
+    const mine = ++opening;
+    const health = checkNow(name).then((h) => {
+        // An answer for an earlier opening may predate a token saved since: dropped
+        if (!h || mine !== opening) return null;
+        updateHealth(h);
+        showRecent('service-recent', h.recent);
+        return h;
+    });
 
     // Two requests at once: the token from .env comes back at once, the service check
     // takes as long as the service does
@@ -149,7 +171,15 @@ export async function openServiceModal(name, known = {}) {
     try {
         const check = await api(`/services/${name}/check`);
         // A missing token is reported by renderInfo; wait for it so the order can't flip
-        if ((await info) && current === name) renderCheck(check);
+        if ((await info) && current === name) {
+            renderCheck(check);
+            // A failure gets "since when" from the badge's check once it answers (a dead service:
+            // its retry takes longer than this check)
+            if (!check.ok) {
+                const h = await health;
+                if (h && h.problem && mine === opening) renderCheck(check, h);
+            }
+        }
     } catch (e) {
         if (current === name && (await info)) {
             renderCheck({ configured: true, ok: false, checkError: e.message });

@@ -252,8 +252,9 @@ const PIXEL = Buffer.from(
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
  *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
  *   recap?: (n: number) => Buffer, recapStatus?: object, recapLooks?: object, recapReady?: object,
- *   recapImage?: (what: string) => Buffer, chats?: object[] }} [options]
- *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `upcoming` / `popular`: the
+ *   recapImage?: (what: string) => Buffer, chats?: object[], healthProblems?: Record<string, object> }} [options]
+ *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `healthProblems`: per service, the
+ *   `problem` / `recent` its /api/health/<name> answer adds; `upcoming` / `popular`: the
  *   dashboard lists; `version`: /api/version; `kinopoisk`: the card's Kinopoisk link;
  *   `kinopoiskHold`: the Kinopoisk answer waits for it; `addHold`: adding a film waits for it;
  *   `addError`: adding a film fails with this message (409);
@@ -475,6 +476,8 @@ async function mockPanel(page, options = {}) {
         return { ...ALERT_CATALOG, rules, recipients, log };
     };
 
+    // A service's /api/health/<name> extras: the problem going on and those that ended
+    const problemsOf = (name) => (options.healthProblems || {})[name] || { problem: null, recent: [] };
     const api = {
         '/api/stats': () => ({ ...stats(panel.subs), ...options.stats }),
         // options.charts(data): the charts' data changed for a test
@@ -488,10 +491,14 @@ async function mockPanel(page, options = {}) {
                 : { day, keptSince: null, failed: [], queued: [], nextCheckAt: null };
         },
         '/api/health': () => ({ ...panel.health, kinopoiskQuota: { used: 3, limit: 500 } }),
-        '/api/health/telegram': () => ({ telegram: panel.health.telegram }),
-        '/api/health/tmdb': () => ({ tmdb: panel.health.tmdb }),
-        '/api/health/proxy': () => ({ proxy: panel.health.proxy }),
-        '/api/health/kinopoisk': () => ({ kinopoisk: panel.health.kinopoisk, kinopoiskQuota: { used: 3, limit: 500 } }),
+        '/api/health/telegram': () => ({ telegram: panel.health.telegram, ...problemsOf('telegram') }),
+        '/api/health/tmdb': () => ({ tmdb: panel.health.tmdb, ...problemsOf('tmdb') }),
+        '/api/health/proxy': () => ({ proxy: panel.health.proxy, ...problemsOf('proxy') }),
+        '/api/health/kinopoisk': () => ({
+            kinopoisk: panel.health.kinopoisk,
+            kinopoiskQuota: { used: 3, limit: 500 },
+            ...problemsOf('kinopoisk')
+        }),
         '/api/trigger-check': () => {
             panel.cron = { ...panel.cron, running: true, startedAt: new Date().toISOString() };
             panel.pollsUntilDone = 2;
