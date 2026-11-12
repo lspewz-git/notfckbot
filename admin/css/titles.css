@@ -434,8 +434,8 @@
     overflow-anchor: none;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    scrollbar-gutter: stable;
-    padding-inline-end: var(--space-2);
+    /* Reserve the scrollbar width on both sides so the content stays centred */
+    scrollbar-gutter: stable both-edges;
 }
 
 .tc-grabber {
