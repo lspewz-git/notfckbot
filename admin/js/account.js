@@ -234,6 +234,9 @@ const empty = (title, body, iconName = 'bookmark') =>
 const loading = (rows = 3) =>
     `<ul class="group-list title-list" aria-busy="true" aria-label="Loading">${'<li><div class="group-row title-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>'.repeat(rows)}</ul>`;
 
+/** Search rows while the results load: the same heading and Follow pill as the results, so nothing jumps */
+const searchLoading = `<h2 class="group-title">Results</h2><ul class="group-list title-list" aria-busy="true" aria-label="Loading">${'<li><div class="group-row title-row search-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span><span class="skeleton follow-skeleton"></span></div></li>'.repeat(4)}</ul>`;
+
 const failed = (message) =>
     `<div class="empty-state" role="alert"><span class="empty-icon">${ICON('triangle-alert')}</span>` +
     `<p class="empty-title">Failed to load</p><p class="empty-text">${escapeHtml(message)}</p>` +
@@ -681,7 +684,7 @@ function resultsView() {
             'Type a title in any language. Follow it to get messages in the chosen chat.',
             'search'
         );
-    if (state.searching) return loading(4);
+    if (state.searching) return searchLoading;
     return searchResults(state.results, {
         open: 'mine-search-card',
         series: 'mine-pick-series',

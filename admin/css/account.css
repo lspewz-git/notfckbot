@@ -1864,6 +1864,15 @@ button.search-result-open:hover .mine-row-title {
     width: 6rem;
 }
 
+/* The Follow pill's place in a loading search row (same size as .follow-btn > span) */
+.follow-skeleton {
+    flex: none;
+    width: 69px;
+    height: 32px;
+    margin: 6px 1px 6px auto;
+    border-radius: 16px;
+}
+
 .devices-body > .group-list[aria-hidden='true'] {
     margin-top: 42px;
 }

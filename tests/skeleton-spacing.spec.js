@@ -34,3 +34,35 @@ for (const section of ['my-aired', 'my-calendar', 'my-subs']) {
         await expect(page.locator(`#${section}-body > .group-list[aria-busy="true"]`)).toHaveCount(0);
     });
 }
+
+test('search skeleton keeps the heading, rows and Follow pill of the results', async ({ page }) => {
+    await mockPanel(page, { role: 'user' });
+    let release = () => {};
+    const held = new Promise((resolve) => {
+        release = resolve;
+    });
+    await page.route(/\/search\?q=/, async (route) => {
+        await held;
+        await route.fallback();
+    });
+    await openSection(page, 'my-subs');
+    await page.getByRole('link', { name: 'Follow a title' }).click();
+    await page.locator('#mine-q').fill('дюна');
+    await page.locator('#mine-q').press('Enter');
+    const boxes = () =>
+        page.locator('#mine-results').evaluate((box) => {
+            const top = (sel) => box.querySelector(sel)?.getBoundingClientRect();
+            const pill = top('.follow-skeleton') || top('.follow-btn > span');
+            return {
+                heading: top('.group-title')?.top,
+                list: top('.group-list')?.top,
+                row: top('.title-row')?.height,
+                pill: pill && [pill.left, pill.top, pill.width, pill.height]
+            };
+        });
+    await expect(page.locator('#mine-results .group-list[aria-busy="true"]')).toBeVisible();
+    const loading = await boxes();
+    release();
+    await expect(page.locator('#mine-results .search-row .follow-btn').first()).toBeVisible();
+    expect(loading).toEqual(await boxes());
+});
