@@ -25,22 +25,26 @@ test('admin details use the shared title sheet and poster viewer', async ({ page
     await expect(modal).toBeVisible();
 });
 
-test('desktop title sheet keeps equal side gaps around its content', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'the phone sheet scrolls edge to edge');
-    await page.setViewportSize({ width: 1440, height: 900 });
+test('title sheet keeps equal side gaps clear of the scrollbar', async ({ page, isMobile }) => {
+    if (!isMobile) await page.setViewportSize({ width: 1440, height: 900 });
     await mockPanel(page, { poster: true });
     await page.locator('#popular-list [data-action="series"]').first().click();
     const sheet = page.locator('#detail-modal .title-sheet');
     await sheet.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
     await page.locator('#detail-modal .tc-link').waitFor();
-    const gaps = await sheet.evaluate(el => {
+    const layout = await sheet.evaluate(el => {
         const box = el.getBoundingClientRect();
+        const scroll = el.querySelector('.tc-scroll');
+        const scrollBox = scroll.getBoundingClientRect();
+        // Where a classic scrollbar starts; overlay scrollbars take no width here.
+        const barStart = scrollBox.left + scroll.clientLeft + scroll.clientWidth;
         return ['.tc-head', '.tc-date', '.tc-link'].map(sel => {
             const part = el.querySelector(sel).getBoundingClientRect();
-            return Math.round(part.left - box.left) - Math.round(box.right - part.right);
+            const gap = Math.round(part.left - box.left) - Math.round(box.right - part.right);
+            return { gap, clear: part.right <= barStart && box.right - part.right >= 16 };
         });
     });
-    expect(gaps).toEqual([0, 0, 0]);
+    expect(layout).toEqual(Array(3).fill({ gap: 0, clear: true }));
 });
 
 test('late details and Kinopoisk answers cannot replace the newly opened title', async ({ page }) => {

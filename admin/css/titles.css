@@ -500,8 +500,8 @@
 
     .title-sheet .tc-scroll {
         border-radius: inherit;
-        padding: var(--space-2) calc(var(--space-4) + var(--space-2))
-            calc(var(--space-6) + env(safe-area-inset-bottom, 0px)) var(--space-4);
+        /* Phone scrollbars overlay the outer few pixels, clear of the 16px gap */
+        padding: var(--space-2) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
     }
 }
 
