@@ -316,7 +316,9 @@ async function redeemLink(token, now = Date.now()) {
 // --- "Войти через Telegram": a code the bot confirms ---
 
 // Codes waiting for the bot: code → { secret's hash, the user once confirmed, refused }
-const codes = lruCache({ max: 2000, ttl: LINK_TTL_MS });
+// Room for far more than one address may ask for in a code's life (100: challengeLimit in routes.js):
+// at 2000 some twenty addresses asking nonstop pushed out the codes people were signing in with
+const codes = lruCache({ max: 20000, ttl: LINK_TTL_MS });
 
 const codeOf = (code, now = Date.now()) => {
     const entry = CODE.test(String(code || '')) ? codes.get(code) : null;
@@ -333,9 +335,9 @@ const checkWord = (code) => codeOf(code)?.check ?? '';
 
 const CHECK_SPACE = 1000000;
 // Every number given out, kept past its code's life (5 min) for as long again
-const recentChecks = lruCache({ max: 20000, ttl: 2 * LINK_TTL_MS });
+const recentChecks = lruCache({ max: 60000, ttl: 2 * LINK_TTL_MS });
 
-// At most 2000 live codes and 20000 recent numbers among a million: a free one is always found
+// At most 20000 live codes and 60000 recent numbers among a million: a free one is always found
 function newCheck(now) {
     // Live codes too: the recent list may have dropped one under a flood of sign-ins
     const live = new Set();

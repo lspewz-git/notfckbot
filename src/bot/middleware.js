@@ -5,6 +5,19 @@
 const { Chat } = require('../db');
 const { clearState } = require('./state');
 const { log } = require('../log');
+const { lruCache } = require('../lru');
+
+// Telegram's stand-ins: an anonymous group admin (@GroupAnonymousBot), a post from the linked channel
+// (777000) and one sent as a channel (@Channel_Bot). Every group sees them under the same id, so the
+// limits below count them per group, and their block is kept here: on the shared record one group's
+// repeated message would stop the bot answering the anonymous admins of all the others.
+const SHARED_SENDERS = new Set([1087968824, 777000, 136817688]);
+const BLOCK_MS = 5 * 60 * 1000;
+const sharedBlocks = lruCache({ max: 2000, ttl: BLOCK_MS });
+
+/** Who the limits count: the user, or a stand-in within one chat. */
+const actorOf = (ctx) =>
+    SHARED_SENDERS.has(ctx.from.id) && ctx.chat ? `${ctx.from.id}:${ctx.chat.id}` : String(ctx.from.id);
 
 // Anti-Spam: throttle to 1 request/second per user
 // And track identical rapid commands for auto-blocking
@@ -29,8 +42,8 @@ setInterval(() => {
 function register(bot) {
     bot.use(async (ctx, next) => {
         // Determine userId whether it's a message, callback query, inline query, etc.
-        const userId = ctx.from ? ctx.from.id : null;
-        if (!userId) return next();
+        if (!ctx.from || !ctx.from.id) return next();
+        const userId = actorOf(ctx);
 
         // Button taps get a shorter window than messages: two quick taps are normal UI use,
         // and a dropped tap is answered with a hint instead of silence.
@@ -68,13 +81,20 @@ function register(bot) {
             }
 
             const now = Date.now();
+            const actor = actorOf(ctx);
+            const shared = SHARED_SENDERS.has(userId);
+            // The record's own block still counts for a stand-in: that one is set by hand in the panel
+            const blockedUntil = Math.max(
+                userData.blockedUntil?.getTime() || 0,
+                (shared && sharedBlocks.get(actor)) || 0
+            );
             // Check if user is blocked
-            if (userData.blockedUntil && userData.blockedUntil.getTime() > now) {
+            if (blockedUntil > now) {
                 // Text messages are dropped silently (the block notice was already sent), but a
                 // button tap gets a popup so the user knows why nothing happens. Popups don't
                 // add messages to the chat, so this can't be abused for spam.
                 if (ctx.callbackQuery) {
-                    const minutesLeft = Math.ceil((userData.blockedUntil.getTime() - now) / 60000);
+                    const minutesLeft = Math.ceil((blockedUntil - now) / 60000);
                     try {
                         await ctx.answerCbQuery(
                             `🚫 Бот временно не отвечает из-за слишком частых действий. Осталось ~${minutesLeft} мин.`,
@@ -133,7 +153,7 @@ function register(bot) {
             const spamMsgId = spamText ? ctx.message.message_id : null;
 
             if (spamText) {
-                const trk = commandTracking[userId] || { text: '', count: 0, lastTime: 0, msgIds: [] };
+                const trk = commandTracking[actor] || { text: '', count: 0, lastTime: 0, msgIds: [] };
 
                 // If they sent the EXACT same text/button within 5 seconds...
                 if (trk.text === spamText && now - trk.lastTime < 5000) {
@@ -145,13 +165,13 @@ function register(bot) {
                     trk.msgIds = spamMsgId ? [spamMsgId] : [];
                 }
                 trk.lastTime = now;
-                commandTracking[userId] = trk;
+                commandTracking[actor] = trk;
 
                 if (trk.count >= 3) {
                     // Auto-block for 5 minutes
-                    const blockUntil = new Date(now + 5 * 60 * 1000);
-                    await userData.update({ blockedUntil: blockUntil });
-                    log.info(`[Anti-Spam] Auto-blocked user ${userId} for spamming: "${spamText}"`);
+                    if (shared) sharedBlocks.set(actor, now + BLOCK_MS);
+                    else await userData.update({ blockedUntil: new Date(now + BLOCK_MS) });
+                    log.info(`[Anti-Spam] Auto-blocked user ${actor} for spamming: "${spamText}"`);
 
                     // 🧹 Clean up the spammed messages from the chat
                     const chatToClean = ctx.chat ? ctx.chat.id : null;
@@ -165,7 +185,7 @@ function register(bot) {
                         }
                     }
 
-                    delete commandTracking[userId];
+                    delete commandTracking[actor];
                     clearState(ctx);
 
                     // A duration rather than a clock time: users are in different time zones.

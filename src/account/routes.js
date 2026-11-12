@@ -515,7 +515,7 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
 });
 
 const seriesBody = z.object({
-    tmdbId: idOf(/^(tv_)?\d{1,10}$/, 'Bad series id'),
+    tmdbId: idOf(/^(tv_)?[1-9]\d{0,9}$/, 'Bad series id'),
     mode: z.enum(ops.NOTIFY_TYPES, { error: 'Bad mode' })
 });
 
@@ -545,7 +545,7 @@ router.delete('/api/account/chats/:chatId/series/:seriesId', openChat, async (re
 });
 
 router.post('/api/account/chats/:chatId/films', openChat, async (req, res) => {
-    const body = valid(z.object({ tmdbId: idOf(/^(movie_)?\d{1,10}$/, 'Bad film id') }), req.body, res);
+    const body = valid(z.object({ tmdbId: idOf(/^(movie_)?[1-9]\d{0,9}$/, 'Bad film id') }), req.body, res);
     if (!body) return;
     try {
         const { entry, isReleased } = await ops.addFilm(req.chatId, body.tmdbId, who(req));

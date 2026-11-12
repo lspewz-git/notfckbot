@@ -25,7 +25,10 @@ const REDIRECT_PORT = 3001;
 
 app.use((req, res, next) => {
     res.set({
-        'Content-Security-Policy': "frame-ancestors 'self' https://web.telegram.org",
+        // Scripts only from the panel's own files (no inline ones, no other site's): text that slipped
+        // past escapeHtml into the page can't run. Styles and pictures are left as they are
+        'Content-Security-Policy':
+            "script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://web.telegram.org",
         'X-Content-Type-Options': 'nosniff'
     });
     next();

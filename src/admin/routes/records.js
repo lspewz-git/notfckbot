@@ -31,7 +31,7 @@ router.delete('/api/subscription/:chatId/:seriesId', async (req, res) => {
 const REQUIRED = 'chatId and tmdbId are required';
 const subscriptionBody = z.object({
     chatId: chatId(REQUIRED),
-    tmdbId: idOf(/^(tv_)?\d+$/, REQUIRED),
+    tmdbId: idOf(/^(tv_)?[1-9]\d{0,9}$/, REQUIRED),
     notify_type: z.enum(ops.NOTIFY_TYPES, { error: 'Bad notify_type' }).optional()
 });
 
@@ -115,7 +115,7 @@ router.post('/api/chat/:chatId/unblock', async (req, res) => {
 
 // Films
 
-const watchlistBody = z.object({ chatId: chatId(REQUIRED), tmdbId: idOf(/^(movie_)?\d+$/, 'Bad film id') });
+const watchlistBody = z.object({ chatId: chatId(REQUIRED), tmdbId: idOf(/^(movie_)?[1-9]\d{0,9}$/, 'Bad film id') });
 
 router.post('/api/watchlist', async (req, res) => {
     const body = valid(watchlistBody, req.body, res);

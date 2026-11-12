@@ -818,7 +818,10 @@ test('the public panel trusts HTTPS and client IP only from its configured proxy
 
     const landing = await send('GET', '/');
     assert.equal(landing.status, 200);
-    assert.equal(landing.headers['content-security-policy'], "frame-ancestors 'self' https://web.telegram.org");
+    assert.equal(
+        landing.headers['content-security-policy'],
+        "script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://web.telegram.org"
+    );
     assert.equal(landing.headers['x-content-type-options'], 'nosniff');
 
     const token = tokenOf(await auth.createLink({ id: 7 }));
