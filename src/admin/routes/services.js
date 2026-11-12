@@ -5,6 +5,7 @@ const { checkKinopoiskKey } = require('../../api/kinopoisk');
 const { updateEnvFile, maskToken } = require('../env');
 const { invalidateHealth } = require('./health');
 const { restartBlock, restartSoon } = require('../restart');
+const { settledOnly } = require('../../account/devices');
 
 const router = require('express').Router();
 const { log } = require('../../log');
@@ -121,7 +122,14 @@ router.get('/api/services/:name/check', async (req, res) => {
     res.json(out);
 });
 
-router.post('/api/services/:name', async (req, res) => {
+/**
+ * The bot's token signs Mini App sign-ins (src/account/miniapp.js): whoever swaps it signs in as
+ * anyone, so it isn't changed from a device first seen today (src/account/devices.js).
+ */
+const forTokenOwner = (req, res, next) =>
+    findService(req.params.name)?.env === 'BOT_TOKEN' ? settledOnly(req, res, next) : next();
+
+router.post('/api/services/:name', forTokenOwner, async (req, res) => {
     const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
 

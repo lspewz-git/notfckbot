@@ -16,6 +16,7 @@ const { UPDATE_INTERVAL_HOURS, INTERVAL_CHOICES, parseIntervalHours } = require(
 const { SERVICES, describeError } = require('./services');
 const { invalidateHealth } = require('./health');
 const { restartBlock, restartSoon } = require('../restart');
+const { settledOnly } = require('../../account/devices');
 const { readSchedule } = require('../../recap/schedule');
 const { KEEP_CHOICES, keepDays } = require('../../chat-changes');
 
@@ -73,10 +74,21 @@ router.get('/api/settings', (req, res) => {
 });
 
 /**
+ * What decides who gets in: the bot's token signs Mini App sign-ins, and the trusted proxy address
+ * is where the sign-in limits take a client's address from. Neither is changed from a device first
+ * seen today (src/account/devices.js); the other fields are.
+ */
+const guardsAccess = (req, res, next) => {
+    const body = req.body || {};
+    const tokens = body.tokens && typeof body.tokens === 'object' ? body.tokens : {};
+    return body.panelProxyIp !== undefined || tokens.telegram !== undefined ? settledOnly(req, res, next) : next();
+};
+
+/**
  * Body: any of { tokens: { telegram?, tmdb?, kinopoisk? }, panelProxyIp?, proxyUrl?, intervalHours?, changesKeepDays? }; what is
  * left out stays as it is. On a problem nothing is written, and `fields` says which field it is.
  */
-router.post('/api/settings', async (req, res) => {
+router.post('/api/settings', guardsAccess, async (req, res) => {
     const body = req.body || {};
     const changes = {};
     const fields = {};

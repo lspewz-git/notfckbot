@@ -18,6 +18,7 @@ const express = require('express');
 const { writeEnv } = require('../../src/admin/env');
 const { restartBlock } = require('../../src/admin/restart');
 const services = require('../../src/admin/routes/services');
+const { AccountDevice } = require('../../src/db');
 
 const ORIGINAL = '# Tokens\nBOT_TOKEN=123:old\nTMDB_PROXY_URL=\n\nDB_PASSWORD=secret\n';
 
@@ -111,20 +112,37 @@ describe('POST /api/settings', () => {
     const oldPanelProxyIp = process.env.PANEL_PROXY_IP;
     const bot = { telegram: { token: '123:old', options: {} } };
 
+    // The browser asking, as the guard sets it: first seen long ago unless a test says otherwise
+    let device;
+    // The admin's other devices first seen more than a day ago
+    let olderDevices;
+    let countStub;
+
     before(async () => {
+        countStub = mock.method(AccountDevice, 'count', async () => olderDevices);
         app = express();
         app.use(express.json());
+        app.use((req, res, next) => {
+            req.user = { id: 'session-1', userId: '1', role: 'admin', system: false };
+            req.device = device;
+            req.deviceId = 'this-browser';
+            next();
+        });
         app.set('bot', bot);
         app.use(require('../../src/admin/routes/settings'));
+        app.use(services);
         ({ base, close } = await listenForTest(app));
     });
     after(async () => {
         await close();
+        countStub.mock.restore();
         if (oldPanelProxyIp === undefined) delete process.env.PANEL_PROXY_IP;
         else process.env.PANEL_PROXY_IP = oldPanelProxyIp;
     });
 
     beforeEach(() => {
+        device = { firstSeen: 0 };
+        olderDevices = 0;
         fs.writeFileSync(ENV_FILE, ORIGINAL);
         process.env.BOT_TOKEN = '123:old';
         process.env.TMDB_PROXY_URL = '';
@@ -146,6 +164,40 @@ describe('POST /api/settings', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         }).then(async (res) => ({ status: res.status, body: await res.json() }));
+
+    test("a device signed in today changes neither the bot's token nor the trusted proxy address", async (t) => {
+        // The token signs Mini App sign-ins: swapped by a sign-in someone was talked into, it would outlive the cancelling
+        device = { firstSeen: Date.now() - 60 * 1000 };
+        olderDevices = 1;
+        const check = t.mock.method(services.SERVICES.telegram, 'check', async () => ({}));
+        const token = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+        const refused = [
+            await post({ tokens: { telegram: token } }),
+            await post({ panelProxyIp: '152.234.253.242', intervalHours: 6 }),
+            await fetch(`${base}/api/services/telegram`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            }).then(async (res) => ({ status: res.status, body: await res.json() }))
+        ];
+        for (const res of refused) {
+            assert.equal(res.status, 403);
+            assert.match(res.body.error, /one day after its first sign-in/);
+        }
+        assert.equal(check.mock.callCount(), 0, 'the token is not even tried');
+        assert.equal(fs.readFileSync(ENV_FILE, 'utf8'), ORIGINAL);
+        assert.equal(process.env.BOT_TOKEN, '123:old');
+        assert.equal(app.get('trust proxy fn')('144.31.82.190', 0), true);
+
+        // What grants nobody access is still changed from it
+        assert.equal((await post({ intervalHours: 6 })).status, 200);
+        const tmdb = await fetch(`${base}/api/services/tmdb`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: 'not a token' })
+        });
+        assert.equal(tmdb.status, 400, 'reaches its own check, not the device rule');
+    });
 
     test('the VPS IP is saved and immediately replaces the trusted peer, including IPv6', async () => {
         for (const ip of ['152.234.253.242', '2001:db8::1']) {

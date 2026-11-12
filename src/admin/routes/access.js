@@ -35,19 +35,7 @@ const ACCESS = z.object({
  * (src/account/devices.js): a sign-in someone was talked into would otherwise outlive its cancelling,
  * by setting the system account's password or making another admin.
  */
-async function settledDevice(req, res, next) {
-    try {
-        const refusal = await devices.freshRefusal(req);
-        if (refusal) {
-            log.warn(`[Access] User ${req.user.userId} refused ${req.method} ${req.path}: a device signed in today`);
-            return res.status(403).json({ error: refusal });
-        }
-        next();
-    } catch (err) {
-        log.error(`[Access] Device check failed: ${err.message}`);
-        res.status(500).json({ error: 'Device check failed. Try again.' });
-    }
-}
+const settledDevice = devices.settledOnly;
 
 /** Body: { userId, role: 'admin' | 'user' | 'none' }. Answers the person's role as the list shows it. */
 router.post('/api/access', settledDevice, async (req, res) => {

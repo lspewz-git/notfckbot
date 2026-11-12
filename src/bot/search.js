@@ -62,10 +62,19 @@ const clearLastMessages = async (ctx, chatId) => {
  * with a restart), and it takes one press at a time. A double tap would otherwise open two cards
  * or subscribe twice; a press while another is being handled is answered quietly and dropped.
  */
+const STALE = 'Этот поиск устарел. Начните новый: 🔍 Поиск';
+
+/**
+ * Whether the search found this title. Button data can be sent by hand: a card, a subscription or
+ * a waiting-list entry for any other id would cost TMDB and Kinopoisk requests (500 a day there)
+ * for titles nobody searched for.
+ */
+const found = (session, tmdbId) => session.results.some((r) => `${r.media_type}_${r.id}` === tmdbId);
+
 async function searchGuard(ctx, next) {
     const session = sessionOf(ctx);
     if (!session) {
-        return ctx.answerCbQuery('Этот поиск устарел. Начните новый: 🔍 Поиск', { show_alert: true });
+        return ctx.answerCbQuery(STALE, { show_alert: true });
     }
     if (session.busy) return ctx.answerCbQuery();
     session.busy = true;
@@ -263,6 +272,7 @@ function register(bot) {
         const mediaType = ctx.match[1];
         const id = ctx.match[2];
         const tmdbId = `${mediaType}_${id}`;
+        if (!found(ctx.state.search, tmdbId)) return ctx.answerCbQuery(STALE, { show_alert: true });
         try {
             // Usually prefetched while the list was on screen (see prefetch), so no wait here
             const data = await getDetailsCached(id, mediaType);
@@ -294,6 +304,7 @@ function register(bot) {
         const tmdbId = ctx.match[1];
         const notifyType = ctx.match[2];
         const chatId = ctx.chat.id;
+        if (!found(ctx.state.search, tmdbId)) return ctx.answerCbQuery(STALE, { show_alert: true });
 
         try {
             const [mediaType, filmId] = tmdbId.split('_');
@@ -339,6 +350,7 @@ function register(bot) {
 
     bot.action(/^watchlist_add_(movie_[1-9]\d{0,9})$/, searchGuard, async (ctx) => {
         const tmdbId = ctx.match[1];
+        if (!found(ctx.state.search, tmdbId)) return ctx.answerCbQuery(STALE, { show_alert: true });
         const [mediaType, filmId] = tmdbId.split('_');
         try {
             const data = await getDetails(filmId, mediaType);

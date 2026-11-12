@@ -281,6 +281,25 @@ async function freshRefusal(req, now = Date.now()) {
     return older ? FRESH_ERROR : null;
 }
 
+/**
+ * Express middleware for the panel's routes that decide who gets in (roles, passwords, the bot's
+ * token): refused where freshRefusal holds the device back. A sign-in someone was talked into
+ * would otherwise outlive its cancelling.
+ */
+async function settledOnly(req, res, next) {
+    try {
+        const refusal = await freshRefusal(req);
+        if (!refusal) return next();
+        log.warn(
+            `[Account] User ${req.user.userId} refused ${req.method} ${req.originalUrl}: a device signed in today`
+        );
+        res.status(403).json({ error: refusal });
+    } catch (err) {
+        log.error(`[Account] Device check failed: ${err.message}`);
+        res.status(500).json({ error: 'Device check failed. Try again.' });
+    }
+}
+
 /** For the tests: everything is looked up again. */
 const resetDevices = () => {
     for (const cache of [seenDevices, denied]) cache.clear();
@@ -302,5 +321,6 @@ module.exports = {
     seen,
     forget,
     freshRefusal,
+    settledOnly,
     resetDevices
 };

@@ -462,6 +462,38 @@ test('a private prompt keeps the reply keyboard it is given', async () => {
     assert.equal(extra, keyboard);
 });
 
+test('button data sent by hand for a title the search did not find: nothing is asked or saved', async () => {
+    const bot = fakeBot();
+    const chat = fakeChat();
+    const { setState } = require('../../src/bot/state');
+    const userCtx = chat.ctxFor(null, { message: { text: 'курьер' } });
+    setState(userCtx, { state: 'waiting_for_search' });
+    await bot.onText()(userCtx, async () => {});
+    const { id } = only(chat);
+    const before = [tmdb.getDetails, tmdb.getDetailsCached, kinopoisk.kinopoiskQuick].map((f) => f.mock.callCount());
+
+    // Like press(), without requiring the button to be on screen
+    const send = (data) => {
+        for (const [trigger, fn] of bot.actions) {
+            const match = typeof trigger === 'string' ? (trigger === data ? [data] : null) : data.match(trigger);
+            if (match) return fn({ ...chat.ctxFor({ message_id: id }), match });
+        }
+        throw new Error(`no handler for ${data}`);
+    };
+    for (const data of ['card_movie_550', 'card_tv_1399', 'sub_set_tv_1399_episode', 'watchlist_add_movie_550']) {
+        await send(data);
+    }
+    assert.deepEqual(
+        [tmdb.getDetails, tmdb.getDetailsCached, kinopoisk.kinopoiskQuick].map((f) => f.mock.callCount()),
+        before,
+        'neither TMDB nor Kinopoisk is asked'
+    );
+    assert.equal(chat.alerts.length, 4);
+    assert.match(chat.alerts[0], /Этот поиск устарел/);
+    assert.deepEqual([db.series.size, db.subs.length, db.watchlist.length], [0, 0, 0]);
+    assert.equal(only(chat).id, id, 'the list stays as it was');
+});
+
 test('button data sent by hand: only a plain series or film id reaches subscribing and the waiting list', () => {
     const bot = fakeBot();
     const handled = (data) =>

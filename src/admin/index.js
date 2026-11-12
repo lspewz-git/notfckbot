@@ -52,7 +52,8 @@ app.use(compression());
 app.use('/api', panelOnly);
 // Then a session: admins get the whole panel, users their own chats (src/account/)
 app.use('/api', guard);
-app.use(express.json());
+// Only the API reads a body: a malformed one elsewhere has nothing to fail in
+app.use('/api', express.json());
 
 // Serve static files from 'admin' directory
 app.use(express.static(path.join(__dirname, '../../admin')));
@@ -87,6 +88,18 @@ app.use(require('./routes/alerts'));
 // eslint-disable-next-line no-unused-vars
 app.use('/api', (err, req, res, next) => {
     res.status(err.status && err.status < 500 ? err.status : 500).json({ error: 'Bad request' });
+});
+// The same outside the API (a path the static files can't decode): without it Express answers
+// with the error's stack, the server's paths in it, to anyone
+app.use((err, req, res, next) => {
+    // Mid-answer (a file that broke while being sent): Express closes the connection
+    if (res.headersSent) return next(err);
+    const refused = err.status && err.status < 500;
+    // Express's page was also how a server fault reached the log
+    if (!refused) log.error({ err }, `[Admin] ${req.method} ${req.path} failed`);
+    res.status(refused ? err.status : 500)
+        .type('text')
+        .send(refused ? 'Bad request' : 'Server error');
 });
 
 function startAdminServer(bot) {
