@@ -64,9 +64,20 @@ test('episodes out the same day give one message, about the last; a one-episode 
             [null, null, '2026-11-13'],
             mode
         );
-    // Episodes 1 and 2 together: no premiere message, the bot only sees episode 2
+    // Episodes 1 and 2 together: the premiere goes out with episode 2, the one the bot sees
     assert.deepEqual(
         notifyDays([ep(1, { mode: 'first_and_full', mark: 'premiere' }), ep(2, { mode: 'first_and_full' })], moscow),
+        [null, '2026-11-13']
+    );
+    // A later pair of the same season stays quiet
+    assert.deepEqual(
+        notifyDays(
+            [
+                ep(3, { mode: 'first_and_full', date: '2026-11-19' }),
+                ep(4, { mode: 'first_and_full', date: '2026-11-19' })
+            ],
+            moscow
+        ),
         [null, null]
     );
     // A season of one episode: marked a premiere, still the season's end

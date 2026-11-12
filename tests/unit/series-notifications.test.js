@@ -127,6 +127,30 @@ describe('notifyNewEpisodes: "1st episode + season" mode', () => {
         assert.deepEqual(kinds(bot), ['10:premiere', '10:complete']);
     });
 
+    test('episodes 1 and 2 out together: still the premiere, then quiet', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 1, last_episode: 6, completed_season: 1 }, [[10, 'first_and_full']]);
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 2, 'Two'), next: ep(2, 3), seasons: { 2: 8 } }));
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 3), next: ep(2, 4), seasons: { 2: 8 } }));
+
+        assert.deepEqual(kinds(bot), ['10:premiere']);
+        assert.match(bot.sent[0].text, /Сезон 2, серии 1–2 \(последняя: Two\)/);
+    });
+
+    test('a row stored at a special (S0) does not call a mid-season episode a premiere', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 0, last_episode: 3, completed_season: 3 }, [[10, 'first_and_full']]);
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(4, 6), next: ep(4, 7), seasons: { 4: 10 } }));
+        assert.equal(bot.sent.length, 0);
+    });
+
+    test('a whole season out at once: "complete", not the premiere', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 1, last_episode: 6, completed_season: 1 }, [[10, 'first_and_full']]);
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 8), seasons: { 2: 8 } }));
+        assert.deepEqual(kinds(bot), ['10:complete']);
+    });
+
     test('a one-episode season gets one message, not premiere and complete', async () => {
         const bot = fakeBot();
         const show = fakeSeries({ last_season: 1, last_episode: 6, completed_season: 1 }, [[10, 'first_and_full']]);

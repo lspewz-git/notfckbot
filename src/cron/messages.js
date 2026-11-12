@@ -11,7 +11,8 @@ function buildSeriesMessages({ title, season, episode, episodeName, links }) {
     const ep = escapeHtml(episodeName || 'Без названия');
     return {
         episode: `⚡️ Новая серия! <b>${t}</b> — Сезон ${season}, Серия ${episode}: ${ep}\n\n${links}`,
-        premiere: `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${t}</b>\n🎞 Сезон ${season}, Серия 1: ${ep}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`,
+        // Several episodes out at once reach the check as the last of them: name the range then
+        premiere: `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${t}</b>\n🎞 Сезон ${season}, ${Number(episode) > 1 ? `серии 1–${episode} (последняя: ${ep})` : `Серия 1: ${ep}`}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`,
         complete: `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${t}</b>\n📦 Сезон ${season} полностью доступен (${episode} сер.).\n\n${links}`
     };
 }

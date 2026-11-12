@@ -34,7 +34,8 @@ function messages(item) {
     const last = item.last ?? item.mark === 'finale';
     if (item.mode === 'episode') return true;
     if (item.mode === 'season') return Boolean(last);
-    if (item.mode === 'first_and_full') return item.episode === 1 || item.mark === 'premiere' || Boolean(last);
+    if (item.mode === 'first_and_full')
+        return item.episode === 1 || item.mark === 'premiere' || Boolean(item.premiereDay) || Boolean(last);
     return false;
 }
 
@@ -59,7 +60,8 @@ const nextDay = (day) => new Date(Date.parse(`${day}T00:00:00Z`) + 864e5).toISOS
 
 /**
  * @param {{ kind: string, date: string, mode?: string | null, mark?: string, episode?: number,
- *   last?: boolean, lastOfDay?: boolean }} item a calendar row
+ *   last?: boolean, lastOfDay?: boolean, premiereDay?: boolean }} item a calendar row; `premiereDay`:
+ *   the season's first episode comes out the same day
  * @param {{ timezone?: string | null, quiet_start?: number | null, quiet_end?: number | null } | null} chat
  * @param {number} [interval] hours between update checks
  * @returns {string | null} the chat's local "YYYY-MM-DD" of the message
@@ -92,14 +94,23 @@ function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
 function notifyDays(items, chat, interval = UPDATE_INTERVAL_HOURS) {
     const order = (i) => Number(i.season) * 10000 + Number(i.episode);
     const latest = new Map();
+    // Days a season's first episode comes out: the bot announces the premiere with the day's last
+    const premieres = new Set();
     for (const i of items) {
         if (i.kind !== 'tv') continue;
         const key = `${i.tmdbId}|${i.date}`;
         if (!(latest.get(key) >= order(i))) latest.set(key, order(i));
+        if (Number(i.episode) === 1 || i.mark === 'premiere') premieres.add(`${key}|${i.season}`);
     }
     return items.map((i) =>
         notifyDay(
-            i.kind === 'tv' ? { ...i, lastOfDay: latest.get(`${i.tmdbId}|${i.date}`) === order(i) } : i,
+            i.kind === 'tv'
+                ? {
+                      ...i,
+                      lastOfDay: latest.get(`${i.tmdbId}|${i.date}`) === order(i),
+                      premiereDay: premieres.has(`${i.tmdbId}|${i.date}|${i.season}`)
+                  }
+                : i,
             chat,
             interval
         )

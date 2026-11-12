@@ -97,9 +97,14 @@ const notifyNewEpisodes = async (bot, item, data) => {
         } else if (mode === 'season') {
             if (announceComplete) kind = 'complete';
         } else if (mode === 'first_and_full') {
-            // A one-episode season is both premiere and finale: one message is enough
+            // A one-episode season is both premiere and finale: one message is enough. Episodes
+            // out together reach the check as the last of them, so a new season is its premiere
+            // even past episode 1 — unless the whole season is already out. A row stored at a
+            // special (season 0, newSeriesFields()) has no regular season to move on from.
+            const afterSpecial = !item.last_season && item.last_episode > 0;
             if (hasNewContent && currentEpisode === 1) kind = 'premiere';
             else if (announceComplete) kind = 'complete';
+            else if (hasNewSeason && !afterSpecial) kind = 'premiere';
         }
         if (!kind) continue;
         await notify(bot, chat.id, messages[kind], {
