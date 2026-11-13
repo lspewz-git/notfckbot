@@ -48,6 +48,48 @@ test("a failing service raises the banner, and its button opens that service's d
     await expect(page.locator('#service-title')).toHaveText('TMDB API');
 });
 
+test('TVmaze has a badge and a dialog without a token: its status, the status page, nothing to save', async ({
+    page
+}) => {
+    await mockPanel(page, { health: { tvmaze: false } });
+    const badge = page.locator('#health-tvmaze');
+    await expect(badge).toHaveText('TVmaze: ERR');
+    await expect(page.locator('#service-alert-text')).toHaveText('TVmaze is reporting an error');
+    await page.route('**/api/services/tvmaze', (route) =>
+        route.fulfill({
+            json: {
+                name: 'tvmaze',
+                label: 'TVmaze API',
+                keyless: true,
+                configured: true,
+                masked: null,
+                statusUrl: 'https://status.tvmaze.com',
+                statusLabel: 'Status page'
+            }
+        })
+    );
+    await page.route('**/api/services/tvmaze/check', (route) =>
+        route.fulfill({ json: { configured: true, ok: false, details: [], checkError: 'timeout of 8000ms exceeded' } })
+    );
+    await badge.click();
+    await expect(page.locator('#service-title')).toHaveText('TVmaze API');
+    await expect(page.locator('#service-state')).toHaveText('● Not responding');
+    await expect(page.locator('#service-token-block')).toBeHidden();
+    await expect(page.locator('#service-save')).toBeHidden();
+    await expect(page.locator('#service-status-link')).toHaveAttribute('href', 'https://status.tvmaze.com');
+    // Another service's dialog gets its token row back
+    await page.locator('[data-close="service-modal"]').click();
+    await page.route('**/api/services/kinopoisk*', (route) =>
+        route.fulfill({ json: { name: 'kinopoisk', label: 'Kinopoisk API', configured: true, masked: 'ab***yz' } })
+    );
+    await page.route('**/api/services/kinopoisk/check', (route) =>
+        route.fulfill({ json: { configured: true, ok: true, details: [] } })
+    );
+    await page.locator('#health-kp').click();
+    await expect(page.locator('#service-token-block')).toBeVisible();
+    await expect(page.locator('#service-save')).toBeVisible();
+});
+
 test('the banner is not rewritten when a refresh brings the same news', async ({ page }) => {
     await mockPanel(page, { health: { kinopoisk: 'error' } });
     await expect(page.locator('#service-alert-text')).toHaveText('KP is reporting an error');

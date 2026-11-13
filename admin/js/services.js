@@ -1,6 +1,6 @@
 /**
- * The dialog behind the TG / TMDB / KP health badges: status, quota, the masked
- * current token (with a pencil to replace it) and a link to the status page.
+ * The dialog behind the TG / TMDB / TVmaze / KP health badges: status, quota, the masked
+ * current token (with a pencil to replace it; none for TVmaze) and a link to the status page.
  *
  * The server never sends a token in full — only its first and last characters.
  * A saved token goes to .env on the server, after the service has accepted it.
@@ -63,9 +63,16 @@ function setEditing(on) {
     (on ? input : $('service-edit')).focus();
 }
 
+/** @param {boolean} keyless a service without a token (TVmaze): no token row, nothing to save */
+function setKeyless(keyless) {
+    $('service-token-block').hidden = keyless;
+    saveBtn().hidden = keyless;
+}
+
 /** The instant part: name, masked token, status page. */
 function renderInfo(info) {
     setText('service-title', info.label);
+    setKeyless(Boolean(info.keyless));
     $('service-current').classList.remove('is-loading');
     setText('service-current', info.masked || 'not set');
     setStatusLink(info.statusUrl, info.statusLabel);
@@ -118,13 +125,15 @@ const setHint = (restarts) =>
     );
 
 /**
- * @param {string} name telegram | tmdb | kinopoisk
- * @param {{ label?: string, restarts?: boolean, statusUrl?: string, statusLabel?: string }} [known]
+ * @param {string} name telegram | tmdb | tvmaze | kinopoisk
+ * @param {{ label?: string, restarts?: boolean, keyless?: boolean, statusUrl?: string, statusLabel?: string }} [known]
  *        what the badge already knows, shown before the server answers: the title, whether
- *        saving restarts the bot, and the status page (useful exactly when the service is down)
+ *        saving restarts the bot, whether it has a token at all, and the status page (useful
+ *        exactly when the service is down)
  */
 export async function openServiceModal(name, known = {}) {
     current = name;
+    setKeyless(Boolean(known.keyless));
     // Final wording from the start, so the dialog doesn't grow by a line on load
     setHint(Boolean(known.restarts));
     // Everything from the previously opened service is replaced before the slow request

@@ -4,6 +4,7 @@
  */
 const { Chat, Series, Subscription, Watchlist } = require('./db');
 const tmdb = require('./api/tmdb');
+const { withTvmazeQuick } = require('./episode-times');
 const { ZONES, isHour } = require('./quiet');
 const { sentMarkOnEnable } = require('./cron/digests');
 // The update check's own rule, so a film added now is filed exactly as the check would announce it
@@ -42,10 +43,11 @@ async function subscribe(chatId, tmdbId, notifyType, who = {}, details = null) {
     let series = await Series.findByPk(fullId);
     if (!series) {
         details ||= await tmdb.getDetails(fullId.replace('tv_', ''), 'tv');
-        // From the latest aired episode, as the bot does: never announce what is already out
+        // From the latest aired episode, as the bot does: never announce what is already out. By
+        // TVmaze's times like the update check, waiting for TVmaze a few seconds at most
         [series] = await Series.findOrCreate({
             where: { tmdb_id: fullId },
-            defaults: tmdb.newSeriesFields(details)
+            defaults: tmdb.newSeriesFields(await withTvmazeQuick(details))
         });
     }
 

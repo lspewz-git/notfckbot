@@ -639,7 +639,10 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
         const chat = await Chat.findByPk(req.chatId);
         if (!chat) return res.status(404).json({ error: 'Chat not found' });
         const p = listPeriod(chat.timezone);
-        const { items, failed } = await periodItems(req.chatId, p.from, p.to, { digitalAlerts: chat.notify_digital });
+        const { items, failed } = await periodItems(req.chatId, p.from, p.to, {
+            digitalAlerts: chat.notify_digital,
+            local: { chat }
+        });
         const bells = notifyDays(items, chat);
         res.json({
             ...p,

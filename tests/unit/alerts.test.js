@@ -303,6 +303,19 @@ describe('services', () => {
         assert.match(to(1)[1].text, /TMDB снова отвечает[\s\S]*Не было 35 мин, 13:00–13:35/);
     });
 
+    test('TVmaze down: its own alert, saying TMDB dates stand in, and its own "back"', async () => {
+        process.env.ALERT_DOWN_MINUTES = '10';
+        await watch.serviceSeen('tvmaze', { tvmaze: false, reason: 'timeout' }, minute(0));
+        await watch.serviceSeen('tvmaze', { tvmaze: false, reason: 'timeout' }, minute(10));
+        assert.match(to(1)[0].text, /TVmaze не отвечает уже 10 мин[\s\S]*Даты серий берутся из TMDB/);
+        await watch.serviceSeen('tvmaze', { tvmaze: true }, minute(20));
+        assert.match(to(1)[1].text, /TVmaze снова отвечает/);
+        assert.ok(
+            catalog.eventsOf({ preset: 'all' }).includes('tvmaze_down') ||
+                catalog.wants({ preset: 'all' }, 'tvmaze_down')
+        );
+    });
+
     test('a short blip: no alert, and no "back" either', async () => {
         await watch.serviceSeen('tmdb', { tmdb: false }, minute(0));
         await watch.serviceSeen('tmdb', { tmdb: true }, minute(3));

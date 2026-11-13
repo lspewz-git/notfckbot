@@ -39,10 +39,13 @@ function pendingRestart(bot) {
 function currentSettings(bot) {
     return {
         tokens: Object.fromEntries(
-            Object.entries(SERVICES).map(([name, service]) => [
-                name,
-                { masked: maskToken(process.env[service.env]), configured: Boolean(process.env[service.env]) }
-            ])
+            Object.entries(SERVICES)
+                // TVmaze has no token
+                .filter(([, service]) => !service.keyless)
+                .map(([name, service]) => [
+                    name,
+                    { masked: maskToken(process.env[service.env]), configured: Boolean(process.env[service.env]) }
+                ])
         ),
         proxy: {
             url: redactProxyUrl(process.env.TMDB_PROXY_URL),
@@ -128,7 +131,7 @@ router.post('/api/settings', guardsAccess, async (req, res) => {
     await Promise.all(
         Object.entries(tokens).map(async ([name, value]) => {
             const service = Object.hasOwn(SERVICES, name) ? SERVICES[name] : null;
-            if (!service) return;
+            if (!service || service.keyless) return;
             const token = typeof value === 'string' ? value.trim() : '';
             if (!service.format.test(token)) {
                 fields[name] = `That doesn't look like ${service.formatHint}`;

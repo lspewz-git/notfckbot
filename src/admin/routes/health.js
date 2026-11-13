@@ -1,4 +1,4 @@
-/** The dashboard's TG / TMDB / KP / Proxy badges. */
+/** The dashboard's TG / TMDB / TVmaze / KP / Proxy badges. */
 const axios = require('axios');
 const { buildProxyAgent } = require('../../proxy');
 const { getKinopoiskStatus } = require('../../api/kinopoisk');
@@ -44,6 +44,18 @@ const HEALTH_CHECKS = {
             return { tmdb: res.status === 200 };
         } catch (err) {
             return { tmdb: false, reason: reasonOf(err) };
+        }
+    },
+    // TVmaze (episode air times): no key, so a public show stands in for an authentication call
+    tvmaze: async () => {
+        try {
+            const res = await axios.get('https://api.tvmaze.com/shows/1', {
+                timeout: HEALTH_TIMEOUT_MS,
+                ...viaProxy()
+            });
+            return { tvmaze: res.status === 200 };
+        } catch (err) {
+            return { tvmaze: false, reason: reasonOf(err) };
         }
     },
     proxy: async () => {
@@ -128,7 +140,7 @@ const resetProblems = () => {
 
 // Whether each check failed, as last seen, so the log gets one line per change rather than one
 // per poll: "[Health] KP: error (HTTP 401)" when it breaks, "[Health] KP: ok again" when it heals
-const LOG_NAMES = { telegram: 'TG', tmdb: 'TMDB', proxy: 'Proxy', kinopoisk: 'KP' };
+const LOG_NAMES = { telegram: 'TG', tmdb: 'TMDB', tvmaze: 'TVmaze', proxy: 'Proxy', kinopoisk: 'KP' };
 const lastFailed = new Map();
 
 function logChange(name, value) {

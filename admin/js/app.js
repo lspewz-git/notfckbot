@@ -233,6 +233,7 @@ const CLICK_ACTIONS = {
         openServiceModal(el.dataset.service, {
             label: el.dataset.label,
             restarts: el.dataset.restarts === 'true',
+            keyless: el.dataset.keyless === 'true',
             statusUrl: el.dataset.statusUrl,
             statusLabel: el.dataset.statusLabel
         })

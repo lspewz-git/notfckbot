@@ -9,6 +9,8 @@ const { ensureReleaseSeasons } = require('./release-seasons');
 const { ensureAiredEpisodes, seasonsToRescan } = require('./aired-episodes');
 const { log } = require('../log');
 const { warmSeasons, seasonsAlong } = require('../calendar');
+const tvmaze = require('../api/tvmaze');
+const { withTvmaze } = require('../episode-times');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
 // Returning <-> In Production changes are not interesting to users and stay silent.
@@ -141,8 +143,12 @@ const checkSeriesUpdates = async (bot, allSeries) => {
         try {
             const [mediaType, filmId] = item.tmdb_id.split('_');
             // The current and next season come in the same request, for the calendar
-            const data = await getDetails(filmId, mediaType, { seasons: seasonsAlong(item) });
-            if (!data) continue;
+            const tmdbData = await getDetails(filmId, mediaType, { seasons: seasonsAlong(item) });
+            if (!tmdbData) continue;
+            // The last aired and next episode by TVmaze's air times where it knows them, so an
+            // episode is announced once it has aired, not once TMDB moves it (≈ a day later)
+            const times = await tvmaze.airTimesForCheck(item.tmdb_id, tvmaze.externalsOf(tmdbData));
+            const data = await withTvmaze(tmdbData, times);
 
             // Store the status first so a failure in the episode step below can't hold up the
             // archive move. The status message is still sent last: a finale often airs in the

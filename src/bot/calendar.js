@@ -53,7 +53,7 @@ function calendarKeyboard(p, { back = true } = {}) {
  */
 async function calendarView(chat, kind, offset, { digest = false, now = new Date() } = {}) {
     const p = period(kind, offset, chat.timezone, now);
-    const data = await periodItems(chat.id, p.from, p.to);
+    const data = await periodItems(chat.id, p.from, p.to, { local: { chat } });
     const back = !digest || canGoBack(chat);
     return { text: calendarText(p, data), keyboard: calendarKeyboard(p, { back }), empty: !data.items.length };
 }

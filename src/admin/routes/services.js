@@ -1,4 +1,7 @@
-/** The dialogs behind the TG / TMDB / KP badges: masked token, check with the service, replace. */
+/**
+ * The dialogs behind the TG / TMDB / TVmaze / KP badges: masked token, check with the service,
+ * replace. TVmaze has no key (`keyless`): only the check.
+ */
 const axios = require('axios');
 const { buildProxyAgent } = require('../../proxy');
 const { checkKinopoiskKey } = require('../../api/kinopoisk');
@@ -55,6 +58,22 @@ const SERVICES = {
             return { details: [['Quota', 'No daily limit (about 50 requests per second)']] };
         }
     },
+    // No key: the dialog shows only whether it answers
+    tvmaze: {
+        label: 'TVmaze API',
+        keyless: true,
+        statusUrl: 'https://status.tvmaze.com',
+        statusLabel: 'Status page',
+        check: async () => {
+            await axios.get('https://api.tvmaze.com/shows/1', outbound());
+            return {
+                details: [
+                    ['Used for', 'Episode air dates and times'],
+                    ['Quota', 'About 20 requests per 10 seconds, no key']
+                ]
+            };
+        }
+    },
     kinopoisk: {
         label: 'Kinopoisk API',
         env: 'KINOPOISK_API_KEY',
@@ -89,12 +108,13 @@ router.get('/api/services/:name', (req, res) => {
     const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
 
-    const token = process.env[service.env];
+    const token = service.keyless ? null : process.env[service.env];
     res.json({
         name: req.params.name,
         label: service.label,
-        configured: Boolean(token),
-        masked: maskToken(token),
+        keyless: Boolean(service.keyless),
+        configured: Boolean(service.keyless || token),
+        masked: service.keyless ? null : maskToken(token),
         statusUrl: service.statusUrl,
         statusLabel: service.statusLabel,
         restartOnChange: Boolean(service.restartOnChange)
@@ -106,9 +126,9 @@ router.get('/api/services/:name/check', async (req, res) => {
     const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
 
-    const token = process.env[service.env];
-    const out = { configured: Boolean(token), ok: false, details: [] };
-    if (!token) return res.json(out);
+    const token = service.keyless ? '' : process.env[service.env];
+    const out = { configured: Boolean(service.keyless || token), ok: false, details: [] };
+    if (!out.configured) return res.json(out);
 
     try {
         Object.assign(out, await service.check(token), { ok: true });
@@ -132,6 +152,7 @@ const forTokenOwner = (req, res, next) =>
 router.post('/api/services/:name', forTokenOwner, async (req, res) => {
     const service = findService(req.params.name);
     if (!service) return res.status(404).json({ error: 'Unknown service' });
+    if (service.keyless) return res.status(400).json({ error: `${service.label} has no token` });
 
     const token = typeof req.body.token === 'string' ? req.body.token.trim() : '';
     if (!service.format.test(token)) {

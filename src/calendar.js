@@ -12,6 +12,9 @@ const { zoneOf } = require('./quiet');
 const { escapeHtml, isFinishedStatus } = require('./constants');
 const { plural } = require('./words');
 const { rowFilmDates } = require('./film-release');
+const { episodeArrivalDay } = require('./account/notify-day');
+const tvmaze = require('./api/tvmaze');
+const { timeOf, releaseDay, outAt, MAX_SHIFT_DAYS } = require('./episode-times');
 
 // --- Dates as "YYYY-MM-DD" strings: TMDB's air dates are days, not moments ---
 
@@ -206,30 +209,61 @@ async function warmSeasons(series, details, now = new Date()) {
     );
 }
 
+// An episode arrives at most this many days after its TMDB date (24 h update checks: two)
+const ARRIVAL_SLACK_DAYS = 3;
+
 /** The seasons to bring along with a series' details: the last aired and the next. */
 const seasonsAlong = (series) => [...new Set([series.last_season, series.next_episode_season].filter(Boolean))];
 
 /**
  * One series' episodes in the period: [{ date, tmdbId, title, season, episode, note, mark, name, overview,
  * poster, kinopoiskId }]; `note` is the bot's Russian word for `mark` ('premiere' | 'finale' | '').
+ * With `local`, `date` is the chat's day the episode comes out: TVmaze's moment in the chat's zone
+ * where TVmaze knows the episode (src/episode-times.js), else the day the bot announces it by
+ * TMDB (episodeArrivalDay(): the day after TMDB's US date). `tmdbDate` keeps TMDB's day and
+ * `outAt` TVmaze's moment it counts as out (the bell's day, src/account/notify-day.js).
+ * @param {{ chat: { timezone?: string | null }, deadline: ReturnType<typeof tvmaze.viewDeadline> } | null} [local]
+ *   deadline: shared by the view's series; after it only cached TVmaze times are used
  */
-async function seriesEpisodes(series, from, to) {
+async function seriesEpisodes(series, from, to, local = null) {
     const numericId = String(series.tmdb_id).replace('tv_', '');
     const details = await getDetailsCached(numericId, 'tv').catch(() => null);
     const counts = new Map(((details && details.seasons) || []).map((s) => [s.season_number, s.episode_count]));
+    const times =
+        local && details
+            ? await tvmaze.airTimesQuick(series.tmdb_id, tvmaze.externalsOf(details), local.deadline)
+            : null;
+    const zoneId = local && local.chat ? local.chat.timezone : null;
+    const dayOf = (season, ep) => {
+        if (!local) return { date: ep.air_date, outAt: null };
+        const time = timeOf(times, season, ep.episode_number, ep.air_date);
+        return time
+            ? { date: releaseDay(time, zoneId), outAt: outAt(time) }
+            : { date: episodeArrivalDay(ep.air_date, local.chat), outAt: null };
+    };
+    // TVmaze's day may be a day before TMDB's, the arrival up to a few after: TMDB's days around the period
+    const askFrom = local ? addDays(from, -ARRIVAL_SLACK_DAYS) : from;
+    const askTo = local && to !== NO_END ? addDays(to, MAX_SHIFT_DAYS) : to;
     const items = [];
-    for (const season of seasonsToAsk(series, details, from, to)) {
+    for (const season of seasonsToAsk(series, details, askFrom, askTo)) {
         const data = await getSeasonDetailsCached(numericId, season);
-        const inPeriod = ((data && data.episodes) || []).filter(
-            (ep) => ep.air_date && ep.air_date >= from && ep.air_date <= to
-        );
+        const inPeriod = ((data && data.episodes) || [])
+            .filter((ep) => ep.air_date && ep.air_date >= askFrom && ep.air_date <= askTo)
+            .map((ep) => ({ ep, ...dayOf(season, ep) }))
+            .filter(({ date }) => date && date >= from && date <= to);
         if (!inPeriod.length) continue;
-        const names = await episodeNames(numericId, season, inPeriod);
-        for (const ep of inPeriod) {
+        const names = await episodeNames(
+            numericId,
+            season,
+            inPeriod.map(({ ep }) => ep)
+        );
+        for (const { ep, date, outAt: out } of inPeriod) {
             const total = counts.get(season);
             const mark = ep.episode_number === 1 ? 'premiere' : total && ep.episode_number === total ? 'finale' : '';
             items.push({
-                date: ep.air_date,
+                date,
+                tmdbDate: ep.air_date,
+                outAt: out,
                 kind: 'tv',
                 tmdbId: series.tmdb_id,
                 title: series.title,
@@ -253,21 +287,25 @@ async function seriesEpisodes(series, from, to) {
 
 /**
  * Everything of a chat's in the period, by date, and how many series TMDB didn't answer for.
+ * `local`: episodes on the chat's days they come out (seriesEpisodes); without it, TMDB's days.
+ * @param {{ digitalAlerts?: boolean, local?: { chat: { timezone?: string | null } } | null }} [options]
  * @returns {Promise<{ items: object[], failed: number }>}
  */
-async function periodItems(chatId, from, to, { digitalAlerts = false } = {}) {
+async function periodItems(chatId, from, to, { digitalAlerts = false, local = null } = {}) {
     const [subs, films] = await Promise.all([
         Subscription.findAll({ where: { chatId }, include: [{ model: Series }] }),
         Watchlist.findAll({ where: { chatId } })
     ]);
     const series = subs.map((s) => s.Series).filter(Boolean);
     let failed = 0;
+    // One wait for TVmaze for the whole view, not one per series: it may not answer at all
+    const deadline = local ? tvmaze.viewDeadline() : null;
     const perSeries = await inBatches(series, (s) =>
-        seriesEpisodes(s, from, to).catch(() => {
+        seriesEpisodes(s, from, to, local && { chat: local.chat, deadline }).catch(() => {
             failed += 1;
             return [];
         })
-    );
+    ).finally(() => deadline && deadline.cancel());
     const modes = new Map(subs.filter((s) => s.Series).map((s) => [s.Series.tmdb_id, s.notify_type]));
     const items = perSeries.flat().map((item) => ({ ...item, mode: modes.get(item.tmdbId) }));
     // One Release event, independent of the chat's optional digital notification setting.

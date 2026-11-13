@@ -593,7 +593,7 @@ const calWhatOf = (kind) => (kind === 'movie' ? 'films' : 'series');
 
 const BELL = `<span class="cal-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${ICON('bell')}</span>`;
 
-function calRow(item, index, today, sameDay) {
+function calRow(item, index, today) {
     const release = item.release || item;
     const extra = item.kind === 'movie' ? Math.max(0, (release.countries?.length || 0) - 3) : 0;
     const sub =
@@ -604,8 +604,8 @@ function calRow(item, index, today, sameDay) {
         ? `<span class="cal-meta-label">${escapeHtml(sub)}</span> <span class="cal-meta-more">+${extra}</span>`
         : escapeHtml(sub);
     return (
-        `<li${sameDay ? ' class="cal-same-day"' : ''}><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
-        `<span class="cal-day"${sameDay ? ' aria-hidden="true"' : ''}><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${titleThumb(item.poster, 'title-thumb cal-thumb')}` +
+        `<li><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
+        `<span class="cal-day"><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${titleThumb(item.poster, 'title-thumb cal-thumb')}` +
         `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta${extra ? ' cal-meta-countries' : ''}">${meta}</span></span>` +
         `<span class="cal-when">${item.notifyOn ? BELL : ''}<span>${whenText(item.date, today)}</span></span></button></li>`
     );
@@ -619,7 +619,7 @@ const monthTitle = (key, today) =>
         ...(key.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' })
     });
 
-/** Yesterday and what is still to come, a card per month, the day shown once for its rows */
+/** Yesterday and what is still to come, a card per month, the day on every row */
 function daysBody(data) {
     const shown = data.items
         .map((item, index) => ({ item, index }))
@@ -638,9 +638,7 @@ function daysBody(data) {
         .map(
             ({ key, rows }) =>
                 `<h2 class="group-title">${monthTitle(key, data.today)}</h2><ul class="group-list cal-list">${rows
-                    .map(({ item, index }, i) =>
-                        calRow(item, index, data.today, i > 0 && rows[i - 1].item.date === item.date)
-                    )
+                    .map(({ item, index }) => calRow(item, index, data.today))
                     .join('')}</ul>`
         )
         .join('');

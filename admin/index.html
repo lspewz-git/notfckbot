@@ -202,6 +202,22 @@
                                         TMDB
                                     </div>
                                     <div
+                                        id="health-tvmaze"
+                                        class="badge loading"
+                                        aria-busy="true"
+                                        data-action="service"
+                                        data-service="tvmaze"
+                                        data-status-url="https://status.tvmaze.com"
+                                        data-status-label="Status page"
+                                        data-label="TVmaze API"
+                                        data-keyless="true"
+                                        role="button"
+                                        tabindex="0"
+                                        title="TVmaze API: episode air times, status"
+                                    >
+                                        TVmaze
+                                    </div>
+                                    <div
                                         id="health-kp"
                                         class="badge loading"
                                         aria-busy="true"
@@ -221,7 +237,7 @@
                                         class="badge loading"
                                         aria-busy="true"
                                         style="cursor: pointer"
-                                        title="Configure the TMDB proxy"
+                                        title="Configure the proxy (TMDB, TVmaze, Telegram)"
                                         data-action="proxy"
                                         role="button"
                                         tabindex="0"
@@ -2896,7 +2912,8 @@
                 <!-- Problems that ended, from the badge's checks; hidden when there were none -->
                 <div id="service-recent" class="health-recent-block" hidden></div>
 
-                <div class="field-block">
+                <!-- Hidden for a service without a key (TVmaze) -->
+                <div class="field-block" id="service-token-block">
                     <label class="field-label" for="service-token">Token</label>
                     <!-- Masked value by default; the pencil swaps it for an empty field -->
                     <div class="token-row">

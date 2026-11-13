@@ -31,6 +31,13 @@ const EVENTS = [
     },
     { key: 'tmdb_down', group: 'services', critical: false, title: 'TMDB not answering', label: 'TMDB not answering' },
     {
+        key: 'tvmaze_down',
+        group: 'services',
+        critical: false,
+        title: 'TVmaze not answering',
+        label: 'TVmaze not answering'
+    },
+    {
         key: 'proxy_down',
         group: 'services',
         critical: false,

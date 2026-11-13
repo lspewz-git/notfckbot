@@ -150,6 +150,7 @@ async function checkLate(now = new Date()) {
 const SERVICES = {
     telegram: { key: 'telegram_down', name: 'Telegram', what: 'Сообщения не уходят.' },
     tmdb: { key: 'tmdb_down', name: 'TMDB', what: 'Новые серии и фильмы не проверяются.' },
+    tvmaze: { key: 'tvmaze_down', name: 'TVmaze', what: 'Даты серий берутся из TMDB.' },
     proxy: { key: 'proxy_down', name: 'Прокси', what: 'Запросы через него не проходят.' },
     kinopoisk: { key: 'kinopoisk_down', name: 'Кинопоиск', what: 'Ссылки на Кинопоиск не находятся.' }
 };
@@ -161,7 +162,7 @@ let tick = 0;
 
 /**
  * One look at a service, as the dashboard's badge sees it (the same check, the same cache).
- * @param {string} name telegram, tmdb, proxy, kinopoisk
+ * @param {string} name telegram, tmdb, tvmaze, proxy, kinopoisk
  * @param {object} value what checkHealth() answered
  */
 async function serviceSeen(name, value, now = new Date()) {

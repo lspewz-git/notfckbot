@@ -54,6 +54,11 @@ mock.method(tmdb, 'getDetailsCached', async () => ({
     ]
 }));
 
+// TVmaze: nothing known unless a test says otherwise
+const tvmaze = require('../../src/api/tvmaze');
+let airTimes = null;
+mock.method(tvmaze, 'airTimesQuick', async () => airTimes);
+
 const calendar = require('../../src/calendar');
 const { calendarView, calendarKeyboard, register } = require('../../src/bot/calendar');
 const { dueDigests, sentMarkOnEnable, sendDigests } = require('../../src/cron/digests');
@@ -74,6 +79,7 @@ const FILMS = [
 beforeEach(() => {
     seasonAsks = [];
     tmdbDown = false;
+    airTimes = null;
     mock.method(Subscription, 'findAll', async () => [{ Series: SERIES, notify_type: 'season' }]);
     mock.method(Watchlist, 'findAll', async () => FILMS);
 });
@@ -86,6 +92,60 @@ test('calendar items carry full-unfollow film ids and the series notification mo
     const { items } = await calendar.periodItems(10, '2026-10-01', '2026-11-30');
     assert.equal(items.find((item) => item.kind === 'movie').listId, 71);
     assert.equal(items.find((item) => item.kind === 'tv').mode, 'season');
+});
+
+describe("the bot's day for an episode", () => {
+    const episodes = (items) => items.filter((i) => i.kind === 'tv').map((i) => [i.episode, i.date, i.tmdbDate]);
+
+    test("an episode is on the chat's day of the message; TMDB's day is kept", async () => {
+        const moscow = { local: { chat: { timezone: 'Europe/Moscow' } } };
+        const { items } = await calendar.periodItems(10, '2026-10-13', '2026-10-15', moscow);
+        assert.deepEqual(episodes(items), [
+            [2, '2026-10-13', '2026-10-12'],
+            [3, '2026-10-15', '2026-10-14']
+        ]);
+    });
+
+    test("one just before the period moves into it; one on the period's last TMDB day moves out", async () => {
+        const moscow = { local: { chat: { timezone: 'Europe/Moscow' } } };
+        const { items } = await calendar.periodItems(10, '2026-11-03', '2026-11-09', moscow);
+        assert.deepEqual(episodes(items), [[5, '2026-11-03', '2026-11-02']]);
+        const before = await calendar.periodItems(10, '2026-10-26', '2026-11-02', moscow);
+        assert.deepEqual(episodes(before.items), []);
+    });
+
+    test("without `local` (the year view) TMDB's day stays", async () => {
+        const { items } = await calendar.periodItems(10, '2026-10-12', '2026-10-12');
+        assert.deepEqual(episodes(items), [[2, '2026-10-12', '2026-10-12']]);
+    });
+
+    test("where TVmaze knows the episode: its moment's day in the chat's zone, and when it's out", async () => {
+        // E2: 01:00 UTC on the 13th; E3: 18:00 UTC on the 14th (21:00 in Moscow, the same day as TMDB's)
+        airTimes = {
+            '2:2': { stamp: Date.parse('2026-10-13T01:00:00Z'), date: '2026-10-12', runtime: 50 },
+            '2:3': { stamp: Date.parse('2026-10-14T18:00:00Z'), date: '2026-10-14', runtime: null }
+        };
+        const moscow = { local: { chat: { timezone: 'Europe/Moscow' } } };
+        const { items } = await calendar.periodItems(10, '2026-10-12', '2026-10-15', moscow);
+        assert.deepEqual(episodes(items), [
+            [2, '2026-10-13', '2026-10-12'],
+            [3, '2026-10-14', '2026-10-14']
+        ]);
+        const e3 = items.find((i) => i.episode === 3);
+        assert.equal(e3.outAt, Date.parse('2026-10-14T19:00:00Z'));
+        // Kaliningrad is an hour behind Moscow: E2 airs at 03:00 there, still the 13th
+        const west = await calendar.periodItems(10, '2026-10-12', '2026-10-15', {
+            local: { chat: { timezone: 'Europe/Kaliningrad' } }
+        });
+        assert.deepEqual(episodes(west.items)[0], [2, '2026-10-13', '2026-10-12']);
+    });
+
+    test('a TVmaze day a day before TMDB brings an episode from just past the period into it', async () => {
+        airTimes = { '2:5': { stamp: Date.parse('2026-11-01T20:00:00Z'), date: '2026-11-01', runtime: 60 } };
+        const moscow = { local: { chat: { timezone: 'Europe/Moscow' } } };
+        const { items } = await calendar.periodItems(10, '2026-10-26', '2026-11-01', moscow);
+        assert.deepEqual(episodes(items), [[5, '2026-11-01', '2026-11-02']]);
+    });
 });
 
 test('a film always has one cinema Release row, with digital information kept as an addition', async (t) => {
@@ -169,14 +229,17 @@ const pick = (p) => [p.from, p.to];
 
 describe('the week', () => {
     test('days with something out, past ones ticked, today marked; films once', async () => {
+        // Episodes on the day the bot announces them: the day after TMDB's (12th -> 13th, 14th -> 15th)
         const view = await calendarView(chat(), 'w', 0, { now: NOW });
         const text = view.text;
         assert.match(text, /^📅 <b>Неделя 12–18 октября<\/b>/);
-        assert.match(text, /<b>Пн, 12 окт<\/b> ✓\n📺 Пацаны — S2E2/);
-        assert.match(text, /<b>Ср, 14 окт<\/b> · сегодня\n📺 Пацаны — S2E3/);
+        assert.match(text, /<b>Вт, 13 окт<\/b> ✓\n📺 Пацаны — S2E2/);
+        assert.match(text, /<b>Чт, 15 окт<\/b>\n📺 Пацаны — S2E3/);
         assert.match(text, /<b>Пт, 16 окт<\/b>\n🎬 Дюна — выход/);
         assert.equal(text.match(/Дюна/g).length, 1);
         assert.equal(view.empty, false);
+        const tomorrow = await calendarView(chat(), 'w', 0, { now: new Date('2026-10-15T09:00:00Z') });
+        assert.match(tomorrow.text, /<b>Чт, 15 окт<\/b> · сегодня\n📺 Пацаны — S2E3/);
     });
 
     test('premieres and finales are named', async () => {

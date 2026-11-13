@@ -199,6 +199,27 @@ describe('POST /api/settings', () => {
         assert.equal(tmdb.status, 400, 'reaches its own check, not the device rule');
     });
 
+    test('TVmaze has no token: its dialog says so, a token for it is refused, Settings leave it out', async (t) => {
+        t.mock.method(services.SERVICES.tvmaze, 'check', async () => ({ details: [['Used for', 'x']] }));
+        const info = await fetch(`${base}/api/services/tvmaze`).then((res) => res.json());
+        assert.equal(info.keyless, true);
+        assert.equal(info.configured, true);
+        assert.equal(info.masked, null);
+        assert.equal(info.statusUrl, 'https://status.tvmaze.com');
+        const check = await fetch(`${base}/api/services/tvmaze/check`).then((res) => res.json());
+        assert.equal(check.ok, true);
+        const posted = await fetch(`${base}/api/services/tvmaze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: 'anything' })
+        });
+        assert.equal(posted.status, 400);
+        const { status, body } = await post({ tokens: { tvmaze: 'anything' }, intervalHours: 6 });
+        assert.equal(status, 200);
+        assert.equal('tvmaze' in body.settings.tokens, false);
+        assert.equal(fs.readFileSync(ENV_FILE, 'utf8').includes('anything'), false);
+    });
+
     test('the VPS IP is saved and immediately replaces the trusted peer, including IPv6', async () => {
         for (const ip of ['152.234.253.242', '2001:db8::1']) {
             const { status, body } = await post({ panelProxyIp: ` ${ip} ` });

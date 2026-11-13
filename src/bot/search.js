@@ -7,6 +7,7 @@ const { searchMulti, getDetails, getDetailsCached } = require('../api/tmdb');
 const { findKinopoiskId, kinopoiskQuick } = require('../api/kinopoisk');
 const { Subscription, Watchlist } = require('../db');
 const ops = require('../chat-ops');
+const { withTvmazeQuick } = require('../episode-times');
 const { todayIn } = require('../calendar');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
@@ -291,8 +292,12 @@ function register(bot) {
                 return showCard(ctx, ctx.state.search, filmCard(data, { kinopoiskId, onWatchlist, ru, today }));
             }
 
-            const sub = await Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } });
-            return showCard(ctx, ctx.state.search, seriesCard(data, { subscribedMode: sub ? sub.notify_type : null }));
+            const [sub, shown] = await Promise.all([
+                Subscription.findOne({ where: { chatId: ctx.chat.id, seriesId: tmdbId } }),
+                // The next episode's day by TVmaze, in the chat's zone
+                withTvmazeQuick(data, ctx.state.chatData && ctx.state.chatData.timezone)
+            ]);
+            return showCard(ctx, ctx.state.search, seriesCard(shown, { subscribedMode: sub ? sub.notify_type : null }));
         } catch (error) {
             log.error({ err: error }, '[Bot] Card error');
             await ctx.answerCbQuery('Не удалось открыть карточку.').catch(() => {});
@@ -324,7 +329,8 @@ function register(bot) {
             const typeLabel = NOTIFY_LABELS_SHORT[notifyType] || notifyType;
             const finished = isFinishedStatus(data.status);
             let nextEpisodeText = 'информации о ближайшей серии пока нет';
-            const nextEp = data.next_episode_to_air;
+            const shown = await withTvmazeQuick(data, ctx.state.chatData && ctx.state.chatData.timezone);
+            const nextEp = shown.next_episode_to_air;
             if (nextEp && nextEp.air_date) {
                 nextEpisodeText = `Ближайшая серия (${nextEp.season_number} сезон, ${nextEp.episode_number} серия) ожидается <b>${formatRuDate(nextEp.air_date)}</b>`;
             }

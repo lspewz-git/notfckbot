@@ -774,8 +774,11 @@
         margin-left: auto;
     }
 
+    /* Five badges: closer together, and a wrapped one sits right under the row (each is already
+       44px tall to touch), not a gap further down. 12px still leaves each its 6px either side */
     .status-badges {
         flex-basis: 100%;
+        gap: 0 var(--space-3);
     }
 
     /* The header stacks from the left */

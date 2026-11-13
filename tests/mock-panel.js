@@ -421,7 +421,7 @@ async function mockPanel(page, options = {}) {
             ],
             drawing: { running: false, left: 0 }
         },
-        health: { telegram: true, tmdb: true, proxy: 'off', kinopoisk: 'ok', ...options.health },
+        health: { telegram: true, tmdb: true, tvmaze: true, proxy: 'off', kinopoisk: 'ok', ...options.health },
         // The update check: "Run now" starts it, and it reports running for two polls
         cron: {
             running: false,
@@ -493,6 +493,7 @@ async function mockPanel(page, options = {}) {
         '/api/health': () => ({ ...panel.health, kinopoiskQuota: { used: 3, limit: 500 } }),
         '/api/health/telegram': () => ({ telegram: panel.health.telegram, ...problemsOf('telegram') }),
         '/api/health/tmdb': () => ({ tmdb: panel.health.tmdb, ...problemsOf('tmdb') }),
+        '/api/health/tvmaze': () => ({ tvmaze: panel.health.tvmaze, ...problemsOf('tvmaze') }),
         '/api/health/proxy': () => ({ proxy: panel.health.proxy, ...problemsOf('proxy') }),
         '/api/health/kinopoisk': () => ({
             kinopoisk: panel.health.kinopoisk,

@@ -52,6 +52,27 @@ describe('logChange', () => {
         assert.deepEqual(logs, ['[Health] KP: error (HTTP 401)', '[Health] KP: ok again']);
     });
 
+    test('TVmaze logs under its own name', () => {
+        logChange('tvmaze', { tvmaze: false, reason: 'timeout of 5000ms exceeded' });
+        logChange('tvmaze', { tvmaze: true });
+        assert.deepEqual(logs, ['[Health] TVmaze: error (timeout of 5000ms exceeded)', '[Health] TVmaze: ok again']);
+    });
+
+    test("TVmaze's check asks a public show through the proxy setting, no key", async (t) => {
+        const axios = require('axios');
+        const asked = [];
+        t.mock.method(axios, 'get', async (url, config) => {
+            asked.push({ url, proxy: config.proxy, key: config.headers });
+            return { status: 200 };
+        });
+        assert.deepEqual(await HEALTH_CHECKS.tvmaze(), { tvmaze: true });
+        assert.deepEqual(asked, [{ url: 'https://api.tvmaze.com/shows/1', proxy: false, key: undefined }]);
+        t.mock.method(axios, 'get', async () => {
+            throw Object.assign(new Error('x'), { response: { status: 503 } });
+        });
+        assert.deepEqual(await HEALTH_CHECKS.tvmaze(), { tvmaze: false, reason: 'HTTP 503' });
+    });
+
     test('a failing service reported on the first check after a start', () => {
         logChange('telegram', { telegram: false, reason: '401: Unauthorized' });
         assert.deepEqual(logs, ['[Health] TG: error (401: Unauthorized)']);

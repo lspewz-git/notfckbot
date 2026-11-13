@@ -33,11 +33,11 @@ test("a film's Release row has its main notification, independently of digital i
 });
 
 test('quiet hours that started before midnight move the message to the next day', () => {
-    // 06 UTC is 16:00 in Kamchatka: quiet from 15 to 9 holds it until the next morning
+    // 09 UTC is 21:00 in Kamchatka: quiet from 15 to 9 holds it until the next morning
     const kamchatka = { timezone: 'Asia/Kamchatka', quiet_start: 15, quiet_end: 9 };
     assert.equal(notifyDay({ kind: 'tv', date: '2026-11-12', mode: 'episode' }, kamchatka), '2026-11-14');
-    // 09:00 in Moscow inside 0–10: held until 10:00 the same day
-    const morning = { timezone: 'Europe/Moscow', quiet_start: 0, quiet_end: 10 };
+    // 12:00 in Moscow inside 0–13: held until 13:00 the same day
+    const morning = { timezone: 'Europe/Moscow', quiet_start: 0, quiet_end: 13 };
     assert.equal(notifyDay({ kind: 'tv', date: '2026-11-12', mode: 'episode' }, morning), '2026-11-13');
     // Outside the hours nothing moves
     const night = { timezone: 'Europe/Moscow', quiet_start: 23, quiet_end: 8 };
@@ -82,15 +82,80 @@ test('episodes out the same day give one message, about the last; a one-episode 
     );
     // A season of one episode: marked a premiere, still the season's end
     assert.deepEqual(notifyDays([ep(1, { mode: 'season', mark: 'premiere', last: true })], moscow), ['2026-11-13']);
+    // Shown on the arrival day: the bell still goes by TMDB's, as the update check does
+    assert.deepEqual(
+        notifyDays(
+            [
+                ep(1, { mode: 'episode', date: '2026-11-13', tmdbDate: '2026-11-12' }),
+                ep(2, { mode: 'episode', date: '2026-11-13', tmdbDate: '2026-11-12' })
+            ],
+            moscow
+        ),
+        [null, '2026-11-13']
+    );
+});
+
+test("an episode's arrival day is its message's day in the chat, whatever the mode", () => {
+    const { episodeArrivalDay } = require('../../src/account/notify-day');
+    const moscow = { timezone: 'Europe/Moscow' };
+    assert.equal(episodeArrivalDay('2026-11-12', moscow, 3), '2026-11-13');
+    assert.equal(episodeArrivalDay('2026-12-31', moscow, 3), '2027-01-01');
+    assert.equal(episodeArrivalDay('2026-11-12', null, 3), '2026-11-13', 'no chat: the default zone');
+    // 24-hour checks: the first slot after TMDB moves the episode is the next midnight
+    assert.equal(episodeArrivalDay('2026-11-12', moscow, 24), '2026-11-14');
+    // Every zone of ours gets it the day after TMDB's date
+    for (const timezone of ['Europe/Kaliningrad', 'Asia/Yekaterinburg', 'Asia/Vladivostok', 'Asia/Kamchatka'])
+        assert.equal(episodeArrivalDay('2026-11-12', { timezone }, 3), '2026-11-13', timezone);
+    // Quiet hours hold the message, not the episode: its day stays (the bell's moves)
+    const late = { timezone: 'Asia/Kamchatka', quiet_start: 18, quiet_end: 8 };
+    assert.equal(episodeArrivalDay('2026-11-12', late, 3), '2026-11-13');
+    const { notifyDay } = require('../../src/account/notify-day');
+    assert.equal(notifyDay({ kind: 'tv', date: '2026-11-12', mode: 'episode' }, late, 3), '2026-11-14');
+});
+
+test("an episode out by TVmaze goes with the first check after that, if before TMDB's", () => {
+    const { notifyDay, notifyDays, firstCheckFrom } = require('../../src/account/notify-day');
+    const moscow = { timezone: 'Europe/Moscow' };
+    assert.equal(firstCheckFrom(Date.parse('2026-11-13T01:50:00Z'), 3), Date.parse('2026-11-13T03:00:00Z'));
+    assert.equal(firstCheckFrom(Date.parse('2026-11-13T03:00:00Z'), 3), Date.parse('2026-11-13T03:00:00Z'));
+    assert.equal(firstCheckFrom(Date.parse('2026-11-13T21:30:00Z'), 5), Date.parse('2026-11-14T00:00:00Z'));
+    const tv = { kind: 'tv', mode: 'episode', date: '2026-11-12' };
+    // Out at 01:50 UTC on the 13th: the 03:00 check, 06:00 in Moscow, the 13th
+    assert.equal(notifyDay({ ...tv, outAt: Date.parse('2026-11-13T01:50:00Z') }, moscow, 3), '2026-11-13');
+    // Out late on the 13th by TVmaze: TMDB moves it first (09:00 UTC), still the 13th
+    assert.equal(notifyDay({ ...tv, outAt: Date.parse('2026-11-13T22:00:00Z') }, moscow, 3), '2026-11-13');
+    // Out by TVmaze the evening before TMDB's US day ends: the check that evening, the 12th
+    assert.equal(notifyDay({ ...tv, outAt: Date.parse('2026-11-12T17:00:00Z') }, moscow, 3), '2026-11-12');
+    // Two out by different checks: each gets its message (not one for the TMDB day)
+    const ep = (episode, outAt) => ({
+        kind: 'tv',
+        tmdbId: 'tv_1',
+        season: 1,
+        episode,
+        mode: 'episode',
+        date: '2026-11-13',
+        tmdbDate: '2026-11-12',
+        outAt
+    });
+    assert.deepEqual(
+        notifyDays([ep(1, Date.parse('2026-11-12T17:00:00Z')), ep(2, Date.parse('2026-11-12T23:00:00Z'))], moscow, 3),
+        ['2026-11-12', '2026-11-13']
+    );
+    // Found by the same check: one message, about the later
+    assert.deepEqual(
+        notifyDays([ep(1, Date.parse('2026-11-13T01:10:00Z')), ep(2, Date.parse('2026-11-13T02:00:00Z'))], moscow, 3),
+        [null, '2026-11-13']
+    );
 });
 
 test('the episode send time follows the update interval', () => {
     const { notifyDay, episodeSendHour } = require('../../src/account/notify-day');
-    assert.equal(episodeSendHour(3), 6);
-    assert.equal(episodeSendHour(4), 8);
+    // The first check after 08 UTC: 13.11 "12 12 12" (TMDB 12.11) was not out at 06:00 and went at 09:00
+    assert.equal(episodeSendHour(3), 9);
+    assert.equal(episodeSendHour(4), 12);
     assert.equal(episodeSendHour(5), 10);
     assert.equal(episodeSendHour(12), 12);
-    // 06 UTC is 22:00 the day before in Los Angeles' -8, 08 UTC is midnight of the next day: our zones are
-    // all east of UTC, so in Moscow both stay on the day after the TMDB date
+    assert.equal(episodeSendHour(24), 24);
+    // Daily checks run at 00 UTC: the next midnight, two days after the TMDB date
     assert.equal(notifyDay({ kind: 'tv', date: '2026-11-12', mode: 'episode' }, moscow, 24), '2026-11-14');
 });

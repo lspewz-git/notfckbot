@@ -56,7 +56,7 @@ export async function fetchData() {
         jobs.push(api('/stats').then(updateStats, orElse(statsFailed)));
         jobs.push(api('/stats/charts').then(updateCharts, orElse(chartsFailed)));
         // One request per service: each badge updates as soon as its own service answers
-        for (const service of ['telegram', 'tmdb', 'kinopoisk', 'proxy']) {
+        for (const service of ['telegram', 'tmdb', 'tvmaze', 'kinopoisk', 'proxy']) {
             jobs.push(api(`/health/${service}`).then(updateHealth));
         }
         jobs.push(

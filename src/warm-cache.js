@@ -11,6 +11,7 @@ const { Series, Watchlist } = require('./db');
 const { getDetailsCached } = require('./api/tmdb');
 const { warmSeasons } = require('./calendar');
 const { findKinopoiskId } = require('./api/kinopoisk');
+const tvmaze = require('./api/tvmaze');
 const { log } = require('./log');
 
 /** Every title the panel can show a card for: the tracked series (rows) and the films on any list. */
@@ -39,6 +40,8 @@ async function warmDetailsCache() {
             // from the seasons: the first view after a start shouldn't wait for TMDB
             if (mediaType === 'tv' && rows.has(tmdbId)) {
                 await warmSeasons(rows.get(tmdbId), details).catch(() => {});
+                // And TVmaze's air times for those dates: queued, paced, in the background
+                tvmaze.warm(tmdbId, tvmaze.externalsOf(details));
             }
         } catch {
             // Already logged by tmdb.js; that card will just ask TMDB when opened

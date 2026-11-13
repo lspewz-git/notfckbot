@@ -320,11 +320,6 @@
     font-weight: 500;
 }
 
-/* A second title on the same day: the day isn't repeated, the rule starts under the poster */
-.cal-same-day .cal-day {
-    visibility: hidden;
-}
-
 .title-thumb.cal-thumb {
     width: 32px;
     height: 48px;
@@ -332,10 +327,6 @@
 
 .cal-list > li + li::before {
     left: 12px;
-}
-
-.cal-list > li.cal-same-day::before {
-    left: 54px;
 }
 
 .cal-when {

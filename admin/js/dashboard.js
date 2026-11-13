@@ -85,9 +85,15 @@ export function updateStats(stats) {
 const serviceState = {};
 /** The problem the server reports per service while it fails: { since, reason, checks } */
 const serviceProblem = {};
-const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', kinopoisk: 'KP', proxy: 'Proxy' };
+const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', tvmaze: 'TVmaze', kinopoisk: 'KP', proxy: 'Proxy' };
 // The badge of each service; clicking one opens its dialog
-const SERVICE_BADGES = { telegram: 'health-tg', tmdb: 'health-tmdb', kinopoisk: 'health-kp', proxy: 'health-proxy' };
+const SERVICE_BADGES = {
+    telegram: 'health-tg',
+    tmdb: 'health-tmdb',
+    tvmaze: 'health-tvmaze',
+    kinopoisk: 'health-kp',
+    proxy: 'health-proxy'
+};
 
 function setService(key, badgeId, state) {
     serviceState[key] = state;
@@ -139,6 +145,7 @@ export function updateHealth(h) {
     }
     if ('telegram' in h) setService('telegram', 'health-tg', h.telegram ? 'ok' : 'error');
     if ('tmdb' in h) setService('tmdb', 'health-tmdb', h.tmdb ? 'ok' : 'error');
+    if ('tvmaze' in h) setService('tvmaze', 'health-tvmaze', h.tvmaze ? 'ok' : 'error');
     if ('proxy' in h) setService('proxy', 'health-proxy', h.proxy === 'ok' || h.proxy === 'error' ? h.proxy : 'off');
 
     // Kinopoisk API, used to find Kinopoisk IDs for watch links. Clicking a status opens

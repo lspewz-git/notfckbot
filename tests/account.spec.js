@@ -699,6 +699,21 @@ test('calendar: one list of what is to come, series and films in their tabs, wit
     await expect(rows.nth(1).locator('.cal-when')).toHaveText('in 2 days');
 });
 
+test('calendar: every row shows its own day, also the second episode of the same day', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    const finale = panel.account.calendar.items.find((x) => x.episode === 5);
+    panel.account.calendar.items.splice(panel.account.calendar.items.indexOf(finale), 0, {
+        ...finale,
+        episode: 4,
+        mark: '',
+        name: 'Day One'
+    });
+    await openMine(page, 'my-calendar');
+    const days = page.locator('#my-calendar-body .cal-day');
+    await expect(days).toHaveText(['04Wed', '04Wed', '15Fri']);
+    for (const day of await days.all()) await expect(day).toBeVisible();
+});
+
 test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
