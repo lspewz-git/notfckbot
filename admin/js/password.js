@@ -11,7 +11,7 @@ const MIN_LENGTH = 8;
 
 // Keep the eye mounted: replacing its external <use> can flicker while Safari resolves the sprite.
 const PASSWORD_EYE =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#eye" /><path class="password-eye-slash" pathLength="1" d="m3 3 18 18" /></svg>';
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye" /><path class="password-eye-slash" pathLength="1" d="m3 3 18 18" /></svg>';
 
 /** @type {{ id: string, name: string | null, hasPassword: boolean, changedAt: string | null, system: boolean } | null} */
 let me = null;
@@ -31,7 +31,7 @@ const passwordField = (id, autocomplete, label) =>
  */
 export const loginAlert = (id, text = '') =>
     `<div class="login-alert" id="${id}" role="alert"${text ? '' : ' hidden'}>` +
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#circle-alert" /></svg>' +
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-circle-alert" /></svg>' +
     `<span>${escapeHtml(text)}</span></div>`;
 
 /** Shows (or with '' hides) a loginAlert's text. */
@@ -52,7 +52,7 @@ export const signInForm = () =>
     '<p class="login-note">Forgot it? Sign in with Telegram and set a new one in Account settings.</p>' +
     loginAlert('login-pass-error') +
     '<div class="login-actions"><button type="submit" class="btn btn-primary" disabled>' +
-    '<svg class="icon login-spin" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#loader-circle" /></svg>' +
+    '<svg class="icon login-spin" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-loader-circle" /></svg>' +
     '<span>Sign in</span></button>' +
     '<button type="button" class="login-text-btn" data-action="login-cancel">Use another way</button></div>' +
     '</form>';
@@ -108,7 +108,7 @@ export function setMe(user) {
 }
 
 const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 // "3 Nov", or with the year when it isn't this one
 const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });

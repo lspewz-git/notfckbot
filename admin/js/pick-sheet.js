@@ -7,7 +7,7 @@
 import { $, escapeHtml } from './dom.js';
 import { openModal, closeModal } from './ui.js';
 
-const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg>';
+const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check" /></svg>';
 
 /**
  * The first letter of a name, for its round avatar (an emoji counts as one). A Telegram username's

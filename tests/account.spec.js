@@ -446,7 +446,7 @@ test('"Bot code": the digits to send, no field to type into, and the page signs 
     if (browserName === 'chromium') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     const panel = await mockPanel(page, { signedOut: true });
     panel.account.confirmationState = 'waiting';
-    expect(await page.locator('[data-action="login-code"] use').getAttribute('href')).toBe('/vendor/lucide.svg#binary');
+    expect(await page.locator('[data-action="login-code"] use').getAttribute('href')).toBe('#i-binary');
     await page.locator('[data-action="login-code"]:not([disabled])').click();
     await expect(page.locator('#login-step')).toHaveText('Send the code to the bot');
     await expect(page.locator('#login-back')).toBeFocused();
@@ -817,6 +817,35 @@ test('calendar: every row shows its own day, also the second episode of the same
     for (const day of await days.all()) await expect(day).toBeVisible();
 });
 
+test('calendar: reopening shows the last list at once and keeps it when nothing changed', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-calendar');
+    const body = page.locator('#my-calendar-body');
+    await expect(body.locator('button.cal-row')).toHaveCount(2);
+    // Posters load with the list, not when scrolled to
+    await expect(body.locator('img.cal-thumb[loading="lazy"]')).toHaveCount(0);
+    await body
+        .locator('button.cal-row')
+        .first()
+        .evaluate((row) => (row.dataset.kept = '1'));
+    await openSection(page, 'my-subs');
+    // The fresh answer waits: the old list stays, no skeleton
+    let release = () => {};
+    const hold = new Promise((resolve) => (release = resolve));
+    await page.route('**/calendar', async (route) => {
+        await hold;
+        await route.fallback();
+    });
+    await openSection(page, 'my-calendar');
+    await expect(body.locator('button.cal-row')).toHaveCount(2);
+    await expect(body.locator('[aria-busy="true"]')).toHaveCount(0);
+    release();
+    await expect.poll(() => panel.account.sent.filter((r) => r.path.endsWith('/calendar')).length).toBeGreaterThan(1);
+    await page.waitForTimeout(100);
+    // Same answer: the very same rows
+    await expect(body.locator('button.cal-row[data-kept="1"]')).toHaveCount(1);
+});
+
 test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
@@ -830,7 +859,7 @@ test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself',
     await expect(card.locator('.tc-date-when')).toHaveText('today');
     await expect(card).toContainText('Ellie and Dina head out.');
     await expect(card.locator('.tc-rating')).toHaveText('8.7/ 10 · TMDB');
-    await expect(card.locator('.tc-rating use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
+    await expect(card.locator('.tc-rating use')).toHaveAttribute('href', '#i-star');
     await expect(card.getByRole('link', { name: 'Open on Kinopoisk' })).toHaveAttribute(
         'href',
         'https://www.kinopoisk.ru/series/1/'
@@ -1072,10 +1101,7 @@ test('Chat settings: the chat on a card that opens the chats, rows with icon til
     await expect(card.locator('.row-meta')).toHaveText('Your personal chat');
     // The header has no chip of its own any more: the card is the way to the chats
     await expect(page.locator('#my-settings-section header .mine-chat-chip')).toHaveCount(0);
-    await expect(body.locator('.group-row .row-tile svg use').first()).toHaveAttribute(
-        'href',
-        '/vendor/lucide.svg#moon'
-    );
+    await expect(body.locator('.group-row .row-tile svg use').first()).toHaveAttribute('href', '#i-moon');
     await expect(body.locator('.group-row-static .row-meta')).toHaveText([
         'Also notify about the digital release',
         'Mondays at 10:00',
@@ -1516,10 +1542,7 @@ test('the tab header: title and chat chip on one row, the line, the search pill 
 }) => {
     await mockPanel(page, { role: 'user', path: '/#my-subs' });
     await expect(page.locator('#my-subs-section h1')).toBeVisible();
-    await expect(page.locator('[data-section="my-aired"] use').first()).toHaveAttribute(
-        'href',
-        '/vendor/lucide.svg#clapperboard'
-    );
+    await expect(page.locator('[data-section="my-aired"] use').first()).toHaveAttribute('href', '#i-clapperboard');
     // No magnifier button in the header any more: the pill is the way to the search
     await expect(page.locator('[data-action="mine-filter-toggle"]')).toHaveCount(0);
     const layout = await page.evaluate(() => {

@@ -3,9 +3,9 @@ import { $, $field, escapeHtml } from './dom.js';
 import { avatar } from './pick-sheet.js';
 import { openModal, closeModal } from './ui.js';
 
-const CHECK = '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/vendor/lucide.svg#check" /></svg>';
+const CHECK = '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-check" /></svg>';
 const DOWN =
-    '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/vendor/lucide.svg#chevron-down" /></svg>';
+    '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-chevron-down" /></svg>';
 
 /** `letterOf`: whose first letter the avatar shows (the person's own name for their private chat) */
 export function chatChip({ title, accent = false, action, label = title, letterOf = title }) {

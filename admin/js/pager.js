@@ -48,7 +48,7 @@ export function fillPagers(root = document) {
                 ${ARROWS.map(
                     ([step, label, name]) => `
                     <button class="btn btn-ghost btn-icon" ${target} data-step="${step}" aria-label="${label}">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>
                     </button>`
                 ).join('')}
             </div>`;

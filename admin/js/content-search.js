@@ -13,7 +13,7 @@ export function titlePoster(url, action, id) {
 }
 
 export function searchForm({ context, inputId, query = '', placeholder = 'Series or film title', back = '' }) {
-    return `<form class="mine-search" data-content-search="${context}">${back ? `<button type="button" class="btn btn-ghost" data-action="${back}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#arrow-left" /></svg>Back</button>` : ''}<input id="${inputId}" class="input-field" type="search" name="q" placeholder="${escapeHtml(placeholder)}" autocomplete="off" enterkeyhint="search" value="${escapeHtml(query)}" /><button type="submit" class="btn btn-primary">Search</button></form>`;
+    return `<form class="mine-search" data-content-search="${context}">${back ? `<button type="button" class="btn btn-ghost" data-action="${back}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-left" /></svg>Back</button>` : ''}<input id="${inputId}" class="input-field" type="search" name="q" placeholder="${escapeHtml(placeholder)}" autocomplete="off" enterkeyhint="search" value="${escapeHtml(query)}" /><button type="submit" class="btn btn-primary">Search</button></form>`;
 }
 
 /** Both forms submit on Search or Enter; clearing the field invalidates an old answer. */
@@ -33,7 +33,7 @@ export function setupSearchForms(handlers) {
 }
 
 export const cardClose = (modal) =>
-    `<button type="button" data-close="${modal}" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg></button>`;
+    `<button type="button" data-close="${modal}" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x" /></svg></button>`;
 
 /** Both views use the same sheet: the shared title card, its close button and focus. */
 export function openSearchCard(item, options) {
@@ -50,7 +50,7 @@ export const MODES = NOTIFY;
 export const modesField = (name, current, id, disabled = false) =>
     notifyField({ name, current, id, disabled, hint: false });
 
-const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg>';
+const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check" /></svg>';
 
 /** Adapt TMDB's response once; the account API already returns this shape. */
 export function searchItem(r) {
@@ -83,7 +83,7 @@ export function searchResults(items, { open, series, film }) {
     if (!items.length)
         return (
             '<div class="empty-state"><span class="empty-icon">' +
-            '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#search" /></svg></span>' +
+            '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search" /></svg></span>' +
             '<p class="empty-title">Nothing found</p><p class="empty-text">Try another spelling or the original title.</p></div>'
         );
     return `<h2 class="group-title">Results</h2><ul class="group-list title-list">${items

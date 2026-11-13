@@ -9,7 +9,7 @@ import { openReleasedDetails } from './records.js';
 
 const views = {};
 const CHEVRON =
-    '<span class="row-chevron"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-right" /></svg></span>';
+    '<span class="row-chevron"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-right" /></svg></span>';
 const SKELETON =
     '<li class="history-skeleton" aria-hidden="true"><div class="group-row title-row"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>'.repeat(
         4

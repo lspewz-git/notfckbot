@@ -30,7 +30,7 @@ test("a series card lists who is subscribed, with each chat's mode", async ({ pa
     await expect(rows.filter({ hasText: 'Movie Club' })).toContainText('Every episode');
     await expect(card(page).locator('.tc-rating')).toHaveText('8.4/ 10 · TMDB');
     const ratingIcon = card(page).locator('.tc-rating svg');
-    await expect(ratingIcon.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
+    await expect(ratingIcon.locator('use')).toHaveAttribute('href', '#i-star');
     await expect.poll(() => ratingIcon.evaluate(el => el.getBBox().width)).toBeGreaterThan(10);
     await expect(card(page).locator('.tc-date-text > .tc-date-label:first-child')).toHaveText('Premiere');
     await expect(card(page).locator('.tc-date-value')).toHaveText('15 Jul 2016');

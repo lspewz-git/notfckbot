@@ -97,7 +97,7 @@ test('Serials and Movies show clickable posters, round add controls and release 
         await expect(page.locator('#detail-body .tc-scroll')).toContainText(date);
         await expect(page.locator('#detail-modal .tc-rating')).toContainText(section === 'subs' ? '8.4' : '7.1');
         const star = page.locator('#detail-modal .tc-rating svg');
-        await expect(star.locator('use')).toHaveAttribute('href', '/vendor/lucide.svg#star');
+        await expect(star.locator('use')).toHaveAttribute('href', '#i-star');
         await expect.poll(() => star.evaluate((el) => el.getBBox().width)).toBeGreaterThan(10);
         await expect(page.locator('#detail-modal .tc-facts')).not.toContainText('⭐');
         await page.locator('#detail-modal [data-close="detail-modal"]').click();

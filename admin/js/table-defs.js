@@ -23,7 +23,7 @@ const isArchivedSub = (sub) => Boolean(sub.archived);
 
 // Small line icons for row buttons (Lucide shapes)
 const svg = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 const ICON = {
     more: svg('ellipsis'),
     mode: svg('bell'),

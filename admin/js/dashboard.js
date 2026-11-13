@@ -28,7 +28,7 @@ function setDelta(id, change, text, flat, goodWhen = 'up') {
         el.textContent = flat;
         return;
     }
-    el.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${n > 0 ? 'trending-up' : 'trending-down'}" /></svg>`;
+    el.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${n > 0 ? 'trending-up' : 'trending-down'}" /></svg>`;
     const strong = document.createElement('b');
     strong.textContent = `${n > 0 ? '+' : '−'}${Math.abs(n)}`;
     el.append(strong, ` ${text}`);
@@ -165,7 +165,7 @@ export function updateHealth(h) {
 // --- Coming up ---
 const DAY = 24 * 60 * 60 * 1000;
 const svg = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 const KIND_ICON = {
     tv: svg('tv'),
     movie: svg('film')

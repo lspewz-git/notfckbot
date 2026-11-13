@@ -1,5 +1,5 @@
 const CHECK_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg>';
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check" /></svg>';
 
 /**
  * Settings → Alerts (src/admin/routes/alerts.js): who gets the bot's alerts, one row each; a row

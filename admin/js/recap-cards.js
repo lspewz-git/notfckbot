@@ -418,7 +418,7 @@ function rowHtml(r) {
               escapeHtml(r.chatId) +
               '" aria-label="More actions for ' +
               escapeHtml(r.name) +
-              '"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#ellipsis" /></svg></button>';
+              '"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ellipsis" /></svg></button>';
     const actions = main + more;
     return `
         <li class="recap-row">

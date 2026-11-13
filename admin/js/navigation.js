@@ -71,7 +71,7 @@ const ABOUT_ENTRY = {
 };
 
 const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 function item(section, tab = false) {
     const { id, label, aria = label, children = [], mine = false } = section;

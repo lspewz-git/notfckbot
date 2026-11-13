@@ -35,7 +35,7 @@ function avatarInitial(chat) {
 }
 
 const svg = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 // Groups and channels carry a small mark in the avatar's corner; private chats don't
 const CHAT_KIND_MARK = {
     group: svg('users'),

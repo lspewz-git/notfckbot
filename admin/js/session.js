@@ -24,7 +24,7 @@ const RENEW_AT_S = 5;
 
 /** A Lucide icon from the local sprite (names are constants here, never data). */
 const icon = (name, cls = '') =>
-    `<svg class="icon${cls ? ` ${cls}` : ''}" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon${cls ? ` ${cls}` : ''}" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 const SPINNER = icon('loader-circle', 'login-spin');
 
 const BRAND =

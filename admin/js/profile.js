@@ -13,7 +13,7 @@ import { setDevicesOwner, loadDevices } from './devices.js';
 import { DEFAULT_PERSONAL_SECTION } from './navigation.js';
 
 const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 const CHEVRON = `<span class="row-chevron">${icon('chevron-right')}</span>`;
 

@@ -9,7 +9,7 @@ import { $, escapeHtml } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
 
 const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 /** Other sessions shown before "Show more" */
 const SHOWN = 4;

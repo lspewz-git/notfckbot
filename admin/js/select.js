@@ -93,7 +93,7 @@ function enhanceSelect(select) {
             row.innerHTML =
                 `<span>${escapeHtml(opt.text)}</span>` +
                 (isSelected
-                    ? '<span class="custom-select-check"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#check" /></svg></span>'
+                    ? '<span class="custom-select-check"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check" /></svg></span>'
                     : '');
             row.onclick = () => {
                 select.value = opt.value;

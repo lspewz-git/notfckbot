@@ -112,8 +112,7 @@ export function setChats(chats, preferred = null) {
 /** The Account tab (profile.js) redraws itself when the chats arrive, fail or change */
 const chatsChanged = () => document.dispatchEvent(new window.CustomEvent('account-chats'));
 
-const ICON = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+const ICON = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 const CHEVRON_RIGHT = ICON('chevron-right');
 
 export const chatHint = (c) =>
@@ -610,7 +609,7 @@ function calRow(item, index, today) {
         : escapeHtml(sub);
     return (
         `<li><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
-        `<span class="cal-day"><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${titleThumb(item.poster, 'title-thumb cal-thumb')}` +
+        `<span class="cal-day"><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${titleThumb(item.poster, 'title-thumb cal-thumb', { lazy: false })}` +
         `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta${extra ? ' cal-meta-countries' : ''}">${meta}</span></span>` +
         `<span class="cal-when">${item.notifyOn ? BELL : ''}<span>${whenText(item.date, today)}</span></span></button></li>`
     );
@@ -870,11 +869,14 @@ export async function loadMine(section) {
             }
             body.innerHTML = subsView();
         } else if (section === 'my-calendar') {
-            if (!body.querySelector('.mine-cal-bar')) body.innerHTML = calendarView(null);
+            // The chat's last answer at once (a chat change clears it), the skeleton only the first time
+            if (!body.querySelector('.mine-cal-bar')) body.innerHTML = calendarView(state.cal);
             const data = await api(chatPath('/calendar'));
             if (stale()) return;
+            // The same answer leaves the list alone: no redraw, so posters don't load again
+            const same = state.cal && JSON.stringify(state.cal) === JSON.stringify(data);
             state.cal = data;
-            body.innerHTML = calendarView(data);
+            if (!same || !body.querySelector('.cal-row, .empty-state')) body.innerHTML = calendarView(data);
         } else if (section === 'my-settings') {
             if (!body.querySelector('.group-list')) body.innerHTML = loading(2);
             const data = await api(chatPath('/settings'));

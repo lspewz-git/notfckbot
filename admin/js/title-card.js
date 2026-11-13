@@ -7,8 +7,7 @@ import { $, escapeHtml } from './dom.js';
 import { openModal, closeModal } from './ui.js';
 import { fitTitleSheet } from './title-sheet.js';
 
-const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 const KP_LOGO =
     '<svg class="kp-logo" width="20" height="20" viewBox="0 0 300 300" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>';
@@ -20,10 +19,10 @@ export function posterSrc(path, size = 'w185') {
 }
 
 /** The same poster thumbnail in search, Following and Calendar. */
-export function titleThumb(path, cls = 'title-thumb') {
+export function titleThumb(path, cls = 'title-thumb', { lazy = true } = {}) {
     const src = posterSrc(path);
     return src
-        ? `<img class="${cls}" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
+        ? `<img class="${cls}" src="${escapeHtml(src)}" alt=""${lazy ? ' loading="lazy"' : ''} decoding="async" />`
         : `<span class="${cls} title-thumb-empty" aria-hidden="true"></span>`;
 }
 
