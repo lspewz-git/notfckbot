@@ -87,7 +87,7 @@ body.view-mine .tabbar {
 
 /* --- Sign-in (SIGNIN.md, 13.11). Below 720px a phone's: the logo in the middle of the free space and
    the ways in at the bottom, a way's screen full height with its buttons at the bottom. From 720px a
-   card in the middle: the ways in beside the QR code (880), a way's screen 440 wide --- */
+   card in the middle, 440 wide, for every screen. The QR code is a way like the others (14.11) --- */
 
 .login-gate {
     position: fixed;
@@ -476,11 +476,6 @@ body.signed-out .tabbar {
 .login-method:disabled {
     opacity: 0.45;
     cursor: not-allowed;
-}
-
-/* The QR beside the ways in: the card's (from 720px) */
-.login-qr-panel {
-    display: none;
 }
 
 /* --- A way's screen --- */
@@ -901,7 +896,7 @@ body.signed-out .tabbar {
     #login-body {
         flex: none;
         width: 100%;
-        max-width: 880px;
+        max-width: 440px;
         margin: auto 0;
     }
 
@@ -921,21 +916,8 @@ body.signed-out .tabbar {
         background: var(--surface-1);
     }
 
-    .login-banner {
-        max-width: 880px;
-    }
-
     .login-step .login-terms-note {
         display: block;
-    }
-
-    /* The ways in and the QR side by side, one column when they don't fit */
-    .login-pick-panel {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 40px;
-        max-width: 880px;
-        padding: 40px;
     }
 
     .login-pick {
@@ -1000,69 +982,15 @@ body.signed-out .tabbar {
         margin: 24px 0 8px;
     }
 
+    /* The phone's three tiles, a step above the card */
     .login-methods {
         order: 6;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         margin-bottom: 0;
     }
 
     .login-method {
-        flex-direction: row;
-        height: 48px;
         border-color: var(--hairline);
-        border-radius: var(--radius-btn);
         background: var(--surface-2);
-    }
-
-    .login-method .icon {
-        width: 18px;
-        height: 18px;
-    }
-
-    .login-method span {
-        font-size: 14px;
-        line-height: 20px;
-    }
-
-    .login-method-qr {
-        display: none;
-    }
-
-    .login-qr-panel {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        min-width: 0;
-        padding: 32px 24px;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-card);
-        background: var(--surface-sunken);
-        text-align: center;
-    }
-
-    .login-qr-panel .login-qr-box {
-        width: 208px;
-        height: 208px;
-        border-radius: var(--radius-method);
-    }
-
-    .login-qr-panel h2 {
-        margin: 0;
-        font-size: 17px;
-        line-height: 22px;
-        font-weight: 600;
-        text-wrap: pretty;
-    }
-
-    .login-qr-panel .login-qr-meta:first-of-type {
-        font-size: 14px;
-        line-height: 20px;
-    }
-
-    .login-renew {
-        width: auto;
     }
 
     /* A way's screen: the buttons right under the content, the safety line under them */

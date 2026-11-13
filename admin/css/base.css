@@ -152,7 +152,6 @@
     --title-poster-w: 2rem;
     --title-poster-h: 3rem;
     --qr-paper: #ffffff;
-    --surface-sunken: #141414; /* the sign-in card's QR panel, a step below the card */
     --rail-width: 180px;
     --page-max-width: 1320px; /* rail and content, centered on wide screens */
 

@@ -274,25 +274,17 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     await expect(page.locator('.login-or')).toHaveText('Other ways to sign in');
     await expect(page.locator('[data-action="login-password"]')).toBeVisible();
     await expect(page.locator('#login-name')).toHaveCount(0);
-    // A phone: three tiles 76 high, QR among them; from 720px two 48 high and the QR beside them
+    // Three tiles 76 high on a phone and a computer alike: the QR is a way like the others, never shown at once
     const tiles = await page
         .locator('.login-method:visible')
         .evaluateAll((nodes) => nodes.map((node) => [node.textContent, node.getBoundingClientRect().height]));
-    if (isMobile) {
-        expect(tiles).toEqual([
-            ['QR code', 76],
-            ['Bot code', 76],
-            ['Password', 76]
-        ]);
-        await expect(page.locator('.login-qr-panel')).toBeHidden();
-    } else {
-        expect(tiles).toEqual([
-            ['Bot code', 48],
-            ['Password', 48]
-        ]);
-        await expect(page.locator('.login-qr-panel')).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
-    }
+    expect(tiles).toEqual([
+        ['QR code', 76],
+        ['Bot code', 76],
+        ['Password', 76]
+    ]);
+    await expect(page.getByRole('img', { name: 'QR code for signing in' })).toHaveCount(0);
+    if (!isMobile) await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
     // One code for the one screen, and no "session ended" on a first visit
     expect(panel.account.sent.filter((r) => r.path === '/api/login/telegram')).toHaveLength(1);
     await expect(page.locator('.login-alert:visible')).toHaveCount(0);
@@ -311,7 +303,7 @@ test('without a session the sign-in screen covers the panel; the Telegram button
         // The keyboard sees the focus ring (redesign handoff), not an underline
         await expect(telegram).toHaveCSS('outline-style', 'solid');
         await page.keyboard.press('Tab');
-        await expect(page.getByRole('button', { name: 'Bot code' })).toBeFocused();
+        await expect(page.getByRole('button', { name: 'QR code' })).toBeFocused();
     }
 });
 
@@ -347,66 +339,30 @@ test('Telegram not answering: its error under the button, QR code and Bot code o
     await expect(page.locator('#login-tg')).not.toHaveAttribute('aria-busy', /.*/);
     await expect(page.locator('[data-action="login-code"]')).toBeDisabled();
     await expect(page.locator('[data-action="login-password"]')).toBeEnabled();
-    // On a phone the error takes the hint's place, and the code is asked again by itself (no New code there)
-    if (isMobile) {
-        await expect(page.locator('#login-tg-hint')).toBeHidden();
-        await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/, { timeout: 15000 });
-        await expect(error).toBeHidden();
-    } else {
-        // No QR left up to scan
-        await expect(page.locator('#login-qr')).toBeHidden();
-        await expect(page.locator('#login-qr-check')).toBeHidden();
-        // The QR's New code asks again
-        await page.locator('[data-action="login-new-code"]').click();
-        await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/);
-        await expect(error).toBeHidden();
-    }
-});
-
-test('from 720px the first screen shows the QR, waits for it and signs in by itself', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'the QR beside the ways in is the card layout');
-    const panel = await mockPanel(page, { signedOut: true });
-    panel.account.confirmationState = 'waiting';
-    const qr = page.getByRole('img', { name: 'QR code for signing in' });
-    await expect(qr.locator('img')).toBeVisible();
-    expect((await qr.boundingBox()).width).toBe(208);
-    await expect(page.locator('#login-qr-check')).toHaveText('The bot will show 042 719');
-    await expect(page.locator('#login-qr-expiry')).toHaveText(/^Code expires in [45]:\d\d$/);
-    // The ways in and the QR side by side, the card 880 wide
-    const [left, right] = await page
-        .locator('.login-pick, .login-qr-panel')
-        .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
-    expect(right.left).toBeGreaterThan(left.right);
-    expect(Math.round(right.top)).toBe(Math.round(left.top));
-    expect(await page.locator('.login-pick-panel').evaluate((el) => el.offsetWidth)).toBe(880);
-    // New code: the old one is cancelled, a new one asked for
-    await page.locator('[data-action="login-new-code"]').click();
-    await expect.poll(() => panel.account.sent.filter((r) => r.path === '/api/login/telegram').length).toBe(2);
-    expect(panel.account.sent.some((r) => r.path === '/api/login/telegram/cancel')).toBe(true);
-    panel.account.confirmationState = 'in';
-    await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
+    // On a phone the error takes the hint's place
+    if (isMobile) await expect(page.locator('#login-tg-hint')).toBeHidden();
+    // The code is asked again by itself
+    await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/, { timeout: 15000 });
+    await expect(error).toBeHidden();
 });
 
 test('at 720px the layout switches between the phone and the card', async ({ page }) => {
     await page.setViewportSize({ width: 719, height: 800 });
     await mockPanel(page, { signedOut: true });
-    await expect(page.locator('[data-action="login-qr"]')).toBeVisible();
-    await expect(page.locator('.login-qr-panel')).toBeHidden();
+    const panel = page.locator('.login-pick-panel');
+    const look = () =>
+        panel.evaluate((el) => [getComputedStyle(el).borderTopWidth, Math.round(el.getBoundingClientRect().width)]);
+    // A phone: no card, the column as wide as the screen allows
+    expect(await look()).toEqual(['0px', 440]);
+    await expect(page.locator('.login-heading')).toBeHidden();
     await page.setViewportSize({ width: 720, height: 800 });
-    await expect(page.locator('[data-action="login-qr"]')).toBeHidden();
-    await expect(page.locator('.login-qr-panel')).toBeVisible();
-    // Too narrow for two columns of 300: the QR goes under the ways in
-    const [left, right] = await page
-        .locator('.login-pick, .login-qr-panel')
-        .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
-    expect(right.top).toBeGreaterThan(left.bottom);
+    // The card: framed, 440 wide, "Sign in" over the ways in
+    expect(await look()).toEqual(['1px', 440]);
+    await expect(page.locator('.login-heading')).toBeVisible();
+    await expect(page.locator('[data-action="login-qr"]')).toBeVisible();
 });
 
-test("a phone's first screen keeps its code fresh but asks about it only on a way's screen", async ({
-    page,
-    isMobile
-}) => {
-    test.skip(!isMobile, 'a phone has no QR on the first screen');
+test("the first screen keeps its code fresh but asks about it only on a way's screen", async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true });
     await expect(page.locator('#login-tg')).toHaveAttribute('href', /t\.me/);
     await page.waitForTimeout(2000);
@@ -1290,8 +1246,7 @@ test('a sent password shows loading and cannot be sent twice', async ({ page }) 
     expect(panel.account.sent.filter((r) => r.path === '/api/login/password')).toHaveLength(1);
 });
 
-test('QR code: the same digits as Telegram, and leaving cancels the pending attempt', async ({ page, isMobile }) => {
-    test.skip(!isMobile, 'from 720px the QR is on the first screen');
+test('QR code: the same digits as Telegram, and leaving cancels the pending attempt', async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true });
     panel.account.confirmationState = 'waiting';
     await page.locator('[data-action="login-qr"]:enabled').click();
@@ -1317,11 +1272,11 @@ test('QR code: the same digits as Telegram, and leaving cancels the pending atte
     await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
 });
 
-test('a QR renews itself before it ends, on a phone as on a computer', async ({ page, isMobile }) => {
+test('a QR renews itself before it ends, on a phone as on a computer', async ({ page }) => {
     const panel = await mockPanel(page, { signedOut: true, codeLife: 8000 });
     panel.account.confirmationState = 'waiting';
-    // A phone shows the QR on its own screen, a computer on the first one
-    if (isMobile) await page.locator('[data-action="login-qr"]:enabled').click();
+    // The QR opens from its tile, on a phone as on a computer
+    await page.locator('[data-action="login-qr"]:enabled').click();
     const qr = page.getByRole('img', { name: 'QR code for signing in' }).locator('img');
     await expect(qr).toBeVisible();
     const asked = panel.account.sent.filter((r) => r.path === '/api/login/telegram').length;

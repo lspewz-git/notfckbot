@@ -7,7 +7,7 @@
  * session, an admin gets the whole panel and a user (body.role-user) only their own chats.
  *
  * Layout: below 720px a phone's (the actions at the bottom, a way's screen full height), from 720px a
- * card in the middle; there the first screen shows the QR code at once and waits for it.
+ * card in the middle (440 wide); the QR code is a way like the others, on a phone and a computer alike.
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
@@ -19,9 +19,8 @@ import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
-// The first screen gets a new code this close to the old one's end, so its link and QR never lapse
+// The first screen gets a new code this close to the old one's end, so its link never lapses
 const RENEW_AT_S = 5;
-const WIDE = window.matchMedia('(min-width: 720px)');
 
 /** A Lucide icon from the local sprite (names are constants here, never data). */
 const icon = (name, cls = '') =>
@@ -244,22 +243,12 @@ async function newChallenge() {
 
 // --- The ways in ---
 
-// The first screen's code failed: asked again after a while (a phone's screen has no New code)
+// The first screen's code failed: asked again after a while
 const RETRY_CODE_MS = 10000;
 let retryTimer = 0;
 
 const tile = (action, name, label, waits, cls = '') =>
     `<button type="button" class="login-method${cls ? ` ${cls}` : ''}" data-action="${action}"${waits ? ' disabled' : ''}>${icon(name)}<span>${label}</span></button>`;
-
-/** The first screen's QR (from 720px): the same code as the Telegram button, polled while shown. */
-const QR_PANEL =
-    '<section class="login-qr-panel" aria-labelledby="login-qr-title">' +
-    '<div class="login-qr-box" role="img" aria-label="QR code for signing in"><img id="login-qr" alt="" hidden /></div>' +
-    '<h2 id="login-qr-title">Scan with your phone, then confirm in the bot.</h2>' +
-    '<p class="login-qr-meta" id="login-qr-check" hidden>The bot will show <span class="login-mono"></span></p>' +
-    '<p class="login-qr-meta" id="login-qr-expiry"></p>' +
-    `<button type="button" class="login-text-btn login-renew" data-action="login-new-code" disabled>${icon('refresh-cw')}<span>New code</span></button>` +
-    '</section>';
 
 /**
  * The ways in. `banner`: why the session ended, over everything; the Telegram button's own failure
@@ -281,11 +270,10 @@ function signInScreen(banner = '', restoreFocus = $('login-body').contains(docum
             loginAlert('login-tg-error') +
             '<div class="login-or"><h2>Other ways to sign in</h2></div>' +
             '<div class="login-methods">' +
-            tile('login-qr', 'qr-code', 'QR code', true, 'login-method-qr') +
+            tile('login-qr', 'qr-code', 'QR code', true) +
             tile('login-code', 'binary', 'Bot code', true) +
             tile('login-password', 'key-round', 'Password', false) +
             '</div></section>' +
-            QR_PANEL +
             '</div>' +
             TERMS_NOTE,
         'start'
@@ -294,10 +282,8 @@ function signInScreen(banner = '', restoreFocus = $('login-body').contains(docum
     prepareCode();
 }
 
-/** The first screen's countdown: the QR's line, and a fresh code just before this one ends. */
+/** The first screen's countdown: a fresh code just before this one ends (its link never lapses). */
 function pickTick(left) {
-    const expiry = $('login-qr-expiry');
-    if (expiry) expiry.textContent = `Code expires in ${clock(left)}`;
     if (left <= RENEW_AT_S) prepareCode();
 }
 
@@ -312,8 +298,6 @@ async function prepareCode() {
     button.removeAttribute('href');
     button.setAttribute('aria-disabled', 'true');
     button.setAttribute('aria-busy', 'true');
-    const renew = /** @type {HTMLButtonElement | null} */ (document.querySelector('[data-action="login-new-code"]'));
-    if (renew) renew.disabled = true;
     for (const t of document.querySelectorAll('[data-action="login-qr"], [data-action="login-code"]'))
         /** @type {HTMLButtonElement} */ (t).disabled = true;
     cancelChallenge(old);
@@ -327,18 +311,11 @@ async function prepareCode() {
         button.removeAttribute('aria-busy');
         for (const t of document.querySelectorAll('[data-action="login-qr"], [data-action="login-code"]'))
             /** @type {HTMLButtonElement} */ (t).disabled = false;
-        const qr = /** @type {HTMLImageElement} */ ($('login-qr'));
-        qr.src = start.qr;
-        qr.hidden = false;
-        const check = $('login-qr-check');
-        check.querySelector('.login-mono').textContent = String(start.check).replace(/^(\d{3})(\d{3})$/, '$1 $2');
-        check.hidden = false;
-        if (renew) renew.disabled = false;
         document.querySelector('.login-pick').classList.remove('has-error');
         setLoginAlert('login-tg-error', '');
-        // Polled only while the QR is on screen (from 720px); the link is renewed either way
+        // Nothing to ask about here: the ways' screens poll; this one only keeps the code fresh
         watch(start, {
-            polls: () => WIDE.matches,
+            polls: () => false,
             tick: pickTick,
             end: () => prepareCode(),
             in: () => {
@@ -351,12 +328,6 @@ async function prepareCode() {
         button.removeAttribute('aria-busy');
         document.querySelector('.login-pick').classList.add('has-error');
         setLoginAlert('login-tg-error', `${err.message} A password still works if you have set one.`);
-        // The old code was cancelled: its QR must not stay up to be scanned
-        $('login-qr').hidden = true;
-        $('login-qr-check').hidden = true;
-        const expiry = $('login-qr-expiry');
-        if (expiry) expiry.textContent = '';
-        if (renew) renew.disabled = false;
         retryTimer = window.setTimeout(() => {
             if (mine === attempt && button.isConnected) prepareCode();
         }, RETRY_CODE_MS);
@@ -474,7 +445,7 @@ function watchPending(start, mode) {
         tick: (left) => {
             const timer = $('login-timer');
             if (timer) timer.textContent = mode === 'qr' ? `Code expires in ${clock(left)}` : `· ${clock(left)}`;
-            // The QR renews itself like the card's on a wide screen: the same logic on a phone and a computer
+            // The QR renews itself before it ends rather than leaving a dead code up
             if (mode === 'qr' && left <= RENEW_AT_S) renewQr();
         },
         end: (why) => endPending(mode, why),
@@ -888,8 +859,7 @@ export function sessionActions(onSignedIn) {
         'login-here': () => {
             if (activeChallenge) pendingScreen(activeChallenge, 'telegram');
         },
-        // A new code for the first screen's QR (from 720px) and for the QR screen: both in place
-        'login-new-code': () => prepareCode(),
+        // The QR screen's New code, in place
         'login-renew-qr': () => renewQr(),
         // "Try again" / "New code" on a way's screen: a password asks for the password again
         'login-again': async (el) => {
