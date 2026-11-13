@@ -151,9 +151,8 @@
     --control-h-sm: 2rem; /* buttons inside table rows */
     --title-poster-w: 2rem;
     --title-poster-h: 3rem;
-    --login-method-h: 4.25rem;
-    --login-qr-size: 14.5rem;
     --qr-paper: #ffffff;
+    --surface-sunken: #141414; /* the sign-in card's QR panel, a step below the card */
     --rail-width: 180px;
     --page-max-width: 1320px; /* rail and content, centered on wide screens */
 
@@ -277,4 +276,17 @@ button {
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
+}
+
+/* Read by a screen reader, not shown */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }

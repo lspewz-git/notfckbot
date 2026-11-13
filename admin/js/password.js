@@ -4,7 +4,7 @@
  * dialog that sets or changes the password. It is set after signing in with Telegram, so it always belongs to a Telegram account.
  */
 import { api } from './api.js';
-import { $, $field, setText } from './dom.js';
+import { $, $field, setText, escapeHtml } from './dom.js';
 import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
 
 const MIN_LENGTH = 8;
@@ -24,49 +24,72 @@ const passwordField = (id, autocomplete, label) =>
     `<div class="password-input"><input id="${id}" class="input-field" type="password" autocomplete="${autocomplete}" maxlength="128" aria-label="${label}" />` +
     `<button type="button" class="password-toggle" data-action="password-show" data-for="${id}" aria-label="Show password" aria-pressed="false">${PASSWORD_EYE}</button></div>`;
 
-/** The form under "Continue with Telegram" (session.js draws the screen); the system account signs in here too. */
+/**
+ * A sign-in screen's error: the icon and the text on the danger fill (hidden while empty).
+ * @param {string} id
+ * @param {string} [text]
+ */
+export const loginAlert = (id, text = '') =>
+    `<div class="login-alert" id="${id}" role="alert"${text ? '' : ' hidden'}>` +
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#circle-alert" /></svg>' +
+    `<span>${escapeHtml(text)}</span></div>`;
+
+/** Shows (or with '' hides) a loginAlert's text. */
+export function setLoginAlert(id, text) {
+    const box = $(id);
+    if (!box) return;
+    box.querySelector('span').textContent = text;
+    box.hidden = !text;
+}
+
+/** The sign-in form (session.js draws the screen around it); the system account signs in here too. */
 export const signInForm = () =>
-    '<form class="login-password" data-login="password" novalidate><div class="login-mid login-mid-top">' +
-    '<label class="field-label" for="login-name">Login</label>' +
-    '<input id="login-name" class="input-field" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="@username or ID" maxlength="64" />' +
-    '<label class="field-label" for="login-pass">Password</label>' +
+    '<form class="login-form" data-login="password" novalidate>' +
+    '<label class="login-label" for="login-name">Telegram username or ID</label>' +
+    '<input id="login-name" class="input-field" name="login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="@username or ID" maxlength="64" />' +
+    '<label class="login-label" for="login-pass">Password</label>' +
     passwordField('login-pass', 'current-password', 'Password') +
-    '<p class="login-error" id="login-pass-error" role="alert" hidden></p></div>' +
-    '<div class="login-actions"><button type="submit" class="btn btn-primary btn-block">Sign in</button>' +
-    '<p class="login-hint">Next, confirm this sign-in in the bot. The system account signs in directly.</p></div>' +
+    '<p class="login-note">Forgot it? Sign in with Telegram and set a new one in Account settings.</p>' +
+    loginAlert('login-pass-error') +
+    '<div class="login-actions"><button type="submit" class="btn btn-primary" disabled>' +
+    '<svg class="icon login-spin" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#loader-circle" /></svg>' +
+    '<span>Sign in</span></button>' +
+    '<button type="button" class="login-text-btn" data-action="login-cancel">Use another way</button></div>' +
     '</form>';
+
+/** Sign in waits for both fields, and for the answer to the last press. */
+export function syncSignInButton(form) {
+    const button = /** @type {HTMLButtonElement} */ (form.querySelector('[type="submit"]'));
+    if (button.getAttribute('aria-busy') === 'true') return;
+    button.disabled = !$field('login-name').value.trim() || !$field('login-pass').value;
+}
 
 /**
  * Sends the sign-in form.
  * @returns {Promise<any>} the session or pending confirmation, null on error
  */
 export async function submitSignIn(form) {
-    const error = $('login-pass-error');
     const login = $field('login-name').value.trim();
     const passwordInput = $field('login-pass');
     const password = passwordInput.value;
-    const say = (text) => {
-        error.textContent = text;
-        error.hidden = !text;
-    };
-    const missing = !login ? 'Enter your @username or ID.' : !password ? 'Enter your password.' : '';
-    if (missing) {
-        say(missing);
-        return null;
-    }
     const button = /** @type {HTMLButtonElement} */ (form.querySelector('[type="submit"]'));
+    // Enter with a field empty: Sign in is off, nothing to send
+    if (!login || !password || button.getAttribute('aria-busy') === 'true') return null;
     button.disabled = true;
-    say('');
+    button.setAttribute('aria-busy', 'true');
+    setLoginAlert('login-pass-error', '');
     try {
         const result = await api('/login/password', { method: 'POST', body: { login, password } });
         passwordInput.value = '';
         return result;
     } catch (err) {
-        say(err.message);
+        setLoginAlert('login-pass-error', err.message);
         passwordInput.value = '';
+        if (form.isConnected) passwordInput.focus();
         return null;
     } finally {
-        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        if (form.isConnected) syncSignInButton(form);
     }
 }
 

@@ -109,6 +109,13 @@ function accountState(options) {
         // Called before each Mini App sign-in answer (its try number from 1): a promise holds that answer
         miniAppWait: options.miniAppWait,
         miniAppTries: 0,
+        // Hold the answer to the Telegram code / a password until the promise they return settles
+        telegramWait: options.telegramWait,
+        passwordWait: options.passwordWait,
+        // Statuses POST /api/login/telegram answers with first, one per request
+        telegramFails: /** @type {number[]} */ ([...(options.telegramFails || [])]),
+        // How long a Telegram code lives (ms), as the server answers it
+        codeLife: options.codeLife || 300000,
         // The chat the Mini App sign-in names (opened from a group)
         miniAppChat: options.miniAppChat || null,
         miniAppTitle: options.miniAppTitle || null,
@@ -315,12 +322,14 @@ function accountAnswer(state, req, url) {
         return { status: 401, body: { error: 'Wrong username or password.' } };
     }
     if (p === '/api/login/telegram') {
+        const fail = state.telegramFails.shift();
+        if (fail) return { status: fail, body: { error: "Telegram isn't answering. Try again later." } };
         state.polls = 0;
         return {
             code: 'c'.repeat(32),
             secret: 's'.repeat(43),
             check: '042719',
-            expiresIn: 300000,
+            expiresIn: state.codeLife,
             qr: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+l8AAAAASUVORK5CYII=',
             url: 'https://t.me/notfckbot?start=Lcode'
         };

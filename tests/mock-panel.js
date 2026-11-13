@@ -1009,6 +1009,10 @@ async function mockPanel(page, options = {}) {
             if (url.pathname === '/api/account/chats' && panel.account.chatsWait) await panel.account.chatsWait;
             if (url.pathname === '/api/login/miniapp' && panel.account.miniAppWait)
                 await panel.account.miniAppWait(++panel.account.miniAppTries);
+            if (url.pathname === '/api/login/telegram' && panel.account.telegramWait)
+                await panel.account.telegramWait();
+            if (url.pathname === '/api/login/password' && panel.account.passwordWait)
+                await panel.account.passwordWait();
             if (url.pathname.endsWith('/visibility') && panel.account.visibilityWait)
                 await panel.account.visibilityWait;
             const mine = await accountAnswer(panel.account, route.request(), url);

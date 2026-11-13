@@ -1,46 +1,71 @@
 /**
- * Who is using the panel (src/account/auth.js). Without a session the sign-in screen covers it:
- * "Continue with Telegram" (the bot asks to confirm, this page waits for the answer), or the link
- * from login-link.js on the server (/login/<token>, spent only by the press of "Sign in"), or a password the user
- * set on their account page (password.js). With one, an admin
- * gets the whole panel and a user (body.role-user) only their own chats.
+ * Who is using the panel (src/account/auth.js). Without a session the sign-in screens cover it
+ * (SIGNIN.md, 13.11): the ways in, then one screen per way. "Continue with Telegram", the QR code
+ * and a personal password wait for «Да, это я» in the bot, which shows the same six digits as the
+ * page; "Bot code" waits for those digits sent to the bot. Besides them: the link from
+ * login-link.js on the server (/login/<token>, spent only by the press of "Sign in"). With a
+ * session, an admin gets the whole panel and a user (body.role-user) only their own chats.
+ *
+ * Layout: below 720px a phone's (the actions at the bottom, a way's screen full height), from 720px a
+ * card in the middle; there the first screen shows the QR code at once and waits for it.
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
+import { toast } from './ui.js';
 import { setChats, chatsFailed, resetChatChoice, setLaunchTitle } from './account.js';
-import { signInForm, submitSignIn, setMe } from './password.js';
+import { signInForm, submitSignIn, setMe, loginAlert, setLoginAlert, syncSignInButton } from './password.js';
 import { setProfile } from './profile.js';
 import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
-const SEND_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#send" /></svg>';
-const QR_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#qr-code" /></svg>';
-const CODE_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#binary" /></svg>';
-const KEY_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#key-round" /></svg>';
-/** A nested screen's top bar: Back to all the ways in, then its title (Telegram's Back too in the Mini App) */
-const topBar = (title) =>
-    '<div class="login-top"><button type="button" id="login-back" class="page-back" data-action="login-cancel" aria-label="All sign-in methods">' +
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#chevron-left" /></svg></button>' +
-    `<h2 id="login-step">${title}</h2></div>`;
+// The first screen gets a new code this close to the old one's end, so its link and QR never lapse
+const RENEW_AT_S = 5;
+const WIDE = window.matchMedia('(min-width: 720px)');
 
-let pollTimer = 0;
-// Each "Continue with Telegram" press: an older attempt's poll still on its way stops when it lands
-let attempt = 0;
+/** A Lucide icon from the local sprite (names are constants here, never data). */
+const icon = (name, cls = '') =>
+    `<svg class="icon${cls ? ` ${cls}` : ''}" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#${name}" /></svg>`;
+const SPINNER = icon('loader-circle', 'login-spin');
+
+const BRAND =
+    `<div class="login-brand"><div class="rail-logo login-logo" aria-hidden="true">${icon('clapperboard')}</div>` +
+    '<h1 id="login-title" tabindex="-1">NotFckBot</h1></div>';
+
+const TERMS_NOTE =
+    '<p class="login-terms-note">By continuing, you agree to the <button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button>.</p>';
+
+/** A way's screen: the round Back to the ways in, then its title. */
+const stepHead = (title) =>
+    `<button type="button" id="login-back" class="login-back" data-action="login-cancel" aria-label="Back to sign-in options">${icon('chevron-left')}</button>` +
+    `<h1 id="login-step" class="login-step-title" tabindex="-1">${title}</h1>`;
+
+const ANOTHER_WAY = '<button type="button" class="login-text-btn" data-action="login-cancel">Use another way</button>';
+
+/** m:ss of whole seconds. */
+const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+/** "482 913" for the eye, "Code 4 8 2 9 1 3" for a screen reader. */
+const digits = (check) =>
+    `<span class="sr-only">Code ${escapeHtml(String(check).split('').join(' '))}</span>` +
+    `<span class="login-digits-value" aria-hidden="true">${escapeHtml(String(check).replace(/^(\d{3})(\d{3})$/, '$1 $2'))}</span>`;
+
 // The first check of the session has answered: a 401 before it is that check's own, not an ended session
 let started = false;
+// Each new screen or try: an older one's answer still on its way is for nobody when it lands
+let attempt = 0;
+/** What the panel does once a sign-in went through (set by sessionActions) */
+let finish = async () => {};
 
 /** A nested screen opened: focus on its Back */
 const focusStep = () => $('login-back')?.focus();
 
-/** Draws a sign-in screen: `nested` ones (with a top bar) hide the logo and take the whole height. */
-const gate = (html, nested = false) => {
-    $('login-body').innerHTML = html;
-    document.querySelector('.login-card').classList.toggle('login-nested', nested);
+/**
+ * Draws a sign-in screen. Kinds: 'start' (the ways in), 'step' (one way's screen), 'link' (the logo
+ * and one action: a sign-in link), 'fail' (a failure with its HTTP status).
+ */
+const gate = (html, kind) => {
+    $('login-body').innerHTML = `<div class="login-screen login-${kind}">${html}</div>`;
     $('login-gate').hidden = false;
     document.body.classList.add('signed-out');
     syncTelegramBack();
@@ -51,15 +76,15 @@ const gate = (html, nested = false) => {
 // link goes straight to the Telegram app with its own scheme, in the same window (no sheet).
 const homeScreenApp = () => /** @type {Navigator & { standalone?: boolean }} */ (navigator).standalone === true;
 
-/** The bot link for this device: `tg://resolve?domain=<bot>&start=<code>` in a home-screen app. */
+/** The bot link for this device: `tg://resolve?domain=<bot>[&start=<code>]` in a home-screen app. */
 function botLink(url) {
     if (!homeScreenApp()) return url;
     try {
         const link = new URL(url);
         const domain = link.pathname.slice(1);
         const start = link.searchParams.get('start');
-        if (link.hostname !== 't.me' || !domain || !start) return url;
-        return `tg://resolve?domain=${encodeURIComponent(domain)}&start=${encodeURIComponent(start)}`;
+        if (link.hostname !== 't.me' || !domain) return url;
+        return `tg://resolve?domain=${encodeURIComponent(domain)}${start ? `&start=${encodeURIComponent(start)}` : ''}`;
     } catch {
         return url;
     }
@@ -68,9 +93,127 @@ function botLink(url) {
 /** Link attributes for the bot link: a new tab in a browser, the same window for the app's scheme. */
 const botTarget = () => (homeScreenApp() ? '' : ' target="_blank" rel="noopener noreferrer"');
 
-// The code for "Continue with Telegram", asked for when the screen shows: the button is then a plain
+/** The bot's @name from a t.me link, or null. */
+function botName(url) {
+    try {
+        const link = new URL(url);
+        const name = link.pathname.slice(1);
+        return link.hostname === 't.me' && /^\w{3,64}$/.test(name) ? name : null;
+    } catch {
+        return null;
+    }
+}
+
+// --- One challenge watched: its countdown every second and its poll every 1.5 s, both paused while
+// the page is hidden (a phone in Telegram) and resumed at once on the way back ---
+
+/**
+ * @typedef {{ code: string, secret: string, check: string, url?: string | null, qr?: string,
+ *   expiresIn?: number, deadline: number }} Challenge
+ * @typedef {{ polls: () => boolean, tick: (seconds: number) => void, end: (why: 'expired' | 'cancelled') => void,
+ *   in: () => void }} Watching
+ */
+/** @type {{ start: Challenge, on: Watching, interval: number, pollTimer: number, asking: boolean, live: boolean } | null} */
+let watcher = null;
+
+const secondsLeft = (start) => Math.max(0, Math.ceil((start.deadline - performance.now()) / 1000));
+
+function unwatch() {
+    if (!watcher) return;
+    watcher.live = false;
+    clearInterval(watcher.interval);
+    clearTimeout(watcher.pollTimer);
+    watcher = null;
+}
+
+/** @param {Challenge} start @param {Watching} on */
+function watch(start, on) {
+    unwatch();
+    const w = { start, on, interval: 0, pollTimer: 0, asking: false, live: true };
+    watcher = w;
+    if (!document.hidden) run(w, false);
+}
+
+/** The countdown now and every second; the poll at once (back from Telegram) or after its pause. */
+function run(w, pollNow) {
+    clearInterval(w.interval);
+    clearTimeout(w.pollTimer);
+    if (!tick(w)) return;
+    w.interval = window.setInterval(() => tick(w), 1000);
+    if (pollNow) ask(w);
+    else w.pollTimer = window.setTimeout(() => ask(w), POLL_MS);
+}
+
+function pause(w) {
+    clearInterval(w.interval);
+    clearTimeout(w.pollTimer);
+}
+
+/** @returns {boolean} whether the challenge is still alive */
+function tick(w) {
+    if (!w.live) return false;
+    const left = secondsLeft(w.start);
+    w.on.tick(left);
+    if (watcher !== w) return false;
+    if (left) return true;
+    unwatch();
+    w.on.end('expired');
+    return false;
+}
+
+async function ask(w) {
+    if (!w.live || w.asking || document.hidden) return;
+    clearTimeout(w.pollTimer);
+    if (!w.on.polls()) {
+        w.pollTimer = window.setTimeout(() => ask(w), POLL_MS);
+        return;
+    }
+    w.asking = true;
+    let answer;
+    try {
+        answer = await api('/login/telegram/poll', {
+            method: 'POST',
+            body: { code: w.start.code, secret: w.start.secret }
+        });
+    } catch {
+        answer = { state: 'waiting' };
+    }
+    w.asking = false;
+    if (answer.state === 'in') {
+        if (w.live) {
+            unwatch();
+            return w.on.in();
+        }
+        // Answered while another screen took over: the session cookie is set all the same
+        if (!$('login-gate').hidden) {
+            stopPolling();
+            pending = null;
+            activeChallenge = null;
+            return finish();
+        }
+        return;
+    }
+    if (!w.live) return;
+    if (answer.state === 'refused' || answer.state === 'gone') {
+        unwatch();
+        return w.on.end(answer.state === 'refused' ? 'cancelled' : 'expired');
+    }
+    w.pollTimer = window.setTimeout(() => ask(w), POLL_MS);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (!watcher) return;
+    if (document.hidden) pause(watcher);
+    else run(watcher, true);
+});
+
+// --- The challenges themselves ---
+
+// The code for the first screen, asked for when it shows: "Continue with Telegram" is then a plain
 // link to the bot, which a phone opens in Telegram without a pop-up or an empty tab left behind
+/** @type {Challenge | null} */
 let pending = null;
+/** @type {Challenge | null} the one a way's screen waits for */
 let activeChallenge = null;
 
 function cancelChallenge(start) {
@@ -78,6 +221,11 @@ function cancelChallenge(start) {
         api('/login/telegram/cancel', { method: 'POST', body: { code: start.code, secret: start.secret } }).catch(
             () => {}
         );
+}
+
+function stopPolling() {
+    unwatch();
+    attempt += 1;
 }
 
 function discardChallenges() {
@@ -88,42 +236,382 @@ function discardChallenges() {
     activeChallenge = null;
 }
 
+/** A new code, its deadline on this page's clock (the server's remaining time, not wall clocks). */
+async function newChallenge() {
+    const start = await api('/login/telegram', { method: 'POST' });
+    return { ...start, deadline: performance.now() + (start.expiresIn ?? POLL_FOR_MS) };
+}
+
+// --- The ways in ---
+
+// The first screen's code failed: asked again after a while (a phone's screen has no New code)
+const RETRY_CODE_MS = 10000;
+let retryTimer = 0;
+
+const tile = (action, name, label, waits, cls = '') =>
+    `<button type="button" class="login-method${cls ? ` ${cls}` : ''}" data-action="${action}"${waits ? ' disabled' : ''}>${icon(name)}<span>${label}</span></button>`;
+
+/** The first screen's QR (from 720px): the same code as the Telegram button, polled while shown. */
+const QR_PANEL =
+    '<section class="login-qr-panel" aria-labelledby="login-qr-title">' +
+    '<div class="login-qr-box" role="img" aria-label="QR code for signing in"><img id="login-qr" alt="" hidden /></div>' +
+    '<h2 id="login-qr-title">Scan with your phone, then confirm in the bot.</h2>' +
+    '<p class="login-qr-meta" id="login-qr-check" hidden>The bot will show <span class="login-mono"></span></p>' +
+    '<p class="login-qr-meta" id="login-qr-expiry"></p>' +
+    `<button type="button" class="login-text-btn login-renew" data-action="login-new-code" disabled>${icon('refresh-cw')}<span>New code</span></button>` +
+    '</section>';
+
+/**
+ * The ways in. `banner`: why the session ended, over everything; the Telegram button's own failure
+ * goes under it (prepareCode).
+ */
+function signInScreen(banner = '', restoreFocus = $('login-body').contains(document.activeElement)) {
+    discardChallenges();
+    if (miniApp) return miniAppScreen(banner, restoreFocus);
+    gate(
+        (banner ? `<div class="login-banner">${loginAlert('login-error', banner)}</div>` : '') +
+            '<div class="login-panel login-pick-panel">' +
+            '<section class="login-pick" aria-labelledby="login-title">' +
+            BRAND +
+            '<h2 class="login-heading">Sign in</h2>' +
+            // A first time in signs up too: the bot is started on the way (with sign-up open)
+            `<a id="login-tg" class="btn btn-primary login-tg"${botTarget()} aria-disabled="true" aria-busy="true" aria-describedby="login-tg-hint" data-action="login-telegram">` +
+            `${SPINNER}${icon('send', 'login-tg-send')}<span>Continue with Telegram</span></a>` +
+            '<p class="login-lead" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p>' +
+            loginAlert('login-tg-error') +
+            '<div class="login-or"><h2>Other ways to sign in</h2></div>' +
+            '<div class="login-methods">' +
+            tile('login-qr', 'qr-code', 'QR code', true, 'login-method-qr') +
+            tile('login-code', 'binary', 'Bot code', true) +
+            tile('login-password', 'key-round', 'Password', false) +
+            '</div></section>' +
+            QR_PANEL +
+            '</div>' +
+            TERMS_NOTE,
+        'start'
+    );
+    if (restoreFocus) $('login-title').focus();
+    prepareCode();
+}
+
+/** The first screen's countdown: the QR's line, and a fresh code just before this one ends. */
+function pickTick(left) {
+    const expiry = $('login-qr-expiry');
+    if (expiry) expiry.textContent = `Code expires in ${clock(left)}`;
+    if (left <= RENEW_AT_S) prepareCode();
+}
+
 async function prepareCode() {
     const button = /** @type {HTMLAnchorElement | null} */ (document.getElementById('login-tg'));
     if (!button) return;
+    stopPolling();
+    clearTimeout(retryTimer);
+    const mine = attempt;
+    const old = pending;
     pending = null;
+    button.removeAttribute('href');
+    button.setAttribute('aria-disabled', 'true');
+    button.setAttribute('aria-busy', 'true');
+    const renew = /** @type {HTMLButtonElement | null} */ (document.querySelector('[data-action="login-new-code"]'));
+    if (renew) renew.disabled = true;
+    for (const t of document.querySelectorAll('[data-action="login-qr"], [data-action="login-code"]'))
+        /** @type {HTMLButtonElement} */ (t).disabled = true;
+    cancelChallenge(old);
     try {
-        const start = await api('/login/telegram', { method: 'POST' });
-        // Another screen was drawn meanwhile (and asked for its own code): this one is for nobody
-        if (!button.isConnected) {
-            cancelChallenge(start);
-            return;
-        }
-        pending = { ...start, deadline: performance.now() + (start.expiresIn ?? POLL_FOR_MS) };
+        const start = await newChallenge();
+        // Another screen was drawn or another code asked for meanwhile: this one is for nobody
+        if (mine !== attempt || !button.isConnected) return cancelChallenge(start);
+        pending = start;
         button.href = botLink(start.url);
         button.removeAttribute('aria-disabled');
-        for (const tile of document.querySelectorAll('[data-action="login-qr"], [data-action="login-code"]'))
-            tile.removeAttribute('disabled');
-        // An idle sign-in screen must not keep a dead deep link forever.
-        pollTimer = window.setTimeout(() => signInScreen(), Math.max(0, pending.deadline - performance.now()));
+        button.removeAttribute('aria-busy');
+        for (const t of document.querySelectorAll('[data-action="login-qr"], [data-action="login-code"]'))
+            /** @type {HTMLButtonElement} */ (t).disabled = false;
+        const qr = /** @type {HTMLImageElement} */ ($('login-qr'));
+        qr.src = start.qr;
+        qr.hidden = false;
+        const check = $('login-qr-check');
+        check.querySelector('.login-mono').textContent = String(start.check).replace(/^(\d{3})(\d{3})$/, '$1 $2');
+        check.hidden = false;
+        if (renew) renew.disabled = false;
+        document.querySelector('.login-pick').classList.remove('has-error');
+        setLoginAlert('login-tg-error', '');
+        // Polled only while the QR is on screen (from 720px); the link is renewed either way
+        watch(start, {
+            polls: () => WIDE.matches,
+            tick: pickTick,
+            end: () => prepareCode(),
+            in: () => {
+                pending = null;
+                finish();
+            }
+        });
     } catch (err) {
-        if (!button.isConnected) return;
-        const error = document.getElementById('login-error');
-        error.textContent = `${err.message} A password still works if you have set one.`;
-        error.hidden = false;
+        if (mine !== attempt || !button.isConnected) return;
+        button.removeAttribute('aria-busy');
+        document.querySelector('.login-pick').classList.add('has-error');
+        setLoginAlert('login-tg-error', `${err.message} A password still works if you have set one.`);
+        // The old code was cancelled: its QR must not stay up to be scanned
+        $('login-qr').hidden = true;
+        $('login-qr-check').hidden = true;
+        const expiry = $('login-qr-expiry');
+        if (expiry) expiry.textContent = '';
+        if (renew) renew.disabled = false;
+        retryTimer = window.setTimeout(() => {
+            if (mine === attempt && button.isConnected) prepareCode();
+        }, RETRY_CODE_MS);
     }
 }
 
-// Inside Telegram's own Mini App window: its bridge, the launch data while it may still sign in, and
-// what the sign-in screen offers after a failed try ('retry' with the same data, 'reopen' for new data)
-let miniApp = null;
+// --- A way's screen while it waits: Telegram, QR code, Bot code, a password's confirmation ---
 
-const failedMiniApp = (err) => {
-    const retry = !err.status || err.status === 429 || err.status >= 500;
-    // 409 comes before the launch data is spent: after signing the other account out it signs in here
-    if (!retry && err.status !== 409) miniApp.initData = null;
-    miniApp.next = retry ? 'retry' : err.status === 401 ? 'reopen' : err.status === 409 ? 'signout' : null;
+/** @typedef {'telegram' | 'qr' | 'code' | 'password'} Mode */
+
+/** The code to send the bot: `/code 482913`, copied with one press. */
+const command = (check) =>
+    `<div class="login-command" id="login-command"><code>/code ${escapeHtml(check)}</code>` +
+    `<button type="button" class="login-copy" data-action="login-copy" aria-label="Copy">${icon('copy')}</button></div>`;
+
+/** The bot's own link without a code (Bot code: the digits sign in, no question in the bot). */
+const plainBotLink = (start) => {
+    const name = botName(start.url);
+    return name ? botLink(`https://t.me/${name}`) : null;
 };
+
+const WAIT_TEXT = {
+    telegram: 'Waiting for confirmation…',
+    qr: '',
+    code: 'Waiting for the bot…',
+    password: 'Waiting for confirmation…'
+};
+
+/** @param {Challenge} start @param {Mode} mode */
+function pendingBody(start, mode) {
+    const bot = botName(start.url);
+    const at = bot ? `@${escapeHtml(bot)}` : 'the bot';
+    const left = clock(secondsLeft(start));
+    const status = WAIT_TEXT[mode]
+        ? `<div class="login-status" id="login-status" role="status" aria-live="polite">${SPINNER}<span>${WAIT_TEXT[mode]} <span id="login-timer" aria-hidden="true">· ${left}</span></span></div>`
+        : '<div class="login-status login-status-empty" id="login-status" role="status" aria-live="polite"></div>';
+    const digitsBlock = (label, large = false) =>
+        `<div class="login-digits${large ? ' login-digits-lg' : ''}" id="login-digits"><span class="login-digits-label">${label}</span>${digits(start.check)}</div>`;
+    const link = (cls, text, url, iconName = '') =>
+        url
+            ? `<a class="${cls}" href="${escapeHtml(url)}"${botTarget()}>${iconName ? icon(iconName) : ''}<span>${text}</span></a>`
+            : '';
+    if (mode === 'qr')
+        return (
+            stepHead('Scan the QR code') +
+            '<p class="login-lead">Scan with the camera on another device where you’re signed in to Telegram, then confirm in the bot. It shows the same code.</p>' +
+            '<div class="login-qr-wrap" id="login-digits">' +
+            `<div class="login-qr-box" role="img" aria-label="QR code for signing in"><img src="${escapeHtml(start.qr)}" alt="" /></div>` +
+            `<p class="login-qr-meta">The bot will show <span class="login-mono">${escapeHtml(String(start.check).replace(/^(\d{3})(\d{3})$/, '$1 $2'))}</span></p>` +
+            `<p class="login-qr-meta" id="login-timer">Code expires in ${left}</p></div>` +
+            status +
+            '<div class="login-actions" id="login-actions">' +
+            `<button type="button" class="btn login-neutral" data-action="login-renew-qr">${icon('refresh-cw')}<span>New code</span></button>` +
+            (start.url
+                ? `<a class="login-text-btn" data-action="login-here" href="${escapeHtml(botLink(start.url))}"${botTarget()}>Open Telegram on this device</a>`
+                : '') +
+            ANOTHER_WAY +
+            '</div>'
+        );
+    if (mode === 'code')
+        return (
+            stepHead('Send the code to the bot') +
+            `<p class="login-lead">Open ${at} on any device with Telegram and send this message. Or open Настройки → Вход по коду and send the digits.</p>` +
+            digitsBlock('Your code', true) +
+            command(start.check) +
+            status +
+            '<div class="login-actions" id="login-actions">' +
+            '<p class="login-safety">Only send a code from your own screen.</p>' +
+            link('btn btn-primary', `Open ${at}`, plainBotLink(start), 'send') +
+            ANOTHER_WAY +
+            '</div>'
+        );
+    const password = mode === 'password';
+    return (
+        stepHead('Confirm in Telegram') +
+        (password
+            ? '<p class="login-lead">We sent a message to your NotFckBot chat. Tap «Да, это я» there to finish signing in.</p>'
+            : '<p class="login-lead">We opened the NotFckBot chat. Check that the bot shows the same code and tap «Да, это я». This page will sign you in by itself.</p>') +
+        digitsBlock('The bot shows the same code') +
+        status +
+        (password
+            ? ''
+            : '<button type="button" class="login-expand" data-action="login-code-help" aria-expanded="false" aria-controls="login-code-help">Sign in with a code</button>' +
+              '<div class="login-code-help" id="login-code-help" hidden>' +
+              `<p>Send this message to ${at} on any device with Telegram, or open Настройки → Вход по коду and send the digits.</p>` +
+              command(start.check) +
+              link('login-text-btn', `Open ${at}`, plainBotLink(start)) +
+              '</div>') +
+        '<div class="login-actions" id="login-actions">' +
+        '<p class="login-safety">Only confirm a sign-in you started.</p>' +
+        link(
+            'btn login-neutral',
+            password ? 'Open Telegram' : 'Open Telegram again',
+            start.url && botLink(start.url),
+            'send'
+        ) +
+        ANOTHER_WAY +
+        '</div>'
+    );
+}
+
+/** @param {Challenge} start @param {Mode} mode */
+function pendingScreen(start, mode) {
+    unwatch();
+    gate(`<div class="login-panel">${pendingBody(start, mode)}</div>${TERMS_NOTE}`, 'step');
+    focusStep();
+    watchPending(start, mode);
+}
+
+/** @param {Challenge} start @param {Mode} mode */
+function watchPending(start, mode) {
+    activeChallenge = start;
+    watch(start, {
+        polls: () => true,
+        tick: (left) => {
+            const timer = $('login-timer');
+            if (timer) timer.textContent = mode === 'qr' ? `Code expires in ${clock(left)}` : `· ${clock(left)}`;
+            // The QR renews itself like the card's on a wide screen: the same logic on a phone and a computer
+            if (mode === 'qr' && left <= RENEW_AT_S) renewQr();
+        },
+        end: (why) => endPending(mode, why),
+        in: () => {
+            activeChallenge = null;
+            finish();
+        }
+    });
+}
+
+/** The QR screen's new code, in place (its own New code, or 5 s before the old one ends). */
+async function renewQr() {
+    const old = activeChallenge;
+    stopPolling();
+    const mine = attempt;
+    activeChallenge = null;
+    cancelChallenge(old);
+    const button = /** @type {HTMLButtonElement | null} */ (document.querySelector('[data-action="login-renew-qr"]'));
+    if (button) {
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+    }
+    try {
+        const start = await newChallenge();
+        if (mine !== attempt || !$('login-digits')) return cancelChallenge(start);
+        /** @type {HTMLImageElement} */ (document.querySelector('#login-digits img')).src = start.qr;
+        document.querySelector('#login-digits .login-mono').textContent = String(start.check).replace(
+            /^(\d{3})(\d{3})$/,
+            '$1 $2'
+        );
+        const here = /** @type {HTMLAnchorElement | null} */ (document.querySelector('[data-action="login-here"]'));
+        if (here && start.url) here.href = botLink(start.url);
+        if (button) {
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+        }
+        watchPending(start, 'qr');
+    } catch {
+        if (mine === attempt && $('login-digits')) endPending('qr', 'expired');
+    }
+}
+
+/** The time ran out or the bot said no: the same screen says so and offers a new try. */
+function endPending(mode, why) {
+    activeChallenge = null;
+    const focusWasIn = $('login-body').contains(document.activeElement) && document.activeElement !== $('login-back');
+    $('login-digits')?.classList.add('is-ended');
+    for (const id of ['login-command', 'login-code-help']) $(id)?.remove();
+    document.querySelector('.login-expand')?.remove();
+    const text =
+        why === 'cancelled'
+            ? 'Sign-in was cancelled in the bot.'
+            : mode === 'code'
+              ? 'The code has expired.'
+              : 'The time to confirm has run out.';
+    const status = $('login-status');
+    status.className = 'login-status is-ended';
+    status.innerHTML = `${icon('clock')}<span>${text}</span>`;
+    const again =
+        why === 'expired' && mode === 'code'
+            ? `<button type="button" class="btn btn-primary" data-action="login-again" data-mode="code">${icon('refresh-cw')}<span>New code</span></button>`
+            : `<button type="button" class="btn btn-primary" data-action="login-again" data-mode="${mode}">Try again</button>`;
+    $('login-actions').innerHTML = again + ANOTHER_WAY;
+    if (focusWasIn || document.activeElement === document.body)
+        /** @type {HTMLElement} */ ($('login-actions').firstElementChild).focus();
+}
+
+// --- The rest: the password form, the Terms, a sign-in link, failures ---
+
+function passwordScreen() {
+    discardChallenges();
+    gate(
+        '<div class="login-panel">' +
+            stepHead('Sign in with password') +
+            '<p class="login-lead">Works if you’ve set a password in Account settings.</p>' +
+            signInForm() +
+            '</div>' +
+            TERMS_NOTE,
+        'step'
+    );
+    focusStep();
+}
+
+/**
+ * The Terms of Service: plain text on a nested screen, Back to the ways in. A placeholder until the
+ * real terms are written (the user, 06.11)
+ */
+const TERMS =
+    '<div class="login-terms">' +
+    '<p>NotFckBot is a personal Telegram bot that tells you when new episodes of your series and new films come out. ' +
+    'By signing in to this panel you agree to the terms below.</p>' +
+    '<h2>Using the bot</h2>' +
+    '<p>The bot and the panel are provided as they are, without any guarantee that a notification arrives on time ' +
+    'or at all. Release dates come from TMDB and Kinopoisk and may be wrong or change.</p>' +
+    '<h2>Your data</h2>' +
+    '<p>The bot keeps your Telegram ID and name, the chats it is in, what you follow and your chat settings. ' +
+    'The panel keeps your signed-in devices: their name, country, network, IP address and when they were last active. ' +
+    'Nothing is sold or shared with anyone.</p>' +
+    '<h2>Links</h2>' +
+    '<p>Watch and Kinopoisk links lead to other websites. Their content and rules are their own.</p>' +
+    '<h2>Changes</h2>' +
+    '<p>These terms may change. The version shown here is the one that applies.</p>' +
+    '</div>';
+
+const termsScreen = () => {
+    discardChallenges();
+    gate(
+        `<div class="login-panel"><div class="login-terms-top">${stepHead('Terms of Service')}</div>${TERMS}</div>`,
+        'step login-terms-screen'
+    );
+    focusStep();
+};
+
+/** /login/<token>: spent only by the press (a messenger's link preview must not use it up). */
+const linkScreen = (error = '') => {
+    gate(
+        '<div class="login-panel">' +
+            BRAND +
+            '<div class="login-actions">' +
+            (error
+                ? loginAlert('login-error', error) +
+                  '<button type="button" class="btn btn-primary" data-action="login-link-again">Sign in again</button>'
+                : '<button type="button" class="btn btn-primary" data-action="login-link">Sign in</button>' +
+                  '<p class="login-hint">A sign-in link from the bot.</p>') +
+            '</div></div>' +
+            TERMS_NOTE,
+        'link'
+    );
+};
+
+/** A failure with its HTTP status line: the icon, the message, then what can be done. */
+const problem = (title, status, actions, alert = false) =>
+    '<div class="login-panel">' +
+    `<div class="login-problem"${alert ? ' role="alert"' : ''}><span class="login-problem-icon">${icon('circle-alert')}</span>` +
+    `<h1 id="login-title" tabindex="-1">${escapeHtml(title)}</h1>` +
+    (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
+    `</div><div class="login-actions">${actions}</div></div>`;
 
 const STATUS_TEXT = {
     400: 'Bad Request',
@@ -138,126 +626,61 @@ const STATUS_TEXT = {
     504: 'Gateway Timeout'
 };
 
-/** The status line under a failed Mini App sign-in: "503 · Service Unavailable", or no answer at all. */
+/** The status line under a failure: "503 · Service Unavailable", or no answer at all. */
 const statusLine = (err) =>
     err.status ? [err.status, STATUS_TEXT[err.status]].filter(Boolean).join(' · ') : 'No connection';
+
+const RETRY = `<button type="button" class="btn btn-primary" data-action="login-retry">${icon('refresh-cw')}<span>Try again</span></button>`;
+
+/** /account/me failed with something other than 401. */
+const panelDownScreen = (err) =>
+    gate(
+        problem(
+            `The panel isn’t answering: ${err.message}`,
+            statusLine(err),
+            `<button type="button" class="btn btn-primary" data-action="login-retry">${icon('refresh-cw')}<span>Retry</span></button>`,
+            true
+        ),
+        'fail'
+    );
+
+// Inside Telegram's own Mini App window: its bridge, the launch data while it may still sign in, and
+// what the sign-in screen offers after a failed try ('retry' with the same data, 'reopen' for new data)
+let miniApp = null;
+
+const failedMiniApp = (err) => {
+    const retry = !err.status || err.status === 429 || err.status >= 500;
+    // 409 comes before the launch data is spent: after signing the other account out it signs in here
+    if (!retry && err.status !== 409) miniApp.initData = null;
+    miniApp.next = retry ? 'retry' : err.status === 401 ? 'reopen' : err.status === 409 ? 'signout' : null;
+};
 
 // The deep link to the bot and the QR code would close this window and lose the confirmation:
 // here the panel signs in again with Telegram's launch data, or with a password
 function miniAppScreen(error, restoreFocus, status = '') {
     const next = miniApp.next ?? (miniApp.initData ? 'retry' : 'reopen');
+    const main =
+        next === 'retry'
+            ? RETRY
+            : next === 'reopen'
+              ? '<button type="button" class="btn btn-primary" data-action="miniapp-close">Close the app</button>' +
+                '<p class="login-hint">Open it again from the bot: Telegram signs you in.</p>'
+              : next === 'signout'
+                ? '<button type="button" class="btn btn-primary" data-action="miniapp-signout">Sign out</button>'
+                : '';
     gate(
-        '<div class="login-actions">' +
-            (next === 'retry'
-                ? '<button type="button" class="btn btn-primary btn-block" data-action="login-retry">Try again</button>'
-                : next === 'reopen'
-                  ? '<button type="button" class="btn btn-primary btn-block" data-action="miniapp-close">Close the app</button>' +
-                    '<p class="login-hint">Open it again from the bot: Telegram signs you in.</p>'
-                  : next === 'signout'
-                    ? '<button type="button" class="btn btn-primary btn-block" data-action="miniapp-signout">Sign out</button>'
-                    : '') +
-            `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
-            (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
-            '<h2 class="login-or">Or</h2>' +
-            `<button type="button" class="btn btn-outline btn-block" data-action="login-password">${KEY_ICON}Password</button></div>`
+        problem(
+            error || 'Couldn’t sign you in through Telegram',
+            status,
+            main +
+                '<div class="login-or login-or-plain"><span>Or</span></div>' +
+                `<button type="button" class="btn login-neutral" data-action="login-password">${icon('key-round')}<span>Password</span></button>`,
+            Boolean(error)
+        ),
+        'fail'
     );
     if (restoreFocus) $('login-title').focus();
 }
-
-function signInScreen(error = '', restoreFocus = $('login-body').contains(document.activeElement)) {
-    discardChallenges();
-    if (miniApp) return miniAppScreen(error, restoreFocus);
-    gate(
-        // A first time in signs up too: the bot is started on the way (with sign-up open)
-        '<div class="login-actions">' +
-            `<a id="login-tg" class="btn btn-primary btn-block"${botTarget()} aria-disabled="true" aria-describedby="login-tg-hint" data-action="login-telegram">${SEND_ICON}<span>Continue with Telegram</span></a>` +
-            '<p class="login-hint" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p>' +
-            `<p class="login-error" id="login-error" role="alert"${error ? '' : ' hidden'}>${escapeHtml(error)}</p>` +
-            '<h2 class="login-or">Other ways to sign in</h2>' +
-            `<div class="login-methods"><button type="button" class="login-method" data-action="login-qr" disabled>${QR_ICON}<span>QR code</span></button>` +
-            `<button type="button" class="login-method" data-action="login-code" disabled>${CODE_ICON}<span>Bot code</span></button>` +
-            `<button type="button" class="login-method" data-action="login-password">${KEY_ICON}<span>Password</span></button></div>` +
-            '<p class="login-terms-note">By continuing, you agree to the <button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button>.</p></div>'
-    );
-    if (restoreFocus) $('login-title').focus();
-    prepareCode();
-}
-
-/**
- * The Terms of Service: plain text on a nested screen, Back to the ways in. A placeholder until the
- * real terms are written (the user, 06.11)
- */
-const TERMS =
-    '<div class="login-terms" tabindex="-1">' +
-    '<p>NotFckBot is a personal Telegram bot that tells you when new episodes of your series and new films come out. ' +
-    'By signing in to this panel you agree to the terms below.</p>' +
-    '<h3>Using the bot</h3>' +
-    '<p>The bot and the panel are provided as they are, without any guarantee that a notification arrives on time ' +
-    'or at all. Release dates come from TMDB and Kinopoisk and may be wrong or change.</p>' +
-    '<h3>Your data</h3>' +
-    '<p>The bot keeps your Telegram ID and name, the chats it is in, what you follow and your chat settings. ' +
-    'The panel keeps your signed-in devices: their name, country, network, IP address and when they were last active. ' +
-    'Nothing is sold or shared with anyone.</p>' +
-    '<h3>Links</h3>' +
-    '<p>Watch and Kinopoisk links lead to other websites. Their content and rules are their own.</p>' +
-    '<h3>Changes</h3>' +
-    '<p>These terms may change. The version shown here is the one that applies.</p>' +
-    '</div>';
-
-/** How to send the six digits to the bot from a device that has Telegram (src/bot/login.js). */
-function codeSteps(start) {
-    let bot = 'the bot';
-    try {
-        const name = new URL(start.url).pathname.slice(1);
-        if (name) bot = `@${name}`;
-    } catch {
-        // A password sign-in has no bot link: the steps name no bot
-    }
-    return (
-        `<div class="login-steps" id="login-steps"><ol><li>Open ${escapeHtml(bot)} on any device with Telegram.</li>` +
-        `<li>Send <b>/code ${escapeHtml(start.check)}</b>, or go to Настройки → Вход по коду and send the digits.</li></ol>` +
-        '<p>The bot replies whether you’re in. The code works for 5 minutes.</p></div>'
-    );
-}
-
-/**
- * Waiting for the bot: after "Continue with Telegram" ('telegram'), the QR code ('qr') or "Code in the
- * bot" ('code'). The first two offer the code as plain text that opens its steps in its place.
- */
-const waitingScreen = (start, mode = 'telegram') => {
-    const qr = mode === 'qr';
-    const code = mode === 'code';
-    gate(
-        topBar(code ? 'Bot code' : qr ? 'Scan to sign in' : 'Confirm in Telegram') +
-            '<div class="login-mid">' +
-            (qr
-                ? `<img class="login-qr" src="${escapeHtml(start.qr)}" alt="Scan to open the Telegram bot" width="184" height="184" />`
-                : '') +
-            (code
-                ? ''
-                : `<p class="login-text">${qr ? 'Scan with your phone camera, then confirm in the bot. It shows the same code.' : 'Check that the bot shows the same code, then confirm the sign-in.'}</p>`) +
-            `<p class="login-check${qr ? ' login-check-sm' : ''}"><b>${escapeHtml(start.check)}</b></p>` +
-            (code
-                ? codeSteps(start)
-                : `<button type="button" class="login-code-link" data-action="login-code-steps">Sign in with a code</button>`) +
-            `<p class="login-hint" id="login-wait">Waiting for the ${code ? 'bot' : 'confirmation'}…</p></div>` +
-            '<div class="login-actions">' +
-            (start.url && !code
-                ? qr
-                    ? `<a class="btn btn-outline btn-block" href="${escapeHtml(botLink(start.url))}"${botTarget()}>Open Telegram on this device</a>`
-                    : `<a class="btn btn-primary btn-block" href="${escapeHtml(botLink(start.url))}"${botTarget()}>Open the bot again</a>`
-                : '') +
-            `<p class="login-hint">${code ? 'Only send a code from your own screen.' : 'Only confirm a sign-in you started.'}</p></div>`,
-        true
-    );
-};
-
-const linkScreen = () =>
-    gate(
-        '<div class="login-actions">' +
-            '<button type="button" class="btn btn-primary btn-block" data-action="login-link">Sign in</button>' +
-            '<p class="login-hint">A sign-in link from the bot.</p></div>'
-    );
 
 /** @type {string | null} the chat this sign-in opens on (a group link or a Mini App opened from a group) */
 let openedChat = null;
@@ -335,11 +758,10 @@ export async function startSession(preferredChat = null, { current = () => true,
             const message = err.status ? err.message : "Can't reach the panel. Check the connection.";
             miniAppScreen(message, focus ?? $('login-body').contains(document.activeElement), statusLine(err));
         } else if (err.status === 401) signInScreen();
-        else
-            gate(
-                '<div class="login-actions"><button type="button" class="btn btn-primary btn-block" data-action="login-retry">Retry</button>' +
-                    `<p class="login-error" role="alert">The panel isn't answering: ${escapeHtml(err.message)}</p></div>`
-            );
+        else {
+            discardChallenges();
+            panelDownScreen(err);
+        }
         return null;
     } finally {
         if (initData) bridge.postEvent('web_app_ready', '{}');
@@ -399,12 +821,6 @@ export function watchSession() {
     document.addEventListener('keydown', activity);
 }
 
-function stopPolling() {
-    clearTimeout(pollTimer);
-    pollTimer = 0;
-    attempt += 1;
-}
-
 /** @param {(role: string) => void} onSignedIn what the panel does once in (app.js) */
 export function sessionActions(onSignedIn) {
     const signedIn = async (chatId = null) => {
@@ -420,57 +836,7 @@ export function sessionActions(onSignedIn) {
         const role = await startSession(chatId);
         if (role) onSignedIn(role);
     };
-    const waitForConfirmation = (start, mode = 'telegram') => {
-        stopPolling();
-        activeChallenge = start;
-        const mine = attempt;
-        waitingScreen(start, mode);
-        focusStep();
-        const until = start.deadline ?? performance.now() + (start.expiresIn ?? POLL_FOR_MS);
-        let asking = false;
-        const poll = async () => {
-            if (attempt !== mine || asking) return;
-            clearTimeout(pollTimer);
-            asking = true;
-            try {
-                await ask();
-            } finally {
-                asking = false;
-            }
-        };
-        // Back from Telegram: a phone held the timer while the page was hidden, so ask at once
-        const back = () => {
-            if (attempt !== mine) return document.removeEventListener('visibilitychange', back);
-            if (!document.hidden) poll();
-        };
-        document.addEventListener('visibilitychange', back);
-        const ask = async () => {
-            const left = Math.max(0, Math.ceil((until - performance.now()) / 1000));
-            const wait = $('login-wait');
-            if (wait)
-                wait.textContent = `Waiting for ${mode === 'code' ? 'the bot' : 'confirmation'} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-            if (!left) return signInScreen('The time to confirm has run out. Try again.');
-            let answer;
-            try {
-                answer = await api('/login/telegram/poll', {
-                    method: 'POST',
-                    body: { code: start.code, secret: start.secret }
-                });
-            } catch {
-                answer = { state: 'waiting' };
-            }
-            if (attempt !== mine) return;
-            if (answer.state === 'in') {
-                stopPolling();
-                activeChallenge = null;
-                return signedIn();
-            }
-            if (answer.state === 'refused') return signInScreen('Sign-in was cancelled in the bot.');
-            if (answer.state === 'gone') return signInScreen('The time to confirm has run out. Try again.');
-            pollTimer = window.setTimeout(poll, POLL_MS);
-        };
-        pollTimer = window.setTimeout(poll, POLL_MS);
-    };
+    finish = () => signedIn();
     // One try at a time: Telegram's launch data signs in only once. Choosing Password meanwhile
     // (a new attempt) leaves its form alone when this try fails late
     const retryFrom = async (el, before = async () => {}) => {
@@ -483,7 +849,13 @@ export function sessionActions(onSignedIn) {
         const role = await startSession(null, { current: () => mine === attempt, focus });
         if (role) onSignedIn(role);
     };
-    $('login-gate').addEventListener('submit', async (event) => {
+    const gateEl = $('login-gate');
+    // The password form's Sign in waits for both fields
+    gateEl.addEventListener('input', (event) => {
+        const form = /** @type {HTMLElement} */ (event.target).closest('form[data-login="password"]');
+        if (form) syncSignInButton(/** @type {HTMLFormElement} */ (form));
+    });
+    gateEl.addEventListener('submit', async (event) => {
         const form = /** @type {HTMLFormElement} */ (event.target);
         if (form.dataset.login !== 'password') return;
         event.preventDefault();
@@ -492,51 +864,72 @@ export function sessionActions(onSignedIn) {
         const result = await submitSignIn(form);
         if (mine !== attempt) {
             if (result?.confirmation) cancelChallenge(result);
+            // The session cookie is set (the system account): stay signed in
+            else if (result?.success && !$('login-gate').hidden) await signedIn();
             return;
         }
-        if (result?.confirmation) waitForConfirmation(result);
+        if (result?.confirmation)
+            pendingScreen({ ...result, deadline: performance.now() + (result.expiresIn ?? POLL_FOR_MS) }, 'password');
         else if (result?.success) await signedIn();
     });
+    /** A way's screen from the first screen's code (the button, a tile): the same digits */
+    const take = (mode) => {
+        const start = pending;
+        if (!start) return;
+        pending = null;
+        pendingScreen(start, mode);
+    };
     return {
-        'login-telegram': () => {
-            // The link itself opens the bot; here the page starts waiting for the answer
-            const start = pending;
-            if (!start) return;
-            pending = null;
-            waitForConfirmation(start);
+        // The link itself opens the bot; here the page starts waiting for the answer
+        'login-telegram': () => take('telegram'),
+        'login-qr': () => take('qr'),
+        'login-code': () => take('code'),
+        // QR's "Open Telegram on this device": the same code, now confirmed on this device
+        'login-here': () => {
+            if (activeChallenge) pendingScreen(activeChallenge, 'telegram');
         },
-        'login-qr': () => {
-            const start = pending;
-            if (!start) return;
-            pending = null;
-            waitForConfirmation(start, 'qr');
-        },
-        'login-code': () => {
-            const start = pending;
-            if (!start) return;
-            pending = null;
-            waitForConfirmation(start, 'code');
-        },
-        // "Sign in with a code" under the digits: the steps take its place
-        'login-code-steps': (el) => {
-            const start = activeChallenge;
-            if (!start) return;
-            el.outerHTML = codeSteps(start);
-        },
-        'login-terms': () => {
-            discardChallenges();
-            gate(topBar('Terms of Service') + TERMS, true);
-            focusStep();
-        },
-        'login-password': () => {
-            discardChallenges();
-            gate(topBar('Password') + signInForm(), true);
-            focusStep();
-        },
-        'login-cancel': () => {
+        // A new code for the first screen's QR (from 720px) and for the QR screen: both in place
+        'login-new-code': () => prepareCode(),
+        'login-renew-qr': () => renewQr(),
+        // "Try again" / "New code" on a way's screen: a password asks for the password again
+        'login-again': async (el) => {
+            const mode = /** @type {Mode} */ (el.dataset.mode);
+            if (mode === 'password') return passwordScreen();
+            const button = /** @type {HTMLButtonElement} */ (el);
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            const old = activeChallenge;
             stopPolling();
-            signInScreen('', true);
+            const mine = attempt;
+            activeChallenge = null;
+            cancelChallenge(old);
+            try {
+                const start = await newChallenge();
+                if (mine !== attempt) return cancelChallenge(start);
+                pendingScreen(start, mode);
+            } catch (err) {
+                if (mine === attempt) signInScreen(err.message, true);
+            }
         },
+        'login-code-help': (el) => {
+            const help = $('login-code-help');
+            const open = help.hidden;
+            help.hidden = !open;
+            el.setAttribute('aria-expanded', String(open));
+        },
+        'login-copy': async () => {
+            const check = activeChallenge?.check;
+            if (!check) return;
+            try {
+                await navigator.clipboard.writeText(`/code ${check}`);
+                toast('Copied', 'success', 2000);
+            } catch {
+                toast("Couldn't copy. Type the code instead.", 'error');
+            }
+        },
+        'login-terms': () => termsScreen(),
+        'login-password': () => passwordScreen(),
+        'login-cancel': () => signInScreen('', true),
         'miniapp-close': () => miniApp?.bridge.postEvent('web_app_close', '{}'),
         'login-retry': (el) => retryFrom(el),
         // Another account's session in this window (409): end it, then the kept launch data signs in
@@ -544,6 +937,7 @@ export function sessionActions(onSignedIn) {
         'login-link': async (el) => {
             const button = /** @type {HTMLButtonElement} */ (el);
             button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
             try {
                 const { chatId } = await api('/login', {
                     method: 'POST',
@@ -551,9 +945,15 @@ export function sessionActions(onSignedIn) {
                 });
                 await signedIn(chatId);
             } catch (err) {
-                window.history.replaceState(null, '', '/');
-                signInScreen(err.message);
+                linkScreen(err.message);
+                /** @type {HTMLElement | null} */ (
+                    $('login-body').querySelector('[data-action="login-link-again"]')
+                )?.focus();
             }
+        },
+        'login-link-again': () => {
+            window.history.replaceState(null, '', '/');
+            signInScreen('', true);
         },
         logout: async () => {
             try {
