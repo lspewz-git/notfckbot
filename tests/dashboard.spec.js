@@ -77,6 +77,16 @@ test('TVmaze has a badge and a dialog without a token: its status, the status pa
     await expect(page.locator('#service-token-block')).toBeHidden();
     await expect(page.locator('#service-save')).toBeHidden();
     await expect(page.locator('#service-status-link')).toHaveAttribute('href', 'https://status.tvmaze.com');
+    // Without the token block the details still keep the dialog's gap above the actions
+    const gap = () =>
+        page.evaluate(() => {
+            const list = document.getElementById('service-details').getBoundingClientRect();
+            const link = document.getElementById('service-status-link').getBoundingClientRect();
+            const space = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-5')) * 16;
+            return { gap: Math.round(link.top - list.bottom), space: Math.round(space) };
+        });
+    const tvmazeGap = await gap();
+    expect(tvmazeGap.gap).toBe(tvmazeGap.space);
     // Another service's dialog gets its token row back
     await page.locator('[data-close="service-modal"]').click();
     await page.route('**/api/services/kinopoisk*', (route) =>
@@ -88,6 +98,13 @@ test('TVmaze has a badge and a dialog without a token: its status, the status pa
     await page.locator('#health-kp').click();
     await expect(page.locator('#service-token-block')).toBeVisible();
     await expect(page.locator('#service-save')).toBeVisible();
+    // With the token block the actions' margin collapses into its own: the same gap, not doubled
+    const tokenGap = await page.evaluate(() => {
+        const block = document.getElementById('service-token-block').getBoundingClientRect();
+        const link = document.getElementById('service-status-link').getBoundingClientRect();
+        return Math.round(link.top - block.bottom);
+    });
+    expect(tokenGap).toBe(tvmazeGap.space);
 });
 
 test('the banner is not rewritten when a refresh brings the same news', async ({ page }) => {

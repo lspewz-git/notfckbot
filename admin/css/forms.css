@@ -254,6 +254,12 @@
     color: var(--danger);
 }
 
+/* The service dialog's actions keep their gap when the token block above is hidden (TVmaze);
+   with the token shown this margin collapses into the block's own */
+#service-modal .modal-actions {
+    margin-top: var(--space-5);
+}
+
 /* Token field: masked value (or the edit input) with square icon buttons beside it */
 .token-row {
     display: flex;
