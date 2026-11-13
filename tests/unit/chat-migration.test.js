@@ -19,7 +19,8 @@ const MODELS = [
     'ChatEvent',
     'RecapSend',
     'AlertRecipient',
-    'SendFailure'
+    'SendFailure',
+    'SentNotification'
 ];
 let chats;
 let tables;
@@ -82,6 +83,8 @@ beforeEach(() => {
     tables.AlertRecipient.push({ chatId: '-100', preset: 'all' });
     // A notification that didn't reach it: the dashboard's list names the group by its new id
     tables.SendFailure.push({ chatId: '-100', status: 'gave_up' });
+    // And one that did, listed the same way
+    tables.SentNotification.push({ chatId: '-100', kind: 'episode' });
 });
 
 describe('moving a group to its supergroup', () => {

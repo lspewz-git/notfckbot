@@ -12,6 +12,8 @@ mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
 // A send that fails for good is kept for the dashboard (src/send-failures.js): not here
 mock.method(require('../../src/db').SendFailure, 'create', async () => {});
 mock.method(require('../../src/db').SendFailure, 'destroy', async () => 0);
+mock.method(require('../../src/db').SentNotification, 'create', async () => {});
+mock.method(require('../../src/db').SentNotification, 'destroy', async () => 0);
 
 const kinds = (bot) => bot.sent.map((m) => `${m.chatId}:${kindOf(m.text)}`);
 

@@ -16,7 +16,8 @@ const {
     ChatEvent,
     RecapSend,
     AlertRecipient,
-    SendFailure
+    SendFailure,
+    SentNotification
 } = require('./db');
 const events = require('./chat-events');
 const botStatus = require('./bot-status');
@@ -79,7 +80,8 @@ async function migrateChat(fromId, toId) {
             ChatEvent,
             RecapSend,
             AlertRecipient,
-            SendFailure
+            SendFailure,
+            SentNotification
         ];
         for (const model of models) {
             await model.update({ chatId: to }, { where: { chatId: from }, transaction });

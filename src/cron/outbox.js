@@ -5,8 +5,7 @@
 const { PendingMessage, HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
-const stats = require('../stats-log');
-const { recordFailure } = require('../send-failures');
+const { recordFailure, recordSent } = require('../send-failures');
 const events = require('../chat-events');
 const { isLeft } = require('../bot-status');
 const { tally, noteFailure } = require('./status');
@@ -80,7 +79,14 @@ async function notify(bot, chatId, text, { photo = null, about = '', line = '', 
     // A chat that blocked the bot or took it out (src/bot-status.js) isn't tried: it would only
     // fail. Its subscriptions stay, and news goes out again once it is back
     if (isLeft(await chatSettings(chatId))) return { status: 'left' };
-    const result = await send(bot, chatId, text, { photo, about, line, label, target: notificationTarget(event) });
+    const result = await send(bot, chatId, text, {
+        photo,
+        about,
+        line,
+        label,
+        event,
+        target: notificationTarget(event)
+    });
     if (event) events.record(chatId, { kind: 'notified', ...event, outcome: outcomeOf(result) });
     return result;
 }
@@ -91,7 +97,7 @@ function outcomeOf(result) {
     return result.status === 'failed' ? 'queued' : 'failed';
 }
 
-async function send(bot, chatId, text, { photo, about, line, label, target }) {
+async function send(bot, chatId, text, { photo, about, line, label, event, target }) {
     if (line && isQuietNow(await chatSettings(chatId))) {
         try {
             await HeldNotification.create({
@@ -116,7 +122,8 @@ async function send(bot, chatId, text, { photo, about, line, label, target }) {
     const to = result.chatId || chatId;
     if (result.status === 'sent') {
         tally('sent');
-        stats.count('sent');
+        const { detail = null, season = null, episode = null } = event || {};
+        recordSent({ chatId: to, about, kind: detail, season, episode });
         return result;
     }
     tally('failed');
@@ -214,7 +221,7 @@ async function flushPending(bot, now = new Date()) {
         }
         if (result.status === 'sent') {
             tally('sent');
-            stats.count('sent');
+            recordSent({ chatId: result.chatId || message.chatId, about: message.about, kind: 'retry' }, now);
             sent += 1;
         } else {
             recordPendingFailure(message, result, now);

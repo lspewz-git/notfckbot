@@ -488,7 +488,7 @@ async function mockPanel(page, options = {}) {
             panel.sendsAsked = [...(panel.sendsAsked || []), day];
             return options.sends
                 ? options.sends(day)
-                : { day, keptSince: null, failed: [], queued: [], nextCheckAt: null };
+                : { day, keptSince: null, failed: [], sentKeptSince: null, sent: [], queued: [], nextCheckAt: null };
         },
         '/api/health': () => ({ ...panel.health, kinopoiskQuota: { used: 3, limit: 500 } }),
         '/api/health/telegram': () => ({ telegram: panel.health.telegram, ...problemsOf('telegram') }),

@@ -3,16 +3,29 @@ const { watchConsole } = require('./helpers');
 const { mockPanel } = require('./mock-panel');
 
 /**
- * The dashboard's notifications chart: a day's bar opens what didn't reach its chat and why, and
- * today's what waits for the next check (admin/js/sends.js), on the API mock.
+ * The dashboard's notifications chart: a day's bar opens what didn't reach its chat and why, what
+ * did, and today's what waits for the next check (admin/js/sends.js), on the API mock.
  */
 
 // A 500 the browser reports itself: the test of details that fail to load asks for one
 watchConsole({ ignore: /500/ });
 
 // tests/mock-panel.js charts(): 30 days from 15 Sep, counted from 20 Sep, the 10th (24 Sep) with
-// one not delivered
+// one not delivered and six sent; sent on day i: (i * 3) % 7
 const FAILED_DAY = '2026-09-24';
+
+/** A sent row of the day, as /api/stats/sends lists it. */
+const sentRow = (fields) => ({
+    chatId: '-100',
+    chat: 'miners_otdihayt',
+    about: 'Фоллаут',
+    kind: 'episode',
+    season: 2,
+    episode: 8,
+    count: 1,
+    at: '2026-09-24T06:00:00Z',
+    ...fields
+});
 const TODAY = '2026-10-14';
 
 const SENDS = (day) => ({
@@ -34,6 +47,8 @@ const SENDS = (day) => ({
                   }
               ]
             : [],
+    sentKeptSince: '2026-09-20',
+    sent: day === FAILED_DAY ? Array.from({ length: 6 }, () => sentRow()) : [],
     queued:
         day === TODAY
             ? [
@@ -78,7 +93,7 @@ test("a day's bar opens what didn't go out, with the title, the chat and why", a
     await expect(dialog).toBeVisible();
     await expect(page.locator('#sends-title')).toHaveText('24 Sep');
     await expect(page.locator('#sends-sub')).toHaveText(/Not delivered 1/);
-    const row = dialog.locator('.sends-row');
+    const row = dialog.locator('.sends-list').first().locator('.sends-row');
     await expect(row).toHaveCount(1);
     await expect(row.locator('.sends-title')).toHaveText('Голодные игры: Рассвет жатвы → miners_otdihayt');
     await expect(row.locator('.sends-meta')).toContainText('Gave up after 8 tries since 23 Sep');
@@ -102,9 +117,7 @@ test('the "Not delivered" card, with none in its week, opens today from the keyb
     expect(panel.sendsAsked).toEqual([TODAY]);
 });
 
-test('the "Not delivered" card opens the latest day of its week that had one, not an empty today', async ({
-    page
-}) => {
+test('the "Not delivered" card opens the latest day of its week that had one, not an empty today', async ({ page }) => {
     const charts = (data) => {
         // 12 Oct, two days before today, had two
         data.days[27].failed = 2;
@@ -116,7 +129,7 @@ test('the "Not delivered" card opens the latest day of its week that had one, no
     expect(panel.sendsAsked).toEqual(['2026-10-12']);
 });
 
-test("a chat that left the bot, a held list of three, a chat without a name", async ({ page }) => {
+test('a chat that left the bot, a held list of three, a chat without a name', async ({ page }) => {
     const gone = (day) => ({
         ...SENDS(day),
         failed: [
@@ -136,7 +149,7 @@ test("a chat that left the bot, a held list of three, a chat without a name", as
     await mockPanel(page, { sends: gone });
     await clickDay(page, 9);
     await detailsLoaded(page);
-    const row = page.locator('.sends-row');
+    const row = page.locator('.sends-list').first().locator('.sends-row');
     // No name known: the chat's id
     await expect(row.locator('.sends-title')).toHaveText('3 notifications held overnight (3) → -200');
     await expect(row.locator('.sends-meta')).toContainText('The chat blocked or removed the bot');
@@ -164,11 +177,65 @@ test('a day counted before the details were kept says so instead of an empty lis
     await expect(page.locator('#sends-body')).toContainText('1 more without details: details are kept since 1 Oct');
 });
 
-test('a day where everything went out says so at once: nothing to load, nothing to jump', async ({ page }) => {
+test('a day with nothing sent says so at once: nothing to load, nothing to jump', async ({ page }) => {
     const panel = await mockPanel(page);
-    await clickDay(page, 6);
-    await expect(page.locator('#sends-body')).toHaveText('Everything went out.');
+    // 22 Sep: 0 sent, 0 not delivered
+    await clickDay(page, 7);
+    await expect(page.locator('#sends-body')).toHaveText('Nothing was sent this day.');
     expect(panel.sendsAsked).toBeUndefined();
+});
+
+test('a day where everything went out lists what was sent, to which chat, and what it was', async ({ page }) => {
+    const sends = (day) => ({
+        ...SENDS(day),
+        sentKeptSince: '2026-09-21',
+        sent: [
+            sentRow({ at: '2026-09-21T06:00:00Z' }),
+            sentRow({
+                chatId: '-200',
+                chat: null,
+                about: 'Маятник',
+                kind: 'film_digital',
+                season: null,
+                episode: null
+            }),
+            sentRow({ about: 'Weekly digest', kind: 'digest_w', season: null, episode: null })
+        ]
+    });
+    const panel = await mockPanel(page, { sends });
+    // 21 Sep: 4 sent, none failed; one of them without its row
+    await clickDay(page, 6);
+    await detailsLoaded(page);
+    await expect(page.locator('#sends-sub')).toHaveText('Sent 4 · Not delivered 0');
+    await expect(page.locator('.sends-group')).toHaveText(['Sent 4']);
+    const rows = page.locator('.sends-row');
+    await expect(rows.locator('.sends-title')).toHaveText([
+        'Фоллаут S2E8 → miners_otdihayt',
+        'Маятник → -200',
+        'Weekly digest → miners_otdihayt'
+    ]);
+    await expect(rows.locator('.sends-meta')).toHaveText(['New episode', 'Film out digitally', 'Digest']);
+    await expect(page.locator('#sends-body')).toContainText('1 sent without details: details are kept since 21 Sep');
+    expect(panel.sendsAsked).toEqual(['2026-09-21']);
+});
+
+test('a held list shows its count once, and a whole season its number', async ({ page }) => {
+    const sends = (day) => ({
+        ...SENDS(day),
+        sent: [
+            sentRow({ about: '3 notifications held overnight', kind: 'held', count: 3, season: null, episode: null }),
+            sentRow({ kind: 'complete', episode: 10 })
+        ]
+    });
+    await mockPanel(page, { sends });
+    // 21 Sep: 4 sent
+    await clickDay(page, 6);
+    await detailsLoaded(page);
+    await expect(page.locator('.sends-row .sends-title')).toHaveText([
+        '3 notifications held overnight → miners_otdihayt',
+        'Фоллаут S2 → miners_otdihayt'
+    ]);
+    await expect(page.locator('.sends-row .sends-meta')).toHaveText(['Sent after quiet hours', 'Season complete']);
 });
 
 test('a day with a failure keeps its height from opening to the answer', async ({ page }) => {
@@ -184,15 +251,15 @@ test('a day with a failure keeps its height from opening to the answer', async (
     });
     await clickDay(page, 9);
     const content = page.locator('#sends-modal .modal-content');
-    // The stand-in: the heading and a row for the one failure
-    await expect(page.locator('#sends-body .sends-group')).toHaveText('Not delivered');
-    await expect(page.locator('#sends-body .sends-row')).toHaveCount(1);
+    // The stand-in: the headings, a row for the one failure and one for each of the six sent
+    await expect(page.locator('#sends-body .sends-group')).toHaveText(['Not delivered', 'Sent 6']);
+    await expect(page.locator('#sends-body .sends-row')).toHaveCount(7);
     // The layout's height: the box on screen still grows with the dialog's opening animation
     const height = () => content.evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
     const before = await height();
     release();
     await expect(page.locator('#sends-body .skeleton')).toHaveCount(0);
-    await expect(page.locator('#sends-body .sends-title')).toContainText('Голодные игры');
+    await expect(page.locator('#sends-body .sends-title').first()).toContainText('Голодные игры');
     const after = await height();
     // Within a line: a reason may wrap one line more or less than its stand-in
     expect(Math.abs(after - before)).toBeLessThanOrEqual(20);

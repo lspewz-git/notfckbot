@@ -24,7 +24,7 @@ mock.method(tmdb, 'getSeasonDetails', async (id, season) => {
     return SEASONS[season];
 });
 
-const { ChatEvent, Chat, SendFailure } = require('../../src/db');
+const { ChatEvent, Chat, SendFailure, SentNotification } = require('../../src/db');
 const events = require('../../src/chat-events');
 const aired = require('../../src/cron/aired-episodes');
 const { computeStats, leader } = require('../../src/chat-stats');
@@ -38,6 +38,8 @@ mock.method(Chat, 'findAll', async () => []);
 // A send that fails for good is kept for the dashboard (src/send-failures.js): not here
 mock.method(SendFailure, 'create', async () => {});
 mock.method(SendFailure, 'destroy', async () => 0);
+mock.method(SentNotification, 'create', async () => {});
+mock.method(SentNotification, 'destroy', async () => 0);
 
 describe('aired episodes by month', () => {
     test('stored as text and read back the same', () => {

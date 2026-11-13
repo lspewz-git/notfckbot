@@ -11,8 +11,7 @@ const { isLeft } = require('../bot-status');
 const { isQuietNow, hourIn } = require('../quiet');
 const { todayIn, weekStart } = require('../calendar');
 const { calendarView } = require('../bot/calendar');
-const stats = require('../stats-log');
-const { recordFailure } = require('../send-failures');
+const { recordFailure, recordSent } = require('../send-failures');
 const { log } = require('../log');
 
 const DIGEST_HOUR = 10;
@@ -71,12 +70,14 @@ async function sendDigests(bot, now = new Date()) {
                     });
                     // Telegram or the network down: the next round tries again
                     if (result.status === 'failed') continue;
-                    if (result.status === 'sent') stats.count('sent');
+                    const about = kind === 'w' ? 'Weekly digest' : 'Monthly digest';
+                    if (result.status === 'sent')
+                        recordSent({ chatId: result.chatId || chat.id, about, kind: `digest_${kind}` }, now);
                     else {
                         recordFailure(
                             {
                                 chatId: chat.id,
-                                about: kind === 'w' ? 'Weekly digest' : 'Monthly digest',
+                                about,
                                 status: result.status,
                                 error: result.error
                             },

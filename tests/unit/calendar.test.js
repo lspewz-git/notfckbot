@@ -6,7 +6,7 @@ const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const tmdb = require('../../src/api/tmdb');
-const { Subscription, Watchlist, Chat, SendFailure } = require('../../src/db');
+const { Subscription, Watchlist, Chat, SendFailure, SentNotification } = require('../../src/db');
 
 // --- TMDB: one series, seasons 1 and 2; season 2 airs weekly across October 2026 ---
 const SEASONS = {
@@ -427,6 +427,8 @@ describe('digests', () => {
         const kept = [];
         t.mock.method(SendFailure, 'create', async (fields) => kept.push(fields));
         t.mock.method(SendFailure, 'destroy', async () => 0);
+        t.mock.method(SentNotification, 'create', async () => {});
+        t.mock.method(SentNotification, 'destroy', async () => 0);
         const bot = {
             telegram: {
                 sendMessage: async () => {

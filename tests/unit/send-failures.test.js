@@ -6,10 +6,10 @@
 const { test, mock, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { Op } = require('sequelize');
-const { SendFailure } = require('../../src/db');
+const { SendFailure, SentNotification } = require('../../src/db');
 const stats = require('../../src/stats-log');
 const { log } = require('../../src/log');
-const { recordFailure, flushFailures, KEEP_DAYS } = require('../../src/send-failures');
+const { recordFailure, recordSent, flushFailures, KEEP_DAYS } = require('../../src/send-failures');
 
 afterEach(() => mock.restoreAll());
 
@@ -87,4 +87,27 @@ test("a row that can't be written is only logged: the count stands, nothing thro
     await recordFailure({ chatId: 7, status: 'rejected' });
     assert.deepEqual(counted, ['failed']);
     assert.match(lines[0], /Keeping a failed send for chat 7 failed: database down/);
+});
+
+test('what went out: counted at once, its row kept with its kind and episode, cut to size', async () => {
+    const rows = [];
+    mock.method(SentNotification, 'create', async (fields) => rows.push(fields));
+    mock.method(SentNotification, 'destroy', async () => 0);
+    const counted = [];
+    mock.method(stats, 'count', (field, n) => counted.push([field, n]));
+
+    const now = new Date('2026-10-13T21:30:00Z');
+    await recordSent({ chatId: -100, about: 'A'.repeat(300), kind: 'episode', season: 2, episode: 8 }, now);
+    await recordSent({ chatId: -100, about: '3 notifications held overnight', kind: 'held', count: 3 }, now);
+    assert.deepEqual(counted, [
+        ['sent', 1],
+        ['sent', 3]
+    ]);
+    assert.deepEqual(
+        rows.map((r) => [r.day, r.about.length, r.kind, r.season, r.episode, r.count]),
+        [
+            ['2026-10-14', 255, 'episode', 2, 8, 1],
+            ['2026-10-14', 30, 'held', null, null, 3]
+        ]
+    );
 });

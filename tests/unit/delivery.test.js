@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 
 // The run's status file (src/cron/status.js) in a temporary place, not the project's
 process.env.CRON_STATUS_FILE = require('path').join(require('os').tmpdir(), `delivery-test-${process.pid}.json`);
-const { PendingMessage, Chat, SendFailure } = require('../../src/db');
+const { PendingMessage, Chat, SendFailure, SentNotification } = require('../../src/db');
 const { deliver } = require('../../src/delivery');
 const { notify, flushPending, MAX_ATTEMPTS } = require('../../src/cron/outbox');
 const { notifyNewEpisodes } = require('../../src/cron');
@@ -205,6 +205,8 @@ describe('the outbox', () => {
         mock.method(PendingMessage, 'create', async (fields) => queued.push(fields));
         mock.method(SendFailure, 'create', async (fields) => failures.push(fields));
         mock.method(SendFailure, 'destroy', async () => 0);
+        mock.method(SentNotification, 'create', async () => {});
+        mock.method(SentNotification, 'destroy', async () => 0);
         // Each test starts like a new check: nothing queued, Telegram presumed reachable
         mock.method(PendingMessage, 'findAll', async () => []);
         await flushPending(scriptedBot());

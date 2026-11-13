@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { Chat, HeldNotification, SendFailure } = require('../../src/db');
+const { Chat, HeldNotification, SendFailure, SentNotification } = require('../../src/db');
 const { ZONES, isQuietNow, quietLabel, hourIn } = require('../../src/quiet');
 const { notify, flushPending } = require('../../src/cron/outbox');
 const { releaseHeld, heldView } = require('../../src/cron/held');
@@ -229,6 +229,8 @@ describe('the list after quiet hours', () => {
         const kept = [];
         t.mock.method(SendFailure, 'create', async (fields) => kept.push(fields));
         t.mock.method(SendFailure, 'destroy', async () => 0);
+        t.mock.method(SentNotification, 'create', async () => {});
+        t.mock.method(SentNotification, 'destroy', async () => 0);
         const bot = {
             telegram: {
                 sendMessage: async () => {

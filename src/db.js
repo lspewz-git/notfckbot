@@ -12,6 +12,7 @@ const RecapLook = require('./models/RecapLook');
 const AlertRecipient = require('./models/AlertRecipient');
 const AlertLog = require('./models/AlertLog');
 const SendFailure = require('./models/SendFailure');
+const SentNotification = require('./models/SentNotification');
 const AccountSession = require('./models/AccountSession');
 const AccountDevice = require('./models/AccountDevice');
 const LoginLink = require('./models/LoginLink');
@@ -51,6 +52,7 @@ module.exports = {
     AlertRecipient,
     AlertLog,
     SendFailure,
+    SentNotification,
     AccountSession,
     AccountDevice,
     LoginLink,

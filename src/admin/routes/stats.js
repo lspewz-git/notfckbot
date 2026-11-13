@@ -1,6 +1,15 @@
 /** Dashboard figures: counters, most popular series, the update check, upcoming releases. */
 const { Op } = require('sequelize');
-const { Chat, Series, Subscription, Watchlist, DailyStat, SendFailure, PendingMessage } = require('../../db');
+const {
+    Chat,
+    Series,
+    Subscription,
+    Watchlist,
+    DailyStat,
+    SendFailure,
+    SentNotification,
+    PendingMessage
+} = require('../../db');
 const { todayIn, addDays, weekStart, addMonths } = require('../../calendar');
 const { DEFAULT_ZONE } = require('../../quiet');
 const { unwritten } = require('../../stats-log');
@@ -129,7 +138,7 @@ const SENDS_QUERY = z.object({
 
 /**
  * A day of the notifications chart, clicked: what didn't reach its chat and why (SendFailure),
- * and with today, what waits in the queue for the next check (PendingMessage).
+ * what did (SentNotification), and with today, what waits in the queue for the next check (PendingMessage).
  */
 router.get('/api/stats/sends', async (req, res) => {
     const query = valid(SENDS_QUERY, req.query, res);
@@ -137,8 +146,15 @@ router.get('/api/stats/sends', async (req, res) => {
     try {
         // The queue is now, not that day's: it goes with today
         const now = query.day === todayIn(DEFAULT_ZONE) || query.latest === '1';
-        const [failures, queue, first] = await Promise.all([
+        const [failures, sent, queue, first, firstSent] = await Promise.all([
             SendFailure.findAll({ where: { day: query.day }, order: [['createdAt', 'ASC']] }),
+            SentNotification.findAll({
+                where: { day: query.day },
+                order: [
+                    ['createdAt', 'ASC'],
+                    ['id', 'ASC']
+                ]
+            }),
             now
                 ? PendingMessage.findAll({
                       attributes: ['chatId', 'about', 'error', 'attempts', 'createdAt'],
@@ -146,9 +162,10 @@ router.get('/api/stats/sends', async (req, res) => {
                   })
                 : [],
             // The oldest kept: a day before it has counts but no rows
-            SendFailure.min('day')
+            SendFailure.min('day'),
+            SentNotification.min('day')
         ]);
-        const ids = [...new Set([...failures, ...queue].map((r) => String(r.chatId)))];
+        const ids = [...new Set([...failures, ...sent, ...queue].map((r) => String(r.chatId)))];
         const chats = ids.length ? await Chat.findAll({ where: { id: ids }, attributes: ['id', 'username'] }) : [];
         const names = new Map(chats.map((c) => [String(c.id), c.username || null]));
         const chat = (id) => ({ chatId: String(id), chat: names.get(String(id)) || null });
@@ -164,6 +181,17 @@ router.get('/api/stats/sends', async (req, res) => {
                 tries: f.tries,
                 since: f.since,
                 at: f.createdAt
+            })),
+            // The oldest kept: a day before it has a sent count but no rows
+            sentKeptSince: firstSent || null,
+            sent: sent.map((s) => ({
+                ...chat(s.chatId),
+                about: s.about,
+                kind: s.kind,
+                season: s.season,
+                episode: s.episode,
+                count: s.count,
+                at: s.createdAt
             })),
             queued: queue.map((m) => ({
                 ...chat(m.chatId),

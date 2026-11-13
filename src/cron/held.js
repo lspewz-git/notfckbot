@@ -8,8 +8,7 @@ const { Markup } = require('telegraf');
 const { HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
-const stats = require('../stats-log');
-const { recordFailure } = require('../send-failures');
+const { recordFailure, recordSent } = require('../send-failures');
 const { log } = require('../log');
 
 // Telegram's limit is 4096 characters; the lines carry HTML, so stop well before it
@@ -66,11 +65,12 @@ async function releaseHeld(bot, now = new Date()) {
             const result = await deliver(bot, chatId, text, { extra: keyboard });
             // A temporary failure: try again on the next round
             if (result.status === 'failed') continue;
+            const about = items.length === 1 ? items[0].label : `${items.length} notifications held overnight`;
             if (result.status !== 'sent') {
                 recordFailure(
                     {
                         chatId,
-                        about: items.length === 1 ? items[0].label : `${items.length} notifications held overnight`,
+                        about,
                         status: result.status,
                         error: result.error,
                         count: items.length
@@ -80,7 +80,7 @@ async function releaseHeld(bot, now = new Date()) {
                 log.error(`[Quiet] List for chat ${chatId} dropped (${result.status}): ${result.error}`);
             } else {
                 log.info(`[Quiet] Sent chat ${chatId} the ${items.length} notification(s) held overnight`);
-                stats.count('sent', items.length);
+                recordSent({ chatId: result.chatId || chatId, about, kind: 'held', count: items.length }, now);
             }
             await HeldNotification.update({ sentAt: now }, { where: { id: items.map((i) => i.id) } });
         }

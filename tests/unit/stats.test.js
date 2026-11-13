@@ -8,7 +8,16 @@ const { test, describe, mock, beforeEach, before, after } = require('node:test')
 const assert = require('node:assert/strict');
 const express = require('express');
 
-const { DailyStat, Subscription, Chat, Series, Watchlist, SendFailure, PendingMessage } = require('../../src/db');
+const {
+    DailyStat,
+    Subscription,
+    Chat,
+    Series,
+    Watchlist,
+    SendFailure,
+    SentNotification,
+    PendingMessage
+} = require('../../src/db');
 const stats = require('../../src/stats-log');
 
 describe('counting by day', () => {
@@ -91,7 +100,7 @@ describe('the API', () => {
         assert.equal(res.countingSince, today);
     });
 
-    test("a day's details: what didn't go out with its chat's name; the queue only with today", async () => {
+    test("a day's details: what went out and what didn't, with its chat's name; the queue only with today", async () => {
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date());
         const asked = [];
         mock.method(SendFailure, 'findAll', async ({ where }) => {
@@ -110,13 +119,44 @@ describe('the API', () => {
             ];
         });
         mock.method(SendFailure, 'min', async () => '2026-10-30');
+        mock.method(SentNotification, 'findAll', async ({ where }) => {
+            asked.push(`sent ${where.day}`);
+            return [
+                {
+                    chatId: -200,
+                    about: 'Фоллаут',
+                    kind: 'episode',
+                    season: 2,
+                    episode: 8,
+                    count: 1,
+                    createdAt: new Date('2026-10-20T06:00:00Z')
+                }
+            ];
+        });
+        mock.method(SentNotification, 'min', async () => '2026-11-13');
         mock.method(PendingMessage, 'findAll', async () => [
             { chatId: -100, about: 'Темная материя', error: 'x', attempts: 1, createdAt: new Date() }
         ]);
-        mock.method(Chat, 'findAll', async () => [{ id: -100, username: 'miners_otdihayt' }]);
+        mock.method(Chat, 'findAll', async () => [
+            { id: -100, username: 'miners_otdihayt' },
+            { id: -200, username: 'lspewz' }
+        ]);
 
         const past = await get('/api/stats/sends?day=2026-10-20');
-        assert.deepEqual(asked, ['2026-10-20']);
+        assert.deepEqual(asked, ['2026-10-20', 'sent 2026-10-20']);
+        assert.deepEqual(past.sent, [
+            {
+                chatId: '-200',
+                chat: 'lspewz',
+                about: 'Фоллаут',
+                kind: 'episode',
+                season: 2,
+                episode: 8,
+                count: 1,
+                at: '2026-10-20T06:00:00.000Z'
+            }
+        ]);
+        assert.equal(past.sentKeptSince, '2026-11-13');
         assert.equal(past.failed[0].chat, 'miners_otdihayt');
         assert.equal(past.failed[0].chatId, '-100');
         assert.deepEqual([past.failed[0].status, past.failed[0].tries], ['gave_up', 8]);
