@@ -177,4 +177,34 @@ async function withTvmazeQuick(details, zoneId = DEFAULT_ZONE) {
     }
 }
 
-module.exports = { timeOf, releaseDay, outAt, dayOnly, withTvmaze, withTvmazeQuick, dayIn, MAX_SHIFT_DAYS };
+/**
+ * The chat's day of a series row's next episode. The row keeps it by the bot's zone
+ * (`next_episode_date`, from withTvmaze()); where TVmaze's cached times know the episode, its
+ * moment in the chat's zone instead. Cache only: never asks TVmaze.
+ * @param {{ tmdb_id: string, next_episode_date?: string | null, next_episode_season?: number | null,
+ *   next_episode_number?: number | null }} series
+ * @param {string | null | undefined} zoneId
+ */
+function nextDayIn(series, zoneId) {
+    const date = series.next_episode_date;
+    if (!date) return null;
+    const time = timeOf(
+        tvmaze.cachedAirTimes(series.tmdb_id),
+        series.next_episode_season,
+        series.next_episode_number,
+        date
+    );
+    return time ? releaseDay(time, zoneId) : date;
+}
+
+module.exports = {
+    timeOf,
+    releaseDay,
+    outAt,
+    dayOnly,
+    withTvmaze,
+    withTvmazeQuick,
+    nextDayIn,
+    dayIn,
+    MAX_SHIFT_DAYS
+};

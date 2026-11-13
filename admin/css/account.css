@@ -12,7 +12,7 @@ body.view-mine #actions-btn,
 body.view-mine #about-btn,
 body.view-mine .rail-bottom,
 body.view-mine .tabbar .tab-item:not(.tab-mine),
-body.system-account #more-modal .action-row[data-section='my-subs'] {
+body.system-account #more-modal .more-personal {
     display: none;
 }
 
@@ -1223,26 +1223,30 @@ button.search-result-open:hover .mine-row-title {
 
 /* The choices as the redesign's sheet (pick-sheet.js adds .app-sheet): a centred title over one
    rounded list, the current choice ticked in the accent; the admin chat picker keeps its list */
-#pick-modal.app-sheet .modal-content {
+#pick-modal.app-sheet .modal-content,
+#more-modal .modal-content {
     display: flex;
     flex-direction: column;
     overflow: visible;
 }
 
 @media (min-width: 641px) {
-    #pick-modal.app-sheet .modal-content {
+    #pick-modal.app-sheet .modal-content,
+    #more-modal .modal-content {
         border-radius: var(--radius-sheet);
     }
 }
 
-#pick-modal .pick-header {
+#pick-modal .pick-header,
+#more-modal .pick-header {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr) 44px;
     align-items: start;
     margin-bottom: var(--space-4);
 }
 
-#pick-modal .pick-header h3 {
+#pick-modal .pick-header h3,
+#more-modal .pick-header h3 {
     grid-column: 2;
     margin: var(--space-2) 0;
     padding: 0;
@@ -1253,11 +1257,47 @@ button.search-result-open:hover .mine-row-title {
     overflow-wrap: anywhere;
 }
 
-#pick-modal .pick-header .sheet-close {
+#pick-modal .pick-header .sheet-close,
+#more-modal .pick-header .sheet-close {
     position: absolute;
     grid-column: 3;
     grid-row: 1;
     align-self: start;
+}
+
+/* More (13.11 mockup): the reference design's groups on the sheet, raised one surface above it */
+#more-modal .group-list {
+    background: var(--surface-2);
+}
+
+/* --tile is set against --surface-1; on these raised groups a sheet's own icon surface shows */
+#more-modal .row-tile {
+    background: var(--surface-3);
+}
+
+#more-modal .group-title {
+    margin-top: var(--space-4);
+}
+
+#more-modal .more-about {
+    margin-top: var(--space-4);
+}
+
+#more-modal .group-row:focus-visible {
+    outline-offset: -2px;
+}
+
+@media (hover: hover) {
+    #more-modal .group-row:hover {
+        background: var(--fill-hover);
+    }
+}
+
+#more-modal .row-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
 }
 
 #pick-modal .pick-admin {

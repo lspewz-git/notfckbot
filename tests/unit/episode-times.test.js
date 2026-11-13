@@ -20,7 +20,8 @@ mock.method(tmdb, 'getSeasonDetailsCached', async (id, season) => {
     return { episodes: SEASON.map(([air_date, episode_number, name]) => ({ air_date, episode_number, name })) };
 });
 
-const { timeOf, releaseDay, outAt, withTvmaze } = require('../../src/episode-times');
+const tvmaze = require('../../src/api/tvmaze');
+const { timeOf, releaseDay, outAt, withTvmaze, nextDayIn } = require('../../src/episode-times');
 
 const at = (iso) => Date.parse(iso);
 const time = (iso, runtime = 50) => ({ stamp: at(iso), date: iso.slice(0, 10), runtime });
@@ -145,5 +146,28 @@ describe("TMDB's details by TVmaze's times", () => {
             next_episode_to_air: { season_number: 1, episode_number: 1 }
         };
         assert.equal(await withTvmaze(other, times), other);
+    });
+});
+
+describe("a series row's next episode in a chat's zone", () => {
+    const row = { tmdb_id: 'tv_50', next_episode_date: '2026-11-13', next_episode_season: 1, next_episode_number: 3 };
+
+    test("TVmaze's cached moment in the chat's zone; the stored day without it", () => {
+        // 21:00 UTC on the 12th: the 13th in Moscow (stored), still the 12th in Kaliningrad
+        const times = { '1:3': time('2026-11-12T21:00:00Z') };
+        mock.method(tvmaze, 'cachedAirTimes', () => times);
+        try {
+            assert.equal(nextDayIn(row, 'Europe/Kaliningrad'), '2026-11-12');
+            assert.equal(nextDayIn(row, 'Asia/Vladivostok'), '2026-11-13');
+        } finally {
+            tvmaze.cachedAirTimes.mock.restore();
+        }
+        mock.method(tvmaze, 'cachedAirTimes', () => undefined);
+        try {
+            assert.equal(nextDayIn(row, 'Europe/Kaliningrad'), '2026-11-13');
+            assert.equal(nextDayIn({ ...row, next_episode_date: null }, 'Europe/Kaliningrad'), null);
+        } finally {
+            tvmaze.cachedAirTimes.mock.restore();
+        }
     });
 });

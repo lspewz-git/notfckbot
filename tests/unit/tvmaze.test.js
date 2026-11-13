@@ -82,7 +82,92 @@ test('the update check asks for a fresh schedule; when TVmaze fails it keeps the
     assert.deepEqual(asked, ['/shows/20/episodes']);
     asked = stub({ '/shows/20/episodes': Object.assign(new Error('503'), { response: { status: 503 } }) });
     assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_120', ids)), ['1:2'], 'the cached one');
-    assert.equal(await tvmaze.airTimesForCheck('tv_121', { imdb: 'tt21', tvdb: null }), null, 'paused, nothing cached');
+    assert.equal(await tvmaze.airTimesForCheck('tv_121', { imdb: 'tt21', tvdb: null }), null, 'nothing cached');
+});
+
+test("one show's list failing pauses nothing; a second address failing in a row pauses TVmaze", async () => {
+    const fail = Object.assign(new Error('timeout of 15000ms exceeded'), { code: 'ECONNABORTED' });
+    // A soap whose huge list times out every check
+    const asked = stub({
+        '/lookup/shows?imdb=tt40': { id: 40 },
+        '/shows/40/episodes': fail,
+        '/lookup/shows?imdb=tt41': { id: 41 },
+        '/shows/41/episodes': [{ season: 1, number: 1, airdate: '2099-01-01' }],
+        '/lookup/shows?imdb=tt42': fail
+    });
+    assert.equal(await tvmaze.airTimesForCheck('tv_140', { imdb: 'tt40', tvdb: null }), null);
+    assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_141', { imdb: 'tt41', tvdb: null })), ['1:1']);
+    // The same soap again, then another address: two different failures in a row
+    assert.equal(await tvmaze.airTimesForCheck('tv_140', { imdb: 'tt40', tvdb: null }), null);
+    assert.equal(await tvmaze.airTimesForCheck('tv_142', { imdb: 'tt42', tvdb: null }), null);
+    const count = asked.length;
+    await assert.rejects(tvmaze.airTimes('tv_143', { imdb: 'tt43', tvdb: null }), /paused/);
+    assert.equal(asked.length, count, 'paused: nothing asked');
+});
+
+test('lookups of two different series failing in a row pause TVmaze (same path, other params)', async () => {
+    const down = Object.assign(new Error('503'), { response: { status: 503 } });
+    const asked = stub({ '/lookup/shows?imdb=tt80': down, '/lookup/shows?imdb=tt81': down });
+    await assert.rejects(tvmaze.airTimes('tv_180', { imdb: 'tt80', tvdb: null }));
+    await assert.rejects(tvmaze.airTimes('tv_181', { imdb: 'tt81', tvdb: null }));
+    const count = asked.length;
+    await assert.rejects(tvmaze.airTimes('tv_182', { imdb: 'tt82', tvdb: null }), /paused/);
+    assert.equal(asked.length, count);
+});
+
+test('one call of the check ends with its budget, even stuck behind a long queue', async () => {
+    const ids = { imdb: 'tt90', tvdb: null };
+    stub({
+        '/lookup/shows?imdb=tt90': { id: 90 },
+        '/shows/90/episodes': [{ season: 1, number: 1, airdate: '2099-01-01' }]
+    });
+    await tvmaze.airTimes('tv_190', ids);
+    // Every request hangs: the call would wait behind them for ever
+    mock.method(tvmaze.client, 'get', () => new Promise(() => {}));
+    const budget = tvmaze.checkBudget(50);
+    const started = Date.now();
+    assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_190', ids, budget)), ['1:1'], 'the cached one');
+    assert.ok(Date.now() - started < 1000);
+    assert.ok(budget.left <= 0);
+});
+
+test("the check's TVmaze budget: once spent, cached times at once and nothing asked", async () => {
+    const ids = { imdb: 'tt50', tvdb: null };
+    stub({
+        '/lookup/shows?imdb=tt50': { id: 50 },
+        '/shows/50/episodes': [{ season: 1, number: 1, airdate: '2099-01-01' }]
+    });
+    await tvmaze.airTimes('tv_150', ids);
+    const asked = stub({});
+    const budget = tvmaze.checkBudget(0);
+    assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_150', ids, budget)), ['1:1'], 'cached');
+    assert.equal(await tvmaze.airTimesForCheck('tv_151', { imdb: 'tt51', tvdb: null }, budget), null);
+    assert.deepEqual(asked, []);
+    // Time spent waiting comes off the budget
+    const left = tvmaze.checkBudget(60000);
+    stub({ '/shows/50/episodes': [] });
+    await tvmaze.airTimesForCheck('tv_150', ids, left);
+    assert.ok(left.left <= 60000 && left.left > 0);
+});
+
+test('a schedule long past its lifetime is not used any more', async () => {
+    const ids = { imdb: 'tt60', tvdb: null };
+    stub({
+        '/lookup/shows?imdb=tt60': { id: 60 },
+        '/shows/60/episodes': [{ season: 1, number: 1, airdate: '2099-01-01' }]
+    });
+    await tvmaze.airTimes('tv_160', ids);
+    const start = Date.now();
+    let now = start + 8 * 3600e3;
+    const clock = mock.method(Date, 'now', () => now);
+    try {
+        // Past its lifetime (two update intervals) but within a day more: still the fallback
+        assert.deepEqual(Object.keys(tvmaze.cachedAirTimes('tv_160')), ['1:1']);
+        now = start + 40 * 3600e3;
+        assert.equal(tvmaze.cachedAirTimes('tv_160'), undefined);
+    } finally {
+        clock.mock.restore();
+    }
 });
 
 test('a failure is not kept, and pauses TVmaze: nothing is asked until the pause ends', async () => {
@@ -162,4 +247,18 @@ test('a long queue: views add no requests of their own (the update check is not 
     assert.equal(await tvmaze.airTimesQuick('tv_35', { imdb: 'tt35', tvdb: null }, pending()), null);
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(asked, before, 'nothing queued for the view');
+});
+
+test('a patient deadline (a digest) queues behind a long queue rather than give up', async () => {
+    mock.method(tvmaze.client, 'get', () => new Promise(() => {}));
+    for (const n of [71, 72, 73, 74]) tvmaze.airTimes(`tv_${n}`, { imdb: `tt${n}`, tvdb: null }).catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    let settled = false;
+    tvmaze.airTimesQuick('tv_75', { imdb: 'tt75', tvdb: null }, { ...pending(), patient: true }).then(() => {
+        settled = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(settled, false, 'waiting in the queue, not given up');
+    const impatient = await tvmaze.airTimesQuick('tv_76', { imdb: 'tt76', tvdb: null }, pending());
+    assert.equal(impatient, null, 'an ordinary view gives up at once');
 });

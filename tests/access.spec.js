@@ -190,7 +190,9 @@ test('the system account has no Telegram chat pages or view switch', async ({ pa
     if (!isMobile) await expect(page.locator('.view-switch')).toBeHidden();
     else {
         await page.locator('.tab-item[data-open="more-modal"]').click();
-        await expect(page.locator('#more-modal .action-row[data-section="my-subs"]')).toBeHidden();
+        // The system account has no chats: the whole My account group goes, not just its row
+        await expect(page.locator('#more-modal .more-personal')).toBeHidden();
+        await expect(page.locator('#more-modal [data-section="my-calendar"]')).toBeHidden();
     }
     expect(panel.account.sent.some((r) => r.path === '/api/account/chats')).toBe(false);
 });

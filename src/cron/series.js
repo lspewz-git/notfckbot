@@ -146,6 +146,8 @@ const notifyNewEpisodes = async (bot, item, data) => {
 };
 
 const checkSeriesUpdates = async (bot, allSeries) => {
+    // TVmaze's share of this check is capped: past it, the times already cached
+    const budget = tvmaze.checkBudget();
     for (const item of allSeries) {
         tally('series');
         try {
@@ -155,7 +157,7 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             if (!tmdbData) continue;
             // The last aired and next episode by TVmaze's air times where it knows them, so an
             // episode is announced once it has aired, not once TMDB moves it (≈ a day later)
-            const times = await tvmaze.airTimesForCheck(item.tmdb_id, tvmaze.externalsOf(tmdbData));
+            const times = await tvmaze.airTimesForCheck(item.tmdb_id, tvmaze.externalsOf(tmdbData), budget);
             const data = await withTvmaze(tmdbData, times);
 
             // Store the status first so a failure in the episode step below can't hold up the

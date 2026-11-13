@@ -18,8 +18,8 @@ const SECTIONS = [
     {
         id: 'logs',
         label: 'Logs',
-        aria: 'Activity Logs',
-        moreLabel: 'Activity Logs',
+        aria: 'Activity logs',
+        moreLabel: 'Activity logs',
         icon: 'file-text',
         hint: 'What the bot has been doing'
     },
@@ -52,7 +52,22 @@ const PERSONAL_ENTRY = {
     id: DEFAULT_PERSONAL_SECTION,
     label: 'My account',
     icon: 'bookmark',
-    hint: 'Subscriptions, calendar and settings of your chats'
+    hint: 'Subscriptions, calendar and chat settings'
+};
+
+// The More sheet's two rows that open a dialog rather than a section
+const ACTIONS_ENTRY = {
+    open: 'actions-modal',
+    label: 'Actions',
+    icon: 'zap',
+    hint: 'Run an update check, send a broadcast'
+};
+const ABOUT_ENTRY = {
+    open: 'about-modal',
+    action: 'about',
+    label: 'About',
+    icon: 'info',
+    hint: 'The version running on the server'
 };
 
 const icon = (name) =>
@@ -73,13 +88,17 @@ function item(section, tab = false) {
     );
 }
 
-function moreItem(section) {
+/** A row of the More sheet: the reference design's group row (tile, name, hint, chevron) */
+function moreItem(entry) {
+    const target = entry.open
+        ? `data-open="${entry.open}"${entry.action ? ` data-action="${entry.action}"` : ''}`
+        : `data-section="${entry.id}"`;
     return (
-        `<button class="action-row" data-section="${section.id}" data-close="more-modal">` +
-        `<span class="action-icon">${icon(section.icon)}</span><span class="action-text">` +
-        `<span class="action-title">${escapeHtml(section.moreLabel || section.label)}</span>` +
-        `<span class="action-desc">${escapeHtml(section.hint)}</span></span>` +
-        `<span class="action-chevron">${icon('chevron-right')}</span></button>`
+        `<li><button type="button" class="group-row more-row" ${target} data-close="more-modal">` +
+        `<span class="row-tile">${icon(entry.icon)}</span><span class="row-text">` +
+        `<span class="row-name">${escapeHtml(entry.moreLabel || entry.label)}</span>` +
+        `<span class="row-meta">${escapeHtml(entry.hint)}</span></span>` +
+        `<span class="row-chevron">${icon('chevron-right')}</span></button></li>`
     );
 }
 
@@ -102,7 +121,9 @@ export function setupNavigation() {
                 .map((s) => item(s, true))
                 .join('')
     );
-    $('more-modal')
-        .querySelector('.action-list')
-        .insertAdjacentHTML('afterbegin', [PERSONAL_ENTRY, ...overflow].map(moreItem).join(''));
+    // Three groups (the 13.11 mockup): your account; the admin sections, Actions after Tools; About
+    const admin = overflow.flatMap((s) => (s.id === 'tools' ? [s, ACTIONS_ENTRY] : [s]));
+    $('more-personal').innerHTML = moreItem(PERSONAL_ENTRY);
+    $('more-admin').innerHTML = admin.map(moreItem).join('');
+    $('more-about').innerHTML = moreItem(ABOUT_ENTRY);
 }

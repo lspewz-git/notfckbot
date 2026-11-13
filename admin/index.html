@@ -636,7 +636,7 @@
                     <!-- Logs Section -->
                     <section id="logs-section" class="section">
                         <header>
-                            <h1>Activity Logs</h1>
+                            <h1>Activity logs</h1>
                             <div class="log-filters">
                                 <button class="btn btn-ghost active" data-log-filter="all">All</button>
                                 <button class="btn btn-ghost" data-log-filter="error">Errors</button>
@@ -1936,42 +1936,21 @@
         </dialog>
 
         <!-- "More" sheet behind the tab bar: what doesn't fit in five tabs -->
-        <dialog id="more-modal" class="modal modal-sheet" aria-labelledby="more-title">
+        <dialog id="more-modal" class="modal modal-sheet app-sheet" aria-labelledby="more-title">
             <div class="modal-content modal-narrow">
-                <h3 id="more-title">More</h3>
-                <div class="action-list">
-                    <button class="action-row" data-close="more-modal" data-open="actions-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#zap" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">Actions</span>
-                            <span class="action-desc">Run an update check, send a broadcast</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
-                    </button>
-                    <button class="action-row" data-action="about" data-close="more-modal" data-open="about-modal">
-                        <span class="action-icon"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#info" /></svg
-                        ></span>
-                        <span class="action-text">
-                            <span class="action-title">About</span>
-                            <span class="action-desc">The version running on the server</span>
-                        </span>
-                        <span class="action-chevron"
-                            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <use href="/vendor/lucide.svg#chevron-right" /></svg
-                        ></span>
+                <div class="pick-header">
+                    <h3 id="more-title">More</h3>
+                    <button type="button" class="sheet-close" data-close="more-modal" aria-label="Close">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <use href="/vendor/lucide.svg#x" />
+                        </svg>
                     </button>
                 </div>
-                <button data-close="more-modal" class="modal-x" aria-label="Close">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/lucide.svg#x" /></svg>
-                </button>
+                <!-- Rows come from navigation.js: your account; the admin sections; About -->
+                <ul id="more-personal" class="group-list more-personal"></ul>
+                <h4 id="more-admin-title" class="group-title">Admin</h4>
+                <ul id="more-admin" class="group-list" aria-labelledby="more-admin-title"></ul>
+                <ul id="more-about" class="group-list more-about"></ul>
             </div>
         </dialog>
 

@@ -46,6 +46,9 @@ function calendarKeyboard(p, { back = true } = {}) {
     return Markup.inlineKeyboard([nav, ...viewRows(kind, { back })]);
 }
 
+// How long a digest waits for TVmaze's times in all
+const DIGEST_WAIT_MS = 30 * 1000;
+
 /**
  * The text and buttons for a chat.
  * @param {{ id: number | string, timezone?: string, buttons_mode?: string }} chat
@@ -53,7 +56,9 @@ function calendarKeyboard(p, { back = true } = {}) {
  */
 async function calendarView(chat, kind, offset, { digest = false, now = new Date() } = {}) {
     const p = period(kind, offset, chat.timezone, now);
-    const data = await periodItems(chat.id, p.from, p.to, { local: { chat } });
+    // A digest goes out once and nobody waits on it: TVmaze gets longer, so a digest after a
+    // restart (cold cache) shows the same days the calendar shows later
+    const data = await periodItems(chat.id, p.from, p.to, { local: { chat }, waitMs: digest ? DIGEST_WAIT_MS : 3000 });
     const back = !digest || canGoBack(chat);
     return { text: calendarText(p, data), keyboard: calendarKeyboard(p, { back }), empty: !data.items.length };
 }

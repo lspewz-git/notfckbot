@@ -28,6 +28,48 @@ test('My account in the admin More menu opens Calendar, the first personal tab',
     await expect(page.locator('#my-calendar-section')).toBeVisible();
 });
 
+test('More is the reference sheet: a centred title, a round Close and three groups of rows', async ({
+    page,
+    isMobile
+}) => {
+    test.skip(!isMobile, 'More opens from the phone tab bar');
+    await mockPanel(page);
+    await page.locator('.tab-item[data-open="more-modal"]').click();
+    const sheet = page.locator('#more-modal');
+    await sheet.locator('.modal-content').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const names = (list) => sheet.locator(`${list} .row-name`).allTextContents();
+    expect(await names('#more-personal')).toEqual(['My account']);
+    await expect(sheet.locator('#more-admin-title')).toHaveText('Admin');
+    expect(await names('#more-admin')).toEqual(['Released', 'Tools', 'Actions', 'Activity logs', 'Settings']);
+    expect(await names('#more-about')).toEqual(['About']);
+    const box = await sheet.evaluate((el) => {
+        const rect = (node) => node.getBoundingClientRect();
+        const frame = rect(el.querySelector('.modal-content'));
+        const title = rect(el.querySelector('#more-title'));
+        const close = rect(el.querySelector('.sheet-close'));
+        const rows = [...el.querySelectorAll('.more-row')].map((row) => rect(row));
+        const tiles = [...el.querySelectorAll('.more-row .row-tile')].map((tile) => rect(tile));
+        return {
+            titleOffset: Math.abs(title.left + title.width / 2 - (frame.left + frame.width / 2)),
+            close: [close.width, close.height],
+            rowMin: Math.min(...rows.map((r) => r.height)),
+            tiles: [...new Set(tiles.map((t) => `${t.width}x${t.height}`))],
+            inside: rows.every((r) => r.left >= frame.left && r.right <= frame.right + 0.5)
+        };
+    });
+    expect(box.titleOffset).toBeLessThan(1);
+    expect(box.close).toEqual([44, 44]);
+    expect(box.rowMin).toBeGreaterThanOrEqual(56);
+    expect(box.tiles).toEqual(['32x32']);
+    expect(box.inside).toBe(true);
+    // Rows still lead where they did: Actions opens its dialog, the Close button shuts the sheet
+    await sheet.locator('.sheet-close').click();
+    await expect(sheet).toBeHidden();
+    await page.locator('.tab-item[data-open="more-modal"]').click();
+    await sheet.locator('[data-open="actions-modal"]').click();
+    await expect(page.locator('#actions-modal')).toBeVisible();
+});
+
 test('a fresh personal launch opens Calendar, the first tab, and explicit links survive reload', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await expect(page.locator('#my-calendar-section')).toBeVisible();

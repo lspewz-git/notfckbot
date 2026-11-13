@@ -28,6 +28,9 @@ client.interceptors.request.use((config) => {
 const limits = { gapMs: 600, pauseMs: 2 * 60 * 1000 };
 let queue = Promise.resolve();
 let pausedUntil = 0;
+// The address of the last failed request while failures run on: one show's huge list timing out
+// is that show's trouble, not TVmaze's, so only a 429 or a second address failing pauses them all
+let lastFailedUrl = null;
 // Requests waiting or running: past a few, views (cards, calendars) add none of their own, so a
 // user opening card after card can't hold the update check up behind a long queue
 let pending = 0;
@@ -37,16 +40,31 @@ const VIEW_QUEUE_MAX = 4;
 function get(url, config) {
     let sent = false;
     pending += 1;
+    // The request as a whole: every lookup shares '/lookup/shows' and differs by its params
+    const target = config && config.params ? `${url} ${JSON.stringify(config.params)}` : url;
     const run = queue.then(async () => {
         if (Date.now() < pausedUntil) throw new Error('TVmaze paused after a failure');
         sent = true;
         try {
-            return await client.get(url, config);
+            const res = await client.get(url, config);
+            lastFailedUrl = null;
+            return res;
         } catch (err) {
-            // 404 is an answer (no such series); anything else means TVmaze isn't answering well
-            if (!err.response || err.response.status !== 404) {
+            const status = err.response ? err.response.status : null;
+            // 404 is an answer (no such series)
+            if (status === 404) {
+                lastFailedUrl = null;
+                throw err;
+            }
+            // Too many requests, or two different addresses failing in a row: TVmaze isn't answering
+            // well, so nothing more for a while. One address failing alone pauses nothing.
+            if (status === 429 || (lastFailedUrl !== null && lastFailedUrl !== target)) {
                 pausedUntil = Date.now() + limits.pauseMs;
-                log.warn(`[TVmaze] ${url} failed, paused for ${limits.pauseMs / 60000} min: ${err.message}`);
+                lastFailedUrl = null;
+                log.warn(`[TVmaze] ${target} failed, paused for ${limits.pauseMs / 60000} min: ${err.message}`);
+            } else {
+                lastFailedUrl = target;
+                log.warn(`[TVmaze] ${target} failed: ${err.message}`);
             }
             throw err;
         }
@@ -68,6 +86,7 @@ const roomForViews = () => pending < VIEW_QUEUE_MAX;
 function resetLimits({ gapMs = 0 } = {}) {
     limits.gapMs = gapMs;
     pausedUntil = 0;
+    lastFailedUrl = null;
     queue = Promise.resolve();
     pending = 0;
 }
@@ -167,23 +186,49 @@ async function airTimes(tmdbId, externals, { fresh = false } = {}) {
     return (await fetchFresh(schedules, showId)) || null;
 }
 
+// How long one update check may spend waiting for TVmaze in all (usually ~1 s a series): past it
+// the rest of the series go by the times already cached, so a slow TVmaze can't hold up films,
+// the next check or a restart
+const CHECK_BUDGET_MS = 2 * 60 * 1000;
+
+/** The TVmaze time allowance of one update check, shared by its airTimesForCheck() calls */
+const checkBudget = (ms = CHECK_BUDGET_MS) => ({ left: ms });
+
 /**
  * airTimes() for the update check: a fresh schedule, else the cached one when TVmaze doesn't
- * answer, else null. Never throws.
+ * answer, else null. Never throws. Once the check's budget is spent, the cached one at once.
+ * @param {{ left: number }} [budget] from checkBudget()
  */
-async function airTimesForCheck(tmdbId, externals) {
+async function airTimesForCheck(tmdbId, externals, budget = null) {
+    const cached = () => cachedAirTimes(tmdbId) || null;
+    if (budget && budget.left <= 0) return cached();
+    const started = Date.now();
+    const asked = airTimes(tmdbId, externals, { fresh: true }).catch(cached);
+    if (!budget) return asked;
+    // One call can't outlast the budget either: waiting behind a long queue (the start's warming,
+    // digests) ends with the budget, and the request stays queued for whoever asks next
+    let timer;
+    const over = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(cached()), budget.left);
+    });
     try {
-        return await airTimes(tmdbId, externals, { fresh: true });
-    } catch {
-        return cachedAirTimes(tmdbId) || null;
+        return await Promise.race([asked, over]);
+    } finally {
+        clearTimeout(timer);
+        budget.left -= Date.now() - started;
     }
 }
+
+// A schedule older than its lifetime by this much isn't used any more: a fortnight-old one may have
+// lost a moved episode. The update check refreshes the tracked series every few hours.
+const STALE_MAX_MS = DAY_MS;
 
 /** What the caches already hold for a series, without asking: times, null (not on TVmaze) or undefined */
 function cachedAirTimes(tmdbId) {
     const showId = showIds.peek(tmdbId, { allowStale: true });
     if (showId === NOT_FOUND) return null;
-    return showId ? schedules.peek(showId, { allowStale: true }) : undefined;
+    if (!showId || schedules.getRemainingTTL(showId) < -STALE_MAX_MS) return undefined;
+    return schedules.peek(showId, { allowStale: true });
 }
 
 /**
@@ -198,12 +243,17 @@ async function airTimesQuick(tmdbId, externals, deadline) {
         airTimes(tmdbId, externals).catch(() => {});
         return cached;
     }
-    if (!hasIds(externals) || deadline.passed() || !roomForViews()) return null;
+    if (!hasIds(externals) || deadline.passed() || (!deadline.patient && !roomForViews())) return null;
     return Promise.race([airTimes(tmdbId, externals).catch(() => null), deadline.promise.then(() => null)]);
 }
 
-/** The shared deadline for one view; cancel it when the view is done */
-function viewDeadline(ms = 3000) {
+/**
+ * The shared deadline for one view; cancel it when the view is done.
+ * @param {number} [ms]
+ * @param {{ patient?: boolean }} [options] patient: queue behind others rather than give up (a digest
+ *   that goes out once, not a view someone is waiting for)
+ */
+function viewDeadline(ms = 3000, { patient = false } = {}) {
     let timer;
     let passed = false;
     const promise = new Promise((resolve) => {
@@ -212,7 +262,7 @@ function viewDeadline(ms = 3000) {
             resolve();
         }, ms);
     });
-    return { promise, passed: () => passed, cancel: () => clearTimeout(timer) };
+    return { promise, passed: () => passed, cancel: () => clearTimeout(timer), patient };
 }
 
 /**
@@ -226,6 +276,7 @@ function warm(tmdbId, externals) {
 module.exports = {
     airTimes,
     airTimesForCheck,
+    checkBudget,
     airTimesQuick,
     cachedAirTimes,
     viewDeadline,

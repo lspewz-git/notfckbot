@@ -290,10 +290,11 @@ async function seriesEpisodes(series, from, to, local = null) {
 /**
  * Everything of a chat's in the period, by date, and how many series TMDB didn't answer for.
  * `local`: episodes on the chat's days they come out (seriesEpisodes); without it, TMDB's days.
- * @param {{ digitalAlerts?: boolean, local?: { chat: { timezone?: string | null } } | null }} [options]
+ * @param {{ digitalAlerts?: boolean, local?: { chat: { timezone?: string | null } } | null, waitMs?: number }} [options]
+ *   waitMs: how long the whole view waits for TVmaze (3 s for one someone opened)
  * @returns {Promise<{ items: object[], failed: number }>}
  */
-async function periodItems(chatId, from, to, { digitalAlerts = false, local = null } = {}) {
+async function periodItems(chatId, from, to, { digitalAlerts = false, local = null, waitMs = 3000 } = {}) {
     const [subs, films] = await Promise.all([
         Subscription.findAll({ where: { chatId }, include: [{ model: Series }] }),
         Watchlist.findAll({ where: { chatId } })
@@ -301,7 +302,8 @@ async function periodItems(chatId, from, to, { digitalAlerts = false, local = nu
     const series = subs.map((s) => s.Series).filter(Boolean);
     let failed = 0;
     // One wait for TVmaze for the whole view, not one per series: it may not answer at all
-    const deadline = local ? tvmaze.viewDeadline() : null;
+    // A longer wait (a digest, sent once): it also queues behind other requests rather than give up
+    const deadline = local ? tvmaze.viewDeadline(waitMs, { patient: waitMs > 3000 }) : null;
     const perSeries = await inBatches(series, (s) =>
         seriesEpisodes(s, from, to, local && { chat: local.chat, deadline }).catch(() => {
             failed += 1;

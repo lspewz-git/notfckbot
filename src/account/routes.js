@@ -9,6 +9,7 @@ const tmdb = require('../api/tmdb');
 const kinopoisk = require('../api/kinopoisk');
 const ops = require('../chat-ops');
 const { listPeriod, periodItems, todayIn } = require('../calendar');
+const { nextDayIn } = require('../episode-times');
 const history = require('../history');
 const { ZONES, PRESETS } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
@@ -482,8 +483,13 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
                 finished: isFinishedStatus(s.status),
                 lastSeason: s.last_season,
                 lastEpisode: s.last_episode,
+                // The next episode's day in the chat's zone, like the calendar (src/episode-times.js)
                 next: s.next_episode_date
-                    ? { date: s.next_episode_date, season: s.next_episode_season, episode: s.next_episode_number }
+                    ? {
+                          date: nextDayIn(s, chat && chat.timezone),
+                          season: s.next_episode_season,
+                          episode: s.next_episode_number
+                      }
                     : null,
                 genres: s.genres,
                 networks: s.networks,
