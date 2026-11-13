@@ -82,7 +82,8 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
  *   premieres?: { season: number, date?: string | null }[],
  *   date?: DateBlock | DateBlock[] | null
  * }} t
- * @typedef {{ label: string, value: string, when?: string, bell?: boolean, note?: string, icon?: string }} DateBlock
+ * @typedef {{ label: string, value: string, when?: string, bell?: boolean, note?: string, hint?: string, icon?: string }} DateBlock
+ *   `hint`: a quieter line under the note
  * @param {{ titleId?: string, notify?: string, extra?: string, error?: string, actions?: string, close?: string }} [options]
  *   `notify`: the Notify me markup; `extra`: anything between it and the actions; `close`: the modal id
  */
@@ -101,7 +102,7 @@ export function titleCard(
         .map(
             (d) =>
                 `<div class="tc-date">${icon(d.icon || 'calendar')}<span class="tc-date-text"><span class="tc-date-label">${escapeHtml(d.label)}</span>` +
-                `<span class="tc-date-value">${escapeHtml(d.value)}</span>${d.note ? `<span class="tc-date-label">${escapeHtml(d.note)}</span>` : ''}</span>` +
+                `<span class="tc-date-value">${escapeHtml(d.value)}</span>${d.note ? `<span class="tc-date-label">${escapeHtml(d.note)}</span>` : ''}${d.hint ? `<span class="tc-date-hint">${escapeHtml(d.hint)}</span>` : ''}</span>` +
                 (d.when || d.bell
                     ? `<span class="tc-date-when">${d.bell ? `<span class="tc-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${icon('bell')}</span>` : ''}${escapeHtml(d.when || '')}</span>`
                     : '') +

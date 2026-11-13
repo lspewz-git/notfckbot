@@ -14,7 +14,7 @@ const { plural } = require('./words');
 const { rowFilmDates } = require('./film-release');
 const { episodeArrivalDay } = require('./account/notify-day');
 const tvmaze = require('./api/tvmaze');
-const { timeOf, releaseDay, outAt, MAX_SHIFT_DAYS } = require('./episode-times');
+const { timeOf, releaseDay, outAt, dayOnly, MAX_SHIFT_DAYS } = require('./episode-times');
 
 // --- Dates as "YYYY-MM-DD" strings: TMDB's air dates are days, not moments ---
 
@@ -235,11 +235,12 @@ async function seriesEpisodes(series, from, to, local = null) {
             : null;
     const zoneId = local && local.chat ? local.chat.timezone : null;
     const dayOf = (season, ep) => {
-        if (!local) return { date: ep.air_date, outAt: null };
+        if (!local) return { date: ep.air_date, outAt: null, dayOnly: false };
         const time = timeOf(times, season, ep.episode_number, ep.air_date);
+        // dayOnly: the day is known, the hour isn't, so the message waits for the day to end
         return time
-            ? { date: releaseDay(time, zoneId), outAt: outAt(time) }
-            : { date: episodeArrivalDay(ep.air_date, local.chat), outAt: null };
+            ? { date: releaseDay(time, zoneId), outAt: outAt(time), dayOnly: dayOnly(time) }
+            : { date: episodeArrivalDay(ep.air_date, local.chat), outAt: null, dayOnly: false };
     };
     // TVmaze's day may be a day before TMDB's, the arrival up to a few after: TMDB's days around the period
     const askFrom = local ? addDays(from, -ARRIVAL_SLACK_DAYS) : from;
@@ -257,13 +258,14 @@ async function seriesEpisodes(series, from, to, local = null) {
             season,
             inPeriod.map(({ ep }) => ep)
         );
-        for (const { ep, date, outAt: out } of inPeriod) {
+        for (const { ep, date, outAt: out, dayOnly: untimed } of inPeriod) {
             const total = counts.get(season);
             const mark = ep.episode_number === 1 ? 'premiere' : total && ep.episode_number === total ? 'finale' : '';
             items.push({
                 date,
                 tmdbDate: ep.air_date,
                 outAt: out,
+                dayOnly: untimed,
                 kind: 'tv',
                 tmdbId: series.tmdb_id,
                 title: series.title,

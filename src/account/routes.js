@@ -662,7 +662,14 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
                     ruServices: i.ruServices,
                     cinemaRu: i.cinemaRu,
                     ...(i.kind === 'tv'
-                        ? { season: i.season, episode: i.episode, mark: i.mark, name: i.name }
+                        ? {
+                              season: i.season,
+                              episode: i.episode,
+                              mark: i.mark,
+                              name: i.name,
+                              // Only the day is known (streaming): the message waits for it to end
+                              dayOnly: Boolean(i.dayOnly)
+                          }
                         : {
                               event: i.event,
                               country: i.country,

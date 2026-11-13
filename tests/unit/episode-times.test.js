@@ -51,6 +51,31 @@ describe('one episode', () => {
         assert.equal(outAt(time('2026-11-13T01:00:00Z', null)), at('2026-11-13T02:00:00Z'));
         assert.equal(outAt({ stamp: null, date: '2026-11-20', runtime: null }), at('2026-11-21T12:00:00Z'));
     });
+
+    test("no time of day (streaming): out once its day is over everywhere, not at the stand-in's noon", () => {
+        // A service may put it up in the US evening, 01:00–04:00 UTC the next day
+        const untimed = { stamp: at('2026-11-13T12:00:00Z'), date: '2026-11-13', runtime: 47, timed: false };
+        assert.equal(outAt(untimed), at('2026-11-14T12:00:00Z'));
+        assert.equal(outAt({ ...untimed, timed: true }), at('2026-11-13T12:47:00Z'));
+    });
+
+    test("a day apart while TVmaze's neighbouring number airs on TMDB's day: the neighbour, not the same episode", () => {
+        // A daily show TVmaze numbers one ahead: TMDB's E5 is on the 12th, E6 on the 13th
+        const times = {
+            '1:5': time('2026-11-11T18:00:00Z'),
+            '1:6': time('2026-11-12T18:00:00Z'),
+            '1:7': time('2026-11-13T18:00:00Z')
+        };
+        assert.equal(timeOf(times, 1, 5, '2026-11-12'), null);
+        assert.equal(timeOf(times, 1, 6, '2026-11-13'), null);
+        // A weekly show a day apart keeps its time: the neighbours are a week away
+        const weekly = { '1:5': time('2026-11-11T18:00:00Z'), '1:6': time('2026-11-18T18:00:00Z') };
+        assert.ok(timeOf(weekly, 1, 5, '2026-11-12'));
+        // The same day: two episodes out together stay matched
+        const pair = { '1:1': time('2026-11-12T01:00:00Z'), '1:2': time('2026-11-12T02:00:00Z') };
+        assert.ok(timeOf(pair, 1, 1, '2026-11-12'));
+        assert.ok(timeOf(pair, 1, 2, '2026-11-12'));
+    });
 });
 
 describe("TMDB's details by TVmaze's times", () => {

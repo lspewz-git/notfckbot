@@ -230,7 +230,9 @@ const CALENDAR = {
             kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/',
             links: [{ kind: 'watch', label: 'Watch on SSPoisk', url: 'https://sspoisk.ru/series/1/' }],
             // The bot writes the next morning (src/account/notify-day.js)
-            notifyOn: '2026-11-05'
+            notifyOn: '2026-11-05',
+            // Streaming without an hour: the card explains the wait
+            dayOnly: true
         },
         {
             date: '2026-11-03',

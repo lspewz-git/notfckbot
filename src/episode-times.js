@@ -39,23 +39,41 @@ const daysApart = (a, b) => Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`
 function timeOf(times, season, episode, tmdbDate) {
     const time = times && times[`${season}:${episode}`];
     if (!time || !tmdbDate) return null;
-    const day = time.date || (time.stamp !== null ? dayIn(time.stamp, 'UTC') : null);
+    const day = airDay(time);
     if (!day || daysApart(day, tmdbDate) > MAX_SHIFT_DAYS) return null;
+    // A day apart while TVmaze's neighbouring number airs exactly on TMDB's day: a daily show the
+    // two number one apart, and this is the neighbouring episode, not the same one
+    if (day !== tmdbDate) {
+        for (const near of [episode - 1, episode + 1]) {
+            const other = times[`${season}:${near}`];
+            if (other && airDay(other) === tmdbDate) return null;
+        }
+    }
     return time;
 }
 
-/**
- * The chat-local day it comes out ("YYYY-MM-DD"). Without a time of day (streaming: TVmaze's
- * stamp is a 12:00 UTC stand-in, 00:00 the next day in Kamchatka) its own day, not the stamp's.
- */
-const releaseDay = (time, zoneId) =>
-    time.stamp !== null && (time.timed !== false || !time.date) ? dayIn(time.stamp, zoneId) : time.date;
+/** TVmaze's own day for an episode: where it airs, else its moment's UTC day */
+const airDay = (time) => time.date || (time.stamp !== null ? new Date(time.stamp).toISOString().slice(0, 10) : null);
 
-/** The moment it counts as out (ms): aired in full; a bare day, once that day is over everywhere */
+/** No time of day (streaming): TVmaze's stamp is a 12:00 UTC stand-in, only the day is known */
+const dayOnly = (time) => time.stamp === null || (time.timed === false && Boolean(time.date));
+
+/**
+ * The chat-local day it comes out ("YYYY-MM-DD"). Without a time of day (the stand-in stamp is
+ * 00:00 the next day in Kamchatka) its own day, not the stamp's.
+ */
+const releaseDay = (time, zoneId) => (dayOnly(time) ? time.date : dayIn(time.stamp, zoneId));
+
+/**
+ * The moment it counts as out (ms): aired in full. With only a day known, once that day is over
+ * everywhere — a service may put it up at any hour of that day, and a message before the episode
+ * exists is worse than a late one (the user's decision 13.11: the calendar shows the day, the
+ * message comes once it is out for certain).
+ */
 const outAt = (time) =>
-    time.stamp !== null
-        ? time.stamp + (time.runtime || DEFAULT_RUNTIME_MIN) * 60 * 1000
-        : Date.parse(`${time.date}T00:00:00Z`) + DAY_MS + 12 * 60 * 60 * 1000;
+    dayOnly(time)
+        ? Date.parse(`${time.date}T00:00:00Z`) + DAY_MS + 12 * 60 * 60 * 1000
+        : time.stamp + (time.runtime || DEFAULT_RUNTIME_MIN) * 60 * 1000;
 
 const order = (season, episode) => season * 100000 + episode;
 
@@ -107,7 +125,40 @@ async function withTvmaze(details, times, now = Date.now(), zoneId = DEFAULT_ZON
     }
     // TMDB's next lies past the seasons read (a season not listed yet): kept as it is
     if (!newNext && next && order(next.season_number, next.episode_number) > after) newNext = next;
-    return { ...details, last_episode_to_air: newLast, next_episode_to_air: newNext };
+    return {
+        ...details,
+        last_episode_to_air: newLast,
+        next_episode_to_air: newNext,
+        season_continues: newNext ? null : continuesBy(times, newLast, now)
+    };
+}
+
+// TVmaze's next episode of a season counts as its continuation when it is this close to the last one
+const CONTINUES_WITHIN_MS = 21 * DAY_MS;
+// ...and for this long after it is out too: TMDB may take a few days to list an aired episode
+const CONTINUES_GRACE_MS = 3 * DAY_MS;
+
+/**
+ * The season number TVmaze still has an episode in after `last` (to come soon, or just out), or
+ * null. TMDB often lists only the episodes announced so far: the last of them out by TVmaze would
+ * read as the season's finale a day before TMDB adds the next (src/cron/series.js,
+ * isSeasonComplete()). Only where TVmaze knows `last` itself by TMDB's day, so the two number this
+ * season alike, and only when TMDB announces no next episode at all (withTvmaze()): with one in a
+ * later season, TVmaze's "1:13" is TMDB's "2:1" and the season is complete. Past the grace an
+ * episode TMDB never adds no longer holds the season's completion.
+ */
+function continuesBy(times, last, now) {
+    if (!last) return null;
+    const own = timeOf(times, last.season_number, last.episode_number, last.air_date);
+    if (!own) return null;
+    const from = Math.max(now, outAt(own));
+    for (const [key, time] of Object.entries(times)) {
+        const [season, episode] = key.split(':').map(Number);
+        if (season !== last.season_number || episode <= last.episode_number) continue;
+        const at = outAt(time);
+        if (at > now - CONTINUES_GRACE_MS && at <= from + CONTINUES_WITHIN_MS) return season;
+    }
+    return null;
 }
 
 /**
@@ -126,4 +177,4 @@ async function withTvmazeQuick(details, zoneId = DEFAULT_ZONE) {
     }
 }
 
-module.exports = { timeOf, releaseDay, outAt, withTvmaze, withTvmazeQuick, dayIn, MAX_SHIFT_DAYS };
+module.exports = { timeOf, releaseDay, outAt, dayOnly, withTvmaze, withTvmazeQuick, dayIn, MAX_SHIFT_DAYS };

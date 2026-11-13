@@ -616,6 +616,13 @@
     line-height: 16px;
 }
 
+.tc-date-hint {
+    margin-top: 1px;
+    color: var(--text-help);
+    font-size: 12px;
+    line-height: 16px;
+}
+
 .tc-date-value {
     font-size: 14px;
     line-height: 19px;

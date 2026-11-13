@@ -42,7 +42,8 @@ const isSeasonComplete = (data, season, episode) => {
     const seasonObj = (data.seasons || []).find((s) => s.season_number === season);
     const total = seasonObj ? seasonObj.episode_count : 0;
     const next = data.next_episode_to_air;
-    const moreInSeason = Boolean(next) && next.season_number === season;
+    // season_continues: TVmaze has a further episode of it that TMDB doesn't list yet (withTvmaze())
+    const moreInSeason = (Boolean(next) && next.season_number === season) || data.season_continues === season;
     return total > 0 && episode >= total && !moreInSeason;
 };
 
@@ -52,6 +53,13 @@ const notifyNewEpisodes = async (bot, item, data) => {
 
     const currentSeason = lastE.season_number;
     const currentEpisode = lastE.episode_number;
+
+    // Behind the row: it moved on by TVmaze's times and this check has only TMDB's (TVmaze not
+    // answering after a restart). Nothing is new, and writing this episode would move the row
+    // back and announce the later one a second time.
+    const behind =
+        currentSeason < item.last_season || (currentSeason === item.last_season && currentEpisode < item.last_episode);
+    if (behind) return;
 
     const hasNewSeason = currentSeason > item.last_season;
     const hasNewEpisode = currentSeason === item.last_season && currentEpisode > item.last_episode;

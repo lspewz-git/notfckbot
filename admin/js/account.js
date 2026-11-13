@@ -358,7 +358,12 @@ function dateBlock(item, event, today) {
                 value: [dateText(event.date, { withYear: true }), MARKS[event.mark]].filter(Boolean).join(' · '),
                 when,
                 bell,
-                note
+                note,
+                // Streaming without an hour: the bot waits for the day to end (src/episode-times.js)
+                hint:
+                    note && event.dayOnly
+                        ? 'No release hour is announced, so the message comes after the day ends.'
+                        : ''
             };
         return filmDates(item, today, event);
     }

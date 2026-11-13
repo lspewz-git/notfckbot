@@ -109,6 +109,18 @@ test.describe('shared cards and calendar unfollow', () => {
         const card = page.locator('#mine-card-modal');
         await expect(card.locator('.tc-date .tc-bell')).toHaveCount(1);
         await expect(card.locator('.tc-date')).toContainText('The bot messages you on Nov 5');
+        // Only the day is known: a quieter line says why the message waits, under the note
+        const hint = card.locator('.tc-date .tc-date-hint');
+        await expect(hint).toHaveText('No release hour is announced, so the message comes after the day ends.');
+        await card
+            .locator('.title-sheet')
+            .evaluate((el) => Promise.all(el.getAnimations().map((animation) => animation.finished)));
+        const [noteBox, hintBox] = await Promise.all([
+            card.locator('.tc-date .tc-date-label').last().boundingBox(),
+            hint.boundingBox()
+        ]);
+        // Below the note, not beside it (subpixel rounding on the phone: within 1px)
+        expect(hintBox.y).toBeGreaterThan(noteBox.y + noteBox.height - 1);
         await expect(card.getByRole('link', { name: 'Watch on SSPoisk' })).toBeVisible();
     });
 
