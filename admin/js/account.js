@@ -869,8 +869,12 @@ export async function loadMine(section) {
             }
             body.innerHTML = subsView();
         } else if (section === 'my-calendar') {
-            // The chat's last answer at once (a chat change clears it), the skeleton only the first time
-            if (!body.querySelector('.mine-cal-bar')) body.innerHTML = calendarView(state.cal);
+            // This chat's last answer at once, else the skeleton: never another chat's list while
+            // this one's loads (a chat change and a Mini App opened from a group clear state.cal)
+            if (body.dataset.chat !== chatNow || !body.querySelector('.mine-cal-bar')) {
+                body.innerHTML = calendarView(state.cal);
+                body.dataset.chat = chatNow;
+            }
             const data = await api(chatPath('/calendar'));
             if (stale()) return;
             // The same answer leaves the list alone: no redraw, so posters don't load again

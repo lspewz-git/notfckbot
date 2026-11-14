@@ -846,6 +846,27 @@ test('calendar: reopening shows the last list at once and keeps it when nothing 
     await expect(body.locator('button.cal-row[data-kept="1"]')).toHaveCount(1);
 });
 
+test("calendar: another chat never shows the previous chat's list while its own loads", async ({ page }) => {
+    await mockPanel(page, { role: 'user' });
+    await openMine(page, 'my-calendar');
+    const body = page.locator('#my-calendar-body');
+    await expect(body.locator('button.cal-row')).toHaveCount(2);
+    let release = () => {};
+    const hold = new Promise((resolve) => (release = resolve));
+    await page.route('**/calendar', async (route) => {
+        await hold;
+        await route.fallback();
+    });
+    await openProfilePage(page, 'my-profile');
+    await page.locator('#my-profile-body .chat-row', { hasText: 'Киноклуб' }).click();
+    await expect(page.locator('#my-calendar-section')).toHaveClass(/active/);
+    await expect(body.locator('[aria-busy="true"]')).toHaveCount(1);
+    await expect(body.locator('button.cal-row')).toHaveCount(0);
+    release();
+    await expect(body.locator('button.cal-row')).toHaveCount(2);
+    await expect(body.locator('[aria-busy="true"]')).toHaveCount(0);
+});
+
 test('calendar: an episode opens its card with Kinopoisk, not Kinopoisk itself', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-calendar');
