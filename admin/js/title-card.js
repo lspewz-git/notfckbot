@@ -273,26 +273,31 @@ function openPoster(button) {
 }
 
 let attempt = 0;
+// Only the latest load may change the viewer: one from before a close and reopen keeps quiet
+let loader = null;
 
 /**
  * Loads the large poster: blurred under a loading circle until it arrives. The server's first
  * download from TMDB can fail (slow proxy, busy), so it tries twice more before the retry icon.
  * True when it was already cached and is shown at once.
  */
-function loadPoster(src, url = src) {
+function loadPoster(src, fresh = false) {
     const modal = $('poster-modal');
     const view = modal.querySelector('.poster-view');
     const img = /** @type {HTMLImageElement} */ (modal.querySelector('.poster-view-img'));
     const retry = /** @type {HTMLButtonElement} */ (modal.querySelector('.poster-retry'));
+    // A new query string: the same src again would not start a new request after a failure
+    const next = () => `${src}?retry=${++attempt}`;
+    let url = fresh ? next() : src;
     let left = 2;
     const large = new window.Image();
+    loader = large;
     large.onload = large.onerror = (e) => {
-        if (img.dataset.want !== src || !modal.open) return;
+        if (loader !== large || !modal.open) return;
         if (e.type === 'error' && left > 0) {
             left -= 1;
-            // A new query string: the same src again would not start a new request
-            url = `${src}?retry=${++attempt}`;
-            setTimeout(() => (large.src = url), 1500);
+            url = next();
+            setTimeout(() => loader === large && (large.src = url), 1500);
             return;
         }
         view.removeAttribute('aria-busy');
@@ -315,7 +320,7 @@ function loadPoster(src, url = src) {
 /** The retry icon after the last failure: the loading circle and its tries again */
 function retryPoster() {
     const img = /** @type {HTMLImageElement} */ ($('poster-modal').querySelector('.poster-view-img'));
-    loadPoster(img.dataset.want, `${img.dataset.want}?retry=${++attempt}`);
+    loadPoster(img.dataset.want, true);
 }
 
 /** A swipe down closes the poster, like a tap anywhere (data-close on the whole view) */

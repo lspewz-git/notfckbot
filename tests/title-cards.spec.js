@@ -96,6 +96,32 @@ test('a failed large poster is tried again under the loading circle', async ({ p
     page.__errors = page.__errors.filter(e => !e.includes('502'));
 });
 
+test('a load from before closing and reopening the poster keeps quiet', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user', poster: true });
+    panel.account.series[0].poster = '/poster.png';
+    // The plain address always fails, a retry comes through: each opening fails once and retries
+    const retries = [];
+    await page.route('**/api/poster/w500/**', route => {
+        if (!route.request().url().includes('?retry=')) return route.fulfill({ status: 502 });
+        retries.push(route.request().url());
+        return route.fallback();
+    });
+    await openSection(page, 'my-subs');
+    await page.locator('#my-subs-body button.title-row img').first().click();
+    const view = page.locator('#poster-modal .poster-view');
+    await page.locator('#mine-card-modal .tc-poster').click();
+    await expect(view).toHaveAttribute('aria-busy', 'true');
+    // Closed and opened again within the first opening's 1.5 s pause before its retry
+    await page.keyboard.press('Escape');
+    await page.locator('#mine-card-modal .tc-poster').click();
+    await expect(view).not.toHaveAttribute('aria-busy', { timeout: 5000 });
+    await page.waitForTimeout(2000);
+    expect(retries).toHaveLength(1);
+    await expect(view.locator('.poster-retry')).toBeHidden();
+    await expect(view.locator('.poster-view-img')).toHaveCSS('filter', 'none');
+    page.__errors = page.__errors.filter(e => !e.includes('502'));
+});
+
 test('after the last failed try the retry icon takes the circle\'s place and loads the poster again', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', poster: true });
     panel.account.series[0].poster = '/poster.png';

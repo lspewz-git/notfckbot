@@ -1114,6 +1114,7 @@
 }
 
 .poster-view {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1136,10 +1137,6 @@
 }
 
 /* While the large poster loads: the small one blurred with the panel's loading circle over it */
-.poster-view {
-    position: relative;
-}
-
 .poster-view[aria-busy='true'] .poster-view-img,
 .poster-view.poster-failed .poster-view-img {
     filter: blur(8px);
