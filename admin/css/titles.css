@@ -538,6 +538,10 @@
     object-fit: cover;
 }
 
+.tc-poster .tc-poster-preload {
+    display: none;
+}
+
 .tc-facts {
     display: flex;
     flex-direction: column;

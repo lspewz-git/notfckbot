@@ -32,20 +32,25 @@ test('native lazy loading loads visible posters and defers distant ones until sc
 test('account list posters are lazy while the opened card poster loads at once; it opens large', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', poster: true });
     panel.account.series[0].poster = '/poster.png';
+    // The large poster is held: it starts loading with the card, before the poster is tapped
+    let release;
+    const held = new Promise(resolve => (release = resolve));
+    const large = [];
+    await page.route('**/api/poster/w500/**', async route => {
+        large.push(route.request().url());
+        await held;
+        await route.fallback();
+    });
     await openSection(page, 'my-subs');
     const poster = page.locator('#my-subs-body button.title-row img').first();
     await expect(poster).toHaveAttribute('loading', 'lazy');
     await poster.click();
-    const cardPoster = page.locator('#mine-card-modal .tc-poster img');
+    await expect.poll(() => large.length).toBeGreaterThan(0);
+    await expect(page.locator('#mine-card-modal .tc-poster-preload')).toBeHidden();
+    const cardPoster = page.locator('#mine-card-modal .tc-poster img').first();
     expect(await cardPoster.getAttribute('loading')).toBeNull();
     await expect(cardPoster).toHaveAttribute('src', '/api/poster/w185/poster.png');
     // The poster viewer: the large size over the card, the cross and a tap anywhere close it
-    let release;
-    const held = new Promise(resolve => (release = resolve));
-    await page.route('**/api/poster/w500/**', async route => {
-        await held;
-        await route.fallback();
-    });
     await page.locator('#mine-card-modal .tc-poster').click();
     const viewer = page.locator('#poster-modal');
     await expect(viewer).toBeVisible();
@@ -75,10 +80,12 @@ test('account list posters are lazy while the opened card poster loads at once; 
 test('a failed large poster is tried again under the loading circle', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', poster: true });
     panel.account.series[0].poster = '/poster.png';
-    let failures = 1;
+    // The card's preload fails, then the viewer's first try; the next one comes through
+    let failures = 2;
     await page.route('**/api/poster/w500/**', route => (failures-- > 0 ? route.fulfill({ status: 502 }) : route.fallback()));
     await openSection(page, 'my-subs');
     await page.locator('#my-subs-body button.title-row img').first().click();
+    await expect.poll(() => failures).toBeLessThan(2);
     await page.locator('#mine-card-modal .tc-poster').click();
     const view = page.locator('#poster-modal .poster-view');
     await expect(view).toHaveAttribute('aria-busy', 'true');
@@ -130,7 +137,7 @@ test('Released reuses the poster and shows every listed season premiere, includi
     await expect(image).toHaveAttribute('loading', 'lazy');
     await row.locator('.history-open').press('Enter');
     const card = page.locator('#released-modal');
-    await expect(card.locator('.tc-poster img')).toHaveAttribute('src', await image.getAttribute('src'));
+    await expect(card.locator('.tc-poster img').first()).toHaveAttribute('src', await image.getAttribute('src'));
     const date = card.locator('.tc-premieres');
     await expect(date).toContainText('Season 4');
     await expect(date.locator('.tc-season').nth(0)).toContainText('15 Dec2025');

@@ -131,7 +131,9 @@ export function titleCard(
     const src = posterSrc(t.poster);
     const big = posterSrc(t.poster, 'w500');
     const poster = src
-        ? `<button type="button" class="tc-poster" data-action="poster-view" data-src="${escapeHtml(big)}" data-thumb="${escapeHtml(src)}" data-title="${escapeHtml(t.title)}" aria-label="Open the poster of ${escapeHtml(t.title)}"><img src="${escapeHtml(src)}" alt="" decoding="async" /></button>`
+        ? `<button type="button" class="tc-poster" data-action="poster-view" data-src="${escapeHtml(big)}" data-thumb="${escapeHtml(src)}" data-title="${escapeHtml(t.title)}" aria-label="Open the poster of ${escapeHtml(t.title)}"><img src="${escapeHtml(src)}" alt="" decoding="async" />` +
+          // The large one starts loading with the card: the server's first download from TMDB takes seconds
+          `<img class="tc-poster-preload" src="${escapeHtml(big)}" alt="" hidden fetchpriority="low" /></button>`
         : '<span class="tc-poster tc-poster-empty" aria-hidden="true"></span>';
     const about = [t.genres, t.networks, t.status].filter(Boolean).join(' · ');
     // One date block, or several (a film: in cinemas and online)
