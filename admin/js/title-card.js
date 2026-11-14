@@ -6,6 +6,7 @@
 import { $, escapeHtml } from './dom.js';
 import { openModal, closeModal } from './ui.js';
 import { fitTitleSheet } from './title-sheet.js';
+import { formatReleaseDate, formatPremiereRu, countryName, compactCountries } from './format.js';
 
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
@@ -16,6 +17,43 @@ const KP_LOGO =
 export function posterSrc(path, size = 'w185') {
     const file = String(path || '').match(/\/[^/]+\.(?:jpg|jpeg|png|webp)$/i)?.[0];
     return file ? `/api/poster/${size}${file}` : '';
+}
+
+/**
+ * A film's two date blocks, Release and Digital release, for every card (Released, Following,
+ * Calendar): one builder, one date format ("10 Jun 2026", the user's pick 14.11). Without a known
+ * digital date the Russian one stands in; the Russian dates otherwise go into the notes.
+ * @param {{ release?: string | null, releaseCountries?: string[], ruPremiere?: string | null,
+ *   digital?: string | null, digitalCountry?: string | null, ruDigital?: string | null,
+ *   ruServices?: string | null }} d
+ */
+export function filmDateBlocks(d) {
+    const countries = compactCountries(d.releaseCountries);
+    const digital = d.digital || d.ruDigital;
+    const digitalCountry = d.digital ? d.digitalCountry : d.ruDigital ? 'RU' : null;
+    const digitalNote =
+        d.ruDigital && (d.ruDigital !== digital || digitalCountry !== 'RU')
+            ? `In Russia ${formatReleaseDate(d.ruDigital)}${d.ruServices ? ` · ${d.ruServices}` : ''}`
+            : d.ruDigital === digital && digitalCountry === 'RU'
+              ? d.ruServices || ''
+              : '';
+    return [
+        {
+            label: 'Release',
+            icon: 'clapperboard',
+            value: d.release ? `${formatReleaseDate(d.release)}${countries ? ` · ${countries}` : ''}` : 'Date unknown',
+            note:
+                d.ruPremiere && !d.releaseCountries?.includes('RU') ? `In Russia ${formatPremiereRu(d.ruPremiere)}` : ''
+        },
+        {
+            label: 'Digital release',
+            icon: 'tv',
+            value: digital
+                ? `${formatReleaseDate(digital)}${digitalCountry ? ` · ${countryName(digitalCountry)}` : ''}`
+                : 'Date unknown',
+            note: digitalNote
+        }
+    ];
 }
 
 /** The same poster thumbnail in search, Following and Calendar. */

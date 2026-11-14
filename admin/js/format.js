@@ -11,6 +11,16 @@ export function countryName(code) {
     }
 }
 
+/**
+ * Release countries as every card shows them: the first three names, then "+N" for the rest
+ * (09.11; TMDB may list dozens). `withCount: false` leaves the count to the caller (calendar rows).
+ */
+export function compactCountries(codes, { withCount = true } = {}) {
+    const list = (codes || []).filter(Boolean);
+    const names = list.slice(0, 3).map(countryName).join(', ');
+    return withCount && list.length > 3 ? `${names} +${list.length - 3}` : names;
+}
+
 export function chatLabel(chat) {
     if (chat.username) return chat.username;
     return chat.type === 'private' ? 'Unknown user' : 'Unnamed group';
@@ -34,8 +44,7 @@ function avatarInitial(chat) {
     return /\p{L}/u.test(first) ? first.toUpperCase() : '#';
 }
 
-const svg = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const svg = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 // Groups and channels carry a small mark in the avatar's corner; private chats don't
 const CHAT_KIND_MARK = {
     group: svg('users'),

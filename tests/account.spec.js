@@ -899,7 +899,7 @@ test('calendar: a film card counts down, expands its description and leaves miss
     await body.getByRole('tab', { name: 'Films', exact: true }).click();
     await body.locator('button.cal-row', { hasText: 'Дюна: Часть третья' }).click();
     const card = page.locator('#mine-card-modal');
-    await expect(card.locator('.tc-date-value')).toHaveText(['Nov 6, 2026 · Belgium', 'Date unknown']);
+    await expect(card.locator('.tc-date-value')).toHaveText(['6 Nov 2026 · Belgium', 'Date unknown']);
     await expect(card.locator('.tc-date-when')).toHaveText('in 2 days');
     await expect(card.locator('.tc-rating')).toContainText('7.4');
     const clamped = () =>
@@ -1634,8 +1634,8 @@ test('a waiting film shows Release and digital information, with the main bell o
     const dates = page.locator('#mine-card-modal .tc-date');
     await expect(dates).toHaveCount(2);
     await expect(dates.nth(0).locator('.tc-date-label').first()).toHaveText('Release');
-    await expect(dates.nth(0).locator('.tc-date-value')).toHaveText('Nov 6, 2026 · Belgium');
-    await expect(dates.nth(0)).toContainText('In Russia Feb 18, 2027');
+    await expect(dates.nth(0).locator('.tc-date-value')).toHaveText('6 Nov 2026 · Belgium');
+    await expect(dates.nth(0)).toContainText('In Russia 18 Feb 2027');
     await expect(dates.nth(0).locator('.tc-bell')).toHaveCount(1);
     await expect(dates.nth(1).locator('.tc-date-value')).toHaveText('Date unknown');
     await expect(dates.nth(1).locator('.tc-date-label').first()).toHaveText('Digital release');

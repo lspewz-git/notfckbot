@@ -6,13 +6,21 @@
  */
 import { api } from './api.js';
 import { createHistory } from './history.js';
-import { countryName } from './format.js';
+import { compactCountries, formatReleaseDate } from './format.js';
 import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { pickFrom, avatar, initial } from './pick-sheet.js';
 import { searchResults, openSearchCard, MODES } from './content-search.js';
-import { titleCard, notifyField, subscriptionActions, titleThumb, fitDescriptions, NOTIFY } from './title-card.js';
+import {
+    titleCard,
+    notifyField,
+    subscriptionActions,
+    titleThumb,
+    fitDescriptions,
+    filmDateBlocks,
+    NOTIFY
+} from './title-card.js';
 export { MODES };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -274,11 +282,8 @@ const seriesNote = (s) => {
     return 'Next episode date unknown';
 };
 
-const releaseCountries = (release, withCount = true) => {
-    const countries = release?.countries?.length ? release.countries : [release?.country].filter(Boolean);
-    const names = countries.slice(0, 3).map(countryName).join(', ');
-    return withCount && countries.length > 3 ? `${names} +${countries.length - 3}` : names;
-};
+const releaseCountries = (release, withCount = true) =>
+    compactCountries(release?.countries?.length ? release.countries : [release?.country], { withCount });
 const filmNote = (film) =>
     film.release?.date || film.date
         ? `Release ${dateText(film.release?.date || film.date, { withYear: true })}${releaseCountries(film.release) ? ` · ${releaseCountries(film.release)}` : ''}`
@@ -385,46 +390,35 @@ function dateBlock(item, event, today) {
 function filmDates(item, today, event = null) {
     const release =
         item.release || (item.date ? { date: item.date, country: item.country, countries: item.countries } : null);
-    const countries = releaseCountries(release);
+    const online = item.online && !item.online.estimate ? item.online : null;
+    // The same blocks as Released (title-card.js); only the bell, the countdown and the bot's day are this card's
+    const [main, digital] = filmDateBlocks({
+        release: release?.date,
+        releaseCountries: release?.countries?.length ? release.countries : [release?.country].filter(Boolean),
+        ruPremiere: item.cinemaRu,
+        digital: online?.date,
+        digitalCountry: online?.country,
+        ruDigital: item.ruDigital,
+        ruServices: item.ruServices
+    });
     const note =
         event?.notifyOn && event.notifyOn !== release?.date
-            ? `The bot messages you on ${dateText(event.notifyOn)}`
+            ? `The bot messages you on ${formatReleaseDate(event.notifyOn)}`
             : '';
-    const main = {
-        label: 'Release',
-        icon: 'clapperboard',
-        value: release
-            ? `${dateText(release.date, { withYear: true })}${countries ? ` · ${countries}` : ''}`
-            : 'Date unknown',
-        note: [
-            item.cinemaRu && !release?.countries?.includes('RU') && release?.country !== 'RU'
-                ? `In Russia ${dateText(item.cinemaRu, { withYear: true })}`
-                : '',
-            note
-        ]
-            .filter(Boolean)
-            .join(' '),
-        bell: Boolean(release && (!event || event.notifyOn)),
-        when: release && today ? whenText(release.date, today) : ''
-    };
-    const online = item.online && !item.online.estimate ? item.online : null;
-    const digitalNote =
-        item.ruDigital && (item.ruDigital !== online?.date || online?.country !== 'RU')
-            ? `In Russia ${dateText(item.ruDigital, { withYear: true })}${item.ruServices ? ` · ${item.ruServices}` : ''}`
-            : item.ruDigital === online?.date && online?.country === 'RU'
-              ? item.ruServices || ''
-              : '';
-    const digital = {
-        label: 'Digital release',
-        icon: 'tv',
-        note: digitalNote,
-        value: online
-            ? `${dateText(online.date, { withYear: true })}${online.country ? ` · ${countryName(online.country)}` : ''}`
-            : 'Date unknown',
-        bell: Boolean(item.notifyDigital && online),
-        when: online && today ? whenText(online.date, today) : ''
-    };
-    return [main, digital];
+    const digitalDate = online?.date || item.ruDigital;
+    return [
+        {
+            ...main,
+            note: [main.note, note].filter(Boolean).join(' '),
+            bell: Boolean(release && (!event || event.notifyOn)),
+            when: release && today ? whenText(release.date, today) : ''
+        },
+        {
+            ...digital,
+            bell: Boolean(item.notifyDigital && online),
+            when: digitalDate && today ? whenText(digitalDate, today) : ''
+        }
+    ];
 }
 
 /** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */

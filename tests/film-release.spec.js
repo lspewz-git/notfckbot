@@ -41,7 +41,7 @@ test('Ёлки 13 keeps Dec 10 Release in Following and Calendar, with an explic
     await page.locator('#my-subs-body [role="tab"]', { hasText: 'Films' }).click();
     await page.locator('#my-subs-body button.title-row', { hasText: film.title }).click();
     const card = page.locator('#mine-card-modal');
-    const expected = ['Dec 10, 2026 · Russia', 'Date unknown'];
+    const expected = ['10 Dec 2026 · Russia', 'Date unknown'];
     await expect(card.locator('.tc-date-value')).toHaveText(expected);
     await expect(card.locator('.tc-date-label').filter({ hasText: /^(Release|Digital release)$/ })).toHaveText([
         'Release',
@@ -104,7 +104,7 @@ for (const { countries, label } of [
         }
         await row.click();
         const card = page.locator('#mine-card-modal');
-        await expect(card.locator('.tc-date-value').first()).toHaveText(`Dec 10, 2026 · ${label}`);
+        await expect(card.locator('.tc-date-value').first()).toHaveText(`10 Dec 2026 · ${label}`);
         expect(
             await card
                 .locator('.tc-date')
@@ -136,6 +136,20 @@ test('Released keeps a distinct Russian digital date and attaches its service to
     await expect(digital).toContainText('In Russia 20 Mar 2026 · Okko');
 });
 
+test('Released lists at most three release countries, like the calendar', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    panel.account.airedFilmDates = {
+        release: '2026-06-10',
+        releaseCountries: ['AR', 'BE', 'CH', 'DE', 'DK', 'EE', 'FI'],
+        digital: '2026-07-21',
+        digitalCountry: 'US'
+    };
+    await openSection(page, 'my-aired');
+    await page.locator('#my-aired-films .history-open').click();
+    const release = page.locator('#released-modal .tc-date').first();
+    await expect(release.locator('.tc-date-value')).toHaveText('10 Jun 2026 · Argentina, Belgium, Switzerland +4');
+});
+
 test('a digital-only main Release uses the same two existing date blocks', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     panel.account.calendar.items = [
@@ -159,8 +173,8 @@ test('a digital-only main Release uses the same two existing date blocks', async
     const card = page.locator('#mine-card-modal');
     await expect(card.locator('.tc-date')).toHaveCount(2);
     await expect(card.locator('.tc-date-value')).toHaveText([
-        'Dec 23, 2026 · United States',
-        'Dec 23, 2026 · United States'
+        '23 Dec 2026 · United States',
+        '23 Dec 2026 · United States'
     ]);
     await expect(card.locator('.tc-bell')).toHaveCount(1);
 });

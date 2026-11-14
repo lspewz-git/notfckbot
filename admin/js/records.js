@@ -5,9 +5,9 @@ import { api } from './api.js';
 import { mutate } from './data.js';
 import { openModal, closeModal, showConfirm, setReturnTo, clearReturnTo } from './ui.js';
 import { setSelectValue } from './select.js';
-import { chatLabel, chatDisplayName, formatReleaseDate, formatPremiereRu, countryName, MODE_LABELS } from './format.js';
+import { chatLabel, chatDisplayName, formatReleaseDate, MODE_LABELS } from './format.js';
 import { subsByKey } from './store.js';
-import { titleCard, fitDescriptions, watchButton } from './title-card.js';
+import { titleCard, fitDescriptions, watchButton, filmDateBlocks } from './title-card.js';
 
 /** Keep artwork already shown in the list when the detail response has none. */
 const sourcePoster = (source) =>
@@ -140,32 +140,7 @@ function releasedDate(item) {
         };
     }
     const d = item.dates || { release: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital };
-    const countries = (d.releaseCountries || []).map(countryName).join(', ');
-    const digital = d.digital || d.ruDigital;
-    const digitalCountry = d.digital ? d.digitalCountry : d.ruDigital ? 'RU' : null;
-    const digitalNote =
-        d.ruDigital && (d.ruDigital !== digital || digitalCountry !== 'RU')
-            ? `In Russia ${formatReleaseDate(d.ruDigital)}${d.ruServices ? ` · ${d.ruServices}` : ''}`
-            : d.ruDigital === digital && digitalCountry === 'RU'
-              ? d.ruServices || ''
-              : '';
-    return [
-        {
-            label: 'Release',
-            icon: 'clapperboard',
-            value: d.release ? `${formatReleaseDate(d.release)}${countries ? ` · ${countries}` : ''}` : 'Date unknown',
-            note:
-                d.ruPremiere && !d.releaseCountries?.includes('RU') ? `In Russia ${formatPremiereRu(d.ruPremiere)}` : ''
-        },
-        {
-            label: 'Digital release',
-            icon: 'tv',
-            value: digital
-                ? `${formatReleaseDate(digital)}${digitalCountry ? ` · ${countryName(digitalCountry)}` : ''}`
-                : 'Date unknown',
-            note: digitalNote
-        }
-    ];
+    return filmDateBlocks(d);
 }
 
 let releasedRequest = 0;
