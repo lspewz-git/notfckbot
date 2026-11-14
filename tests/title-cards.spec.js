@@ -40,10 +40,28 @@ test('account list posters are lazy while the opened card poster loads at once; 
     expect(await cardPoster.getAttribute('loading')).toBeNull();
     await expect(cardPoster).toHaveAttribute('src', '/api/poster/w185/poster.png');
     // The poster viewer: the large size over the card, the cross and a tap anywhere close it
+    let release;
+    const held = new Promise(resolve => (release = resolve));
+    await page.route('**/api/poster/w500/**', async route => {
+        await held;
+        await route.fallback();
+    });
     await page.locator('#mine-card-modal .tc-poster').click();
     const viewer = page.locator('#poster-modal');
     await expect(viewer).toBeVisible();
+    // While the large one loads: the small poster blurred under a loading circle, then sharp
+    const view = viewer.locator('.poster-view');
+    await expect(view).toHaveAttribute('aria-busy', 'true');
+    await expect(viewer.locator('.poster-view-img')).toHaveAttribute('src', '/api/poster/w185/poster.png');
+    expect(await view.evaluate(el => getComputedStyle(el, '::after').animationName)).toBe('spin');
+    release();
+    await expect(view).not.toHaveAttribute('aria-busy');
+    await expect(viewer.locator('.poster-view-img')).toHaveCSS('filter', 'none');
     await expect(viewer.locator('.poster-view-img')).toHaveAttribute('alt', 'Poster: Одни из нас');
+    // A full-size 2:3 box from the start, whatever size the image that is loaded
+    const box = await viewer.locator('.poster-view-img').boundingBox();
+    expect(box.width).toBeGreaterThan(300);
+    expect(Math.abs(box.height / box.width - 1.5)).toBeLessThan(0.02);
     await expect.poll(() => viewer.locator('.poster-view-img').getAttribute('src')).toBe('/api/poster/w500/poster.png');
     await page.keyboard.press('Escape');
     await expect(viewer).toBeHidden();
@@ -52,6 +70,49 @@ test('account list posters are lazy while the opened card poster loads at once; 
     await viewer.locator('.poster-view').click({ position: { x: 10, y: 10 } });
     await expect(viewer).toBeHidden();
     await expect(page.locator('#mine-card-modal')).toBeVisible();
+});
+
+test('a failed large poster is tried again under the loading circle', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user', poster: true });
+    panel.account.series[0].poster = '/poster.png';
+    let failures = 1;
+    await page.route('**/api/poster/w500/**', route => (failures-- > 0 ? route.fulfill({ status: 502 }) : route.fallback()));
+    await openSection(page, 'my-subs');
+    await page.locator('#my-subs-body button.title-row img').first().click();
+    await page.locator('#mine-card-modal .tc-poster').click();
+    const view = page.locator('#poster-modal .poster-view');
+    await expect(view).toHaveAttribute('aria-busy', 'true');
+    await expect(view).not.toHaveAttribute('aria-busy', { timeout: 5000 });
+    await expect(view.locator('.poster-view-img')).toHaveAttribute('src', /\/api\/poster\/w500\/poster\.png\?retry=\d+$/);
+    await expect(view.locator('.poster-retry')).toBeHidden();
+    // The browser logs the failed first load itself; that one is expected here
+    page.__errors = page.__errors.filter(e => !e.includes('502'));
+});
+
+test('after the last failed try the retry icon takes the circle\'s place and loads the poster again', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user', poster: true });
+    panel.account.series[0].poster = '/poster.png';
+    let failures = 99;
+    await page.route('**/api/poster/w500/**', route => (failures-- > 0 ? route.fulfill({ status: 502 }) : route.fallback()));
+    await openSection(page, 'my-subs');
+    await page.locator('#my-subs-body button.title-row img').first().click();
+    await page.locator('#mine-card-modal .tc-poster').click();
+    const view = page.locator('#poster-modal .poster-view');
+    const retry = view.locator('.poster-retry');
+    await expect(retry).toBeVisible({ timeout: 6000 });
+    await expect(view).not.toHaveAttribute('aria-busy');
+    expect(await view.locator('.poster-view-img').evaluate(el => getComputedStyle(el).filter)).toContain('blur');
+    const box = await retry.boundingBox();
+    expect(box.width).toBe(48);
+    failures = 0;
+    await retry.click();
+    await expect(retry).toBeHidden();
+    await expect(view.locator('.poster-view-img')).toHaveAttribute('src', /\/api\/poster\/w500\/poster\.png\?retry=\d+$/);
+    await expect(view).not.toHaveAttribute('aria-busy');
+    await expect(view.locator('.poster-view-img')).toHaveCSS('filter', 'none');
+    await expect(page.locator('#poster-modal')).toBeVisible();
+    // The browser logs the failed loads itself; those are expected here
+    page.__errors = page.__errors.filter(e => !e.includes('502'));
 });
 
 test('Released reuses the poster and shows every listed season premiere, including the previous December', async ({ page }) => {

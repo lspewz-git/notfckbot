@@ -263,16 +263,57 @@ function toggleSeasons(button) {
 function openPoster(button) {
     const modal = $('poster-modal');
     const img = /** @type {HTMLImageElement} */ (modal.querySelector('.poster-view-img'));
-    // The small poster shows at once, the large one replaces it when it arrives
-    img.src = button.dataset.thumb;
+    // The small poster fills the box at once, the large one replaces it when it arrives (or now, if cached)
     img.alt = `Poster: ${button.dataset.title}`;
-    const large = new window.Image();
-    large.onload = () => {
-        if (img.dataset.want === button.dataset.src) img.src = button.dataset.src;
-    };
     img.dataset.want = button.dataset.src;
-    large.src = button.dataset.src;
+    if (!loadPoster(button.dataset.src)) img.src = button.dataset.thumb;
     openModal('poster-modal');
+}
+
+let attempt = 0;
+
+/**
+ * Loads the large poster: blurred under a loading circle until it arrives. The server's first
+ * download from TMDB can fail (slow proxy, busy), so it tries twice more before the retry icon.
+ * True when it was already cached and is shown at once.
+ */
+function loadPoster(src, url = src) {
+    const modal = $('poster-modal');
+    const view = modal.querySelector('.poster-view');
+    const img = /** @type {HTMLImageElement} */ (modal.querySelector('.poster-view-img'));
+    const retry = /** @type {HTMLButtonElement} */ (modal.querySelector('.poster-retry'));
+    let left = 2;
+    const large = new window.Image();
+    large.onload = large.onerror = (e) => {
+        if (img.dataset.want !== src || !modal.open) return;
+        if (e.type === 'error' && left > 0) {
+            left -= 1;
+            // A new query string: the same src again would not start a new request
+            url = `${src}?retry=${++attempt}`;
+            setTimeout(() => (large.src = url), 1500);
+            return;
+        }
+        view.removeAttribute('aria-busy');
+        if (e.type === 'load') img.src = url;
+        else view.classList.add('poster-failed');
+        retry.hidden = e.type === 'load';
+    };
+    view.classList.remove('poster-failed');
+    retry.hidden = true;
+    large.src = url;
+    if (large.complete && large.naturalWidth) {
+        img.src = url;
+        view.removeAttribute('aria-busy');
+        return true;
+    }
+    view.setAttribute('aria-busy', 'true');
+    return false;
+}
+
+/** The retry icon after the last failure: the loading circle and its tries again */
+function retryPoster() {
+    const img = /** @type {HTMLImageElement} */ ($('poster-modal').querySelector('.poster-view-img'));
+    loadPoster(img.dataset.want, `${img.dataset.want}?retry=${++attempt}`);
 }
 
 /** A swipe down closes the poster, like a tap anywhere (data-close on the whole view) */
@@ -293,5 +334,6 @@ export const titleCardActions = {
     'tc-notify': toggleNotify,
     'tc-more': toggleMore,
     'tc-seasons': toggleSeasons,
-    'poster-view': openPoster
+    'poster-view': openPoster,
+    'poster-retry': retryPoster
 };

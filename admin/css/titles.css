@@ -1118,14 +1118,80 @@
     padding: calc(56px + env(safe-area-inset-top, 0px)) var(--space-4)
         calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
     cursor: zoom-out;
+    container-type: size;
 }
 
+/* A fixed 2:3 box: the small poster opens at full size and the large one sharpens it in place */
 .poster-view-img {
-    max-width: min(100%, 500px);
-    max-height: 100%;
+    width: min(100cqw, 500px, 100cqh * 2 / 3);
+    aspect-ratio: 2 / 3;
     border-radius: var(--radius-banner);
-    object-fit: contain;
+    object-fit: cover;
     box-shadow: var(--shadow-modal);
+    transition: filter 0.35s ease;
+}
+
+/* While the large poster loads: the small one blurred with the panel's loading circle over it */
+.poster-view {
+    position: relative;
+}
+
+.poster-view[aria-busy='true'] .poster-view-img,
+.poster-view.poster-failed .poster-view-img {
+    filter: blur(8px);
+}
+
+/* After the last failure: the retry icon in the loading circle's place and size, no plate */
+.poster-retry {
+    position: absolute;
+    inset: 0;
+    width: 48px;
+    height: 48px;
+    margin: auto;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.poster-retry[hidden] {
+    display: none;
+}
+
+.poster-retry .icon {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2.5;
+}
+
+.poster-view[aria-busy='true']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 32px;
+    height: 32px;
+    margin: auto;
+    border: 3px solid var(--text);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .poster-view-img {
+        transition: none;
+    }
+
+    .poster-view[aria-busy='true']::after {
+        animation: none;
+        opacity: 0.6;
+    }
 }
 
 .poster-close {
@@ -1135,7 +1201,7 @@
 
 @media (min-width: 641px) {
     .poster-view-img {
-        max-height: 80vh;
+        width: min(100cqw, 500px, 100cqh * 2 / 3, 80vh * 2 / 3);
     }
 }
 
