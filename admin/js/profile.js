@@ -12,8 +12,7 @@ import { chatList, chatHint, selectChat, setChatHidden, chatAvatar, setOwnName }
 import { setDevicesOwner, loadDevices } from './devices.js';
 import { DEFAULT_PERSONAL_SECTION } from './navigation.js';
 
-const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 const CHEVRON = `<span class="row-chevron">${icon('chevron-right')}</span>`;
 
@@ -65,7 +64,7 @@ const SKELETON_CHAT =
 
 function chatsGroup() {
     if (me?.system) return '';
-    const { chats, chatId, loading, error } = chatList();
+    const { chats, chatId, loading, error, partial, retrying } = chatList();
     let rows;
     if (loading) rows = SKELETON_CHAT.repeat(2);
     else if (error)
@@ -89,6 +88,12 @@ function chatsGroup() {
                 );
             })
             .join('');
+        // Telegram didn't answer for some groups: they aren't gone, a retry asks again
+        if (partial)
+            rows +=
+                `<li><button type="button" class="group-row" data-action="chats-retry"${retrying ? ' aria-busy="true"' : ''}><span class="row-tile">${icon('triangle-alert')}</span>` +
+                `<span class="row-text"><span class="row-name">Some groups didn't load</span><span class="row-meta">Telegram isn't answering</span></span>` +
+                `<span class="row-value profile-retry">${retrying ? 'Checking…' : 'Retry'}</span></button></li>`;
         const hidden = chats.filter((c) => c.hidden).length;
         if (chats.some((c) => c.type !== 'private'))
             rows += pageRow({

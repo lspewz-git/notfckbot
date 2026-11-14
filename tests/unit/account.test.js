@@ -468,6 +468,36 @@ test('Telegram hanging: a membership question gives up after 3 s, and the next o
     assert.ok(Date.now() - again < 100, 'not asked again for 30 s');
 });
 
+test('a group Telegram did not answer for marks the list partial, and a fresh list asks again at once', async (t) => {
+    members.forget();
+    t.after(() => members.forget());
+    const groups = [
+        { id: -1, type: 'supergroup' },
+        { id: -2, type: 'group' }
+    ];
+    t.mock.method(Chat, 'findByPk', async (id) => (Number(id) === 42 ? { id: 42 } : { type: 'group' }));
+    t.mock.method(Chat, 'findAll', async () => groups);
+    const statuses = { '-1': { 42: 'member' }, '-2': { 42: new Error('ECONNRESET') } };
+    members.useBot(fakeBot(statuses));
+    const first = await members.chatsOf('42');
+    assert.equal(first.partial, true);
+    assert.deepEqual(
+        first.chats.map((c) => c.id),
+        ['42', '-1']
+    );
+    statuses['-2'][42] = 'member';
+    assert.equal((await members.chatsOf('42')).partial, true, 'a reload waits out the failure');
+    const fresh = await members.chatsOf('42', { fresh: true });
+    assert.equal(fresh.partial, false);
+    assert.deepEqual(fresh.chats.map((c) => c.id).sort(), ['-1', '-2', '42']);
+    // A second Retry within 10 s doesn't ask Telegram about the failed groups again
+    groups.push({ id: -3, type: 'group' });
+    statuses['-3'] = { 42: new Error('ECONNRESET') };
+    assert.equal((await members.chatsOf('42', { fresh: true })).partial, true);
+    statuses['-3'][42] = 'member';
+    assert.equal((await members.chatsOf('42', { fresh: true })).partial, true, 'looping Retry is held back');
+});
+
 // --- The API, as src/admin/index.js puts it together ---
 
 test('chat visibility is personal, persists, requires membership and cannot hide the own account', async (t) => {
@@ -491,9 +521,9 @@ test('chat visibility is personal, persists, requires membership and cannot hide
     assert.equal(hidden.size, 1);
     const list = await call('GET', '/api/account/chats', { cookie });
     assert.equal(list.status, 200);
-    assert.equal(list.body.find((c) => c.id === '-1').hidden, true);
+    assert.equal(list.body.chats.find((c) => c.id === '-1').hidden, true);
     assert.equal(
-        (await call('GET', '/api/account/chats', { cookie: other })).body.find((c) => c.id === '-1').hidden,
+        (await call('GET', '/api/account/chats', { cookie: other })).body.chats.find((c) => c.id === '-1').hidden,
         false
     );
     assert.equal((await save('7', true)).status, 400);
@@ -760,7 +790,7 @@ test('the API: a session for everything but signing in; the panel itself for adm
         passwordChangedAt: null,
         system: false
     });
-    assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, []);
+    assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, { chats: [], partial: false });
 
     const admin = await signIn(call, 42);
     assert.equal((await call('GET', '/api/stats', { cookie: admin })).status, 200);
@@ -1749,7 +1779,7 @@ test('the API: the system account has no chats and no own password here, its pas
         passwordChangedAt: null,
         system: true
     });
-    assert.deepEqual((await call('GET', '/api/account/chats', { cookie: token })).body, []);
+    assert.deepEqual((await call('GET', '/api/account/chats', { cookie: token })).body, { chats: [], partial: false });
     const own = await call('PUT', '/api/account/password', { cookie: token, body: { password: 'long-enough' } });
     assert.deepEqual([own.status, own.body.error], [400, "The system account's password is in Settings"]);
     assert.equal((await call('DELETE', '/api/account/password', { cookie: token })).status, 400);

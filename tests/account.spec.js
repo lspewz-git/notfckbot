@@ -1055,6 +1055,42 @@ test('the Account tab keeps Account settings and Sign out when the chats could n
     await expect(body.getByRole('button', { name: 'Sign out' })).toBeVisible();
 });
 
+test('groups Telegram did not answer for: the Account tab says so, and Retry brings them back', async ({ page }) => {
+    const panel = await mockPanel(page, {
+        role: 'user',
+        chatsPartial: 1,
+        hiddenGroups: [{ id: '-200', type: 'group', title: 'Сериальная', settings: false }]
+    });
+    await openProfilePage(page, 'my-profile');
+    const body = page.locator('#my-profile-body');
+    const retry = body.locator('[data-action="chats-retry"]');
+    await expect(retry).toContainText("Some groups didn't load");
+    await expect(retry).toContainText('Retry');
+    await expect(body.locator('.chat-row')).not.toContainText(['Сериальная']);
+    const open = await body.locator('.chat-row[aria-pressed="true"]').getAttribute('data-id');
+    await retry.click();
+    await expect(body.locator('.chat-row', { hasText: 'Сериальная' })).toBeVisible();
+    await expect(retry).toHaveCount(0);
+    expect(panel.account.sent.some((r) => r.path === '/api/account/chats?fresh=1')).toBe(true);
+    // Only the list changed: the open chat stays open
+    await expect(body.locator('.chat-row[aria-pressed="true"]')).toHaveAttribute('data-id', open);
+});
+
+test('a Retry that fails again keeps the open group open and listed', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user', chatsPartial: 2 });
+    await openProfilePage(page, 'my-profile');
+    const body = page.locator('#my-profile-body');
+    await body.locator('.chat-row', { hasText: 'Киноклуб' }).click();
+    await openProfilePage(page, 'my-profile');
+    // Telegram doesn't answer for the open group this time
+    const group = panel.account.chats.findIndex((c) => c.title === 'Киноклуб');
+    const [missing] = panel.account.chats.splice(group, 1);
+    await body.locator('[data-action="chats-retry"]').click();
+    await expect(body.locator('[data-action="chats-retry"]')).toContainText('Retry');
+    await expect(body.locator('.chat-row[aria-pressed="true"]')).toContainText('Киноклуб');
+    panel.account.chats.push(missing);
+});
+
 test('Account settings: who is signed in, the role, and signing out on other devices', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user' });
     await openMine(page, 'my-account');

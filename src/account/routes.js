@@ -361,17 +361,24 @@ router.post('/api/account/sessions/end-others', async (req, res) => {
     }
 });
 
+const chatsQuery = z.object({ fresh: z.literal('1').optional() });
+
 // The chats the user can open: asks Telegram about the groups, a few seconds at most
 router.get('/api/account/chats', async (req, res) => {
+    const query = valid(chatsQuery, req.query, res);
+    if (!query) return;
     try {
         // The system account is nobody in Telegram: no chats of its own
-        if (req.user.system) return res.json([]);
-        const [chats, hidden] = await Promise.all([
-            chatsOf(req.user.userId),
+        if (req.user.system) return res.json({ chats: [], partial: false });
+        const [{ chats, partial }, hidden] = await Promise.all([
+            chatsOf(req.user.userId, { fresh: query.fresh === '1' }),
             HiddenChat.findAll({ where: { userId: req.user.userId }, attributes: ['chatId'], raw: true })
         ]);
         const ids = new Set(hidden.map((c) => String(c.chatId)));
-        res.json(chats.map((c) => ({ ...c, hidden: c.type !== 'private' && ids.has(String(c.id)) })));
+        res.json({
+            chats: chats.map((c) => ({ ...c, hidden: c.type !== 'private' && ids.has(String(c.id)) })),
+            partial
+        });
     } catch (err) {
         fail(res, err);
     }

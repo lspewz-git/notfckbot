@@ -756,7 +756,7 @@ export async function startSession(preferredChat = null, { current = () => true,
     if (me.user.system) return me.user.role;
     // The chats ask Telegram about each group: they come later, the panel doesn't wait for them
     api('/account/chats')
-        .then((chats) => setChats(chats, preferredChat))
+        .then((answer) => setChats(answer, preferredChat))
         .catch((err) => chatsFailed(err.message));
     return me.user.role;
 }

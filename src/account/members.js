@@ -41,6 +41,8 @@ function ask(request) {
 }
 
 const failed = lruCache({ max: 5000, ttl: FAILED_TTL_MS });
+const FRESH_GAP_MS = 10 * 1000;
+const freshAsked = lruCache({ max: 5000, ttl: FRESH_GAP_MS });
 const UNKNOWN = "Telegram isn't answering. Try again in a minute.";
 
 /**
@@ -112,10 +114,12 @@ async function inBatches(items, fn, deadline) {
 
 /**
  * The accounts a user can open: their own (once they have started the bot), then the groups
- * with the bot that they are in, as far as Telegram answered within LIST_BUDGET_MS.
- * @returns {Promise<{ id: string, type: string, title: string, settings: boolean }[]>}
+ * with the bot that they are in, as far as Telegram answered within LIST_BUDGET_MS. `partial`:
+ * some groups were left out because Telegram didn't answer. `fresh` (the page's Retry) asks again
+ * at once instead of waiting out FAILED_TTL_MS.
+ * @returns {Promise<{ chats: { id: string, type: string, title: string, settings: boolean }[], partial: boolean }>}
  */
-async function chatsOf(userId) {
+async function chatsOf(userId, { fresh = false } = {}) {
     const deadline = Date.now() + LIST_BUDGET_MS;
     const [own, groups] = await Promise.all([
         Chat.findByPk(userId),
@@ -127,18 +131,30 @@ async function chatsOf(userId) {
     ]);
     const list = [];
     if (own) list.push({ id: String(own.id), type: 'private', title: 'My account', settings: true });
+    // Once per FRESH_GAP_MS a user: a looping Retry mustn't drive the bot into Telegram's rate limit
+    if (fresh && !freshAsked.has(String(userId))) {
+        freshAsked.set(String(userId), true);
+        for (const group of groups) failed.delete(`${group.id}:${userId}`);
+    }
+    let partial = false;
     const found = await inBatches(
         groups,
         async (group) => {
             // A group Telegram didn't answer for is left out this time, not an error for the whole list
-            const access = await accessTo(userId, group.id).catch(() => null);
+            const access = await accessTo(userId, group.id).catch(() => {
+                partial = true;
+                return null;
+            });
             if (!access) return null;
             const title = (await fetchFresh(titles, String(group.id))) || group.username || `Group ${group.id}`;
             return { id: String(group.id), type: group.type, title, settings: access.settings };
         },
         deadline
     );
-    return list.concat(found.filter(Boolean).sort((a, b) => a.title.localeCompare(b.title, 'ru')));
+    // Groups the deadline cut off were never asked: they count as not loaded too
+    if (found.length < groups.length) partial = true;
+    const chats = list.concat(found.filter(Boolean).sort((a, b) => a.title.localeCompare(b.title, 'ru')));
+    return { chats, partial };
 }
 
 /** Forgets what Telegram said about a group (a test, or a member who just joined). */
@@ -146,6 +162,7 @@ const forget = () => {
     members.clear();
     titles.clear();
     failed.clear();
+    freshAsked.clear();
 };
 
 module.exports = { useBot, accessTo, chatsOf, forget };

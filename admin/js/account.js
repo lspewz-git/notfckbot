@@ -56,6 +56,10 @@ const state = {
     chats: null,
     /** @type {string | null} why the chats couldn't be loaded */
     chatsError: null,
+    /** Some groups were left out: Telegram didn't answer for them */
+    chatsPartial: false,
+    /** Retry of the left-out groups is on its way */
+    chatsRetrying: false,
     chatId: null,
     subsTab: 'series',
     /** @type {any} */
@@ -97,9 +101,10 @@ const chatPath = (rest) => `/account/chats/${encodeURIComponent(state.chatId)}${
  * The chats from /api/account/chats. Opens on the user's own account (first in the list), not on
  * the chat picked last time; only a Mini App opened from a group (`preferred`) opens that group.
  */
-export function setChats(chats, preferred = null) {
+export function setChats({ chats, partial }, preferred = null) {
     preferred ||= launchTitle?.chatId || null;
     state.chats = chats;
+    state.chatsPartial = Boolean(partial);
     const ids = chats.filter((c) => !c.hidden).map((c) => c.id);
     // A named chat opens even when hidden from the menu: hiding only tidies the list, access stays
     const named = preferred && chats.some((c) => c.id === String(preferred));
@@ -140,8 +145,42 @@ export const chatList = () => ({
     chats: state.chats || [],
     chatId: state.chatId,
     loading: !state.chats && !state.chatsError,
-    error: state.chatsError
+    error: state.chatsError,
+    partial: state.chatsPartial,
+    retrying: state.chatsRetrying
 });
+
+/**
+ * Asks Telegram again about the groups it didn't answer for. The open chat stays open and its
+ * section isn't reloaded: only the list changes.
+ */
+async function retryChats() {
+    if (state.chatsRetrying) return;
+    const before = state.chats;
+    state.chatsRetrying = true;
+    chatsChanged();
+    try {
+        const { chats, partial } = await api('/account/chats?fresh=1');
+        // Signed out, another session, or the list reloaded meanwhile: this answer is someone else's
+        if (state.chats !== before) return;
+        // Hidden-chat choices saved while the retry was on its way win over its older answer
+        const hidden = new Map(before.map((c) => [c.id, c.hidden]));
+        state.chats = chats.map((c) => (hidden.has(c.id) ? { ...c, hidden: hidden.get(c.id) } : c));
+        state.chatsPartial = Boolean(partial);
+        const open = before.find((c) => c.id === state.chatId);
+        if (open && !chats.some((c) => c.id === open.id)) {
+            // Missing from a partial answer means Telegram failed again, not that the chat is gone
+            if (partial) state.chats.push(open);
+            else await selectChat(state.chats.find((c) => !c.hidden)?.id || null);
+        }
+        showChatChips();
+    } catch (err) {
+        toast(err.message);
+    } finally {
+        state.chatsRetrying = false;
+        chatsChanged();
+    }
+}
 
 /** Apply a saved preference; hiding the current group returns to the first visible chat. */
 export async function setChatHidden(id, hidden) {
@@ -960,9 +999,10 @@ export const accountActions = {
         chatsChanged();
         reload();
         api('/account/chats')
-            .then((chats) => setChats(chats))
+            .then((answer) => setChats(answer))
             .catch((err) => chatsFailed(err.message));
     },
+    'chats-retry': retryChats,
     'mine-subs-tab': (el) => {
         state.subsTab = el.dataset.tab;
         if (state.list) $('my-subs-body').innerHTML = subsView();

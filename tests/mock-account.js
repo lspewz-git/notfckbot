@@ -105,6 +105,9 @@ function accountState(options) {
         hasPassword: Boolean(options.hasPassword),
         // /api/account/chats fails (Telegram down)
         chatsDown: Boolean(options.chatsDown),
+        // How many /api/account/chats answers leave out `hiddenGroups` (Telegram didn't answer for them)
+        chatsPartial: options.chatsPartial || 0,
+        hiddenGroups: /** @type {any[]} */ (options.hiddenGroups || []),
         chatsWait: options.chatsWait,
         // Called before each Mini App sign-in answer (its try number from 1): a promise holds that answer
         miniAppWait: options.miniAppWait,
@@ -411,8 +414,15 @@ function accountAnswer(state, req, url) {
             ? { status: 404, body: { error: 'This device is already signed out' } }
             : { success: true };
     }
-    if (p === '/api/account/chats')
-        return state.chatsDown ? { status: 503, body: { error: "Telegram isn't answering" } } : state.chats;
+    if (p === '/api/account/chats') {
+        if (state.chatsDown) return { status: 503, body: { error: "Telegram isn't answering" } };
+        if (state.chatsPartial > 0) {
+            state.chatsPartial -= 1;
+            return { chats: state.chats, partial: true };
+        }
+        state.chats.push(...state.hiddenGroups.splice(0));
+        return { chats: state.chats, partial: false };
+    }
 
     const m = /^\/api\/account\/chats\/(-?\d+)(\/.*)$/.exec(p);
     if (!m) return { status: 404, body: { error: 'Not mocked' } };
