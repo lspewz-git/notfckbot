@@ -9,7 +9,7 @@ const {
     escapeHtml,
     formatRuDate,
     extraFilmDates,
-    countryName
+    countryList
 } = require('../constants');
 const { watchButtonRows } = require('./keyboards');
 const { pluralWord: plural } = require('../words');
@@ -139,9 +139,7 @@ function filmCard(
     const released = isReleased(data, ru, today);
     const release = releaseDate(data, ru);
     const date = formatRuDate(release?.date);
-    const country = release?.countries.length
-        ? ` (${release.countries.map(countryName).map(escapeHtml).join(', ')})`
-        : '';
+    const country = release?.countries.length ? ` (${countryList(release.countries)})` : '';
 
     let dates;
     let rows;

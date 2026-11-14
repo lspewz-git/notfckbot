@@ -159,3 +159,31 @@ describe('filmCard', () => {
         assert.ok(!urls.includes('watchlist_add_movie_7'));
     });
 });
+
+test('a wide release names three countries and +N, so a big premiere keeps its poster caption', () => {
+    const codes =
+        'US GB FR DE IT ES MX BR AR CL PE CO PL CZ HU RO BG GR TR UA KZ JP KR TW HK SG MY TH ID PH VN IN AU NZ ZA EG AE SA IL NL BE SE NO DK FI PT'.split(
+            ' '
+        );
+    const film = {
+        id: 7,
+        title: 'Человек-паук: Совершенно новый день',
+        director_name: 'Destin Daniel Cretton',
+        status: 'Post Production',
+        overview: 'а'.repeat(400),
+        poster_path: '/a.jpg',
+        release_dates: {
+            results: codes.map((c) => ({ iso_3166_1: c, release_dates: [{ type: 3, release_date: '2099-07-29' }] }))
+        }
+    };
+    const { caption } = filmCard(film, { today: '2026-11-14' });
+    const release = caption.split('\n').find((line) => line.startsWith('📅 Релиз'));
+    // The first three by the release rule's order (country code), then how many more
+    assert.ok(release.endsWith('(ОАЭ, Аргентина, Австралия +43)'), release);
+    // Telegram's limit for a photo caption: over it the card loses its poster
+    assert.ok(caption.length <= 1024, `caption is ${caption.length} characters`);
+    // "Мои подписки" and the add confirmation show the stored row the same way
+    const { filmDateLines } = require('../../src/bot/subscriptions-views');
+    const { storedDates } = require('../../src/film-release');
+    assert.equal(filmDateLines(storedDates(film))[0], release);
+});

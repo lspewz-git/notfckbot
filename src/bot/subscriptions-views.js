@@ -12,7 +12,8 @@ const {
     formatRuDate,
     formatRuPremiere,
     premiereMonthOnly,
-    countryName
+    countryName,
+    countryList
 } = require('../constants');
 const { onlineCountry, rowRelease } = require('../film-release');
 
@@ -66,7 +67,7 @@ function filmDateLines(row) {
     const lines = [];
     const release = rowRelease(row);
     const cinema = release?.date;
-    const countries = release?.countries.map(countryName).map(escapeHtml).join(', ');
+    const countries = countryList(release?.countries);
     lines.push(`📅 Релиз: <b>${formatDigitalDate(cinema)}</b>${countries ? ` (${countries})` : ''}`);
     const kp = row.ru_premiere && !premiereMonthOnly(row.ru_premiere) ? row.ru_premiere : null;
     const ruCinema = kp || row.cinema_ru_date || row.ru_premiere;

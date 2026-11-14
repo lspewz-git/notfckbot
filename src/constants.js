@@ -63,6 +63,12 @@ function countryName(code) {
     }
 }
 
+/** "Аргентина, Бразилия, Чили +43" (HTML-escaped): a release's countries, the first three named. */
+function countryList(codes = []) {
+    const names = codes.slice(0, 3).map(countryName).map(escapeHtml).join(', ');
+    return codes.length > 3 ? `${names} +${codes.length - 3}` : names;
+}
+
 /**
  * Whether a Russian cinema premiere from Kinopoisk is only a month: Kinopoisk puts a month it
  * knows no day of on the 1st, and films open in Russian cinemas on Thursdays, so a 1st that isn't
@@ -193,6 +199,7 @@ module.exports = {
     extraFilmDates,
     COUNTRY_NAMES,
     countryName,
+    countryList,
     premiereMonthOnly,
     formatRuPremiere,
     formatDigitalDate,

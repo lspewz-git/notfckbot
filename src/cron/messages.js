@@ -1,5 +1,12 @@
 /** The notification texts the update check sends. Pure: no Telegram, database or network. */
-const { isFinishedStatus, escapeHtml, formatRuDate, extraFilmDates, countryName } = require('../constants');
+const {
+    isFinishedStatus,
+    escapeHtml,
+    formatRuDate,
+    extraFilmDates,
+    countryName,
+    countryList
+} = require('../constants');
 const { onlineDate, releaseDate, worldwideRelease } = require('../film-release');
 
 /**
@@ -44,10 +51,8 @@ const NO_DIGITAL_DATE = '💻 Дата цифрового релиза неиз�
 function buildFilmMessage({ entry, data, links, now = new Date(), today, ru = {} }) {
     const online = onlineDate(data, ru);
     const release = releaseDate(data, ru);
-    const countryCodes = release?.countries || [];
-    const countryNames = countryCodes.slice(0, 3).map(countryName).map(escapeHtml).join(', ');
-    const countries = countryCodes.length > 3 ? `${countryNames} +${countryCodes.length - 3}` : countryNames;
-    const where = release && worldwideRelease(data)?.date === release.date ? 'мировой прокат' : countries;
+    const where =
+        release && worldwideRelease(data)?.date === release.date ? 'мировой прокат' : countryList(release?.countries);
     const dates = extraFilmDates(
         {
             ...data,
