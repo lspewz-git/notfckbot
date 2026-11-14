@@ -5,12 +5,11 @@
  * One message, edited in place.
  */
 const { Markup } = require('telegraf');
-const { editView } = require('./message-view');
+const { editView, NO_PREVIEW } = require('./message-view');
 const { period, periodItems, calendarText, addMonths, MONTHS_TITLE } = require('../calendar');
 
 // The previous and the next week or month; further is a click-through nobody needs
 const LIMIT = 1;
-const NO_PREVIEW = { link_preview_options: { is_disabled: true } };
 
 const monthName = (p, n) => MONTHS_TITLE[Number(addMonths(p.from, n).slice(5, 7)) - 1];
 

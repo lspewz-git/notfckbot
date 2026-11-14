@@ -1,3 +1,6 @@
+/** No link previews: a message with a dozen links would otherwise show the first one's page. */
+const NO_PREVIEW = { link_preview_options: { is_disabled: true } };
+
 /** Edit an HTML view in place; pressing the same page again is harmless. */
 async function editView(ctx, { text, keyboard }, extra = {}) {
     try {
@@ -7,4 +10,4 @@ async function editView(ctx, { text, keyboard }, extra = {}) {
     }
 }
 
-module.exports = { editView };
+module.exports = { editView, NO_PREVIEW };

@@ -11,11 +11,11 @@ const { isLeft } = require('../bot-status');
 const { isQuietNow, hourIn } = require('../quiet');
 const { todayIn, weekStart } = require('../calendar');
 const { calendarView } = require('../bot/calendar');
+const { NO_PREVIEW } = require('../bot/message-view');
 const { recordFailure, recordSent } = require('../send-failures');
 const { log } = require('../log');
 
 const DIGEST_HOUR = 10;
-const NO_PREVIEW = { link_preview_options: { is_disabled: true } };
 const TITLES = { w: '📬 <b>Сводка недели</b>', m: '📬 <b>Сводка месяца</b>' };
 
 /** The period a digest is for, as stored in digest_*_sent: the week's Monday, or "2026-10". */

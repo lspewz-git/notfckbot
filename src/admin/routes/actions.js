@@ -105,7 +105,7 @@ async function filmTest(filmId, chatId) {
     return {
         title,
         msg: buildTestMessage('film', { film: { entry, data, ru, now, today }, links }),
-        posterUrl: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null
+        posterUrl: tmdb.tmdbPoster(data.poster_path)
     };
 }
 
@@ -129,7 +129,7 @@ async function seriesTest(seriesId, mode, { season, episode, episodeName }) {
         if (details) {
             if (!title) title = details.name || details.original_name;
             if (!posterUrl && details.poster_path) {
-                posterUrl = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
+                posterUrl = tmdb.tmdbPoster(details.poster_path);
             }
             if (!kinopoiskId) {
                 kinopoiskId = await findKinopoiskIdQuick(fullSeriesId, details.imdb_id, 2000);

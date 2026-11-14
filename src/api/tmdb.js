@@ -6,6 +6,9 @@ const { lruCache, fetchFresh } = require('../lru');
 require('dotenv').config();
 const { log } = require('../log');
 
+/** A TMDB poster path ("/abc.jpg") as the w500 image URL stored and sent everywhere; null for none. */
+const tmdbPoster = (path) => (path ? `https://image.tmdb.org/t/p/w500${path}` : null);
+
 const BASE_URL = 'https://api.themoviedb.org/3';
 
 const apiClient = axios.create({
@@ -130,7 +133,7 @@ function newSeriesFields(details) {
         last_season: last ? last.season_number : 0,
         last_episode: last ? last.episode_number : 0,
         last_episode_name: (last && last.name) || '',
-        poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
+        poster_url: tmdbPoster(details.poster_path),
         status: details.status || null,
         ...nextEpisodeFields(details),
         ...titleFacts(details, 'tv')
@@ -331,6 +334,7 @@ async function refreshSeasons(tvId, seasons, language = 'ru-RU') {
 }
 
 module.exports = {
+    tmdbPoster,
     hasSeason,
     refreshSeasons,
     getSeasonDetailsCached,

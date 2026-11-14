@@ -113,7 +113,7 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
 
     const fields = {
         title: details.title || details.original_title || 'Без названия',
-        poster_url: details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null,
+        poster_url: tmdb.tmdbPoster(details.poster_path),
         year: details.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
         ...tmdb.titleFacts(details, 'movie'),
         // What the lookup found; the update check asks Kinopoisk again on its next run

@@ -4,7 +4,7 @@
  * /history. One message; the year buttons switch it in place.
  */
 const { Markup } = require('telegraf');
-const { editView } = require('./message-view');
+const { editView, NO_PREVIEW } = require('./message-view');
 const { escapeHtml } = require('../constants');
 const { releaseHistory, upcomingHistory } = require('../history');
 const { todayIn } = require('../calendar');
@@ -13,8 +13,6 @@ const { viewRows, canGoBack, isDigest } = require('./calendar');
 
 // Telegram's limit is 4096 characters; the links make each line long, so stop well before it
 const MAX_TEXT = 3800;
-// No previews: a message with a dozen links would otherwise show the first one's page
-const NO_PREVIEW = { link_preview_options: { is_disabled: true } };
 
 /** "сезон 4", "сезоны 2, 3"; null for a film. */
 const seasonsText = (seasons) =>

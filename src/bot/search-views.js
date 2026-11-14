@@ -13,6 +13,7 @@ const {
 } = require('../constants');
 const { watchButtonRows } = require('./keyboards');
 const { pluralWord: plural } = require('../words');
+const { tmdbPoster: posterOf } = require('../api/tmdb');
 // The release check's own rule, so the card never says "out" before the notification does
 const { isReleased, isOnline, releaseDate } = require('../film-release');
 
@@ -28,7 +29,6 @@ const KIND_EMOJI = { movie: '🎬', tv: '📺' };
 const yearOf = (item) => (item.release_date || item.first_air_date || '').slice(0, 4) || null;
 const nameOf = (item) => item.title || item.name || item.original_title || item.original_name || 'Без названия';
 const shorten = (s, max) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s);
-const posterOf = (path) => (path ? `https://image.tmdb.org/t/p/w500${path}` : null);
 
 const backRow = [Markup.button.callback('⬅️ К результатам', 'back_to_results')];
 
@@ -170,4 +170,4 @@ function filmCard(
     };
 }
 
-module.exports = { resultsList, seriesCard, filmCard, plural, PER_PAGE };
+module.exports = { resultsList, seriesCard, filmCard, PER_PAGE };

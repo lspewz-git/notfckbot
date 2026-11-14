@@ -229,10 +229,7 @@ function register(bot) {
             const results = await searchMulti(text);
             if (!results || results.length === 0) {
                 setState(ctx, { state: 'idle' });
-                return ctx.reply(
-                    'Ничего не найдено 😕',
-                    Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'cancel_search')]])
-                );
+                return ctx.reply('Ничего не найдено 😕', mainMenuButton);
             }
             // A previous search's message goes: the chat keeps one search at a time
             await clearLastMessages(ctx, ctx.chat.id);

@@ -4,7 +4,8 @@
  */
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { resultsList, seriesCard, filmCard, plural, PER_PAGE } = require('../../src/bot/search-views');
+const { resultsList, seriesCard, filmCard, PER_PAGE } = require('../../src/bot/search-views');
+const { pluralWord: plural } = require('../../src/words');
 
 const buttons = (keyboard) => keyboard.reply_markup.inline_keyboard;
 const labels = (keyboard) => buttons(keyboard).map((row) => row.map((b) => b.text));

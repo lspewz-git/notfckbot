@@ -1,6 +1,6 @@
 /** The watchlist half of the update check: tell each chat when its film is out. */
 const { Chat, Watchlist } = require('../db');
-const { getDetails, getDetailsCached, titleFacts } = require('../api/tmdb');
+const { getDetails, getDetailsCached, titleFacts, tmdbPoster } = require('../api/tmdb');
 const { findKinopoiskId, russianDates } = require('../api/kinopoisk');
 const { formatWatchLinks } = require('../constants');
 const { buildFilmMessage, buildDigitalMessage, heldLine } = require('./messages');
@@ -65,7 +65,7 @@ const checkWatchlistReleases = async (bot, { datesOnly = false } = {}) => {
             // Titles change too, e.g. "Мстители: Судный день" -> "Мстители: Доктор Дум"
             const freshTitle = data.title || null;
             // Reuse the details response; missing artwork must not erase a stored poster.
-            const freshPoster = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
+            const freshPoster = tmdbPoster(data.poster_path);
             const facts = titleFacts(data, 'movie');
             for (const entry of filmEntries) {
                 const changes = {};
