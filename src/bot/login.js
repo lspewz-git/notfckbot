@@ -14,6 +14,9 @@ const { placeLine } = require('../account/devices');
 const { escapeHtml } = require('../constants');
 const { getState, setState } = require('./state');
 const { log } = require('../log');
+const events = require('../chat-events');
+const { isGroupChat } = require('./access');
+const { appUrl } = require('../app-links');
 const { plural } = require('../words');
 
 const CLOSED = 'Вход в панель пока в закрытом тесте.';
@@ -65,9 +68,7 @@ function checkReply(result) {
 
 const codeBack = { reply_markup: { inline_keyboard: [[{ text: '⬅️ Назад', callback_data: 'settings_root' }]] } };
 
-const nameOf = (from) =>
-    from.username ? `@${from.username}` : [from.first_name, from.last_name].filter(Boolean).join(' ') || null;
-const userOf = (from) => ({ id: from.id, name: nameOf(from) });
+const userOf = (ctx) => ({ id: ctx.from.id, name: events.actor(ctx).userName });
 
 /**
  * In a group: the bot's Mini App opened on this group's page (`startapp`, signed into the launch data:
@@ -75,11 +76,8 @@ const userOf = (from) => ({ id: from.id, name: nameOf(from) });
  * opens the group only for its members. Needs the bot's Main Mini App set in BotFather.
  */
 function appButton(ctx) {
-    const username = ctx.botInfo?.username;
-    if (!username || !ctx.botInfo?.has_main_web_app) return {};
-    const inGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
-    const url = `https://t.me/${username}?startapp${inGroup ? `=c${ctx.chat.id}` : ''}`;
-    return { reply_markup: { inline_keyboard: [[{ text: '📱 Открыть в приложении', url }]] } };
+    const url = appUrl(ctx.botInfo, isGroupChat(ctx.chat) ? `c${ctx.chat.id}` : '');
+    return url ? { reply_markup: { inline_keyboard: [[{ text: '📱 Открыть в приложении', url }]] } } : {};
 }
 
 function register(bot) {
@@ -97,7 +95,7 @@ function register(bot) {
 
     bot.action(/^login_(ok|no)_([A-Za-z0-9_-]{32})$/, async (ctx) => {
         const yes = ctx.match[1] === 'ok';
-        const answered = await auth.answerCode(ctx.match[2], userOf(ctx.from), yes);
+        const answered = await auth.answerCode(ctx.match[2], userOf(ctx), yes);
         await ctx.answerCbQuery();
         const text = !answered ? GONE : yes ? '✅ Готово: вернитесь на страницу панели.' : 'Вход отменён.';
         await ctx.editMessageText(text).catch(() => {});
@@ -108,7 +106,7 @@ function register(bot) {
     const tryCheck = async (ctx, digits) => {
         const clean = digits.replace(/[\s-]/g, '');
         // Only spaces or dashes: not a try
-        const result = clean ? await auth.answerCheck(clean, userOf(ctx.from)) : { state: 'empty' };
+        const result = clean ? await auth.answerCheck(clean, userOf(ctx)) : { state: 'empty' };
         // A wrong try keeps waiting for the digits; anything else ends that wait (and only that:
         // "/code 042719" during a search leaves the search alone)
         if (!['wrong', 'empty'].includes(result.state) && getState(ctx).state === CODE_STATE)
@@ -176,8 +174,7 @@ function register(bot) {
     bot.command('app', async (ctx) => {
         const button = appButton(ctx);
         if (!button.reply_markup) return ctx.reply('Приложение пока не настроено.');
-        const group = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
-        const text = group
+        const text = isGroupChat(ctx.chat)
             ? `📱 Панель группы «${escapeHtml(ctx.chat.title || '')}»: подписки, календарь и настройки.`
             : '📱 Панель: подписки, календарь и настройки.';
         await ctx.reply(text, { parse_mode: 'HTML', ...button });

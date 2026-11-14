@@ -11,13 +11,15 @@ const events = require('../chat-events');
 const IN = ['member', 'administrator', 'creator'];
 const OUT = ['left', 'kicked'];
 
+/** Whether a chat member record says the bot is in the chat (a restricted member still is). */
+const inside = (m) => IN.includes(m.status) || (m.status === 'restricted' && m.is_member);
+
 /**
  * What a change of the bot's membership means for the chat, or null for one that doesn't matter
  * (made an admin, its rights changed).
  * @returns {{ status: string, detail: string } | null}
  */
 function membershipChange(chatType, before, after) {
-    const inside = (m) => IN.includes(m.status) || (m.status === 'restricted' && m.is_member);
     if (chatType === 'private') {
         if (after.status === 'kicked') return { status: 'stopped', detail: 'stopped' };
         return inside(after) ? { status: 'active', detail: 'started' } : null;
@@ -58,7 +60,7 @@ async function recheckRemoved(bot, botId) {
     for (const chat of removed) {
         try {
             const member = await bot.telegram.getChatMember(chat.id, botId);
-            if (IN.includes(member.status) || (member.status === 'restricted' && member.is_member)) {
+            if (inside(member)) {
                 status.noteTelegram(chat.id, 'active', { detail: 'returned' });
             }
         } catch {
@@ -78,7 +80,7 @@ function register(bot) {
         // A group the bot was just added to has no row yet. Leaving one it keeps nothing for (an old
         // group already moved to its supergroup) makes none: flushStatus() skips a chat with no row
         if (change.status === 'active') {
-            const name = chat.title || (chat.username ? `@${chat.username}` : actor.userName || null);
+            const name = events.chatTitle(chat) || actor.userName || null;
             await Chat.findOrCreate({ where: { id: chat.id }, defaults: { type: chat.type, username: name } });
         }
         // In a private chat the user is the chat: no "by" to name

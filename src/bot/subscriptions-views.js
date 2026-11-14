@@ -176,7 +176,7 @@ const buildMovieCard = (item, loc) => ({
     text:
         `🎬 <b>${escapeHtml(item.title)}</b>${item.year ? ` (${item.year})` : ''}\n\n` +
         filmDateLines(item).join('\n') +
-        '\n\n🔔 Пришлю уведомление, когда фильм выйдет онлайн.',
+        '\n\n🔔 Пришлю уведомление, когда фильм выйдет.',
     keyboard: Markup.inlineKeyboard([
         [
             Markup.button.callback('❌ Удалить', `subs_cm_${item.id}_${loc}`),
@@ -203,7 +203,7 @@ const buildUnsubscribeConfirm = (series, tmdbId, loc) => {
 
 /** "Remove … from the watchlist?": yes removes it, no goes back to the card. */
 const buildWatchlistRemoveConfirm = (item, watchlistId, loc) => ({
-    text: `Удалить <b>${escapeHtml(item?.title || 'фильм')}</b> из списка ожидания?\n\nУведомление о цифровом релизе не придёт.`,
+    text: `Удалить <b>${escapeHtml(item?.title || 'фильм')}</b> из списка ожидания?\n\nУведомление о релизе не придёт.`,
     keyboard: Markup.inlineKeyboard([
         [
             Markup.button.callback('✅ Да, удалить', `subs_um_${watchlistId}_${loc}`),
@@ -216,6 +216,7 @@ module.exports = {
     EMPTY_SUBS_TEXT,
     SUBS_PER_PAGE,
     isArchiveLoc,
+    filmDateLines,
     buildOverview,
     buildSettingsView,
     buildArchiveView,

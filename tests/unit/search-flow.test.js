@@ -19,7 +19,15 @@ const RESULTS = [
     ...Array.from({ length: 4 }, (_, i) => film(10 + i, `Фильм ${i}`, '2001-01-01'))
 ];
 const DETAILS = {
-    'movie:1': { id: 1, title: 'Курьер', release_date: '2099-12-18', status: 'Post Production', poster_path: '/a.jpg' },
+    'movie:1': {
+        id: 1,
+        title: 'Курьер',
+        release_date: '2099-12-18',
+        status: 'Post Production',
+        poster_path: '/a.jpg',
+        // A cinema Release unlike TMDB's own release_date: the date the card and the confirmation must share
+        release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ type: 3, release_date: '2099-11-01' }] }] }
+    },
     // Out already; opened only by the poster test, so its poster isn't cached by another test
     'movie:2': { id: 2, title: 'Курьер', release_date: '2019-11-08', status: 'Released', poster_path: '/b.jpg' },
     'tv:3': {
@@ -244,10 +252,15 @@ test('adding a film from its photo card replaces the card with the confirmation'
     await bot.onText()(userCtx, async () => {});
 
     await press(bot, chat, only(chat).id, 'card_movie_1');
+    const releaseLine = (text) => text.split('\n').find((l) => l.startsWith('📅 Релиз'));
+    const cardRelease = releaseLine(only(chat).text);
     await press(bot, chat, only(chat).id, 'watchlist_add_movie_1');
     const screen = only(chat);
     assert.equal(screen.kind, 'text');
     assert.match(screen.text, /добавлен в список ожидания/);
+    // The same Release as the card (not TMDB's raw release_date), so the two never disagree
+    assert.match(cardRelease, /1 ноября 2099/);
+    assert.equal(releaseLine(screen.text), cardRelease);
     assert.equal(db.watchlist.length, 1);
 });
 

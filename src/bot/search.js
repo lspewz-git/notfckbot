@@ -11,9 +11,10 @@ const { withTvmazeQuick } = require('../episode-times');
 const { todayIn } = require('../calendar');
 const { NOTIFY_LABELS_SHORT, isFinishedStatus, escapeHtml, formatRuDate } = require('../constants');
 const { getState, setState } = require('./state');
-const { mainMenu } = require('./keyboards');
+const { MENU, mainMenu } = require('./keyboards');
 const { editView } = require('./message-view');
 const { resultsList, seriesCard, filmCard, PER_PAGE } = require('./search-views');
+const { filmDateLines } = require('./subscriptions-views');
 const { recordOwner, ownerOf } = require('./access');
 const events = require('../chat-events');
 const { lruCache } = require('../lru');
@@ -166,6 +167,8 @@ function endSearch(ctx) {
 }
 
 const PROMPT = 'Введите название фильма или сериала для поиска:';
+// Menu buttons pressed while a title is awaited: theirs to answer, not a search
+const MENU_TEXTS = Object.values(MENU);
 
 /**
  * Asks for a title. In a group the reply keyboard is the whole chat's: a "❌ Отмена" there would
@@ -173,7 +176,7 @@ const PROMPT = 'Введите название фильма или сериал
  * inline Cancel, for whoever asked, and the reply keyboard stays the menu.
  */
 function askForQuery(ctx, privateKeyboard) {
-    setState(ctx, { state: 'waiting_for_search', results: [], currentPage: 0 });
+    setState(ctx, { state: 'waiting_for_search' });
     if (ctx.chat && ctx.chat.type !== 'private') {
         return ctx.reply(PROMPT, Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_prompt')]]));
     }
@@ -214,16 +217,7 @@ function register(bot) {
 
     bot.on('text', async (ctx, next) => {
         const text = ctx.message.text;
-        const BUTTON_TEXTS = [
-            '🔍 Поиск',
-            '📺 Мои подписки',
-            '❌ Отмена',
-            'ℹ️ Помощь',
-            '❓ Помощь',
-            '⚙️ Настройки',
-            '🎲 Случайный фильм'
-        ];
-        if (BUTTON_TEXTS.includes(text) || text.startsWith('/')) return next();
+        if (MENU_TEXTS.includes(text) || text.startsWith('/')) return next();
 
         const state = getState(ctx);
         if (state.state !== 'waiting_for_search') return;
@@ -366,25 +360,17 @@ function register(bot) {
                 details: data,
                 waitingOnly: true
             });
-            const title = entry.title;
-            const digitalDate = data.release_date || null;
-
             if (!created) {
                 return ctx.answerCbQuery('Уже в списке ожидания! 📌', { show_alert: false });
             }
-            const dateLabel = formatRuDate(digitalDate) || 'пока не объявлена';
-            const digitalLine = data.digital_release_date
-                ? `💻 Цифровой релиз: <b>${formatRuDate(data.digital_release_date)}</b>\n`
-                : '';
 
             await ctx.answerCbQuery('Добавлено в список ожидания! 📌');
+            // The saved row's dates, as "Мои подписки" shows them: the same Release the notification uses
             await showText(
                 ctx,
-                `📌 <b>«${escapeHtml(title)}»</b> добавлен в список ожидания!\n\n` +
-                    `📅 Выход: <b>${dateLabel}</b>\n` +
-                    digitalLine +
-                    '\n' +
-                    `<i>Как только фильм выйдет — пришлю ссылки для просмотра.</i>`,
+                `📌 <b>«${escapeHtml(entry.title)}»</b> добавлен в список ожидания!\n\n` +
+                    filmDateLines(entry).join('\n') +
+                    '\n\n<i>Как только фильм выйдет — пришлю уведомление.</i>',
                 mainMenuButton
             );
             endSearch(ctx);

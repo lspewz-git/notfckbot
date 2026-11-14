@@ -6,6 +6,8 @@ const { Chat } = require('../db');
 const { clearState } = require('./state');
 const { log } = require('../log');
 const { lruCache } = require('../lru');
+const events = require('../chat-events');
+const { isGroupChat } = require('./access');
 
 // Telegram's stand-ins: an anonymous group admin (@GroupAnonymousBot), a post from the linked channel
 // (777000) and one sent as a channel (@Channel_Bot). Every group sees them under the same id, so the
@@ -19,25 +21,11 @@ const sharedBlocks = lruCache({ max: 2000, ttl: BLOCK_MS });
 const actorOf = (ctx) =>
     SHARED_SENDERS.has(ctx.from.id) && ctx.chat ? `${ctx.from.id}:${ctx.chat.id}` : String(ctx.from.id);
 
-// Anti-Spam: throttle to 1 request/second per user
-// And track identical rapid commands for auto-blocking
-const lastMessageTimes = {};
-// Store shape: { text: lastCommandStr, count: duplicateCount, lastTime: timestamp }
-const commandTracking = {};
-
-setInterval(() => {
-    // FIX: Memory leak — purge old anti-spam entries (older than 1 minute)
-    const cutoff = Date.now() - 60_000;
-    for (const userId of Object.keys(lastMessageTimes)) {
-        if (lastMessageTimes[userId] < cutoff) {
-            delete lastMessageTimes[userId];
-        }
-        if (commandTracking[userId] && commandTracking[userId].lastTime < cutoff) {
-            delete commandTracking[userId];
-        }
-    }
-    // unref: the bot keeps the process alive anyway; a test loading the bot can exit
-}, 60_000).unref();
+// Anti-spam, per actor: the time of the last update (1 a second), and the last text with how often
+// it came in a row ({ text, count, lastTime, msgIds }) for the auto-block. A minute is longer than
+// either window, so an actor quiet that long is forgotten.
+const lastMessageTimes = lruCache({ max: 10000, ttl: 60_000 });
+const commandTracking = lruCache({ max: 10000, ttl: 60_000 });
 
 function register(bot) {
     bot.use(async (ctx, next) => {
@@ -49,7 +37,7 @@ function register(bot) {
         // and a dropped tap is answered with a hint instead of silence.
         const now = Date.now();
         const minGap = ctx.callbackQuery ? 400 : 1000;
-        if (now - (lastMessageTimes[userId] || 0) < minGap) {
+        if (now - (lastMessageTimes.get(userId) || 0) < minGap) {
             log.info(`[Anti-Spam] Global Throttle: Ignoring rapid event from User ${userId}`);
             if (ctx.callbackQuery) {
                 try {
@@ -58,7 +46,7 @@ function register(bot) {
             }
             return;
         }
-        lastMessageTimes[userId] = now;
+        lastMessageTimes.set(userId, now);
         return next();
     });
 
@@ -66,9 +54,7 @@ function register(bot) {
         if (ctx.from) {
             // Track the specific user explicitly, whether they are in a group or private
             const userId = ctx.from.id;
-            const username = ctx.from.username
-                ? `@${ctx.from.username}`
-                : `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim();
+            const username = events.actor(ctx).userName || '';
 
             const [userData] = await Chat.findOrCreate({
                 where: { id: userId },
@@ -112,8 +98,7 @@ function register(bot) {
 
             // Also ensure the actual group chat exists purely for settings like menu_enabled
             if (ctx.chat && ctx.chat.id !== userId) {
-                // Groups/channels have a title; public ones also have a @username
-                const chatTitle = ctx.chat.title || (ctx.chat.username ? `@${ctx.chat.username}` : null);
+                const chatTitle = events.chatTitle(ctx.chat);
 
                 const [chatData] = await Chat.findOrCreate({
                     where: { id: ctx.chat.id },
@@ -132,7 +117,7 @@ function register(bot) {
                     instance &&
                     /^-?\d{1,30}$/.test(instance) &&
                     chatData.chat_instance !== instance &&
-                    (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')
+                    isGroupChat(ctx.chat)
                 ) {
                     // Only a convenience for the panel: a failed write must not break the button
                     await chatData
@@ -153,7 +138,7 @@ function register(bot) {
             const spamMsgId = spamText ? ctx.message.message_id : null;
 
             if (spamText) {
-                const trk = commandTracking[actor] || { text: '', count: 0, lastTime: 0, msgIds: [] };
+                const trk = commandTracking.get(actor) || { text: '', count: 0, lastTime: 0, msgIds: [] };
 
                 // If they sent the EXACT same text/button within 5 seconds...
                 if (trk.text === spamText && now - trk.lastTime < 5000) {
@@ -165,7 +150,7 @@ function register(bot) {
                     trk.msgIds = spamMsgId ? [spamMsgId] : [];
                 }
                 trk.lastTime = now;
-                commandTracking[actor] = trk;
+                commandTracking.set(actor, trk);
 
                 if (trk.count >= 3) {
                     // Auto-block for 5 minutes
@@ -185,7 +170,7 @@ function register(bot) {
                         }
                     }
 
-                    delete commandTracking[actor];
+                    commandTracking.delete(actor);
                     clearState(ctx);
 
                     // A duration rather than a clock time: users are in different time zones.

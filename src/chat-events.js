@@ -39,6 +39,9 @@ function actor(ctx) {
     return { userId: from.id, userName: name || null, source: 'bot' };
 }
 
+/** A group's or channel's name as the bot stores it: its title, else its public @username. */
+const chatTitle = (chat) => chat.title || (chat.username ? `@${chat.username}` : null);
+
 /** The events not yet written, for tests. */
 const unwritten = () => pending.map((row) => ({ ...row }));
 
@@ -74,4 +77,4 @@ function moveChat(fromId, toId) {
     for (const row of pending) if (String(row.chatId) === String(fromId)) row.chatId = toId;
 }
 
-module.exports = { record, actor, flushEvents, unwritten, settled, moveChat };
+module.exports = { record, actor, chatTitle, flushEvents, unwritten, settled, moveChat };

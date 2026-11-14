@@ -5,6 +5,7 @@
  */
 const events = require('../chat-events');
 const { getState } = require('./state');
+const { MENU } = require('./keyboards');
 
 const COMMANDS = {
     start: 'start',
@@ -16,11 +17,11 @@ const COMMANDS = {
     settings: 'settings'
 };
 const BUTTONS = {
-    '🔍 Поиск': 'search',
-    '📺 Мои подписки': 'subs',
-    'ℹ️ Помощь': 'help',
-    '❓ Помощь': 'help',
-    '⚙️ Настройки': 'settings'
+    [MENU.search]: 'search',
+    [MENU.subs]: 'subs',
+    [MENU.help]: 'help',
+    [MENU.oldHelp]: 'help',
+    [MENU.settings]: 'settings'
 };
 // Inline buttons: the first that matches names the part
 const ACTIONS = [

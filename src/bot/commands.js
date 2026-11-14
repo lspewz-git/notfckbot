@@ -1,6 +1,6 @@
 /** Slash commands and the reply-keyboard buttons. */
 const { setState, clearState } = require('./state');
-const { mainMenu, getCancelMenu } = require('./keyboards');
+const { MENU, mainMenu, getCancelMenu } = require('./keyboards');
 const { clearLastMessages, askForQuery } = require('./search');
 const { sendSubscriptionList } = require('./subscriptions');
 const { log } = require('../log');
@@ -8,17 +8,15 @@ const { log } = require('../log');
 function register(bot) {
     bot.command('start', async (ctx) => {
         clearState(ctx);
-        setState(ctx, { state: 'idle', results: [], currentPage: 0, lastMessageIds: [] });
         log.info(`[Bot] /start from ${ctx.from.id} (${ctx.from.username || 'N/A'})`);
         await ctx.reply(
-            '👋 <b>Привет!</b>\n\nЯ помогу тебе не пропустить выход новых серий твоих любимых сериалов и цифровой релиз фильмов.\n\nИспользуй меню ниже, чтобы начать работу.',
+            '👋 <b>Привет!</b>\n\nЯ помогу тебе не пропустить выход новых серий твоих любимых сериалов и релизы фильмов.\n\nИспользуй меню ниже, чтобы начать работу.',
             { parse_mode: 'HTML', ...mainMenu(ctx) }
         );
     });
 
     bot.command('reset', async (ctx) => {
         clearState(ctx);
-        setState(ctx, { state: 'idle', results: [], currentPage: 0, lastMessageIds: [] });
         await ctx.reply('🔄 Состояние сброшено. Кнопки должны снова работать!', mainMenu(ctx));
     });
 
@@ -60,15 +58,13 @@ function register(bot) {
     };
 
     bot.command('help', sendHelp);
-    bot.hears('ℹ️ Помощь', sendHelp);
-    bot.hears('❓ Помощь', sendHelp);
+    bot.hears([MENU.help, MENU.oldHelp], sendHelp);
 
-    bot.hears('🔍 Поиск', (ctx) => askForQuery(ctx, getCancelMenu(ctx)));
+    bot.hears(MENU.search, (ctx) => askForQuery(ctx, getCancelMenu(ctx)));
     bot.command('search', (ctx) => askForQuery(ctx, mainMenu(ctx)));
 
-    // FIX: Single handler, no duplication
     bot.command('subs', sendSubscriptionList);
-    bot.hears('📺 Мои подписки', sendSubscriptionList);
+    bot.hears(MENU.subs, sendSubscriptionList);
 
     // /menu_on and /menu_off live in settings.js, next to the settings screen
 
@@ -77,16 +73,16 @@ function register(bot) {
     // both with the current menu, so the button disappears instead of turning into a search
     const handleRemovedRandom = (ctx) => ctx.reply('Этой функции больше нет. Обновил меню.', mainMenu(ctx));
     bot.command('random', handleRemovedRandom);
-    bot.hears('🎲 Случайный фильм', handleRemovedRandom);
+    bot.hears(MENU.random, handleRemovedRandom);
 
     const handleCancel = async (ctx) => {
         await clearLastMessages(ctx, ctx.chat.id);
-        setState(ctx, { state: 'idle', results: [] });
+        setState(ctx, { state: 'idle' });
         await ctx.reply('Действие отменено.', mainMenu(ctx));
     };
 
     bot.command('cancel', handleCancel);
-    bot.hears('❌ Отмена', handleCancel);
+    bot.hears(MENU.cancel, handleCancel);
 }
 
 module.exports = { register };

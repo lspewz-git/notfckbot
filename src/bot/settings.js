@@ -3,9 +3,9 @@
  * look, but only its admins may change things; in a private chat the user is the admin.
  */
 const { Markup } = require('telegraf');
-const { mainMenu } = require('./keyboards');
+const { MENU, mainMenu } = require('./keyboards');
 const { editView: showView } = require('./message-view');
-const { ownerOf } = require('./access');
+const { ownerOf, isGroup } = require('./access');
 const { getState, setState } = require('./state');
 const { ZONES, PRESETS, zoneOf, hasQuietHours, quietLabel, pad } = require('../quiet');
 const { updateSettings } = require('../chat-ops');
@@ -15,8 +15,6 @@ const BUTTONS_LABEL = {
     owner: 'только тот, кто их вызвал',
     all: 'все участники'
 };
-
-const isGroup = (chat) => Boolean(chat) && chat.type !== 'private';
 
 /** Whether the person behind this update may change the chat's settings. */
 async function canChange(ctx) {
@@ -170,7 +168,7 @@ function register(bot) {
         await showView(ctx, firstView(ctx.chat, ctx.state.chatData));
     });
     bot.command('settings', showSettings);
-    bot.hears('⚙️ Настройки', showSettings);
+    bot.hears(MENU.settings, showSettings);
 
     bot.action(/^settings_(buttons_owner|buttons_all|menu_on|menu_off)$/, async (ctx) => {
         if (!(await canChange(ctx))) return ctx.answerCbQuery(NOT_ADMIN, { show_alert: true });

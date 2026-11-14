@@ -22,7 +22,10 @@ function ownerOf(chatId, messageId) {
     return userId === undefined ? null : userId;
 }
 
+/** Any chat but a private one (a channel too): where buttons have owners. */
 const isGroup = (chat) => Boolean(chat) && chat.type !== 'private';
+/** A group or supergroup, not a channel: members, an admin list, a page in the panel. */
+const isGroupChat = (chat) => chat?.type === 'group' || chat?.type === 'supergroup';
 
 // Buttons that check their own rights, or do nothing: open to everyone in every mode
 const OPEN_BUTTONS = /^(settings_|held_|cal_|hist_|noop$|subs_noop$)/;
@@ -67,4 +70,4 @@ function register(bot) {
     });
 }
 
-module.exports = { register, refusal, recordOwner, ownerOf };
+module.exports = { register, refusal, recordOwner, ownerOf, isGroup, isGroupChat };
