@@ -16,6 +16,7 @@ import { setChats, chatsFailed, resetChatChoice, setLaunchTitle } from './accoun
 import { signInForm, submitSignIn, setMe, loginAlert, setLoginAlert, syncSignInButton } from './password.js';
 import { setProfile } from './profile.js';
 import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
+import { PRIVACY, TERMS } from './legal.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
@@ -31,8 +32,10 @@ const BRAND =
     `<div class="login-brand"><div class="rail-logo login-logo" aria-hidden="true">${icon('clapperboard')}</div>` +
     '<h1 id="login-title" tabindex="-1">NotFckBot</h1></div>';
 
-const TERMS_NOTE =
-    '<p class="login-terms-note">By continuing, you agree to the <button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button>.</p>';
+const LEGAL_NOTICE =
+    '<p class="login-terms-note">By continuing, you agree to the ' +
+    '<button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button> ' +
+    'and acknowledge the <button type="button" class="login-terms-link" data-action="login-privacy">Privacy Policy</button>.</p>';
 
 /** A way's screen: the round Back to the ways in, then its title. */
 const stepHead = (title) =>
@@ -275,7 +278,7 @@ function signInScreen(banner = '', restoreFocus = $('login-body').contains(docum
             tile('login-password', 'key-round', 'Password', false) +
             '</div></section>' +
             '</div>' +
-            TERMS_NOTE,
+            LEGAL_NOTICE,
         'start'
     );
     if (restoreFocus) $('login-title').focus();
@@ -432,7 +435,7 @@ function pendingBody(start, mode) {
 /** @param {Challenge} start @param {Mode} mode */
 function pendingScreen(start, mode) {
     unwatch();
-    gate(`<div class="login-panel">${pendingBody(start, mode)}</div>${TERMS_NOTE}`, 'step');
+    gate(`<div class="login-panel">${pendingBody(start, mode)}</div>${LEGAL_NOTICE}`, 'step');
     focusStep();
     watchPending(start, mode);
 }
@@ -513,7 +516,7 @@ function endPending(mode, why) {
         /** @type {HTMLElement} */ ($('login-actions').firstElementChild).focus();
 }
 
-// --- The rest: the password form, the Terms, a sign-in link, failures ---
+// --- The rest: the password form, legal documents, a sign-in link, failures ---
 
 function passwordScreen() {
     discardChallenges();
@@ -523,41 +526,21 @@ function passwordScreen() {
             '<p class="login-lead">Works if you’ve set a password in Account settings.</p>' +
             signInForm() +
             '</div>' +
-            TERMS_NOTE,
+            LEGAL_NOTICE,
         'step'
     );
     focusStep();
 }
 
-/**
- * The Terms of Service: plain text on a nested screen, Back to the ways in. A placeholder until the
- * real terms are written (the user, 06.11)
- */
-const TERMS =
-    '<div class="login-terms">' +
-    '<p>NotFckBot is a personal Telegram bot that tells you when new episodes of your series and new films come out. ' +
-    'By signing in to this panel you agree to the terms below.</p>' +
-    '<h2>Using the bot</h2>' +
-    '<p>The bot and the panel are provided as they are, without any guarantee that a notification arrives on time ' +
-    'or at all. Release dates come from TMDB and Kinopoisk and may be wrong or change.</p>' +
-    '<h2>Your data</h2>' +
-    '<p>The bot keeps your Telegram ID and name, the chats it is in, what you follow and your chat settings. ' +
-    'The panel keeps your signed-in devices: their name, country, network, IP address and when they were last active. ' +
-    'Nothing is sold or shared with anyone.</p>' +
-    '<h2>Links</h2>' +
-    '<p>Watch and Kinopoisk links lead to other websites. Their content and rules are their own.</p>' +
-    '<h2>Changes</h2>' +
-    '<p>These terms may change. The version shown here is the one that applies.</p>' +
-    '</div>';
-
-const termsScreen = () => {
+/** @param {{title: string, body: string}} document */
+function legalScreen({ title, body }) {
     discardChallenges();
     gate(
-        `<div class="login-panel"><div class="login-terms-top">${stepHead('Terms of Service')}</div>${TERMS}</div>`,
+        `<div class="login-panel"><div class="login-terms-top">${stepHead(title)}</div><div class="login-terms">${body}</div></div>`,
         'step login-terms-screen'
     );
     focusStep();
-};
+}
 
 /** /login/<token>: spent only by the press (a messenger's link preview must not use it up). */
 const linkScreen = (error = '') => {
@@ -571,7 +554,7 @@ const linkScreen = (error = '') => {
                 : '<button type="button" class="btn btn-primary" data-action="login-link">Sign in</button>' +
                   '<p class="login-hint">A sign-in link from the bot.</p>') +
             '</div></div>' +
-            TERMS_NOTE,
+            LEGAL_NOTICE,
         'link'
     );
 };
@@ -897,7 +880,8 @@ export function sessionActions(onSignedIn) {
                 toast("Couldn't copy. Type the code instead.", 'error');
             }
         },
-        'login-terms': () => termsScreen(),
+        'login-terms': () => legalScreen(TERMS),
+        'login-privacy': () => legalScreen(PRIVACY),
         'login-password': () => passwordScreen(),
         'login-cancel': () => signInScreen('', true),
         'miniapp-close': () => miniApp?.bridge.postEvent('web_app_close', '{}'),

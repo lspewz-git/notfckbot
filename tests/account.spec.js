@@ -558,6 +558,34 @@ test("the first screen and a way's screen follow the mockups at both sizes", asy
     await expect.poll(() => panel.account.sent.some((r) => r.path === '/api/login/telegram/cancel')).toBe(true);
 });
 
+test('both legal documents are available before sign-in', async ({ page, isMobile }) => {
+    await mockPanel(page, { signedOut: true });
+    const notice = page.locator('.login-terms-note');
+    await expect(notice).toHaveText(
+        'By continuing, you agree to the Terms of Service and acknowledge the Privacy Policy.'
+    );
+    if (!isMobile) {
+        expect(await notice.evaluate((el) => el.clientHeight / parseFloat(getComputedStyle(el).lineHeight))).toBe(1);
+    }
+
+    await notice.getByRole('button', { name: 'Terms of Service' }).click();
+    await expect(page.getByRole('heading', { name: 'Terms of Service' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Accounts and group chats' })).toBeVisible();
+    const back = page.getByRole('button', { name: 'Back to sign-in options' });
+    await expect(back).toBeFocused();
+    await back.click();
+
+    await notice.getByRole('button', { name: 'Privacy Policy' }).click();
+    await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your choices and rights' })).toBeAttached();
+    await expect(page.getByRole('link', { name: 'info@notfck.top' }).first()).toHaveAttribute(
+        'href',
+        'mailto:info@notfck.top'
+    );
+    await back.click();
+    await expect(page.getByRole('link', { name: 'Continue with Telegram' })).toBeVisible();
+});
+
 test('confirmation stays usable when the browser clock is ahead of the server', async ({ page }) => {
     await page.addInitScript(() => {
         const now = Date.now.bind(Date);

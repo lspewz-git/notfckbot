@@ -916,6 +916,11 @@ body.signed-out .tabbar {
         background: var(--surface-1);
     }
 
+    .login-terms-note {
+        width: max-content;
+        max-width: 90vw;
+    }
+
     .login-step .login-terms-note {
         display: block;
     }
