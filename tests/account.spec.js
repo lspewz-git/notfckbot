@@ -598,7 +598,7 @@ test('no way in starts before the Terms checkbox; its links open the documents a
     await page.locator('.terms-text').getByRole('button', { name: 'Privacy Policy' }).click();
     await expect(page.getByRole('heading', { name: 'Cookies and browser settings' })).toBeVisible();
     await expect(page.locator('.legal-record code')).toHaveText(['nfb_session', 'nfb_device', 'Interface settings']);
-    await expect(page.locator('.legal-draft')).toHaveText('Draft · for legal review');
+    await expect(page.locator('.legal-meta')).not.toContainText('Draft');
     await page.getByRole('button', { name: 'Back to sign-in options' }).click();
     await expect(box).toBeChecked();
 
@@ -614,11 +614,9 @@ test('no way in starts before the Terms checkbox; its links open the documents a
     await expect(page.locator('#terms-cb')).not.toBeChecked();
 });
 
-test('"Before you start": signed in without the Terms, Continue records them and opens the panel', async ({
-    page
-}) => {
+test('"Before you start": signed in without the Terms, Continue records them and opens the panel', async ({ page }) => {
     const panel = await mockPanel(page, { role: 'user', terms: 'first' });
-    await expect(page.getByRole('heading', { name: 'Before you start' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Before you start' })).not.toBeFocused();
     await expect(page.locator('.terms-main .login-lead')).toHaveText(
         'To use NotFckBot, accept the terms. We keep a sign-in cookie on this device so you stay signed in.'
     );
@@ -650,7 +648,7 @@ test('"Before you start" after an update: What changed opens the policy and Back
     await page.getByRole('button', { name: 'What changed' }).click();
     await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible();
     await page.locator('#login-back').click();
-    await expect(page.getByRole('heading', { name: 'Before you start' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Before you start' })).not.toBeFocused();
     await expect(page.locator('#terms-cb')).toBeChecked();
     const cont = await page.getByRole('button', { name: 'Continue' }).boundingBox();
     const out = await page.getByRole('button', { name: 'Sign out' }).boundingBox();
@@ -1793,4 +1791,26 @@ test('a waiting film shows Release and digital information, with the main bell o
     await expect(body.locator('button.cal-row', { hasText: 'Мегалополис' }).locator('.row-meta')).toHaveText(
         'Release · United States'
     );
+});
+
+test('the legal documents: a 720px card with the records as a table on desktop, a group on a phone', async ({
+    page
+}) => {
+    await mockPanel(page, { signedOut: true });
+    await page.locator('.terms-text').getByRole('button', { name: 'Privacy Policy' }).click();
+    const first = page.locator('.legal-record').first();
+    const [card, name, term] = await Promise.all(
+        ['.login-terms-screen .login-panel', '.legal-record code', '.legal-record-term'].map((s) =>
+            page.locator(s).first().boundingBox()
+        )
+    );
+    await expect(first).toBeVisible();
+    if ((page.viewportSize()?.width ?? 0) >= 720) {
+        expect(Math.round(card.width)).toBe(720);
+        await expect(page.locator('.legal-records-head')).toBeVisible();
+        expect(Math.abs(term.y - name.y)).toBeLessThan(4); // one row
+    } else {
+        await expect(page.locator('.legal-records-head')).toBeHidden();
+        expect(term.y).toBeGreaterThan(name.y + 10); // stacked
+    }
 });

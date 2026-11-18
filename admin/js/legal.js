@@ -1,11 +1,7 @@
 // The same date as TERMS_VERSION and PRIVACY_VERSION in src/account/terms.js (a unit test checks it)
 const VERSION = '18 November 2026';
-// Until the lawyer has approved the texts
-const DRAFT = true;
 const EDITION =
-    '<p class="legal-meta">' +
-    (DRAFT ? '<span class="legal-draft">Draft · for legal review</span>' : '') +
-    `<span>Version dated ${VERSION}. Effective from the date of publication.</span></p>`;
+    '<p class="legal-meta">' + `<span>Version dated ${VERSION}. Effective from the date of publication.</span></p>`;
 
 /** One record kept in the browser: its name, kind, what it's for and how long it stays. */
 const record = (name, kind, purpose, term) =>
@@ -58,6 +54,7 @@ export const PRIVACY = {
         <h2>Cookies and browser settings</h2>
         <p>To sign you in and protect your account, the panel stores these records in your browser:</p>
         <ul class="legal-records">
+            <li class="legal-records-head" aria-hidden="true"><span>Name</span><span>Kind</span><span>Purpose</span><span>Kept</span></li>
             ${record('nfb_session', 'Cookie · httpOnly', 'Signs you in to the panel.', '1 year in the browser; the session on the server expires after 7 days without activity.')}
             ${record('nfb_device', 'Cookie · httpOnly', 'Recognizes this browser to protect sign-in: the “New sign-in” notice and limits for new devices.', '1 year.')}
             ${record('Interface settings', 'localStorage', 'Things like list page size.', 'Until you clear the browser.')}

@@ -951,14 +951,6 @@ body.signed-out .tabbar {
     padding: 3px 0;
 }
 
-.legal-meta > .legal-draft {
-    padding: 3px 8px;
-    border-radius: var(--radius-chip);
-    background: var(--warning-soft);
-    color: var(--warning);
-    font-weight: 600;
-}
-
 /* The records kept in the browser: one group, a row each */
 .legal-records {
     margin: 16px 0 0;
@@ -1026,6 +1018,11 @@ body.signed-out .tabbar {
 
 .legal-records + p {
     margin-top: 12px;
+}
+
+/* Column names: only the desktop table has columns */
+.legal-records-head {
+    display: none;
 }
 
 /* --- A sign-in link, a failure --- */
@@ -1157,6 +1154,51 @@ body.signed-out .tabbar {
     /* The card is the group's surface here: the group a step above it */
     .legal-records {
         background: var(--surface-2);
+    }
+
+    /* The documents are for reading: a wider card than the sign-in steps, the records a table */
+    #login-body:has(.login-terms-screen),
+    .login-terms-screen .login-panel {
+        max-width: 720px;
+    }
+
+    .legal-records-head,
+    .legal-record {
+        display: grid;
+        grid-template-columns: 152px 136px minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+        padding: 12px 14px;
+    }
+
+    .legal-records-head {
+        color: var(--text-dim);
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 600;
+    }
+
+    .legal-records-head + .legal-record::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 14px;
+        height: 1px;
+        background: var(--divider);
+    }
+
+    .legal-record-head {
+        display: contents;
+    }
+
+    .legal-chip {
+        justify-self: start;
+    }
+
+    .legal-record-term {
+        font-size: 14px;
+        line-height: 20px;
     }
 
     .login-pick {

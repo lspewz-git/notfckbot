@@ -582,7 +582,7 @@ function termsScreen(state) {
         '<main class="login-panel terms-panel" aria-labelledby="bys-title">' +
             '<div class="terms-main">' +
             `<div class="rail-logo login-logo terms-logo" aria-hidden="true">${icon('file-text')}</div>` +
-            '<h1 id="bys-title" class="login-step-title" tabindex="-1">Before you start</h1>' +
+            '<h1 id="bys-title" class="login-step-title">Before you start</h1>' +
             (state === 'updated'
                 ? '<p class="login-lead">We’ve updated the Terms of Service and the Privacy Policy. Accept them to continue.</p>' +
                   '<button type="button" class="terms-changed" data-action="login-privacy">What changed</button>'
@@ -595,7 +595,6 @@ function termsScreen(state) {
             '</div></main>',
         'accept'
     );
-    $('bys-title').focus();
 }
 
 /** Shows "Before you start" and waits until the terms are accepted (signing out reloads the page). */
