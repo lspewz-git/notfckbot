@@ -298,6 +298,12 @@ test('without a session the sign-in screen covers the panel; the Telegram button
     if (isMobile) {
         expect((await telegram.boundingBox()).height).toBe(48);
     } else {
+        // The Terms checkbox and its two links come first
+        await page.locator('#terms-cb').focus();
+        for (const name of ['Terms of Service', 'Privacy Policy']) {
+            await page.keyboard.press('Tab');
+            await expect(page.getByRole('button', { name, exact: true })).toBeFocused();
+        }
         await page.keyboard.press('Tab');
         await expect(telegram).toBeFocused();
         // The keyboard sees the focus ring (redesign handoff), not an underline
@@ -547,10 +553,9 @@ test("the first screen and a way's screen follow the mockups at both sizes", asy
         expect(safety.y).toBeLessThan(open.y);
         expect(open.y).toBeGreaterThan(500);
     } else {
-        // A 440 card; the safety line under the buttons, the Terms under the card
+        // A 440 card; the safety line under the buttons
         expect(Math.round(panelBox.width)).toBe(440);
         expect(safety.y).toBeGreaterThan(open.y);
-        await expect(page.locator('.login-terms-note')).toBeVisible();
     }
     await back.click();
     await expect(page.locator('#login-tg')).toBeVisible();
@@ -558,32 +563,105 @@ test("the first screen and a way's screen follow the mockups at both sizes", asy
     await expect.poll(() => panel.account.sent.some((r) => r.path === '/api/login/telegram/cancel')).toBe(true);
 });
 
-test('both legal documents are available before sign-in', async ({ page, isMobile }) => {
-    await mockPanel(page, { signedOut: true });
-    const notice = page.locator('.login-terms-note');
-    await expect(notice).toHaveText(
-        'By continuing, you agree to the Terms of Service and acknowledge the Privacy Policy.'
+test('no way in starts before the Terms checkbox; its links open the documents and keep it', async ({ page }) => {
+    const panel = await mockPanel(page, { signedOut: true, termsUnchecked: true, terms: 'first' });
+    const box = page.locator('#terms-cb');
+    await expect(box).not.toBeChecked();
+    await expect(page.locator('.terms-text')).toHaveText(
+        'I accept the Terms of Service and the Privacy Policy, including the sign-in cookies they describe'
     );
-    if (!isMobile) {
-        expect(await notice.evaluate((el) => el.clientHeight / parseFloat(getComputedStyle(el).lineHeight))).toBe(1);
+    // Right over Continue with Telegram
+    const boxAt = await page.locator('.terms-check').boundingBox();
+    const tgAt = await page.locator('#login-tg').boundingBox();
+    expect(boxAt.y + boxAt.height).toBeLessThanOrEqual(tgAt.y);
+    expect(await page.locator('.terms-row').evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(
+        44
+    );
+
+    for (const way of ['#login-tg[href]', '[data-action="login-qr"]:enabled', '[data-action="login-password"]']) {
+        await page.locator(way).click();
+        await expect(page.locator('#terms-err')).toBeVisible();
+        await expect(page.locator('#terms-err')).toHaveText('Accept the terms to continue');
+        await expect(box).toBeFocused();
+        await expect(box).toHaveAttribute('aria-describedby', 'terms-err');
+        await expect(page.locator('#login-back')).toHaveCount(0);
     }
+    expect(page.context().pages()).toHaveLength(1);
 
-    await notice.getByRole('button', { name: 'Terms of Service' }).click();
-    await expect(page.getByRole('heading', { name: 'Terms of Service' })).toBeVisible();
+    // A link inside the row opens its document and leaves the box alone
+    await page.locator('.terms-text').getByRole('button', { name: 'Terms of Service' }).click();
     await expect(page.getByRole('heading', { name: 'Accounts and group chats' })).toBeVisible();
-    const back = page.getByRole('button', { name: 'Back to sign-in options' });
-    await expect(back).toBeFocused();
-    await back.click();
+    await page.getByRole('button', { name: 'Back to sign-in options' }).click();
+    await expect(box).not.toBeChecked();
+    await box.check();
+    await expect(page.locator('#terms-err')).toBeHidden();
+    await page.locator('.terms-text').getByRole('button', { name: 'Privacy Policy' }).click();
+    await expect(page.getByRole('heading', { name: 'Cookies and browser settings' })).toBeVisible();
+    await expect(page.locator('.legal-record code')).toHaveText(['nfb_session', 'nfb_device', 'Interface settings']);
+    await expect(page.locator('.legal-draft')).toHaveText('Draft · for legal review');
+    await page.getByRole('button', { name: 'Back to sign-in options' }).click();
+    await expect(box).toBeChecked();
 
-    await notice.getByRole('button', { name: 'Privacy Policy' }).click();
-    await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your choices and rights' })).toBeAttached();
-    await expect(page.getByRole('link', { name: 'info@notfck.top' }).first()).toHaveAttribute(
-        'href',
-        'mailto:info@notfck.top'
+    // Ticked: the way in works, and the acceptance goes to the server once signed in
+    await page.locator('[data-action="login-code"]:enabled').click();
+    await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
+    expect(panel.account.sent.filter((r) => r.path === '/api/account/terms').map((r) => r.body)).toEqual([
+        { source: 'signin' }
+    ]);
+    // The session ends: the next person finds the box empty
+    panel.account.signedIn = false;
+    await page.evaluate(() => window.dispatchEvent(new Event('session-ended')));
+    await expect(page.locator('#terms-cb')).not.toBeChecked();
+});
+
+test('"Before you start": signed in without the Terms, Continue records them and opens the panel', async ({
+    page
+}) => {
+    const panel = await mockPanel(page, { role: 'user', terms: 'first' });
+    await expect(page.getByRole('heading', { name: 'Before you start' })).toBeFocused();
+    await expect(page.locator('.terms-main .login-lead')).toHaveText(
+        'To use NotFckBot, accept the terms. We keep a sign-in cookie on this device so you stay signed in.'
     );
-    await back.click();
-    await expect(page.getByRole('link', { name: 'Continue with Telegram' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'What changed' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.locator('#terms-err')).toBeVisible();
+    await expect(page.locator('#terms-cb')).toBeFocused();
+    expect(panel.account.sent.some((r) => r.path === '/api/account/terms')).toBe(false);
+    await page.locator('#terms-cb').check();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.locator('#login-gate')).toBeHidden();
+    expect(panel.account.sent.filter((r) => r.path === '/api/account/terms').map((r) => r.body)).toEqual([
+        { source: 'before-you-start' }
+    ]);
+    // Nothing of the panel was asked for before that
+    const first = panel.account.sent.findIndex((r) => r.path === '/api/account/terms');
+    expect(panel.account.sent.slice(0, first).map((r) => r.path)).toEqual(['/api/account/me']);
+});
+
+test('"Before you start" after an update: What changed opens the policy and Back returns, the box kept', async ({
+    page,
+    isMobile
+}) => {
+    await mockPanel(page, { role: 'user', terms: 'updated' });
+    await expect(page.locator('.terms-main .login-lead')).toHaveText(
+        'We’ve updated the Terms of Service and the Privacy Policy. Accept them to continue.'
+    );
+    await page.locator('#terms-cb').check();
+    await page.getByRole('button', { name: 'What changed' }).click();
+    await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible();
+    await page.locator('#login-back').click();
+    await expect(page.getByRole('heading', { name: 'Before you start' })).toBeFocused();
+    await expect(page.locator('#terms-cb')).toBeChecked();
+    const cont = await page.getByRole('button', { name: 'Continue' }).boundingBox();
+    const out = await page.getByRole('button', { name: 'Sign out' }).boundingBox();
+    expect(Math.round(cont.height)).toBe(48);
+    expect(Math.round(out.height)).toBe(44);
+    expect(out.y).toBeGreaterThan(cont.y);
+    // A phone: the buttons at the bottom; a computer: the 440 card
+    if (isMobile) expect(out.y + out.height).toBeGreaterThan(page.viewportSize().height - 80);
+    else expect(Math.round((await page.locator('.terms-panel').boundingBox()).width)).toBe(440);
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.locator('#login-tg')).toBeVisible();
 });
 
 test('confirmation stays usable when the browser clock is ahead of the server', async ({ page }) => {

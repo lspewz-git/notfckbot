@@ -265,7 +265,8 @@ const PIXEL = Buffer.from(
  *   `chats`: the Users / Chats rows instead of the three default ones;
  *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
  *   served once it resolves (a page.route() of the test's would lose to this one's catch-all);
- *   `role`: 'user' signs in as a user (default 'admin'), `signedOut`: the sign-in screen,
+ *   `role`: 'user' signs in as a user (default 'admin'), `signedOut`: the sign-in screen (its Terms
+ *   checkbox ticked unless `termsUnchecked`), `terms`: 'first' / 'updated' shows "Before you start",
  *   `groupAdmin`: the user is an admin of the group "Киноклуб"; `path`: the page opened first
  */
 /** A chat's statistics as /api/chat/:id/stats answers them (src/chat-stats.js). */
@@ -1068,6 +1069,13 @@ async function mockPanel(page, options = {}) {
     });
 
     await page.goto(`${ORIGIN}${options.path || '/'}`);
+    // The sign-in screen's Terms checkbox, ticked for the tests about the ways in (termsUnchecked: as it opens)
+    if (options.signedOut && !options.termsUnchecked) {
+        // A Mini App test may sign in at once: then there is no screen to wait for
+        await page.locator('#login-body > .login-screen').first().waitFor({ timeout: 5000 }).catch(() => {});
+        const box = page.locator('#terms-cb');
+        if (await box.count()) await box.check();
+    }
     return panel;
 }
 

@@ -102,6 +102,8 @@ function changesPage(url, rows = CHANGES) {
 function accountState(options) {
     return {
         signedIn: !options.signedOut,
+        // What /api/account/me says about the Terms: 'ok', or 'first' / 'updated' for "Before you start"
+        terms: options.terms || 'ok',
         hasPassword: Boolean(options.hasPassword),
         // /api/account/chats fails (Telegram down)
         chatsDown: Boolean(options.chatsDown),
@@ -364,8 +366,13 @@ function accountAnswer(state, req, url) {
         const fail = state.meFails.shift();
         return { status: fail, body: { error: `Account check failed (${fail})` } };
     }
+    if (p === '/api/account/terms') {
+        state.terms = 'ok';
+        return { terms: 'ok' };
+    }
     if (p === '/api/account/me')
         return {
+            terms: state.terms,
             user: {
                 id: state.system ? '0' : '42',
                 name: state.system ? 'admin' : '@me',

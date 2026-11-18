@@ -20,6 +20,7 @@ const auth = require('./auth');
 const { miniAppUser } = require('./miniapp');
 const password = require('./password');
 const devices = require('./devices');
+const terms = require('./terms');
 const { accessTo, chatsOf } = require('./members');
 const { log } = require('../log');
 const QRCode = require('qrcode');
@@ -282,7 +283,24 @@ router.get('/api/account/me', async (req, res) => {
         // The system account's password lives in .env: always set, no date
         const changed = system ? null : await password.passwordChangedAt(userId);
         const hasPassword = system || Boolean(changed);
-        res.json({ user: { id: userId, name, role, hasPassword, passwordChangedAt: changed, system } });
+        const termsState = await terms.termsState(req.user);
+        res.json({
+            user: { id: userId, name, role, hasPassword, passwordChangedAt: changed, system },
+            terms: termsState
+        });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+// The Terms of Service and the Privacy Policy accepted: the checkbox on the sign-in screen or "Before you start"
+router.post('/api/account/terms', async (req, res) => {
+    const body = valid(z.object({ source: z.enum(terms.SOURCES) }), req.body, res);
+    if (!body) return;
+    try {
+        // Already accepted: no second row
+        if ((await terms.termsState(req.user)) !== 'ok') await terms.acceptTerms(req, body.source);
+        res.json({ terms: 'ok' });
     } catch (err) {
         fail(res, err);
     }

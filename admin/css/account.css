@@ -372,13 +372,66 @@ body.signed-out .tabbar {
     display: none;
 }
 
-/* Under the ways in: the agreement, its link to the Terms screen */
-.login-terms-note {
-    margin: 0 var(--space-2);
-    color: var(--text-help);
-    font-size: 12px;
-    line-height: 16px;
-    text-align: center;
+/* --- The Terms checkbox (sign-in and "Before you start"): a native box, its links open the documents --- */
+
+.terms-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 44px;
+    padding: 12px 0;
+    cursor: pointer;
+}
+
+.terms-box {
+    position: relative;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -1px;
+}
+
+.terms-box input {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 1.5px solid var(--checkbox-border);
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.terms-box input.is-error {
+    border-color: var(--danger);
+}
+
+.terms-box input:checked {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+}
+
+.terms-tick {
+    position: absolute;
+    inset: 3px;
+    width: 14px;
+    height: 14px;
+    color: var(--on-accent);
+    stroke-width: 3;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.terms-box input:checked + .terms-tick {
+    visibility: visible;
+}
+
+.terms-text {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 18px;
     text-wrap: pretty;
 }
 
@@ -387,16 +440,82 @@ body.signed-out .tabbar {
     padding: 0;
     border: none;
     background: none;
-    color: var(--text-secondary);
+    color: var(--text);
     font: inherit;
+    font-weight: 600;
     text-decoration: underline;
     text-underline-offset: 2px;
     cursor: pointer;
 }
 
-/* A phone's way screen has no room for it */
-.login-step .login-terms-note {
+.terms-nowrap {
+    white-space: nowrap;
+}
+
+.terms-err {
+    margin: -4px 0 4px 32px;
+    color: var(--danger);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.terms-err[hidden] {
     display: none;
+}
+
+/* On a phone, right over Continue with Telegram */
+.login-pick .terms-check {
+    margin-bottom: 8px;
+}
+
+/* --- "Before you start": the text in the middle, the buttons at the bottom (a phone) --- */
+
+.terms-main {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.terms-main .login-step-title {
+    margin-top: 0;
+}
+
+.terms-main .login-lead {
+    margin-top: 12px;
+}
+
+.terms-logo {
+    display: none;
+}
+
+.terms-changed {
+    align-self: flex-start;
+    min-height: 44px;
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.terms-main .terms-check {
+    margin-top: 16px;
+}
+
+.terms-actions {
+    padding-top: 16px;
+    /* Telegram's own bottom bar in the Mini App */
+    padding-bottom: calc(
+        var(--tg-content-safe-area-inset-bottom, 0px) +
+            max(0px, var(--tg-safe-area-inset-bottom, 0px) - env(safe-area-inset-bottom, 0px))
+    );
 }
 
 /* --- The ways in --- */
@@ -806,15 +925,107 @@ body.signed-out .tabbar {
 }
 
 .login-terms h2 {
-    margin: 24px 0 8px;
+    margin: 24px 0 12px;
     color: var(--text);
-    font-size: 17px;
-    line-height: 22px;
-    font-weight: 600;
+    font-size: 20px;
+    line-height: 26px;
+    font-weight: 700;
 }
 
 .login-terms h2 + p {
     margin: 0;
+}
+
+/* The version line: the draft mark while the lawyer hasn't approved the text */
+.login-terms .legal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.legal-meta > span {
+    padding: 3px 0;
+}
+
+.legal-meta > .legal-draft {
+    padding: 3px 8px;
+    border-radius: var(--radius-chip);
+    background: var(--warning-soft);
+    color: var(--warning);
+    font-weight: 600;
+}
+
+/* The records kept in the browser: one group, a row each */
+.legal-records {
+    margin: 16px 0 0;
+    padding: 0;
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
+    list-style: none;
+}
+
+.legal-record {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+}
+
+.legal-record {
+    position: relative;
+}
+
+.legal-record + .legal-record::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 14px;
+    height: 1px;
+    background: var(--divider);
+}
+
+.legal-record-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.legal-record code {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.legal-chip {
+    padding: 2px 8px;
+    border-radius: var(--radius-chip);
+    background: var(--fill-active);
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+}
+
+.legal-record-purpose {
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.legal-record-term {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 18px;
+}
+
+.legal-records + p {
+    margin-top: 12px;
 }
 
 /* --- A sign-in link, a failure --- */
@@ -916,13 +1127,36 @@ body.signed-out .tabbar {
         background: var(--surface-1);
     }
 
-    .login-terms-note {
-        width: max-content;
-        max-width: 90vw;
+    .terms-logo {
+        display: flex;
+        width: 48px;
+        height: 48px;
+        margin: 0 0 24px;
+        border-radius: var(--radius-btn);
     }
 
-    .login-step .login-terms-note {
-        display: block;
+    .terms-logo .icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .terms-main .terms-check {
+        margin-top: 16px;
+    }
+
+    .terms-actions {
+        padding-top: 16px;
+        padding-bottom: 0;
+    }
+
+    .login-pick .terms-check {
+        order: 3;
+        margin: 12px 0 0;
+    }
+
+    /* The card is the group's surface here: the group a step above it */
+    .legal-records {
+        background: var(--surface-2);
     }
 
     .login-pick {
@@ -975,7 +1209,7 @@ body.signed-out .tabbar {
 
     .login-tg {
         order: 3;
-        margin-top: 24px;
+        margin-top: 8px;
     }
 
     #login-tg-error {

@@ -20,6 +20,7 @@ const MiniAppLaunch = require('./models/MiniAppLaunch');
 const AccountPassword = require('./models/AccountPassword');
 const PanelRole = require('./models/PanelRole');
 const HiddenChat = require('./models/HiddenChat');
+const TermsAcceptance = require('./models/TermsAcceptance');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -59,5 +60,6 @@ module.exports = {
     MiniAppLaunch,
     AccountPassword,
     PanelRole,
-    HiddenChat
+    HiddenChat,
+    TermsAcceptance
 };

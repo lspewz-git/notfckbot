@@ -5,10 +5,13 @@
  */
 const auth = require('./auth');
 const devices = require('./devices');
+const { termsState } = require('./terms');
 const { log } = require('../log');
 
 const OPEN = /^\/login(\/telegram(\/poll|\/cancel)?|\/password|\/miniapp)?$/;
 const ANY_ROLE = /^\/(account\/|poster\/|logout$)/;
+// What a signed-in person may do before accepting the current Terms and Privacy Policy
+const BEFORE_TERMS = /^\/(account\/(me|terms|activity)|logout)$/;
 
 async function guard(req, res, next) {
     if (OPEN.test(req.path)) return next();
@@ -29,6 +32,8 @@ async function guard(req, res, next) {
             // For the Devices list: never in the way of the request
             auth.noteSession(req, session).catch((err) => log.warn(`[Account] Session note failed: ${err.message}`));
         }
+        if (!BEFORE_TERMS.test(req.path) && (await termsState(session)) !== 'ok')
+            return res.status(428).json({ error: 'Accept the terms to continue.', terms: true });
         if (session.role === 'admin' || ANY_ROLE.test(req.path)) return next();
         log.warn(`[Account] User ${session.userId} refused ${req.method} /api${req.path}: admins only`);
         res.status(403).json({ error: 'Only for the panel admins' });

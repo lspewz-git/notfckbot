@@ -32,10 +32,34 @@ const BRAND =
     `<div class="login-brand"><div class="rail-logo login-logo" aria-hidden="true">${icon('clapperboard')}</div>` +
     '<h1 id="login-title" tabindex="-1">NotFckBot</h1></div>';
 
-const LEGAL_NOTICE =
-    '<p class="login-terms-note">By continuing, you agree to the ' +
-    '<button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button> ' +
-    'and acknowledge the <button type="button" class="login-terms-link" data-action="login-privacy">Privacy Policy</button>.</p>';
+// The checkbox on the sign-in screen and "Before you start": kept while the documents are opened and closed
+let termsChecked = false;
+/** @type {null | 'first' | 'updated'} "Before you start" is up, and which text it shows */
+let termsNeeded = null;
+/** @type {(value?: unknown) => void} resolves the wait of startSession once "Before you start" is accepted */
+let termsDone = () => {};
+
+/** The Terms and Privacy checkbox (src/account/terms.js): a native one, its links open the documents. */
+const termsCheckbox = () =>
+    '<div class="terms-check"><label class="terms-row">' +
+    `<span class="terms-box"><input id="terms-cb" type="checkbox"${termsChecked ? ' checked' : ''} />${icon('check', 'terms-tick')}</span>` +
+    '<span class="terms-text">I accept the ' +
+    '<button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button> and the ' +
+    // WebKit wraps before a comma after a button: the two stay together
+    '<span class="terms-nowrap"><button type="button" class="login-terms-link" data-action="login-privacy">Privacy Policy</button>,</span> ' +
+    'including the sign-in cookies they describe</span></label>' +
+    '<p class="terms-err" id="terms-err" role="alert" hidden>Accept the terms to continue</p></div>';
+
+/** Pressed without the checkbox: the error under it, focus on it. @returns {boolean} whether it's checked */
+function termsGuard() {
+    if (termsChecked) return true;
+    const box = /** @type {HTMLInputElement | null} */ (document.getElementById('terms-cb'));
+    $('terms-err').hidden = false;
+    box?.setAttribute('aria-describedby', 'terms-err');
+    box?.classList.add('is-error');
+    box?.focus();
+    return false;
+}
 
 /** A way's screen: the round Back to the ways in, then its title. */
 const stepHead = (title) =>
@@ -259,6 +283,7 @@ const tile = (action, name, label, waits, cls = '') =>
  */
 function signInScreen(banner = '', restoreFocus = $('login-body').contains(document.activeElement)) {
     discardChallenges();
+    termsNeeded = null;
     if (miniApp) return miniAppScreen(banner, restoreFocus);
     gate(
         (banner ? `<div class="login-banner">${loginAlert('login-error', banner)}</div>` : '') +
@@ -266,6 +291,7 @@ function signInScreen(banner = '', restoreFocus = $('login-body').contains(docum
             '<section class="login-pick" aria-labelledby="login-title">' +
             BRAND +
             '<h2 class="login-heading">Sign in</h2>' +
+            termsCheckbox() +
             // A first time in signs up too: the bot is started on the way (with sign-up open)
             `<a id="login-tg" class="btn btn-primary login-tg"${botTarget()} aria-disabled="true" aria-busy="true" aria-describedby="login-tg-hint" data-action="login-telegram">` +
             `${SPINNER}${icon('send', 'login-tg-send')}<span>Continue with Telegram</span></a>` +
@@ -277,8 +303,7 @@ function signInScreen(banner = '', restoreFocus = $('login-body').contains(docum
             tile('login-code', 'binary', 'Bot code', true) +
             tile('login-password', 'key-round', 'Password', false) +
             '</div></section>' +
-            '</div>' +
-            LEGAL_NOTICE,
+            '</div>',
         'start'
     );
     if (restoreFocus) $('login-title').focus();
@@ -435,7 +460,7 @@ function pendingBody(start, mode) {
 /** @param {Challenge} start @param {Mode} mode */
 function pendingScreen(start, mode) {
     unwatch();
-    gate(`<div class="login-panel">${pendingBody(start, mode)}</div>${LEGAL_NOTICE}`, 'step');
+    gate(`<div class="login-panel">${pendingBody(start, mode)}</div>`, 'step');
     focusStep();
     watchPending(start, mode);
 }
@@ -525,8 +550,7 @@ function passwordScreen() {
             stepHead('Sign in with password') +
             '<p class="login-lead">Works if you’ve set a password in Account settings.</p>' +
             signInForm() +
-            '</div>' +
-            LEGAL_NOTICE,
+            '</div>',
         'step'
     );
     focusStep();
@@ -535,12 +559,52 @@ function passwordScreen() {
 /** @param {{title: string, body: string}} document */
 function legalScreen({ title, body }) {
     discardChallenges();
+    // Opened from "Before you start": Back returns there, not to the ways in
+    const head = termsNeeded
+        ? stepHead(title).replace('data-action="login-cancel"', 'data-action="terms-back"')
+        : stepHead(title);
     gate(
-        `<div class="login-panel"><div class="login-terms-top">${stepHead(title)}</div><div class="login-terms">${body}</div></div>`,
+        `<div class="login-panel"><div class="login-terms-top">${head}</div><div class="login-terms">${body}</div></div>`,
         'step login-terms-screen'
     );
     focusStep();
 }
+
+/**
+ * "Before you start": signed in, but the current Terms and Privacy Policy aren't accepted yet (the
+ * Mini App, a sign-in link, an older session, a new version). The panel's API answers 428 until then.
+ * @param {'first' | 'updated'} state
+ */
+function termsScreen(state) {
+    discardChallenges();
+    termsNeeded = state;
+    gate(
+        '<main class="login-panel terms-panel" aria-labelledby="bys-title">' +
+            '<div class="terms-main">' +
+            `<div class="rail-logo login-logo terms-logo" aria-hidden="true">${icon('file-text')}</div>` +
+            '<h1 id="bys-title" class="login-step-title" tabindex="-1">Before you start</h1>' +
+            (state === 'updated'
+                ? '<p class="login-lead">We’ve updated the Terms of Service and the Privacy Policy. Accept them to continue.</p>' +
+                  '<button type="button" class="terms-changed" data-action="login-privacy">What changed</button>'
+                : '<p class="login-lead">To use NotFckBot, accept the terms. We keep a sign-in cookie on this device so you stay signed in.</p>') +
+            termsCheckbox() +
+            '</div>' +
+            '<div class="login-actions terms-actions">' +
+            '<button type="button" class="btn btn-primary" data-action="terms-accept">Continue</button>' +
+            '<button type="button" class="login-text-btn" data-action="logout">Sign out</button>' +
+            '</div></main>',
+        'accept'
+    );
+    $('bys-title').focus();
+}
+
+/** Shows "Before you start" and waits until the terms are accepted (signing out reloads the page). */
+const acceptedTerms = (state) =>
+    new Promise((resolve) => {
+        termsDone = resolve;
+        termsChecked = false;
+        termsScreen(state);
+    });
 
 /** /login/<token>: spent only by the press (a messenger's link preview must not use it up). */
 const linkScreen = (error = '') => {
@@ -553,8 +617,7 @@ const linkScreen = (error = '') => {
                   '<button type="button" class="btn btn-primary" data-action="login-link-again">Sign in again</button>'
                 : '<button type="button" class="btn btn-primary" data-action="login-link">Sign in</button>' +
                   '<p class="login-hint">A sign-in link from the bot.</p>') +
-            '</div></div>' +
-            LEGAL_NOTICE,
+            '</div></div>',
         'link'
     );
 };
@@ -721,6 +784,19 @@ export async function startSession(preferredChat = null, { current = () => true,
         if (initData) bridge.postEvent('web_app_ready', '{}');
     }
     started = true;
+    if (me.terms && me.terms !== 'ok') {
+        // Checked on the sign-in screen of this page: recorded now; otherwise "Before you start"
+        const recorded =
+            termsChecked &&
+            (await api('/account/terms', { method: 'POST', body: { source: 'signin' } }).then(
+                () => true,
+                () => false
+            ));
+        if (!recorded) await acceptedTerms(me.terms);
+        termsNeeded = null;
+    }
+    // Never ticked in advance for the next person or the next version
+    termsChecked = false;
     openedChat = me.user.system ? null : preferredChat;
     if (miniApp) miniApp.chat = null;
     setMe(me.user);
@@ -747,8 +823,15 @@ export async function startSession(preferredChat = null, { current = () => true,
 /** Back to the sign-in screen when a request says the session is over (api.js sends the event). */
 export function watchSession() {
     window.addEventListener('session-ended', () => {
-        if (started && !document.body.classList.contains('signed-out'))
+        if (started && !document.body.classList.contains('signed-out')) {
+            termsChecked = false;
             signInScreen('Your session has ended. Sign in again.');
+        }
+    });
+    // The documents changed while the panel was open (api.js sends the event on a 428)
+    window.addEventListener('terms-needed', () => {
+        if (started && !termsNeeded && !document.body.classList.contains('signed-out'))
+            acceptedTerms('updated').then(() => location.reload());
     });
     let lastActivity = 0;
     let sending = false;
@@ -804,6 +887,29 @@ export function sessionActions(onSignedIn) {
         if (role) onSignedIn(role);
     };
     const gateEl = $('login-gate');
+    // No way in starts before the Terms checkbox (the server refuses the panel without it all the same)
+    gateEl.addEventListener(
+        'click',
+        (event) => {
+            const way = /** @type {HTMLElement} */ (event.target).closest(
+                '.login-pick :is([data-action="login-telegram"], [data-action="login-qr"], [data-action="login-code"], [data-action="login-password"])'
+            );
+            if (!way || termsChecked) return;
+            event.preventDefault();
+            event.stopPropagation();
+            termsGuard();
+        },
+        true
+    );
+    gateEl.addEventListener('change', (event) => {
+        const box = /** @type {HTMLInputElement} */ (event.target);
+        if (box.id !== 'terms-cb') return;
+        termsChecked = box.checked;
+        if (!termsChecked) return;
+        $('terms-err').hidden = true;
+        box.removeAttribute('aria-describedby');
+        box.classList.remove('is-error');
+    });
     // The password form's Sign in waits for both fields
     gateEl.addEventListener('input', (event) => {
         const form = /** @type {HTMLElement} */ (event.target).closest('form[data-login="password"]');
@@ -880,6 +986,23 @@ export function sessionActions(onSignedIn) {
                 toast("Couldn't copy. Type the code instead.", 'error');
             }
         },
+        'terms-accept': async (el) => {
+            if (!termsGuard()) return;
+            const button = /** @type {HTMLButtonElement} */ (el);
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            try {
+                await api('/account/terms', { method: 'POST', body: { source: 'before-you-start' } });
+                termsNeeded = null;
+                termsDone();
+            } catch (err) {
+                button.disabled = false;
+                button.removeAttribute('aria-busy');
+                // A 401 has already put the sign-in screen up
+                if (err.status !== 401) toast(err.message, 'error');
+            }
+        },
+        'terms-back': () => termsScreen(termsNeeded || 'first'),
         'login-terms': () => legalScreen(TERMS),
         'login-privacy': () => legalScreen(PRIVACY),
         'login-password': () => passwordScreen(),

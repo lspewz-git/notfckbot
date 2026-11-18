@@ -6,6 +6,7 @@ const API_URL = '/api';
 async function jsonResponse(res) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) window.dispatchEvent(new Event('session-ended'));
+    if (res.status === 428 && data.terms) window.dispatchEvent(new Event('terms-needed'));
     if (!res.ok || data.error) {
         const err = /** @type {Error & { status?: number, data?: any }} */ (
             new Error(data.error || `HTTP ${res.status}`)

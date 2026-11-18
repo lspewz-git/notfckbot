@@ -19,6 +19,7 @@ const {
     AccountPassword,
     PanelRole,
     HiddenChat,
+    TermsAcceptance,
     Chat,
     Watchlist,
     Subscription
@@ -28,6 +29,7 @@ const roles = require('../../src/account/roles');
 const password = require('../../src/account/password');
 const members = require('../../src/account/members');
 const devices = require('../../src/account/devices');
+const terms = require('../../src/account/terms');
 const { guard } = require('../../src/account/guard');
 const { panelOnly } = require('../../src/admin/panel-only');
 
@@ -40,6 +42,8 @@ let passwords;
 let panelRoles;
 // AccountDevice's rows
 let deviceRows;
+// TermsAcceptance's rows (null: everyone has accepted the current versions)
+let acceptances;
 
 /** AccountDevice's where: the fields the code asks by, with Op.ne / Op.lte / Op.lt. */
 function deviceMatch(row, where) {
@@ -128,6 +132,15 @@ beforeEach(() => {
             mock.method(model, method, fake[method]);
     }
     members.forget();
+    // Everyone has accepted the current Terms and Privacy Policy, unless a test says otherwise
+    terms.forgetTerms();
+    acceptances = null;
+    mock.method(TermsAcceptance, 'findAll', async ({ where }) =>
+        acceptances
+            ? acceptances.filter((r) => r.userId === where.userId)
+            : [{ termsVersion: terms.TERMS_VERSION, privacyVersion: terms.PRIVACY_VERSION }]
+    );
+    mock.method(TermsAcceptance, 'create', async (row) => (acceptances || (acceptances = [])).push({ ...row }));
     deviceRows = [];
     devices.resetDevices();
     const matching = (where) => deviceRows.filter((row) => deviceMatch(row, where));
@@ -766,6 +779,62 @@ test('poster images need a session and work for users without the request marker
     assert.equal((await fetch(url)).status, 401);
     const cookie = await signIn(call, '7');
     assert.equal((await fetch(url, { headers: { Cookie: `nfb_session=${cookie}` } })).status, 204);
+});
+
+test('the Terms: the panel answers 428 until the current versions are accepted; each acceptance is recorded', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findAll', async () => []);
+    acceptances = [];
+    const user = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).body.terms, 'first');
+    const refused = await call('GET', '/api/account/chats', { cookie: user });
+    assert.deepEqual([refused.status, refused.body.terms], [428, true]);
+    assert.equal((await call('POST', '/api/account/activity', { cookie: user })).status, 200, 'allowed before');
+    assert.equal(
+        (await call('POST', '/api/account/terms', { cookie: user, body: { source: 'cookie-banner' } })).status,
+        400
+    );
+    const ok = await call('POST', '/api/account/terms', { cookie: user, body: { source: 'signin' }, ua: 'Test' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(
+        acceptances.map(({ userId, termsVersion, privacyVersion, source, userAgent }) => ({
+            userId,
+            termsVersion,
+            privacyVersion,
+            source,
+            userAgent
+        })),
+        [
+            {
+                userId: '7',
+                termsVersion: terms.TERMS_VERSION,
+                privacyVersion: terms.PRIVACY_VERSION,
+                source: 'signin',
+                userAgent: 'Test'
+            }
+        ]
+    );
+    assert.equal((await call('GET', '/api/account/chats', { cookie: user })).status, 200);
+    await call('POST', '/api/account/terms', { cookie: user, body: { source: 'signin' } });
+    assert.equal(acceptances.length, 1, 'accepted already: no second row');
+
+    // An older version accepted: "Before you start" says the documents were updated
+    terms.forgetTerms();
+    acceptances = [{ userId: '7', termsVersion: '2026-01-01', privacyVersion: terms.PRIVACY_VERSION }];
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).body.terms, 'updated');
+    assert.equal((await call('GET', '/api/account/chats', { cookie: user })).status, 428);
+    // Signing out needs no acceptance
+    assert.equal((await call('POST', '/api/logout', { cookie: user })).status, 200);
+});
+
+test('the Terms: the system account needs none; the page shows the date the server records', async () => {
+    assert.equal(await terms.termsState({ userId: '0', system: true }), 'ok');
+    const page = require('fs').readFileSync(require.resolve('../../admin/js/legal.js'), 'utf8');
+    const shown = /const VERSION = '(\d+) (\w+) (\d{4})'/.exec(page);
+    const date = new Date(`${shown[2]} ${shown[1]}, ${shown[3]} UTC`).toISOString().slice(0, 10);
+    assert.equal(date, terms.TERMS_VERSION);
+    assert.equal(date, terms.PRIVACY_VERSION);
 });
 
 test('the API: a session for everything but signing in; the panel itself for admins only', async (t) => {
