@@ -1293,16 +1293,19 @@
                             <p class="tab-top-sub">
                                 Series and films already released among this chat’s subscriptions.
                             </p>
-                            <a
-                                class="search-pill"
-                                href="#my-search"
-                                data-action="mine-search-open"
-                                data-section="my-search"
-                            >
+                            <!-- Filters this tab's own list (account.js); the catalog search is Following's + -->
+                            <label class="search-pill">
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                     <use href="#i-search" /></svg
-                                ><span>Search series and films</span>
-                            </a>
+                                ><input
+                                    type="search"
+                                    data-tab-find="aired"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Search released titles"
+                                    placeholder="Search released"
+                                />
+                            </label>
                         </header>
                         <div id="my-aired-body" class="mine-body" aria-live="polite"></div>
                     </section>
@@ -1313,16 +1316,18 @@
                                 <div class="mine-chat" data-chat-picker></div>
                             </div>
                             <p class="tab-top-sub">Series and films the bot writes about in the chosen chat.</p>
-                            <a
-                                class="search-pill"
-                                href="#my-search"
-                                data-action="mine-search-open"
-                                data-section="my-search"
-                            >
+                            <label class="search-pill">
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                     <use href="#i-search" /></svg
-                                ><span>Search series and films</span>
-                            </a>
+                                ><input
+                                    type="search"
+                                    data-tab-find="subs"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Search following titles"
+                                    placeholder="Search following"
+                                />
+                            </label>
                         </header>
                         <div id="my-subs-body" class="mine-body" aria-live="polite"></div>
                     </section>
@@ -1334,16 +1339,18 @@
                                 <div class="mine-chat" data-chat-picker></div>
                             </div>
                             <p class="tab-top-sub">What comes out among the chosen chat’s subscriptions.</p>
-                            <a
-                                class="search-pill"
-                                href="#my-search"
-                                data-action="mine-search-open"
-                                data-section="my-search"
-                            >
+                            <label class="search-pill">
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                                     <use href="#i-search" /></svg
-                                ><span>Search series and films</span>
-                            </a>
+                                ><input
+                                    type="search"
+                                    data-tab-find="calendar"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Search calendar titles"
+                                    placeholder="Search calendar"
+                                />
+                            </label>
                         </header>
                         <div id="my-calendar-body" class="mine-body" aria-live="polite"></div>
                     </section>

@@ -66,7 +66,11 @@ test.describe('shared cards and calendar unfollow', () => {
 
     test('Following and Calendar share the title card: rows without data are left out', async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });
-        panel.account.calendar.items.filter(item => item.kind === 'movie' && item.overview).forEach(item => { item.overview = 'A long calendar overview. '.repeat(100); });
+        panel.account.calendar.items
+            .filter((item) => item.kind === 'movie' && item.overview)
+            .forEach((item) => {
+                item.overview = 'A long calendar overview. '.repeat(100);
+            });
         await openSection(page, 'my-subs');
         await expect(page.locator('#my-subs-section h1')).toHaveText('Following');
         await page.locator('[data-action="mine-subs-tab"][data-tab="films"]').click();
@@ -77,7 +81,9 @@ test.describe('shared cards and calendar unfollow', () => {
         await expect(card.locator('.tc-date')).toHaveCount(2);
         await expect(card.locator('.tc-date').first()).toContainText('6 Nov 2026');
         await expect(card.locator('.tc-overview')).toBeVisible();
-        await card.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(animation=>animation.finished)));
+        await card
+            .locator('.title-sheet')
+            .evaluate((el) => Promise.all(el.getAnimations().map((animation) => animation.finished)));
         const gap = await card.evaluate((el) => {
             const above = el.querySelector('.tc-link').getBoundingClientRect();
             return el.querySelector('.tc-actions').getBoundingClientRect().top - above.bottom;
@@ -180,27 +186,53 @@ test.describe('unfollow service outage', () => {
 
 test.describe('the title search page', () => {
     watchConsole();
-    test('the search pill opens it from each tab; Back returns there; results Follow or show Following', async ({
-        page
-    }) => {
+    test("each tab's field filters only that tab's list, never the catalog", async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });
-        for (const section of ['my-calendar', 'my-aired', 'my-subs']) {
+        const rows = {
+            'my-calendar': '#my-calendar-body .cal-row',
+            'my-aired': '#my-aired-body .history-open',
+            'my-subs': '#my-subs-body .title-row'
+        };
+        for (const [section, row] of Object.entries(rows)) {
             await openSection(page, section);
-            await page.locator(`#${section}-section .search-pill`).click();
-            await expect(page.locator('#my-search-section')).toHaveClass(/active/);
-            await expect(page.locator('#mine-q')).toBeFocused();
-            await expect(page.locator('#mine-results')).toContainText('Find a series or film');
-            await page.locator('#mine-search-back').click();
-            await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
+            const first = page.locator(row).first();
+            await expect(first).toBeVisible();
+            const title = (await first.locator('.row-name').textContent()).trim();
+            const field = page.locator(`#${section}-section [data-tab-find]`);
+            await field.fill(title.slice(0, 4));
+            await expect(page.locator('#my-search-section')).not.toHaveClass(/active/);
+            for (const name of await page.locator(`${row} .row-name`).allTextContents())
+                expect(name.toLowerCase()).toContain(title.slice(0, 4).toLowerCase());
+            await field.fill('zzzzqq');
+            await expect(page.locator(row)).toHaveCount(0);
+            await expect(page.locator(`#${section}-section`)).toContainText(/No matching titles/);
+            await field.fill('');
+            await expect(page.locator(row).first()).toBeVisible();
         }
-        // Following's "+" opens it too; typing searches after a pause
+        expect(panel.account.sent.filter((r) => r.path.includes('/search'))).toHaveLength(0);
+        // The + drops Following's filter, so a title added from the catalog shows on return
+        await page.locator('#my-subs-section [data-tab-find]').fill('zzzzqq');
+        await page.getByRole('link', { name: 'Follow a title' }).click();
+        await page.locator('#mine-search-back').click();
+        await expect(page.locator('#my-subs-section [data-tab-find]')).toHaveValue('');
+        await expect(page.locator(rows['my-subs']).first()).toBeVisible();
+    });
+
+    test("Following's + opens it; Back returns there; results Follow or show Following", async ({ page }) => {
+        const panel = await mockPanel(page, { role: 'user' });
+        await openSection(page, 'my-subs');
+        await page.getByRole('link', { name: 'Follow a title' }).click();
+        await expect(page.locator('#my-search-section')).toHaveClass(/active/);
+        await expect(page.locator('#mine-q')).toBeFocused();
+        await expect(page.locator('#mine-results')).toContainText('Find a series or film');
+        await page.locator('#mine-search-back').click();
+        await expect(page.locator('#my-subs-section')).toHaveClass(/active/);
+        // Typing searches after a pause
         await page.getByRole('link', { name: 'Follow a title' }).click();
         await page.locator('#mine-q').fill('Дюна');
         await expect(page.locator('#mine-results .search-row')).toHaveCount(3);
         expect(panel.account.sent.filter((r) => r.path.includes('/search'))).toHaveLength(1);
-        await expect(page.locator('#mine-results .search-row', { hasText: 'Часть третья' })).toContainText(
-            'Following'
-        );
+        await expect(page.locator('#mine-results .search-row', { hasText: 'Часть третья' })).toContainText('Following');
         // The clear cross empties the field and the results
         await page.getByRole('button', { name: 'Clear search', exact: true }).click();
         await expect(page.locator('#mine-q')).toHaveValue('');
@@ -219,8 +251,6 @@ test.describe('the title search page', () => {
             tmdbId: 'tv_500',
             mode: 'first_and_full'
         });
-        await expect(page.locator('#mine-results .search-row', { hasText: 'Пророчество' })).toContainText(
-            'Following'
-        );
+        await expect(page.locator('#mine-results .search-row', { hasText: 'Пророчество' })).toContainText('Following');
     });
 });

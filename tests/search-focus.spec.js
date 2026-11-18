@@ -4,7 +4,8 @@ const { watchConsole, openSection } = require('./helpers');
 
 watchConsole();
 
-for (const section of ['my-calendar', 'my-aired', 'my-subs']) {
+// The catalog search opens only from Following's +; the other tabs' fields filter their own list
+for (const section of ['my-subs']) {
     test(`search focuses during the opening tap from ${section}`, async ({ page }) => {
         await mockPanel(page, { role: 'user' });
         await openSection(page, section);
@@ -45,8 +46,8 @@ for (const section of ['my-calendar', 'my-aired', 'my-subs']) {
 
 test('search input has an iOS-safe font size without disabling pinch zoom', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
-    await openSection(page, 'my-calendar');
-    await page.locator('#my-calendar-section [data-action="mine-search-open"]').click();
+    await openSection(page, 'my-subs');
+    await page.locator('#my-subs-section [data-action="mine-search-open"]').click();
     expect(
         await page.locator('#mine-q').evaluate((input) => parseFloat(getComputedStyle(input).fontSize))
     ).toBeGreaterThanOrEqual(16);
@@ -56,7 +57,7 @@ test('search input has an iOS-safe font size without disabling pinch zoom', asyn
 
 test('Cancel ignores a search response arriving after reopening', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
-    await openSection(page, 'my-calendar');
+    await openSection(page, 'my-subs');
     let release;
     const held = new Promise((resolve) => (release = resolve));
     let arrived;
@@ -66,12 +67,12 @@ test('Cancel ignores a search response arriving after reopening', async ({ page 
         await held;
         await route.fulfill({ json: [{ tmdbId: 'late', title: 'Late result', kind: 'movie' }] });
     });
-    await page.locator('#my-calendar-section .search-pill').click();
+    await page.locator('#my-subs-section [data-action="mine-search-open"]').click();
     await page.locator('#mine-q').fill('late');
     await page.locator('#mine-q').press('Enter');
     await started;
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await page.locator('#my-calendar-section .search-pill').click();
+    await page.locator('#my-subs-section [data-action="mine-search-open"]').click();
     const answered = page.waitForResponse((response) => response.url().includes('/search?q=late'));
     release();
     await answered;

@@ -62,6 +62,27 @@
     flex: none;
 }
 
+.search-pill:has(input:focus-visible) {
+    border-color: var(--focus-ring);
+}
+
+.search-pill input {
+    flex: 1;
+    min-width: 0;
+    height: 42px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-lg);
+    outline: none;
+}
+
+.search-pill input::placeholder {
+    color: var(--text-dim);
+}
+
 @media (hover: hover) {
     .search-pill:hover {
         background: var(--surface-2);

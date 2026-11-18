@@ -1665,7 +1665,7 @@ test('the tab header: title and chat chip on one row, the line, the search pill 
     expect(marks.tab).toBe('rgba(255, 255, 255, 0.1)');
     expect(marks.icon).toBe('rgba(0, 0, 0, 0)');
     // The search page counts under Following
-    await page.locator('#my-subs-section .search-pill').click();
+    await page.getByRole('link', { name: 'Follow a title' }).click();
     await expect(page.locator('.tabbar .tab-item[data-section="my-subs"]')).toHaveAttribute('aria-current', 'true');
 });
 

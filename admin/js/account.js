@@ -73,8 +73,14 @@ const state = {
     results: [],
     /** @type {string | null} why the last search failed */
     searchError: null,
-    searching: false
+    searching: false,
+    /** What is typed in each tab's own search field, lower case */
+    find: { aired: '', subs: '', calendar: '' }
 };
+
+/** @param {'subs' | 'calendar'} tab */
+const matches = (tab, title) => String(title).toLocaleLowerCase().includes(state.find[tab]);
+const noMatch = () => empty('No matching titles', 'Try another title.', 'search');
 
 /** The signed-in person's name (profile.js): their private chat's avatar shows its first letter */
 let ownName = '';
@@ -329,9 +335,10 @@ const filmNote = (film) =>
         : 'Release date unknown';
 
 function subsView() {
-    const list = state.list;
-    const running = list.series.filter((s) => !s.finished);
-    const archive = list.series.filter((s) => s.finished);
+    const series = state.list.series.filter((s) => matches('subs', s.title));
+    const list = { series, films: state.list.films.filter((f) => matches('subs', f.title)) };
+    const running = series.filter((s) => !s.finished);
+    const archive = series.filter((s) => s.finished);
     const tab = state.subsTab;
     const top =
         '<div class="cat-bar">' +
@@ -362,7 +369,9 @@ function subsView() {
                       })
                   )
                   .join('')}</ul>`
-            : empty('No films waiting', 'Find a film and follow it: the bot writes when it comes out.', 'film');
+            : state.find.subs
+              ? noMatch()
+              : empty('No films waiting', 'Find a film and follow it: the bot writes when it comes out.', 'film');
     } else {
         const items = tab === 'archive' ? archive : running;
         body = items.length
@@ -378,9 +387,11 @@ function subsView() {
                       })
                   )
                   .join('')}</ul>`
-            : tab === 'archive'
-              ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.', 'tv')
-              : empty('No series yet', 'Find a series and follow its new episodes.', 'tv');
+            : state.find.subs
+              ? noMatch()
+              : tab === 'archive'
+                ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.', 'tv')
+                : empty('No series yet', 'Find a series and follow its new episodes.', 'tv');
     }
     return top + body;
 }
@@ -619,6 +630,7 @@ function getAiredHistory() {
 }
 function resetAired() {
     airedHistory?.reset();
+    airedHistory?.filter(state.find.aired);
     closeModal('released-modal');
     const body = $('my-aired-body');
     if (body) body.innerHTML = loading(6);
@@ -660,11 +672,18 @@ const monthTitle = (key, today) =>
 function daysBody(data) {
     const shown = data.items
         .map((item, index) => ({ item, index }))
-        .filter(({ item }) => calWhatOf(item.kind) === state.calWhat && daysUntil(item.date, data.today) >= -1);
+        .filter(
+            ({ item }) =>
+                calWhatOf(item.kind) === state.calWhat &&
+                daysUntil(item.date, data.today) >= -1 &&
+                matches('calendar', item.title)
+        );
     if (!shown.length)
-        return state.calWhat === 'films'
-            ? empty('No films coming', 'No films on the list have a release date yet.', 'film')
-            : empty('No episodes coming', 'No followed series have dated episodes yet.', 'calendar-days');
+        return state.find.calendar
+            ? noMatch()
+            : state.calWhat === 'films'
+              ? empty('No films coming', 'No films on the list have a release date yet.', 'film')
+              : empty('No episodes coming', 'No followed series have dated episodes yet.', 'calendar-days');
     const months = [];
     for (const entry of shown) {
         const key = entry.item.date.slice(0, 7);
@@ -1036,6 +1055,12 @@ export const accountActions = {
             const back = $(id);
             if (back) back.dataset.section = searchFrom;
         }
+        // A title added from the catalog must show in Following on return, so its filter goes
+        const field = /** @type {HTMLInputElement | null} */ (document.querySelector('[data-tab-find="subs"]'));
+        if (field?.value) {
+            field.value = state.find.subs = '';
+            if (state.list) $('my-subs-body').innerHTML = subsView();
+        }
     },
     'mine-search-close': () => {
         window.clearTimeout(searchTimer);
@@ -1117,6 +1142,15 @@ export function setupAccount() {
     // The search runs as the person types (after a pause), or at once on Enter (setupSearchForms)
     document.addEventListener('input', (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
+        const tab = input.dataset?.tabFind;
+        if (tab) {
+            // A tab's own field filters only what that tab already shows; the catalog is Following's +
+            state.find[tab] = input.value.trim().toLocaleLowerCase();
+            if (tab === 'aired') getAiredHistory().filter(input.value);
+            else if (tab === 'subs' && state.list) $('my-subs-body').innerHTML = subsView();
+            else if (tab === 'calendar' && state.cal) $('my-calendar-body').innerHTML = calendarView(state.cal);
+            return;
+        }
         if (input.id !== 'mine-q') return;
         syncSearchField();
         window.clearTimeout(searchTimer);
