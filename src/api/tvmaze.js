@@ -196,11 +196,13 @@ const checkBudget = (ms = CHECK_BUDGET_MS) => ({ left: ms });
 
 /**
  * airTimes() for the update check: a fresh schedule, else the cached one when TVmaze doesn't
- * answer, else null. Never throws. Once the check's budget is spent, the cached one at once.
+ * answer, else undefined (null: not on TVmaze). Never throws. Once the check's budget is spent,
+ * the cached one at once.
  * @param {{ left: number }} [budget] from checkBudget()
  */
 async function airTimesForCheck(tmdbId, externals, budget = null) {
-    const cached = () => cachedAirTimes(tmdbId) || null;
+    // undefined stays: the check holds back season completion without TVmaze (src/cron/series.js)
+    const cached = () => cachedAirTimes(tmdbId);
     if (budget && budget.left <= 0) return cached();
     const started = Date.now();
     const asked = airTimes(tmdbId, externals, { fresh: true }).catch(cached);

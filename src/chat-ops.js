@@ -8,7 +8,13 @@ const { withTvmazeQuick } = require('./episode-times');
 const { ZONES, isHour } = require('./quiet');
 const { sentMarkOnEnable } = require('./cron/digests');
 // The update check's own rule, so a film added now is filed exactly as the check would announce it
-const { isReleased: filmIsReleased, isOnline, storedDates, RELEASE_RULE_VERSION } = require('./film-release');
+const {
+    isReleased: filmIsReleased,
+    isOnline,
+    isRussian,
+    storedDates,
+    RELEASE_RULE_VERSION
+} = require('./film-release');
 const kinopoisk = require('./api/kinopoisk');
 const { todayIn } = require('./calendar');
 const { NOTIFY_LABELS } = require('./constants');
@@ -105,7 +111,10 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
 
     details ||= await tmdb.getDetails(numericId, 'movie');
     // Russia's dates count too, as in the update check: a quick lookup (3 s at most, never throws)
-    const { ru } = await kinopoisk.kinopoiskQuick(fullTmdbId, details.imdb_id);
+    const { ru, pending } = await kinopoisk.kinopoiskQuick(fullTmdbId, details.imdb_id);
+    // A Russian film's release is Kinopoisk's date: without its answer the first check decides,
+    // silently (initialReleaseState()), so a film long out isn't announced as new
+    const ruUnknown = !waitingOnly && (pending || ru.failed) && isRussian(details);
     const today = todayIn(chat.timezone);
     const isReleased = filmIsReleased(details, ru, today);
     // A released film is stored straight into Released; one record there is enough
@@ -123,7 +132,7 @@ async function addFilm(chatId, tmdbId, who = {}, { details = null, waitingOnly =
         ...storedDates(details, ru),
         notified: waitingOnly ? false : isReleased,
         digital_notified: isOnline(details, ru, today),
-        release_rule_version: RELEASE_RULE_VERSION
+        release_rule_version: ruUnknown ? 0 : RELEASE_RULE_VERSION
     };
     const [entry, created] = waitingOnly
         ? await Watchlist.findOrCreate({ where: { chatId, tmdb_id: fullTmdbId, notified: false }, defaults: fields })

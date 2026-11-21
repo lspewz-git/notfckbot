@@ -82,7 +82,10 @@ test('the update check asks for a fresh schedule; when TVmaze fails it keeps the
     assert.deepEqual(asked, ['/shows/20/episodes']);
     asked = stub({ '/shows/20/episodes': Object.assign(new Error('503'), { response: { status: 503 } }) });
     assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_120', ids)), ['1:2'], 'the cached one');
-    assert.equal(await tvmaze.airTimesForCheck('tv_121', { imdb: 'tt21', tvdb: null }), null, 'nothing cached');
+    assert.equal(await tvmaze.airTimesForCheck('tv_121', { imdb: 'tt21', tvdb: null }), null, 'not on TVmaze');
+    stub({ '/lookup/shows?imdb=tt22': Object.assign(new Error('503'), { response: { status: 503 } }) });
+    // undefined, not null: the check then holds back "season complete" (src/cron/series.js)
+    assert.equal(await tvmaze.airTimesForCheck('tv_122', { imdb: 'tt22', tvdb: null }), undefined, 'nothing cached');
 });
 
 test("one show's list failing pauses nothing; a second address failing in a row pauses TVmaze", async () => {
@@ -95,11 +98,11 @@ test("one show's list failing pauses nothing; a second address failing in a row 
         '/shows/41/episodes': [{ season: 1, number: 1, airdate: '2099-01-01' }],
         '/lookup/shows?imdb=tt42': fail
     });
-    assert.equal(await tvmaze.airTimesForCheck('tv_140', { imdb: 'tt40', tvdb: null }), null);
+    assert.equal(await tvmaze.airTimesForCheck('tv_140', { imdb: 'tt40', tvdb: null }), undefined);
     assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_141', { imdb: 'tt41', tvdb: null })), ['1:1']);
     // The same soap again, then another address: two different failures in a row
-    assert.equal(await tvmaze.airTimesForCheck('tv_140', { imdb: 'tt40', tvdb: null }), null);
-    assert.equal(await tvmaze.airTimesForCheck('tv_142', { imdb: 'tt42', tvdb: null }), null);
+    assert.equal(await tvmaze.airTimesForCheck('tv_140', { imdb: 'tt40', tvdb: null }), undefined);
+    assert.equal(await tvmaze.airTimesForCheck('tv_142', { imdb: 'tt42', tvdb: null }), undefined);
     const count = asked.length;
     await assert.rejects(tvmaze.airTimes('tv_143', { imdb: 'tt43', tvdb: null }), /paused/);
     assert.equal(asked.length, count, 'paused: nothing asked');
@@ -141,7 +144,7 @@ test("the check's TVmaze budget: once spent, cached times at once and nothing as
     const asked = stub({});
     const budget = tvmaze.checkBudget(0);
     assert.deepEqual(Object.keys(await tvmaze.airTimesForCheck('tv_150', ids, budget)), ['1:1'], 'cached');
-    assert.equal(await tvmaze.airTimesForCheck('tv_151', { imdb: 'tt51', tvdb: null }, budget), null);
+    assert.equal(await tvmaze.airTimesForCheck('tv_151', { imdb: 'tt51', tvdb: null }, budget), undefined);
     assert.deepEqual(asked, []);
     // Time spent waiting comes off the budget
     const left = tvmaze.checkBudget(60000);

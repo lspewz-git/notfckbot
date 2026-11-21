@@ -180,5 +180,6 @@ module.exports = {
     ruCinemaDate,
     onlineCountry,
     rowFilmDates,
+    isRussian,
     RELEASE_RULE_VERSION
 };

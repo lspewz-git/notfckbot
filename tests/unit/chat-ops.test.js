@@ -118,6 +118,24 @@ test('a film added after its cinema premiere gets no premiere message (nor again
     assert.equal((await ops.addFilm(1, '1')).entry.notified, false);
 });
 
+test("a Russian film added while Kinopoisk is silent leaves its release to the first check's silent pass", async (t) => {
+    t.mock.method(Chat, 'findByPk', async () => ({ id: 1, timezone: 'UTC' }));
+    t.mock.method(Watchlist, 'findAll', async () => []);
+    // Out long ago by Kinopoisk only: TMDB has no Russian date
+    const details = { title: 'Фильм', status: 'Released', origin_country: ['RU'] };
+    t.mock.method(tmdb, 'getDetails', async () => details);
+    t.mock.method(Watchlist, 'create', async (fields) => fields);
+    t.mock.method(events, 'record', () => {});
+    t.mock.method(kinopoisk, 'kinopoiskQuick', async () => ({
+        kinopoiskId: null,
+        ru: kinopoisk.NO_DATES,
+        pending: true
+    }));
+    assert.equal((await ops.addFilm(1, '1')).entry.release_rule_version, 0);
+    details.origin_country = ['US'];
+    assert.equal((await ops.addFilm(1, '1')).entry.release_rule_version, 1, 'other films keep the usual rule');
+});
+
 test('film removal retains the chat boundary and removes only that row by default', async (t) => {
     const entry = { chatId: -10, tmdb_id: 'movie_1', title: 'Film', destroy: async () => {} };
     t.mock.method(Watchlist, 'findByPk', async () => entry);
