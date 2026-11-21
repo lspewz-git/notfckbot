@@ -164,6 +164,8 @@ select {
     display: none;
 }
 
+/* One chip look for the admin filters and the personal tabs' category chips (titles.css) */
+.cat-chip > span,
 .log-filters .btn,
 .tab-filters .btn {
     flex: none;
@@ -186,6 +188,7 @@ select {
     }
 }
 
+.cat-chip[aria-selected='true'] > span,
 .log-filters .btn.active,
 .tab-filters .btn.active {
     border-color: var(--text);
@@ -194,6 +197,7 @@ select {
     font-weight: 600;
 }
 
+.cat-chip[aria-selected='true'] .cat-count,
 .tab-filters .btn.active .cat-count {
     color: var(--chip-count-on);
 }

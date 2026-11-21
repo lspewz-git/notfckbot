@@ -156,7 +156,7 @@ export function renderSkeleton(type, rows = 4) {
             const isActions = i === columns.length - 1;
             const cls = isActions ? 'skeleton skeleton-btn' : 'skeleton';
             const width = isActions ? '100%' : SKELETON_WIDTHS[i % SKELETON_WIDTHS.length];
-            if (label === 'Series' || label === 'Film Title') {
+            if (label === 'Series' || label === 'Film title') {
                 return `<td data-label="${label}"><div class="title-with-poster"><span class="title-poster skeleton"></span><span class="skeleton" style="width:${width}"></span></div></td>`;
             }
             return `<td data-label="${label}"><span class="${cls}" style="width:${width}"></span></td>`;

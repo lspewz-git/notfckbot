@@ -13,7 +13,7 @@ async function goToMovies(page) {
     await expect(page.locator('#watchlist-body .skeleton-row')).toHaveCount(0, { timeout: 15_000 });
 }
 
-const titles = (page) => page.locator('#watchlist-body [data-label="Film Title"]').allInnerTexts();
+const titles = (page) => page.locator('#watchlist-body [data-label="Film title"]').allInnerTexts();
 
 // Column headers on wide screens; the header row is hidden on phones, where a Sort strip stands in
 function sortButton(page, key) {

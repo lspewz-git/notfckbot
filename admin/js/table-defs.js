@@ -177,7 +177,7 @@ export const TABLES = {
     films: {
         body: 'watchlist-body',
         filter: 'watchlist-filter',
-        columns: ['User', 'Film Title', 'Year', 'Release', 'Actions'],
+        columns: ['User', 'Film title', 'Year', 'Release', 'Actions'],
         table: 'watchlist-table',
         paged: true,
         sorts: {
@@ -206,7 +206,7 @@ export const TABLES = {
             return `
             <tr class="row-compact">
                 <td data-label="User">${escapeHtml(user)}</td>
-                <td data-label="Film Title"><div class="title-with-poster">${poster}<span class="link-text" data-action="film" data-id="${escapeHtml(item.tmdb_id)}" role="button" tabindex="0">${escapeHtml(item.title)}</span></div></td>
+                <td data-label="Film title"><div class="title-with-poster">${poster}<span class="link-text" data-action="film" data-id="${escapeHtml(item.tmdb_id)}" role="button" tabindex="0">${escapeHtml(item.title)}</span></div></td>
                 <td data-label="Year">${item.year || '—'}</td>
                 <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}${extras
                     .map((line) => `<span class="release-sub">${escapeHtml(line)}</span>`)
