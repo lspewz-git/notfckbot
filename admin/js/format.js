@@ -65,8 +65,8 @@ export function chatDisplayName(chat) {
 // TMDB reports one of: Returning Series / In Production / Planned / Pilot /
 // Ended / Canceled. There is no "paused" state in the API.
 const SERIES_STATUS = {
-    'Returning Series': { label: 'On Air', cls: 'ok' },
-    'In Production': { label: 'In Production', cls: 'warn' },
+    'Returning Series': { label: 'On air', cls: 'ok' },
+    'In Production': { label: 'In production', cls: 'warn' },
     Planned: { label: 'Planned', cls: 'warn' },
     Pilot: { label: 'Pilot', cls: 'warn' },
     Ended: { label: 'Ended', cls: 'muted' },

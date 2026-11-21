@@ -247,7 +247,7 @@ test('subscriptions show a status and let the mode be reviewed', async ({ page }
     await waitForRows(page, 'subs-body');
 
     const status = page.locator('#subs-body [data-label="Status"]').first();
-    await expect(status).toHaveText(/On Air|Ended|Canceled|In Production|Planned|Pilot|Unknown/);
+    await expect(status).toHaveText(/On air|Ended|Canceled|In production|Planned|Pilot|Unknown/);
 
     await subAction(page, 'mode');
     const modal = page.locator('#mode-modal');

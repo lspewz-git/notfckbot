@@ -1,8 +1,7 @@
-/* Cards: one surface step above the page, a hairline border, 20px corners, no shadow */
+/* Cards: the personal pages' group card — one surface step above the page, 18px corners, no border */
 .glass-card {
     background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-card);
     padding: var(--space-5) var(--space-6);
     margin-bottom: var(--space-3);
 }

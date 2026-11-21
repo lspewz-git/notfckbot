@@ -72,64 +72,29 @@
 
 /* Phones — stack the header, shrink the chrome */
 @media (max-width: 768px) {
+    /* The personal tabs' title row (titles.css .tab-top-row): 28/34, 16px over the content */
     header {
         flex-direction: column;
         align-items: stretch;
-        gap: 1.25rem;
-        margin-bottom: 1.75rem;
+        gap: var(--space-3);
+        margin-bottom: var(--space-4);
     }
 
     .header-info h1,
     header h1 {
-        font-size: 1.75rem;
-    }
-
-    /* Serials and Movies: the title and its Add button stay on one row */
-    header.section-header {
-        flex-direction: row;
-        align-items: center;
-    }
-
-    .log-filters {
-        flex-wrap: wrap;
-    }
-
-    /* Tabs become one full-width segmented control with thumb-sized targets; more than fit (Users'
-       four with their counts) scroll inside the track instead of running past the card */
-    .tab-filters {
-        display: flex;
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    .tab-filters::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Equal while they fit, never narrower than their words */
-    .tab-filters .btn {
-        flex: 1 1 0;
-        min-width: max-content;
-        min-height: 2.75rem;
-    }
-
-    .tab-filters,
-    .tab-hint {
-        margin-bottom: 1rem;
+        font-size: 28px;
+        line-height: 34px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
     }
 
     .glass-card {
         padding: var(--space-4);
-        margin-bottom: var(--space-4);
     }
 
     .logs-viewer {
         height: 320px;
         font-size: 0.78rem;
-    }
-
-    .search-box {
-        margin-bottom: 1.25rem;
     }
 }
 
@@ -138,7 +103,6 @@
 @media (max-width: 760px) {
     .table-wrap {
         overflow-x: visible;
-        margin: 0;
         padding: 0;
     }
 
@@ -176,10 +140,8 @@
     }
 
     .sort-bar-label {
-        font-size: var(--text-xs);
+        font-size: 12px;
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
         color: var(--text-dim);
     }
 
@@ -199,13 +161,22 @@
         white-space: nowrap;
     }
 
+    /* Rows of one group card: a rule between them, none after the last (account.css .group-list) */
     .table-wrap tr {
+        position: relative;
         display: block;
-        margin-bottom: var(--space-2);
         padding: var(--space-1) 0;
-        background: var(--surface-2);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
+    }
+
+    /* After a shown row: tables.js hides the other pages' and filtered-out rows with display: none */
+    .table-wrap tr:not([style*='none']) ~ tr::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: var(--space-3);
+        height: 1px;
+        background: var(--divider);
     }
 
     .table-wrap td {
@@ -221,16 +192,14 @@
     }
 
     .table-wrap td + td {
-        border-top: 1px solid var(--border);
+        border-top: 1px solid var(--divider);
     }
 
     .table-wrap td::before {
         content: attr(data-label);
         flex: 0 0 auto;
-        font-size: var(--text-xs);
+        font-size: 12px;
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
         color: var(--text-dim);
     }
 
@@ -281,8 +250,13 @@
         display: flex;
         align-items: center;
         gap: var(--space-2);
-        margin-bottom: 6px;
-        padding: 10px var(--space-2) 10px var(--space-3);
+        min-height: 56px;
+        padding: var(--space-2) var(--space-1) var(--space-2) var(--space-3);
+    }
+
+    /* Under the text, not under the poster (36 + 12 + 12) */
+    .table-wrap tr:not([style*='none']) ~ tr.row-compact::before {
+        left: 56px;
     }
 
     .table-wrap tr.row-compact > td {
@@ -320,6 +294,10 @@
         width: var(--control-h);
         padding: 0;
         justify-content: center;
+        border-color: transparent;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--text-secondary);
     }
 
     .table-wrap tr.row-compact .btn-label,

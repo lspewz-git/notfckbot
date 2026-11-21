@@ -649,36 +649,47 @@
                     <!-- Chats Section -->
                     <section id="chats-section" class="section">
                         <header>
-                            <h1>Users / Chats</h1>
+                            <h1>Chats</h1>
                         </header>
-                        <div class="glass-card">
-                            <div class="tab-filters" role="group" aria-label="Which chats to show">
-                                <button class="btn btn-ghost active" data-chats-tab="all" aria-pressed="true">
-                                    All
-                                </button>
-                                <button class="btn btn-ghost" data-chats-tab="active" aria-pressed="false">
-                                    Active
-                                </button>
-                                <button class="btn btn-ghost" data-chats-tab="admins" aria-pressed="false">
-                                    Admins
-                                </button>
-                                <button class="btn btn-ghost" data-chats-tab="left" aria-pressed="false">
-                                    Left the bot
-                                </button>
+                        <div class="list-page">
+                            <label class="search-pill">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="#i-search" /></svg
+                                ><input
+                                    type="search"
+                                    id="chats-filter"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Search chats"
+                                    placeholder="Search by ID or username"
+                                />
+                            </label>
+                            <div class="cat-bar">
+                                <div class="tab-filters" role="group" aria-label="Which chats to show">
+                                    <button class="btn btn-ghost active" data-chats-tab="all" aria-pressed="true">
+                                        All
+                                    </button>
+                                    <button class="btn btn-ghost" data-chats-tab="active" aria-pressed="false">
+                                        Active
+                                    </button>
+                                    <button class="btn btn-ghost" data-chats-tab="admins" aria-pressed="false">
+                                        Admins
+                                    </button>
+                                    <button class="btn btn-ghost" data-chats-tab="left" aria-pressed="false">
+                                        Left the bot
+                                    </button>
+                                </div>
                             </div>
                             <p id="chats-left-hint" class="tab-hint" hidden>
                                 Chats that blocked the bot or removed it from the group. Their subscriptions stay, and
                                 notifications start again by themselves when the bot is back.
                             </p>
-                            <div class="search-box">
-                                <input type="text" id="chats-filter" placeholder="Filter by ID or Username..." />
-                            </div>
                             <div class="table-wrap">
                                 <table id="chats-table" data-tab="all">
                                     <thead>
                                         <tr>
                                             <th>Chat ID</th>
-                                            <th>User / Group</th>
+                                            <th>Chat</th>
                                             <th>Type</th>
                                             <th>Status</th>
                                             <th>Last active</th>
@@ -694,7 +705,7 @@
                     <!-- Logs Section -->
                     <section id="logs-section" class="section">
                         <header>
-                            <h1>Activity logs</h1>
+                            <h1>Logs</h1>
                             <div class="log-filters">
                                 <button class="btn btn-ghost active" data-log-filter="all">All</button>
                                 <button class="btn btn-ghost" data-log-filter="error">Errors</button>
@@ -1511,12 +1522,12 @@
                             <div class="recap-heading">
                                 <button
                                     type="button"
-                                    class="btn btn-ghost recap-back"
+                                    class="page-back"
                                     data-section="tools"
                                     aria-label="Back to Tools"
                                 >
                                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <use href="#i-arrow-left" />
+                                        <use href="#i-chevron-left" />
                                     </svg>
                                 </button>
                                 <h1>Year recap</h1>
@@ -1668,38 +1679,47 @@
                     </section>
 
                     <section id="watchlist-section" class="section">
-                        <header class="section-header">
+                        <header>
                             <h1>Movies</h1>
-                            <button
-                                class="btn btn-primary btn-add-round"
-                                data-action="add-content"
-                                data-kind="movie"
-                                aria-label="Add movie"
-                            >
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                    <use href="#i-plus" />
-                                </svg>
-                            </button>
                         </header>
-                        <div class="glass-card">
-                            <div class="tab-filters" role="group" aria-label="Which films to show">
-                                <button class="btn btn-ghost active" data-films-tab="active" aria-pressed="true">
-                                    Waiting
-                                </button>
-                                <button class="btn btn-ghost" data-films-tab="archive" aria-pressed="false">
-                                    Released
+                        <div class="list-page">
+                            <label class="search-pill">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="#i-search" /></svg
+                                ><input
+                                    type="search"
+                                    id="watchlist-filter"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Search films"
+                                    placeholder="Search by chat, film or year"
+                                />
+                            </label>
+                            <div class="cat-bar">
+                                <div class="tab-filters" role="group" aria-label="Which films to show">
+                                    <button class="btn btn-ghost active" data-films-tab="active" aria-pressed="true">
+                                        Waiting
+                                    </button>
+                                    <button class="btn btn-ghost" data-films-tab="archive" aria-pressed="false">
+                                        Released
+                                    </button>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="cat-plus"
+                                    data-action="add-content"
+                                    data-kind="movie"
+                                    aria-label="Add movie"
+                                >
+                                    <span
+                                        ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="#i-plus" /></svg
+                                    ></span>
                                 </button>
                             </div>
                             <p id="films-archive-hint" class="tab-hint" hidden>
                                 Films that came out and were announced to the chat. Kept as a record.
                             </p>
-                            <div class="search-box">
-                                <input
-                                    type="text"
-                                    id="watchlist-filter"
-                                    placeholder="Filter by user, film or year..."
-                                />
-                            </div>
                             <!-- Phones: the header row is hidden, so sorting gets its own strip -->
                             <div class="sort-bar" role="group" aria-label="Sort films">
                                 <span class="sort-bar-label">Sort</span>
@@ -1784,35 +1804,48 @@
                     </section>
 
                     <section id="subs-section" class="section">
-                        <header class="section-header">
+                        <header>
                             <h1>Serials</h1>
-                            <button
-                                class="btn btn-primary btn-add-round"
-                                data-action="add-content"
-                                data-kind="tv"
-                                aria-label="Add serial"
-                            >
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                    <use href="#i-plus" />
-                                </svg>
-                            </button>
                         </header>
-                        <div class="glass-card">
-                            <div class="tab-filters" role="group" aria-label="Which subscriptions to show">
-                                <button class="btn btn-ghost active" data-subs-tab="active" aria-pressed="true">
-                                    Active
-                                </button>
-                                <button class="btn btn-ghost" data-subs-tab="archive" aria-pressed="false">
-                                    Archive
+                        <div class="list-page">
+                            <label class="search-pill">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <use href="#i-search" /></svg
+                                ><input
+                                    type="search"
+                                    id="subs-filter"
+                                    enterkeyhint="search"
+                                    autocomplete="off"
+                                    aria-label="Search subscriptions"
+                                    placeholder="Search by chat, series or mode"
+                                />
+                            </label>
+                            <div class="cat-bar">
+                                <div class="tab-filters" role="group" aria-label="Which subscriptions to show">
+                                    <button class="btn btn-ghost active" data-subs-tab="active" aria-pressed="true">
+                                        Active
+                                    </button>
+                                    <button class="btn btn-ghost" data-subs-tab="archive" aria-pressed="false">
+                                        Archive
+                                    </button>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="cat-plus"
+                                    data-action="add-content"
+                                    data-kind="tv"
+                                    aria-label="Add serial"
+                                >
+                                    <span
+                                        ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <use href="#i-plus" /></svg
+                                    ></span>
                                 </button>
                             </div>
                             <p id="subs-archive-hint" class="tab-hint" hidden>
                                 Series that ended or were canceled. They return to Active automatically if TMDB marks
                                 them as renewed.
                             </p>
-                            <div class="search-box">
-                                <input type="text" id="subs-filter" placeholder="Filter by user, series or mode..." />
-                            </div>
                             <div class="table-wrap">
                                 <table id="subs-table" data-tab="active">
                                     <thead>
@@ -1820,7 +1853,7 @@
                                             <th>User</th>
                                             <th>Series</th>
                                             <th>Status</th>
-                                            <th class="col-next">Next Episode</th>
+                                            <th class="col-next">Next episode</th>
                                             <th class="col-mode">Mode</th>
                                             <th>Actions</th>
                                         </tr>

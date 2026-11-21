@@ -205,8 +205,9 @@
 .chat-settings-scroll h4 {
     margin-block: var(--space-3) var(--space-1);
     color: var(--text-dim);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
 }
 
 .chat-settings-scroll small,
@@ -634,7 +635,8 @@
     margin-bottom: var(--space-2);
 }
 
-.alert-presets .btn {
+/* Equal shares of the row, not chips sized to their words (utilities.css) */
+.tab-filters.alert-presets .btn {
     flex: 1;
 }
 

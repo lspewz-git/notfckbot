@@ -183,7 +183,8 @@ test('Serials and Movies show clickable posters, round add controls and release 
         await expect(add).toHaveText('');
         const box = await add.boundingBox();
         expect(box.width).toBe(box.height);
-        expect(await add.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('50%');
+        // Following's +: a 36px circle inside the 44px target
+        expect(await add.locator('span').evaluate((el) => getComputedStyle(el).borderRadius)).toBe('50%');
         const row = page.locator(`#${body} tr`).first();
         const poster = row.locator(isPhone(page) ? '.cell-compact .title-poster' : '.title-with-poster .title-poster');
         await expect(poster.locator('img')).toHaveAttribute('src', '/api/poster/w185/poster.png');

@@ -48,8 +48,8 @@ test('the tabs show counts and split the rows', async ({ page }) => {
     await goToSubs(page);
     await expect(page.locator('#subs-section h1')).toHaveText('Serials');
 
-    await expect(tab(page, 'active')).toHaveText(`Active (${ACTIVE})`);
-    await expect(tab(page, 'archive')).toHaveText(`Archive (${ARCHIVED})`);
+    await expect(tab(page, 'active')).toHaveText(`Active ${ACTIVE}`);
+    await expect(tab(page, 'archive')).toHaveText(`Archive ${ARCHIVED}`);
     await expect(tab(page, 'active')).toHaveAttribute('aria-pressed', 'true');
 
     // Active is the default; a not-yet-checked status counts as active
@@ -79,19 +79,19 @@ test('archived rows can be deleted but offer no mode', async ({ page }) => {
     await expect(page.locator('#subs-body [data-action="delete-sub"]')).toHaveCount(ARCHIVED);
     await expect(page.locator('#subs-table th.col-mode')).toBeHidden();
     // Nothing more will air, so no Next Episode either
-    await expect(page.locator('#subs-body [data-label="Next Episode"]')).toHaveCount(0);
+    await expect(page.locator('#subs-body [data-label="Next episode"]')).toHaveCount(0);
     await expect(page.locator('#subs-table th.col-next')).toBeHidden();
 
     // Back on Active the columns return
     await tab(page, 'active').click();
     await expect(page.locator('#subs-body [data-label="Mode"]')).toHaveCount(ACTIVE);
-    await expect(page.locator('#subs-body [data-label="Next Episode"]')).toHaveCount(ACTIVE);
+    await expect(page.locator('#subs-body [data-label="Next episode"]')).toHaveCount(ACTIVE);
 });
 
 test('Next Episode shows the announced episode, or TBA', async ({ page }) => {
     await goToSubs(page);
     const nextOf = (title) =>
-        page.locator('#subs-body tr', { hasText: title }).first().locator('[data-label="Next Episode"]');
+        page.locator('#subs-body tr', { hasText: title }).first().locator('[data-label="Next episode"]');
 
     await expect(nextOf('Severance')).toHaveText('S3E2 · 15 Oct 2026');
     // Numbered but not dated yet
@@ -215,8 +215,8 @@ test('the selected tab survives the auto-refresh, with or without new data', asy
         s.seriesId === '94997' ? { ...s, Series: { ...s.Series, status: 'Canceled' } } : s
     );
     await poll();
-    await expect(tab(page, 'archive')).toHaveText(`Archive (${ARCHIVED + 2})`);
-    await expect(tab(page, 'active')).toHaveText(`Active (${ACTIVE - 2})`);
+    await expect(tab(page, 'archive')).toHaveText(`Archive ${ARCHIVED + 2}`);
+    await expect(tab(page, 'active')).toHaveText(`Active ${ACTIVE - 2}`);
     await expect(tab(page, 'archive')).toHaveClass(/active/);
     await expect(page.locator('#subs-body tr')).toHaveCount(ARCHIVED + 2);
     await expect(page.locator('#subs-body [data-action="mode"]')).toHaveCount(0);
@@ -226,7 +226,7 @@ test('an empty tab says so', async ({ page }) => {
     panel.subs = panel.subs.filter((s) => !['Ended', 'Canceled'].includes(s.Series.status));
     await goToSubs(page);
     await tab(page, 'archive').click();
-    await expect(tab(page, 'archive')).toHaveText('Archive (0)');
+    await expect(tab(page, 'archive')).toHaveText('Archive 0');
     await expect(page.locator('#subs-body')).toHaveText('No archived subscriptions.');
 });
 
@@ -262,9 +262,14 @@ for (const [width, height] of [
 
             const [a, b] = await Promise.all([tab(page, 'active').boundingBox(), tab(page, 'archive').boundingBox()]);
             expect(Math.round(a.y)).toBe(Math.round(b.y));
-            // Full-width segmented control: equal halves, thumb-sized
-            expect(Math.abs(a.width - b.width)).toBeLessThan(2);
-            expect(a.height).toBeGreaterThanOrEqual(40);
+            // Category chips as on Following: 36px pills, 44px to a finger (the ::after reaches 5px out)
+            expect(a.height).toBe(36);
+            const reach = await tab(page, 'active').evaluate((el) => {
+                const r = el.getBoundingClientRect();
+                const x = r.left + r.width / 2;
+                return [r.top - 4, r.bottom + 3].every((y) => el.contains(document.elementFromPoint(x, y)));
+            });
+            expect(reach).toBe(true);
 
             await tab(page, 'archive').click();
             await expect(page.locator('#subs-body tr')).toHaveCount(ARCHIVED);

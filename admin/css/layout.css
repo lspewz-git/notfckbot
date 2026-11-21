@@ -96,11 +96,13 @@
     padding: 0 var(--space-5) var(--space-6);
 }
 
-/* Wide tables scroll inside their card rather than widening the page */
+/* A list page's table is one group card (account.css .group-list); wide tables scroll inside it
+   rather than widening the page */
 .table-wrap {
     overflow-x: auto;
-    margin: 0 calc(-1 * var(--space-2));
-    padding: 0 var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-card);
+    background: var(--surface-1);
 }
 
 .table-wrap table {

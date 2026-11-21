@@ -12,16 +12,14 @@
     gap: var(--space-2);
 }
 
-.recap-heading .recap-back {
-    flex: none;
-    width: var(--control-h);
-    padding: 0;
-    background: transparent;
-    border-color: transparent;
+/* The round Back of Account settings (account.css .page-back), its circle on the content's edge */
+.recap-heading {
+    gap: var(--space-1);
+    margin-left: -5px;
 }
 
-.recap-heading .recap-back:hover {
-    background: var(--surface-2);
+.recap-heading .page-back {
+    flex: none;
 }
 
 .recap-heading h1 {
@@ -41,7 +39,7 @@
 }
 
 .recap-head-actions .tab-filters {
-    margin: 0;
+    margin: -5px;
 }
 
 /* Schedule has its own year, the day's */
@@ -50,13 +48,17 @@
 }
 
 .recap-toolbar .recap-tabs {
-    margin: 0;
+    margin: -5px;
 }
 
 @media (max-width: 760px) {
-    .recap-toolbar .recap-tabs,
     .recap-head-actions {
         width: 100%;
+    }
+
+    /* Full width plus the 5px either side the strip keeps for focus rings */
+    .recap-toolbar .recap-tabs {
+        width: calc(100% + 10px);
     }
 
     .recap-head-actions {
@@ -797,18 +799,19 @@ button.recap-thumb:focus-visible {
     gap: var(--space-4);
     width: var(--tool-card-width);
     max-width: 100%;
-    padding: var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    border: none;
+    border-radius: var(--radius-card);
     background: var(--surface-1);
     color: var(--text);
     font: inherit;
     text-align: left;
     cursor: pointer;
 }
-.tool-card:hover {
-    background: var(--surface-2);
-    border-color: var(--border-strong);
+@media (hover: hover) {
+    .tool-card:hover {
+        background: var(--surface-2);
+    }
 }
 .tool-card-copy {
     display: flex;
@@ -817,10 +820,9 @@ button.recap-thumb:focus-visible {
     min-width: 0;
 }
 .tool-card-title {
-    font-size: var(--text-xl);
+    font-size: 15px;
     font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    line-height: 20px;
 }
 .tool-card-desc {
     color: var(--text-dim);

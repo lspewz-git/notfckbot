@@ -275,25 +275,20 @@
     flex-direction: column;
     gap: 2px;
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-card);
     background: var(--surface-1);
     cursor: pointer;
-    transition:
-        border-color 0.15s ease,
-        background-color 0.15s ease;
+    transition: background-color 0.15s ease;
 }
 
-.stat-card:hover {
-    border-color: var(--border-strong);
+@media (hover: hover) {
+    .stat-card:not([data-static]):hover {
+        background: var(--surface-2);
+    }
 }
 
 .stat-card[data-static] {
     cursor: default;
-}
-
-.stat-card[data-static]:hover {
-    border-color: var(--border);
 }
 
 .stat-label {
@@ -787,7 +782,10 @@
     }
 
     .dash-header h1 {
-        font-size: 1.75rem;
+        font-size: 28px;
+        line-height: 34px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
     }
 
     /* Two cards a row: a card's change line ("+3 from the week before") takes two lines here,

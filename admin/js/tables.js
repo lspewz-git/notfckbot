@@ -52,7 +52,8 @@ function updateTabCounts(type, data) {
     const { tabs } = TABLES[type];
     tabButtons(type).forEach((btn) => {
         const tab = tabs[btn.dataset[`${type}Tab`]];
-        if (tab) btn.innerText = `${tab.label} (${data.filter(tab.matches).length})`;
+        if (tab)
+            btn.innerHTML = `${escapeHtml(tab.label)} <span class="cat-count">${data.filter(tab.matches).length}</span>`;
     });
 }
 

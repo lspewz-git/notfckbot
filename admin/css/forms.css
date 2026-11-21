@@ -1,9 +1,9 @@
 /* Form fields */
 .field-label {
     display: block;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05rem;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
     color: var(--text-dim);
     margin-bottom: 0.5rem;
 }
@@ -17,7 +17,7 @@
     padding: var(--space-2) var(--space-3);
     background-color: var(--surface-2);
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-btn);
     color: var(--text);
     font-family: inherit;
     /* 16px stops iOS Safari from zooming into the field on focus */
@@ -232,8 +232,9 @@
 .token-masked {
     display: block;
     padding: var(--space-2) var(--space-3);
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-btn);
+    background: var(--surface-2);
     font-size: var(--text-sm);
     letter-spacing: 0.03em;
     color: var(--text);

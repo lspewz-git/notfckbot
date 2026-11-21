@@ -59,6 +59,13 @@ body.view-mine .tabbar {
     justify-self: end;
 }
 
+/* A phone's tools under the title start on its left, like the personal tabs' chips */
+@media (max-width: 768px) {
+    .section:not(.mine-section) > header > :not(:first-child):not(.admin-profile) {
+        justify-self: start;
+    }
+}
+
 .admin-profile {
     grid-column: 2;
     grid-row: 1;

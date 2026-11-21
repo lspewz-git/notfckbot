@@ -447,7 +447,7 @@ html:has(.modal[open]) {
 
 .stats-head .tab-filters {
     flex: none;
-    margin-bottom: 0;
+    margin-bottom: -5px;
 }
 
 .stats-kpis {

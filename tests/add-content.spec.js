@@ -356,6 +356,8 @@ test('Movies filters films and Added belongs only to the selected chat', async (
     const trigger = page.locator('#content-chat-field .mine-chat-chip');
     await trigger.click();
     await page.locator('#pick-list .pick-row', { hasText: 'alice' }).click();
+    // The field under the closing sheet is inert until the sheet has left
+    await expect(page.locator('#pick-modal')).toBeHidden();
     await page.locator('#content-search-input').fill('long title');
     await page.locator('#content-search-input').press('Enter');
     await expect(page.locator('#content-search-results li')).toHaveCount(4);

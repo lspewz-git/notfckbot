@@ -43,13 +43,6 @@
     height: var(--title-poster-h);
 }
 
-.btn.btn-add-round {
-    width: var(--control-h);
-    height: var(--control-h);
-    padding: 0;
-    border-radius: 50%;
-}
-
 @media (pointer: coarse) {
     .title-with-poster .link-text {
         display: inline-flex;
@@ -96,9 +89,10 @@ tbody tr:hover td {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 0.125rem var(--space-2);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-chip);
+    font-size: 12px;
+    line-height: 16px;
     font-weight: 600;
     white-space: nowrap;
 }

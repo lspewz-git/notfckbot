@@ -69,7 +69,7 @@ export const TABLES = {
     chats: {
         body: 'chats-body',
         filter: 'chats-filter',
-        columns: ['Chat ID', 'User / Group', 'Type', 'Status', 'Last active', 'Actions'],
+        columns: ['Chat ID', 'Chat', 'Type', 'Status', 'Last active', 'Actions'],
         tabs: {
             all: { label: 'All', matches: () => true, empty: 'No chats yet.' },
             active: { label: 'Active', matches: (item) => !botLeft(item), empty: 'No active chats.' },
@@ -89,7 +89,7 @@ export const TABLES = {
             return `
                 <tr class="row-compact">
                     <td data-label="Chat ID"><code>${item.id}</code></td>
-                    <td data-label="User / Group">${chatDisplayName(item)}${roleBadge(item.panelRole)}</td>
+                    <td data-label="Chat">${chatDisplayName(item)}${roleBadge(item.panelRole)}</td>
                     <td data-label="Type"><span class="chat-type">${item.type}</span></td>
                     <td data-label="Status"><div class="status-cell">${badge}${noteLine}</div></td>
                     <td data-label="Last active"><span class="last-active">${seen}</span></td>
@@ -111,7 +111,7 @@ export const TABLES = {
         body: 'subs-body',
         filter: 'subs-filter',
         paged: true,
-        columns: ['User', 'Series', 'Status', 'Next Episode', 'Mode', 'Actions'],
+        columns: ['User', 'Series', 'Status', 'Next episode', 'Mode', 'Actions'],
         tabs: {
             active: {
                 label: 'Active',
@@ -124,14 +124,14 @@ export const TABLES = {
                 matches: isArchivedSub,
                 empty: 'No archived subscriptions.',
                 hint: 'subs-archive-hint',
-                hides: ['Next Episode', 'Mode']
+                hides: ['Next episode', 'Mode']
             }
         },
         row: (item) => {
             const archived = isArchivedSub(item);
             const next = archived
                 ? ''
-                : `<td data-label="Next Episode">${escapeHtml(formatNextEpisode(item.Series))}</td>`;
+                : `<td data-label="Next episode">${escapeHtml(formatNextEpisode(item.Series))}</td>`;
             const mode = archived
                 ? ''
                 : `<td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>`;

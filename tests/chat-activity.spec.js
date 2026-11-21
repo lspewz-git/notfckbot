@@ -52,9 +52,9 @@ async function goToChats(page) {
 test('who left the bot and when each chat was last active', async ({ page }) => {
     await mockPanel(page, { chats: CHATS });
     await goToChats(page);
-    await expect(tab(page, 'all')).toHaveText('All (4)');
-    await expect(tab(page, 'active')).toHaveText('Active (2)');
-    await expect(tab(page, 'left')).toHaveText('Left the bot (2)');
+    await expect(tab(page, 'all')).toHaveText('All 4');
+    await expect(tab(page, 'active')).toHaveText('Active 2');
+    await expect(tab(page, 'left')).toHaveText('Left the bot 2');
     await expect(page.locator('#chats-body tr')).toHaveCount(4);
 
     const status = (id) => rowOf(page, id).locator('[data-label="Status"]');
@@ -77,7 +77,7 @@ test('who left the bot and when each chat was last active', async ({ page }) => 
     } else {
         await expect(page.locator('#chats-table th')).toHaveText([
             'Chat ID',
-            'User / Group',
+            'Chat',
             'Type',
             'Status',
             'Last active',

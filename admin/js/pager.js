@@ -109,7 +109,7 @@ export function stepPage(type, step) {
  */
 export function afterPageTurn(type, pressed) {
     // On a phone the pager sits several screens below the first card of the new page
-    const card = $(TABLES[type].body).closest('.glass-card');
+    const card = $(TABLES[type].body).closest('.list-page');
     // An instant jump, like turning a page; a smooth scroll over several screens only delays it
     if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start' });
 
