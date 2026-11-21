@@ -6,6 +6,7 @@ const { test, describe, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { notifyNewEpisodes, notifyStatusChange, isSeasonComplete, buildSeriesMessages } = require('../../src/cron');
 const { fakeBot, fakeSeries, ep, tmdbSeries, kindOf } = require('./fakes');
+const { heldLine } = require('../../src/cron/messages');
 
 // A chat's settings (quiet hours) come from the database: none here, so none set
 mock.method(require('../../src/db').Chat, 'findByPk', async () => null);
@@ -66,6 +67,54 @@ describe('notifyNewEpisodes: "every episode" mode', () => {
 
         assert.deepEqual(kinds(bot), ['10:episode']);
         assert.equal(show.last_season, 2);
+    });
+
+    test("the season's last episode says the season is out", async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 2, last_episode: 9, completed_season: 1 }, [[10, 'episode']]);
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } }));
+
+        assert.deepEqual(kinds(bot), ['10:episode']);
+        assert.match(bot.sent[0].text, /Финал сезона/);
+        assert.equal(show.completed_season, 2);
+        // ...and in the list after quiet hours
+        const held = heldLine({ kind: 'episode', title: 'X', season: 2, episode: 10, finale: true });
+        assert.match(held.line, /S2E10, финал сезона$/);
+    });
+
+    test('completion seen on a later check is announced once', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 2, last_episode: 10, completed_season: 1 }, [[10, 'episode']]);
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } }));
+        await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } }));
+
+        assert.deepEqual(kinds(bot), ['10:complete']);
+    });
+
+    test('without TVmaze the finale waits: plain episode now, "season out" on the next check', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 2, last_episode: 9, completed_season: 1 }, [[10, 'episode']]);
+        const data = tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } });
+        await notifyNewEpisodes(bot, show, { ...data, tvmaze_missing: true });
+        assert.doesNotMatch(bot.sent[0].text, /Финал сезона/);
+        assert.equal(show.completed_season, 1);
+
+        await notifyNewEpisodes(bot, show, data);
+        assert.deepEqual(kinds(bot), ['10:episode', '10:complete']);
+    });
+
+    test('a first check without TVmaze takes a season already out as announced', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 2, last_episode: 10, completed_season: null }, [[10, 'season']]);
+        const data = tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } });
+        await notifyNewEpisodes(bot, show, { ...data, tvmaze_missing: true });
+        await notifyNewEpisodes(bot, show, data);
+        assert.equal(bot.sent.length, 0);
+        assert.equal(show.completed_season, 2);
+    });
+
+    test('specials (season 0) are never "the whole season"', async () => {
+        assert.equal(isSeasonComplete(tmdbSeries({ last: ep(0, 3), seasons: { 0: 3 } }), 0, 3), false);
     });
 
     test('no aired episode yet: nothing happens', async () => {

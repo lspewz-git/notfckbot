@@ -39,6 +39,9 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
  * say "complete" while more episodes are still scheduled.
  */
 const isSeasonComplete = (data, season, episode) => {
+    // Specials (season 0) are no season to finish; without TVmaze's answer a season TMDB lists only
+    // up to its last aired episode would read as complete: wait for a check that has it
+    if (season < 1 || data.tvmaze_missing) return false;
     const seasonObj = (data.seasons || []).find((s) => s.season_number === season);
     const total = seasonObj ? seasonObj.episode_count : 0;
     const next = data.next_episode_to_air;
@@ -73,7 +76,10 @@ const notifyNewEpisodes = async (bot, item, data) => {
         // With new content in hand, only seasons before the current one count as
         // announced, so a finale arriving on this very check is still announced.
         if (hasNewContent) completedSeason = currentSeason - 1;
-        else completedSeason = complete ? currentSeason : currentSeason - 1;
+        // Without TVmaze's answer too: taking a season as announced too early only silences it
+        else if (complete || isSeasonComplete({ ...data, tvmaze_missing: false }, currentSeason, currentEpisode))
+            completedSeason = currentSeason;
+        else completedSeason = currentSeason - 1;
         await item.update({ completed_season: completedSeason });
     }
 
@@ -103,7 +109,9 @@ const notifyNewEpisodes = async (bot, item, data) => {
         const mode = chat.Subscription.notify_type;
         let kind = null;
         if (mode === 'episode') {
+            // The finale's message says the season is out; completion seen on a later check gets its own
             if (hasNewContent) kind = 'episode';
+            else if (announceComplete) kind = 'complete';
         } else if (mode === 'season') {
             if (announceComplete) kind = 'complete';
         } else if (mode === 'first_and_full') {
@@ -117,7 +125,8 @@ const notifyNewEpisodes = async (bot, item, data) => {
             else if (hasNewSeason && !afterSpecial) kind = 'premiere';
         }
         if (!kind) continue;
-        await notify(bot, chat.id, messages[kind], {
+        const text = kind === 'episode' && announceComplete ? messages.finale : messages[kind];
+        await notify(bot, chat.id, text, {
             photo: item.poster_url,
             about: item.title,
             event: {
@@ -132,7 +141,8 @@ const notifyNewEpisodes = async (bot, item, data) => {
                 title: item.title,
                 season: currentSeason,
                 episode: currentEpisode,
-                episodeName: lastE.name
+                episodeName: lastE.name,
+                finale: announceComplete
             })
         });
     }
@@ -158,7 +168,8 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             // The last aired and next episode by TVmaze's air times where it knows them, so an
             // episode is announced once it has aired, not once TMDB moves it (≈ a day later)
             const times = await tvmaze.airTimesForCheck(item.tmdb_id, tvmaze.externalsOf(tmdbData), budget);
-            const data = await withTvmaze(tmdbData, times);
+            // undefined: TVmaze didn't answer and nothing is cached (null: the series isn't on TVmaze)
+            const data = { ...(await withTvmaze(tmdbData, times)), tvmaze_missing: times === undefined };
 
             // Store the status first so a failure in the episode step below can't hold up the
             // archive move. The status message is still sent last: a finale often airs in the

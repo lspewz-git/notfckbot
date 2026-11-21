@@ -107,6 +107,22 @@ describe('by TVmaze', () => {
         assert.deepEqual([show.last_episode, show.completed_season], [4, 0]);
     });
 
+    test('a mid-season break: TVmaze has the next episode five weeks on, TMDB not yet: no finale', async () => {
+        const bot = fakeBot();
+        const show = fakeSeries({ last_season: 1, last_episode: 3, completed_season: 0 }, [
+            [10, 'season'],
+            [11, 'episode']
+        ]);
+        const more = {
+            ...TIMES,
+            '1:5': { stamp: Date.parse('2027-01-01T01:00:00Z'), date: '2026-12-31', runtime: 55 }
+        };
+        await check(bot, show, details(ep(1, 3), ep(1, 4)), more, '2026-11-27T03:00:00Z');
+        assert.deepEqual(kinds(bot), ['11:episode']);
+        assert.doesNotMatch(bot.sent[0].text, /Финал сезона/);
+        assert.equal(show.completed_season, 0);
+    });
+
     test('TVmaze\'s next episode is out but TMDB hasn\'t listed it yet: still not "the whole season is out"', async () => {
         const bot = fakeBot();
         const show = fakeSeries({ last_season: 1, last_episode: 4, completed_season: 0 }, [[10, 'season']]);

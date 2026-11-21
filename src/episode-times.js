@@ -133,13 +133,13 @@ async function withTvmaze(details, times, now = Date.now(), zoneId = DEFAULT_ZON
     };
 }
 
-// TVmaze's next episode of a season counts as its continuation when it is this close to the last one
-const CONTINUES_WITHIN_MS = 21 * DAY_MS;
-// ...and for this long after it is out too: TMDB may take a few days to list an aired episode
+// TVmaze's next episode of a season counts as its continuation however far off (a mid-season break:
+// a late "season complete" beats a false one), and for this long after it is out too: TMDB may take
+// a few days to list an aired episode
 const CONTINUES_GRACE_MS = 3 * DAY_MS;
 
 /**
- * The season number TVmaze still has an episode in after `last` (to come soon, or just out), or
+ * The season number TVmaze still has an episode in after `last` (still to come, or just out), or
  * null. TMDB often lists only the episodes announced so far: the last of them out by TVmaze would
  * read as the season's finale a day before TMDB adds the next (src/cron/series.js,
  * isSeasonComplete()). Only where TVmaze knows `last` itself by TMDB's day, so the two number this
@@ -151,12 +151,10 @@ function continuesBy(times, last, now) {
     if (!last) return null;
     const own = timeOf(times, last.season_number, last.episode_number, last.air_date);
     if (!own) return null;
-    const from = Math.max(now, outAt(own));
     for (const [key, time] of Object.entries(times)) {
         const [season, episode] = key.split(':').map(Number);
         if (season !== last.season_number || episode <= last.episode_number) continue;
-        const at = outAt(time);
-        if (at > now - CONTINUES_GRACE_MS && at <= from + CONTINUES_WITHIN_MS) return season;
+        if (outAt(time) > now - CONTINUES_GRACE_MS) return season;
     }
     return null;
 }

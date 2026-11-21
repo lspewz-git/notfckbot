@@ -16,8 +16,11 @@ const { onlineDate, releaseDate, worldwideRelease } = require('../film-release')
 function buildSeriesMessages({ title, season, episode, episodeName, links }) {
     const t = escapeHtml(title);
     const ep = escapeHtml(episodeName || 'Без названия');
+    const head = `⚡️ Новая серия! <b>${t}</b> — Сезон ${season}, Серия ${episode}: ${ep}`;
     return {
-        episode: `⚡️ Новая серия! <b>${t}</b> — Сезон ${season}, Серия ${episode}: ${ep}\n\n${links}`,
+        episode: `${head}\n\n${links}`,
+        // "Every episode" mode at the season's last episode
+        finale: `${head}\n🏁 <b>Финал сезона</b> — сезон ${season} вышел целиком.\n\n${links}`,
         // Several episodes out at once reach the check as the last of them: name the range then
         premiere: `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${t}</b>\n🎞 Сезон ${season}, ${Number(episode) > 1 ? `серии 1–${episode} (последняя: ${ep})` : `Серия 1: ${ep}`}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`,
         complete: `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${t}</b>\n📦 Сезон ${season} полностью доступен (${episode} сер.).\n\n${links}`
@@ -114,16 +117,19 @@ function buildTestMessage(mode, { title, season, episode, episodeName, links, fi
 /**
  * A held notification's line in the list that comes after quiet hours, and its button.
  * @param {{ kind: 'episode' | 'premiere' | 'complete' | 'status' | 'film' | 'digital', title: string,
- *   season?: number, episode?: number, episodeName?: string, status?: string }} what
+ *   season?: number, episode?: number, episodeName?: string, status?: string, finale?: boolean }} what
+ *   finale: the episode ends its season ("every episode" mode)
  * @returns {{ line: string, label: string }}
  */
-function heldLine({ kind, title, season, episode, episodeName, status }) {
+function heldLine({ kind, title, season, episode, episodeName, status, finale = false }) {
     const t = escapeHtml(title);
     const code = `S${season}E${episode}`;
     switch (kind) {
         case 'episode':
             return {
-                line: `📺 <b>${t}</b> — серия ${code}${episodeName ? ` «${escapeHtml(episodeName)}»` : ''}`,
+                line:
+                    `📺 <b>${t}</b> — серия ${code}${episodeName ? ` «${escapeHtml(episodeName)}»` : ''}` +
+                    (finale ? ', финал сезона' : ''),
                 label: `${title} ${code}`
             };
         case 'premiere':
