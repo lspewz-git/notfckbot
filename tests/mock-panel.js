@@ -237,11 +237,71 @@ function charts() {
     };
 }
 
-/** A 1x1 grey PNG: a poster for the cards, sized by CSS like a real one */
+/** A 1x1 grey PNG: the year recap's pictures */
 const PIXEL = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
     'base64'
 );
+
+/** Titles of the posters `poster: 'generated'` gave out, by file ('/g-1a2b.jpg' → 'Дюна') */
+const posterTitles = new Map();
+
+const hashOf = (text) => [...String(text)].reduce((h, ch) => (h * 31 + ch.codePointAt(0)) >>> 0, 7);
+
+/**
+ * A stand-in poster, never a TMDB one: a two-colour gradient picked by the file's hash and the title in
+ * large type, 2:3 like a real poster. Titles not given out here show the file's name.
+ */
+function posterImage(file) {
+    const title = posterTitles.get(file) || file.replace(/^\/|\.[a-z]+$/gi, '');
+    const hash = hashOf(file);
+    const from = hash % 360;
+    const to = (from + 40 + ((hash >> 9) % 80)) % 360;
+    const words = title.split(/\s+/);
+    const lines = [];
+    for (const word of words) {
+        const last = lines.length - 1;
+        if (last >= 0 && (lines[last] + ' ' + word).length <= 10) lines[last] += ' ' + word;
+        else lines.push(word);
+    }
+    const shown = lines.slice(0, 4);
+    const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    const text = shown.map((line, i) => `<tspan x="20" dy="${i ? 32 : 0}">${escape(line)}</tspan>`).join('');
+    return Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">` +
+            `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+            `<stop offset="0" stop-color="hsl(${from} 55% 42%)"/><stop offset="1" stop-color="hsl(${to} 60% 18%)"/>` +
+            `</linearGradient></defs><rect width="200" height="300" fill="url(#g)"/>` +
+            `<text y="${280 - (shown.length - 1) * 32}" fill="#fff" font-family="system-ui, -apple-system, sans-serif" ` +
+            `font-size="26" font-weight="700">${text}</text></svg>`
+    );
+}
+
+const POSTER_KEYS = ['poster', 'poster_path', 'poster_url'];
+
+/**
+ * `poster: 'generated'`: a copy of an answer where every title without a poster (or with the shared
+ * placeholder one) gets its own generated one, so reference screenshots show no grey boxes.
+ */
+function withPosters(value) {
+    if (Array.isArray(value)) return value.map(withPosters);
+    if (!value || typeof value !== 'object') return value;
+    const copy = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withPosters(v)]));
+    const title = copy.title || copy.name || copy.series_name;
+    for (const key of POSTER_KEYS) {
+        if (!(key in copy) || typeof title !== 'string') continue;
+        if (copy[key] && !/\/poster\.png$/.test(copy[key])) {
+            // A poster the fixture set itself shows its title as well
+            const own = String(copy[key]).match(/\/[^/]+$/)?.[0];
+            if (own && !posterTitles.has(own)) posterTitles.set(own, title);
+            continue;
+        }
+        const file = `/g-${hashOf(title).toString(36)}.jpg`;
+        posterTitles.set(file, title);
+        copy[key] = file;
+    }
+    return copy;
+}
 
 /**
  * Routes every request of `page` and opens the panel. Returns the mutable fixture so a test can
@@ -250,7 +310,7 @@ const PIXEL = Buffer.from(
  * @param {{ health?: object, upcoming?: object[], popular?: object[], version?: object, kinopoisk?: object,
  *   hold?: Promise<void>, kinopoiskHold?: Promise<void>, apiHold?: Record<string, Promise<void>>,
  *   addHold?: Promise<void>, addError?: string, files?: Record<string, 'missing' | Promise<void>>,
- *   failing?: string[], poster?: boolean, chatStats?: (query: string) => object, statsHold?: Promise<void>,
+ *   failing?: string[], poster?: boolean | 'generated', chatStats?: (query: string) => object, statsHold?: Promise<void>,
  *   recap?: (n: number) => Buffer, recapStatus?: object, recapLooks?: object, recapReady?: object,
  *   recapImage?: (what: string) => Buffer, chats?: object[], healthProblems?: Record<string, object> }} [options]
  *   `health`: overrides per service, e.g. { kinopoisk: 'error' }; `healthProblems`: per service, the
@@ -261,7 +321,8 @@ const PIXEL = Buffer.from(
  *   `history(year)`: the /api/history answer for the year asked (0 when none);
  *   `hold`: API answers wait for it, so a test can see the loading state;
  *   `failing`: API paths ('/api/stats') that answer 500;
- *   `poster`: a series card gets a poster (a 1x1 image);
+ *   `poster`: a series card gets a poster; 'generated': every title without one gets a generated
+ *   poster too (a gradient and its title, see posterImage(); no TMDB images);
  *   `chats`: the Users / Chats rows instead of the three default ones;
  *   `files`: the panel's own files by path ('js/app.js'): 'missing' fails to load, a promise is
  *   served once it resolves (a page.route() of the test's would lose to this one's catch-all);
@@ -817,7 +878,7 @@ async function mockPanel(page, options = {}) {
                         { season_number: 5, air_date: '2026-03-20' },
                         { season_number: 6, air_date: '2026-06-01' }
                     ],
-                    // options.poster: the card gets a poster (a 1x1 image, see /api/poster/ below)
+                    // options.poster: the card gets a poster (generated, see /api/poster/ below)
                     poster_path: options.poster ? '/different.png' : null,
                     subCount: subs.length,
                     subscribers: subs.map((s) => ({ chat: s.Chat, mode: s.notify_type }))
@@ -999,7 +1060,12 @@ async function mockPanel(page, options = {}) {
         }
 
         if (url.pathname.startsWith('/api/poster/'))
-            return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
+            return route.fulfill({
+                status: 200,
+                contentType: 'image/svg+xml',
+                body: posterImage(decodeURIComponent(url.pathname.replace(/^\/api\/poster\/[^/]+/, '')))
+            });
+        const posters = options.poster === 'generated' ? withPosters : (answer) => answer;
         if (url.pathname.startsWith('/api/')) {
             if (url.pathname === '/api/recap/schedule') {
                 if (route.request().method() === 'PUT' && options.recapScheduleSaveWait)
@@ -1021,7 +1087,7 @@ async function mockPanel(page, options = {}) {
                 if (route.request().headers()['x-requested-by'] !== 'notfckbot-panel')
                     return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
                 if (mine.status && mine.body) return route.fulfill({ status: mine.status, json: mine.body });
-                return route.fulfill({ status: 200, json: mine });
+                return route.fulfill({ status: 200, json: posters(mine) });
             }
             // As src/account/guard.js: the rest of the API is for a signed-in admin (posters are open)
             if (!url.pathname.startsWith('/api/poster/')) {
@@ -1049,7 +1115,7 @@ async function mockPanel(page, options = {}) {
             // A handler may pick the status: { status, body }
             if (answer && answer.status && answer.body)
                 return route.fulfill({ status: answer.status, json: answer.body });
-            return route.fulfill({ status: 200, json: answer });
+            return route.fulfill({ status: 200, json: posters(answer) });
         }
 
         // A sign-in link from the bot is the panel's own page
@@ -1072,7 +1138,11 @@ async function mockPanel(page, options = {}) {
     // The sign-in screen's Terms checkbox, ticked for the tests about the ways in (termsUnchecked: as it opens)
     if (options.signedOut && !options.termsUnchecked) {
         // A Mini App test may sign in at once: then there is no screen to wait for
-        await page.locator('#login-body > .login-screen').first().waitFor({ timeout: 5000 }).catch(() => {});
+        await page
+            .locator('#login-body > .login-screen')
+            .first()
+            .waitFor({ timeout: 5000 })
+            .catch(() => {});
         const box = page.locator('#terms-cb');
         if (await box.count()) await box.check();
     }
