@@ -142,7 +142,13 @@
             var(--tg-content-safe-area-inset-top, 0px)
     );
     --tabbar-h: 56px;
-    --tabbar-gap: max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) - 12px));
+    /* The same under the page's bottom: the device's home indicator or Telegram's safe area, whichever is
+       larger, plus Telegram's content inset there. 0 in a browser tab without a home indicator */
+    --bottom-inset: calc(
+        max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px)) +
+            var(--tg-content-safe-area-inset-bottom, 0px)
+    );
+    --tabbar-gap: max(var(--space-3), calc(var(--bottom-inset) - 12px));
     --tabbar-room: calc(var(--tabbar-h) + var(--tabbar-gap) + 28px);
     --tabbar-toast: calc(var(--tabbar-h) + var(--tabbar-gap) + 12px);
 

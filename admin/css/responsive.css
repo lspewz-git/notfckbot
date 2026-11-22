@@ -413,7 +413,7 @@
         max-width: none;
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         border-bottom: none;
-        padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(var(--space-6) + var(--bottom-inset));
         animation: sheet-in 0.2s ease-out;
     }
 

@@ -6,7 +6,16 @@ const { watchConsole } = require('./helpers');
 
 watchConsole();
 
-const SCREENS = ['my-calendar', 'my-aired', 'my-subs', 'my-profile', 'my-account', 'my-settings', 'my-devices', 'my-search'];
+const SCREENS = [
+    'my-calendar',
+    'my-aired',
+    'my-subs',
+    'my-profile',
+    'my-account',
+    'my-settings',
+    'my-devices',
+    'my-search'
+];
 const rowOf = (id) => (id === 'my-search' ? '#my-search-section .search-bar' : `#${id}-section > header`);
 
 async function tops(context, insets = null) {
@@ -23,7 +32,8 @@ async function tops(context, insets = null) {
                                 window.Telegram.WebView.receiveEvent(name, { top, bottom: 0, left: 0, right: 0 })
                             );
                         if (event === 'web_app_request_safe_area') send('safe_area_changed', tg.safe);
-                        if (event === 'web_app_request_content_safe_area') send('content_safe_area_changed', tg.content);
+                        if (event === 'web_app_request_content_safe_area')
+                            send('content_safe_area_changed', tg.content);
                     }
                 };
             }, insets);
@@ -44,9 +54,7 @@ test('in a browser tab every screen title row starts 12px from the top', async (
     expect(await tops(context)).toEqual(every(12));
 });
 
-test("Telegram's fullscreen safe areas push the title rows under its status bar and buttons", async ({
-    context
-}) => {
+test("Telegram's fullscreen safe areas push the title rows under its status bar and buttons", async ({ context }) => {
     test.setTimeout(90000);
     expect(await tops(context, { safe: 47, content: 46 })).toEqual(every(12 + 47 + 46));
 });
@@ -54,4 +62,40 @@ test("Telegram's fullscreen safe areas push the title rows under its status bar 
 test("Telegram's normal mode adds nothing", async ({ context }) => {
     test.setTimeout(90000);
     expect(await tops(context, { safe: 0, content: 0 })).toEqual(every(12));
+});
+
+/** A phone page with Telegram's bridge answering bottom insets the way its fullscreen mode does */
+async function withBottom(page, tg) {
+    await page.addInitScript((tg) => {
+        window.TelegramWebviewProxy = {
+            postEvent(event) {
+                const send = (name, bottom) =>
+                    setTimeout(() => window.Telegram.WebView.receiveEvent(name, { top: 0, bottom, left: 0, right: 0 }));
+                if (event === 'web_app_request_safe_area') send('safe_area_changed', tg.safe);
+                if (event === 'web_app_request_content_safe_area') send('content_safe_area_changed', tg.content);
+            }
+        };
+    }, tg);
+}
+
+test("Telegram's bottom safe areas lift the tab bar, the page's end and an open sheet's content", async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) > 640, 'a phone');
+    await withBottom(page, { safe: 34, content: 20 });
+    await mockPanel(page, { role: 'user', path: '/#my-subs' });
+    const bar = page.locator('nav.tabbar');
+    await expect(bar).toBeVisible();
+    const viewport = page.viewportSize().height;
+    // --bottom-inset = max(env, 34) + 20 = 54; the bar sits that much less 12px above the bottom edge
+    await expect
+        .poll(() => bar.evaluate((el, h) => Math.round(h - el.getBoundingClientRect().bottom), viewport))
+        .toBe(54 - 12);
+    await page.locator('#my-subs-body button.title-row').first().tap();
+    const sheet = page.locator('dialog[open] .modal-content').last();
+    await expect(sheet).toBeVisible();
+    const padding = await sheet.evaluate((el) => {
+        const own = getComputedStyle(el).paddingBottom;
+        const scroll = el.querySelector('.tc-scroll');
+        return [own, scroll ? getComputedStyle(scroll).paddingBottom : null];
+    });
+    expect(padding.map((p) => (p ? parseFloat(p) : 0)).some((px) => px >= 54 + 24)).toBe(true);
 });

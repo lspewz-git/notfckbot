@@ -103,7 +103,7 @@ body.view-mine .tabbar {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: calc(var(--top-inset) + 12px) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    padding: calc(var(--top-inset) + 12px) 16px calc(24px + var(--bottom-inset));
     background: var(--bg);
     overflow-y: auto;
 }
@@ -517,12 +517,8 @@ body.signed-out .tabbar {
 }
 
 .terms-actions {
+    /* Telegram's bottom insets are already the sign-in screen's own padding (.login-gate, --bottom-inset) */
     padding-top: 16px;
-    /* Telegram's own bottom bar in the Mini App */
-    padding-bottom: calc(
-        var(--tg-content-safe-area-inset-bottom, 0px) +
-            max(0px, var(--tg-safe-area-inset-bottom, 0px) - env(safe-area-inset-bottom, 0px))
-    );
 }
 
 /* --- The ways in --- */
@@ -2287,7 +2283,7 @@ button.search-result-open:hover .mine-row-title {
     #visibility-modal .visibility-sheet {
         max-width: none;
         padding-top: var(--space-5);
-        padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(var(--space-6) + var(--bottom-inset));
         border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
     }
 
@@ -2869,7 +2865,7 @@ button.search-result-open:hover .mine-row-title {
 @media (max-width: 640px) {
     .app-sheet.modal-sheet .modal-content {
         border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(24px + var(--bottom-inset));
         box-shadow: var(--shadow-sheet);
     }
 }
