@@ -6,7 +6,7 @@
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
-import { toast, openModal, closeModal, showConfirm } from './ui.js';
+import { toast, openModal, closeModal, showConfirm, isTouch } from './ui.js';
 
 const icon = (name) =>
     `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
@@ -255,7 +255,8 @@ function keepFocus(index) {
         document.querySelectorAll('#devices-body .group-list > li > button')
     );
     const next = rows[Math.min(index, rows.length - 1)];
-    if (next) next.focus();
+    // On a touch screen only the title takes it: a screen reader reads on from there
+    if (next && !isTouch()) next.focus();
     else $('devices-heading')?.focus();
 }
 

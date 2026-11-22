@@ -248,14 +248,6 @@ code {
     outline-offset: 2px;
 }
 
-/* Touch screens: no ring at all. Phones focus things on their own (a sheet's box, the row a closed
-   sheet hands back) and the ring there only looks broken (the user, 05.11) */
-@media (pointer: coarse) {
-    :focus-visible {
-        outline: none;
-    }
-}
-
 /* A dialog's own box takes focus to hold it, not to be acted on */
 .modal-content:focus-visible {
     outline: none;

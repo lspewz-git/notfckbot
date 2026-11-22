@@ -11,7 +11,7 @@
  */
 import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
-import { toast } from './ui.js';
+import { toast, isTouch } from './ui.js';
 import { setChats, chatsFailed, resetChatChoice, setLaunchTitle } from './account.js';
 import { signInForm, submitSignIn, setMe, loginAlert, setLoginAlert, syncSignInButton } from './password.js';
 import { setProfile } from './profile.js';
@@ -537,7 +537,8 @@ function endPending(mode, why) {
             ? `<button type="button" class="btn btn-primary" data-action="login-again" data-mode="code">${icon('refresh-cw')}<span>New code</span></button>`
             : `<button type="button" class="btn btn-primary" data-action="login-again" data-mode="${mode}">Try again</button>`;
     $('login-actions').innerHTML = again + ANOTHER_WAY;
-    if (focusWasIn || document.activeElement === document.body)
+    // A touch screen keeps no keyboard place to hand on; the status line above already says why
+    if (!isTouch() && (focusWasIn || document.activeElement === document.body))
         /** @type {HTMLElement} */ ($('login-actions').firstElementChild).focus();
 }
 

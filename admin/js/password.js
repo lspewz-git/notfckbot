@@ -5,7 +5,7 @@
  */
 import { api } from './api.js';
 import { $, $field, setText, escapeHtml } from './dom.js';
-import { openModal, closeModal, showConfirm, toast, focusField } from './ui.js';
+import { openModal, closeModal, showConfirm, toast, focusField, isTouch } from './ui.js';
 
 const MIN_LENGTH = 8;
 
@@ -208,7 +208,7 @@ function refocusRow() {
     const row = /** @type {HTMLElement | null} */ (
         document.querySelector('#my-signin .group-row:not(.group-row-static)')
     );
-    if (row?.offsetParent) row.focus();
+    if (row?.offsetParent && !isTouch()) row.focus();
 }
 
 /**

@@ -49,7 +49,7 @@ function focusables(modal) {
     );
 }
 
-const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
+export const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
 export const isPhoneTitleSheet = () => window.matchMedia('(max-width: 640px)').matches;
 
 /** Preserve a card's outer frame while its details expand in the scrolling content. */

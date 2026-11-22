@@ -173,6 +173,9 @@ test('on a touch screen closing a dialog leaves no focus ring on what opened it'
     await page.locator('#chat-settings-modal [data-close-return="chat-settings-modal"]').first().tap();
     await expect(page.locator('#chat-actions-modal')).toBeVisible();
     expect(await rings(page)).toBe(0);
+    // An outside keyboard still gets its ring (WCAG 2.4.7)
+    await page.keyboard.press('Tab');
+    expect(await rings(page)).toBeGreaterThan(0);
 });
 
 test('scrolling in an open dialog leaves the page behind it where it was', async ({ page }) => {

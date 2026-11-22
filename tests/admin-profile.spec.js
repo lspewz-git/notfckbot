@@ -294,26 +294,29 @@ for (const [who, options] of [
     });
 }
 
-test('Devices: no focus ring on a touch screen, even for focus the page moves itself', async ({ page }) => {
+test('Devices: a touch screen draws no ring for taps, an outside keyboard still gets one', async ({ page }) => {
     test.skip(!isNarrow(page), 'a touch screen');
     await mockPanel(page, { devices: DEVICES });
     await openDevices(page);
-    const row = page.locator('#devices-body .group-list [data-action="device-open"]').first();
-    await row.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.locator('#device-modal')).toBeVisible();
-    await page.locator('#device-modal .sheet-close').focus();
-    expect(
-        await page.evaluate(
+    const rings = () =>
+        page.evaluate(
             () =>
                 [...document.querySelectorAll(':focus-visible')].filter(
                     (el) => getComputedStyle(el).outlineStyle !== 'none'
                 ).length
-        )
-    ).toBe(0);
-    await page.keyboard.press('Escape');
+        );
+    const row = page.locator('#devices-body .group-list [data-action="device-open"]').first();
+    await row.tap();
+    await expect(page.locator('#device-modal')).toBeVisible();
+    expect(await rings()).toBe(0);
+    await page.locator('#device-modal .sheet-close').tap();
+    await expect(page.locator('#device-modal')).toBeHidden();
+    expect(await rings()).toBe(0);
+    // WCAG 2.4.7: a keyboard paired with the phone sees where it is. WebKit's Tab skips buttons unless
+    // Safari's "Press Tab to highlight each item" is on, so an arrow key then focus stands in for it
+    await page.keyboard.press('ArrowDown');
     await row.focus();
-    expect(await row.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');
+    expect(await row.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
 });
 
 test('Devices: Sign out of other sessions asks first, then leaves the empty state', async ({ page }) => {
