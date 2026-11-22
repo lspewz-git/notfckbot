@@ -21,8 +21,8 @@
     position: relative;
     display: block;
     flex: none;
-    width: var(--title-poster-w);
-    height: var(--title-poster-h);
+    width: var(--list-poster-w);
+    height: var(--list-poster-h);
     padding: 0;
     border: 0;
     border-radius: var(--radius-sm);
@@ -40,7 +40,7 @@
 }
 
 .title-poster.skeleton {
-    height: var(--title-poster-h);
+    height: var(--list-poster-h);
 }
 
 @media (pointer: coarse) {

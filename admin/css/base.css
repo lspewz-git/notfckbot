@@ -39,22 +39,19 @@
     --primary-hover: #ffffff;
     --on-primary: #0f0f0f;
     --primary-text: #f2f2f2;
-    --primary-soft: rgba(255, 255, 255, 0.08);
 
     /* Status — text colours, each with a soft fill */
     --success: #5fd08a;
     --success-soft: rgba(95, 208, 138, 0.12);
     --danger: #f2836b; /* destructive actions only */
-    --danger-dot: #f2836b;
-    --danger-muted: #c97a72;
-    --danger-fill: #f2836b;
+    --danger-dot: var(--danger);
+    --danger-fill: var(--danger);
     --danger-bg: #382926; /* a destructive button: solid, the same on any surface (never a coral fill) */
     --danger-soft: rgba(242, 131, 107, 0.13);
     --danger-border: rgba(242, 131, 107, 0.2);
     --warning: #e8b04a;
     --warning-soft: rgba(232, 176, 74, 0.14);
     --warning-text: #eadbc0; /* text on --warning-soft */
-    --muted-soft: rgba(255, 255, 255, 0.06);
     --on-danger: #1a0f0c; /* text on --danger-fill */
     --danger-tint: rgba(242, 131, 107, 0.07); /* the alert banner */
     --danger-tint-hover: rgba(242, 131, 107, 0.1);
@@ -69,6 +66,7 @@
     --switch-off: #3a3a3a; /* a switch that is off */
     --chip-count-on: #3a3a3a; /* a count on the selected (light) category chip */
     --divider: rgba(255, 255, 255, 0.06); /* between list rows, short rules in the rail and the header */
+    --muted-soft: var(--divider);
     --hairline: rgba(255, 255, 255, 0.08); /* the sign-in screen's rules */
     --checkbox-border: rgba(255, 255, 255, 0.3); /* an unticked checkbox (the Terms) */
 
@@ -151,8 +149,8 @@
     /* Height of buttons, inputs and nav items. Dense with a mouse, 44px with a finger. */
     --control-h: 2.25rem;
     --control-h-sm: 2rem; /* buttons inside table rows */
-    --title-poster-w: 2rem;
-    --title-poster-h: 3rem;
+    --list-poster-w: 2rem;
+    --list-poster-h: 3rem;
     --qr-paper: #ffffff;
     --rail-width: 180px;
     --page-max-width: 1320px; /* rail and content, centered on wide screens */
