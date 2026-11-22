@@ -92,8 +92,8 @@ export function setLaunchTitle(chatId, title) {
     return Boolean(launchTitle);
 }
 
-/** A chat's avatar: a group's own letter, the person's for their private chat ("My account") */
-export const chatAvatar = (c) => (c.type === 'private' ? avatar(ownName || c.title, true) : avatar(c.title));
+/** A chat's avatar: a group's own letter, the person's for their private chat ("My account"); its id is theirs */
+export const chatAvatar = (c) => (c.type === 'private' ? avatar(ownName || c.id, true) : avatar(c.title, false, true));
 
 /** Who is signed in changed (session.js → profile.js): the chips' avatars follow */
 export function setOwnName(name) {
@@ -209,7 +209,7 @@ function showChatChips() {
     const own = !chat || chat.type === 'private';
     const html =
         `<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="Account: ${escapeHtml(name)}">` +
-        avatar(own ? ownName || name : name, own) +
+        avatar(own ? ownName || chat?.id || '' : name, own, !own) +
         `<span class="mine-chat-chip-name">${escapeHtml(name)}</span></a>`;
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
     for (const holder of all('[data-profile-chat]')) holder.textContent = name;
@@ -221,7 +221,7 @@ function showTabChat(chat) {
     const group = Boolean(chat && chat.type !== 'private');
     for (const el of all('[data-tab-chat-avatar]')) {
         el.hidden = !group;
-        el.innerHTML = group ? avatar(chat.title) : '';
+        el.innerHTML = group ? avatar(chat.title, false, true) : '';
     }
     for (const el of all('.tab-profile [data-profile-avatar]')) el.hidden = group;
 }
@@ -859,7 +859,7 @@ function chatCard(data) {
     const meta = !group ? 'Your personal chat' : data.canChange ? 'You’re an admin' : 'Only admins change settings';
     return (
         `<button type="button" class="group-card chat-card" data-action="chat-switch" aria-haspopup="dialog" aria-label="Current chat: ${escapeHtml(title)}. Switch chat">` +
-        `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(group ? title : ownName || title))}</span>` +
+        `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(group ? title : ownName || chat?.id || ''))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(title)}</span>` +
         `<span class="role-chip">${group ? 'Group' : 'Private'}</span></span>` +
         `<span class="row-meta">${meta}</span></span>` +

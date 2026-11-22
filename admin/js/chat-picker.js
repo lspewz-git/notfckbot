@@ -8,8 +8,8 @@ const DOWN =
     '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-chevron-down" /></svg>';
 
 /** `letterOf`: whose first letter the avatar shows (the person's own name for their private chat) */
-export function chatChip({ title, accent = false, action, label = title, letterOf = title }) {
-    return `<button type="button" class="mine-chat-chip" data-action="${action}" aria-haspopup="dialog" aria-label="${escapeHtml(label)}">${avatar(letterOf, accent)}<span class="mine-chat-chip-name">${escapeHtml(title)}</span>${DOWN}</button>`;
+export function chatChip({ title, accent = false, group = false, action, label = title, letterOf = title }) {
+    return `<button type="button" class="mine-chat-chip" data-action="${action}" aria-haspopup="dialog" aria-label="${escapeHtml(label)}">${avatar(letterOf, accent, group)}<span class="mine-chat-chip-name">${escapeHtml(title)}</span>${DOWN}</button>`;
 }
 
 export function chatRows(chats, selected, action) {
@@ -18,7 +18,7 @@ export function chatRows(chats, selected, action) {
             const on = String(c.id) === String(selected);
             const state =
                 action === 'chat-picker-select' ? `role="option" aria-selected="${on}"` : `aria-pressed="${on}"`;
-            return `<button type="button" class="action-row pick-row${on ? ' selected' : ''}" data-action="${action}" data-id="${escapeHtml(c.id)}" ${state}>${avatar(c.title, c.type === 'private')}<span class="action-text"><span class="action-title">${escapeHtml(c.title)}</span>${c.hint ? `<span class="action-desc">${escapeHtml(c.hint)}</span>` : ''}</span>${on ? `<span class="pick-check">${CHECK}</span>` : ''}</button>`;
+            return `<button type="button" class="action-row pick-row${on ? ' selected' : ''}" data-action="${action}" data-id="${escapeHtml(c.id)}" ${state}>${avatar(c.title, c.type === 'private', c.type !== 'private')}<span class="action-text"><span class="action-title">${escapeHtml(c.title)}</span>${c.hint ? `<span class="action-desc">${escapeHtml(c.hint)}</span>` : ''}</span>${on ? `<span class="pick-check">${CHECK}</span>` : ''}</button>`;
         })
         .join('');
 }

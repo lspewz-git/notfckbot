@@ -130,6 +130,7 @@
     --radius-tile: 10px; /* a row's icon tile */
     --radius-chip: 7px; /* role and Hosting IP chips */
     --radius-sheet: 24px; /* bottom sheet */
+    --radius-avatar-group: 28%; /* a group's avatar is a rounded square, a person's a circle */
     /* The floating phone tab bar: its height, its distance from the screen's bottom edge, the room
        the page leaves under its content (bar, gap, 28px of air: 96px without a home indicator) and where toasts sit above it.
        Like Telegram's (05.11): it sits low, over the lower part of the home indicator area, and 12px

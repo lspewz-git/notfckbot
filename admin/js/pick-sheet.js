@@ -22,9 +22,9 @@ export function initial(name) {
     return (letters[0] || '?').toUpperCase();
 }
 
-/** A letter avatar; `accent` marks the user's own chat */
-export const avatar = (name, accent = false) =>
-    `<span class="pick-avatar${accent ? ' pick-avatar-accent' : ''}" aria-hidden="true">${escapeHtml(initial(name))}</span>`;
+/** A letter avatar; `accent` marks the user's own chat, `group` a group's (a rounded square, not a circle) */
+export const avatar = (name, accent = false, group = false) =>
+    `<span class="pick-avatar${accent ? ' pick-avatar-accent' : ''}${group ? ' pick-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(name))}</span>`;
 
 /** @type {((value: string) => void) | null} */
 let onPicked = null;

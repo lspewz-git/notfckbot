@@ -85,6 +85,16 @@ test('the chat chip names the open chat on every tab; the Account tab shows its 
     await expect(page.locator('#my-settings-body .chat-card .card-name')).toHaveText('Киноклуб');
     await expect(page.locator('.tab-profile-label')).toHaveText('Account');
     await expect(page.locator('[data-tab-chat-avatar]')).toHaveText('К');
+    // A group is a rounded square, a person a circle: shape, not only colour
+    const radius = (locator) => locator.first().evaluate((el) => getComputedStyle(el).borderRadius);
+    expect(await radius(page.locator('#my-settings-body .chat-card .profile-avatar'))).toBe('28%');
+    expect(await radius(page.locator('[data-tab-chat-avatar] .pick-avatar'))).toBe('28%');
+    await page.locator('#my-settings-body .chat-card').click();
+    const rows = page.locator('#pick-modal .pick-avatar');
+    await expect(rows.first()).toBeVisible();
+    expect(await rows.evaluateAll((els) => els.map((el) => getComputedStyle(el).borderRadius))).toEqual(
+        expect.arrayContaining(['50%', '28%'])
+    );
     if (isNarrow(page)) {
         await expect(page.locator('.tab-profile [data-profile-avatar]')).toBeHidden();
         await expect(page.locator('[data-tab-chat-avatar]')).toBeVisible();

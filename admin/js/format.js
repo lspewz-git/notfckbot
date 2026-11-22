@@ -57,7 +57,7 @@ export function chatDisplayName(chat) {
     // Decorative: the name is right next to it and the type has its own column. The letter
     // is drawn from data-initial by CSS, so it isn't text: the table filter matches on a
     // row's text and would otherwise see "K@kent2357"
-    const avatar = `<span class="avatar" style="--avatar-hue:${avatarHue(chat.id)}" data-initial="${escapeHtml(avatarInitial(chat))}" aria-hidden="true">${mark}</span>`;
+    const avatar = `<span class="avatar${kind ? ' avatar-group' : ''}" style="--avatar-hue:${avatarHue(chat.id)}" data-initial="${escapeHtml(avatarInitial(chat))}" aria-hidden="true">${mark}</span>`;
     const label = escapeHtml(chatLabel(chat));
     return `<span class="chat-name${chat.username ? '' : ' chat-name-unknown'}">${avatar}<span class="chat-name-text">${label}</span></span>`;
 }

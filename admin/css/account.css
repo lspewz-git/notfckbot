@@ -3064,6 +3064,12 @@ button.search-result-open:hover .mine-row-title {
     color: var(--text);
 }
 
+/* A group is told from a person by shape too, not only by colour */
+.profile-avatar-group,
+.pick-avatar-group {
+    border-radius: var(--radius-avatar-group);
+}
+
 .chat-settings-note {
     margin-top: var(--space-3);
 }

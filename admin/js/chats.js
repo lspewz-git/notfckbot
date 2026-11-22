@@ -330,6 +330,7 @@ function renderContentChat() {
     $('content-chat-field').innerHTML = chatChip({
         title: chat?.title || 'Choose a chat…',
         accent: chat?.type === 'private',
+        group: Boolean(chat) && chat.type !== 'private',
         action: 'content-chat-open'
     });
 }

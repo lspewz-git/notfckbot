@@ -350,6 +350,10 @@ button.cat-plus {
 }
 
 /* The letter, from data-initial: not part of the row's text (see chatDisplayName) */
+.avatar-group {
+    border-radius: var(--radius-avatar-group);
+}
+
 .avatar::before {
     content: attr(data-initial);
 }
