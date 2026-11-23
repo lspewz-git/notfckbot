@@ -666,7 +666,8 @@ body.signed-out .tabbar {
     line-height: 48px;
 }
 
-.login-digits.is-ended,
+/* Only the spent code fades: its label stays readable (AA contrast) */
+.login-digits.is-ended .login-digits-value,
 .login-qr-wrap.is-ended {
     opacity: 0.4;
 }
@@ -2327,6 +2328,11 @@ button.search-result-open:hover .mine-row-title {
     gap: var(--space-1);
     min-height: 44px;
     margin: 0 0 var(--space-4) -5px;
+}
+
+/* Without Back (the Account tab) the title itself starts on the content edge, like Calendar's */
+.app-page > .page-nav:not(:has(.page-back)) {
+    margin-left: 0;
 }
 
 .app-page > .page-nav .page-back {

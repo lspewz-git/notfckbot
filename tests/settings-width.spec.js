@@ -4,6 +4,17 @@ const { mockPanel } = require('./mock-panel');
 
 watchConsole();
 
+test('the Account title starts on the content edge, like Calendar’s', async ({ page }) => {
+    await mockPanel(page, { path: '/#my-calendar' });
+    const calendar = page.locator('#my-calendar-section h1');
+    await expect(calendar).toBeVisible();
+    const left = (await calendar.boundingBox()).x;
+    await openProfilePage(page, 'my-profile');
+    const account = page.locator('#my-profile-section h1');
+    await expect(account).toBeVisible();
+    expect(Math.abs((await account.boundingBox()).x - left)).toBeLessThanOrEqual(1);
+});
+
 for (const section of ['my-settings', 'my-account']) {
     test(`${section} fills the same content column as Following`, async ({ page }) => {
         await mockPanel(page, { role: 'user', path: '/#my-subs' });

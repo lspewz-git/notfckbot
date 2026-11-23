@@ -1069,6 +1069,8 @@ test('digital release notifications are off by default and can be enabled', asyn
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    // A dark knob on the amber track (white there fails 3:1)
+    await expect(toggle.locator('.switch-knob')).toHaveCSS('background-color', 'rgb(26, 26, 26)');
     expect(panel.account.sent.find((r) => r.method === 'PATCH').body).toEqual({ notify_digital: true });
 });
 
@@ -1497,7 +1499,9 @@ test('a cancelled or expired wait stays on its screen and offers a new try', asy
         const status = page.locator('#login-status');
         await expect(status).toHaveText(text, { timeout: 10000 });
         await expect(status).toHaveAttribute('role', 'status');
-        await expect(page.locator('#login-digits')).toHaveCSS('opacity', '0.4');
+        // The spent digits fade; their label keeps full contrast
+        await expect(page.locator('#login-digits .login-digits-value')).toHaveCSS('opacity', '0.4');
+        await expect(page.locator('#login-digits')).toHaveCSS('opacity', '1');
         await expect(page.locator('#login-command')).toHaveCount(0);
         const button = page.locator('#login-actions .btn');
         await expect(button).toHaveText(again);

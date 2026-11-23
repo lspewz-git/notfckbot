@@ -177,8 +177,10 @@
     background: var(--accent);
 }
 
+/* A dark knob on amber: white on it is ~1.9:1, under the 3:1 a control part needs (WCAG 1.4.11) */
 .switch[aria-checked='true'] .switch-knob {
     left: 17px;
+    background: var(--on-accent);
 }
 
 /* A borderless square icon button (refresh) */
