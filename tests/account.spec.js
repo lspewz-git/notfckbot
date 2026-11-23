@@ -121,8 +121,10 @@ test('a failed Mini App sign-in offers a retry and a password, not the bot link 
     const panel = await mockPanel(page, { path, signedOut: true, role: 'user', miniAppFails: [503] });
     const retry = page.locator('#login-body [data-action="login-retry"]');
     await expect(retry).toBeVisible();
-    await expect(page.locator('#login-title')).toHaveText('Mini App sign-in failed (503)');
+    // The title stays the same; the server's words go under the status line (canvas, 23.11)
+    await expect(page.locator('#login-title')).toHaveText('Couldn’t sign you in through Telegram');
     await expect(page.locator('#login-code')).toHaveText('503 · Service Unavailable');
+    await expect(page.locator('#login-code + .login-problem-detail')).toHaveText('Mini App sign-in failed (503)');
     const password = page.locator('#login-body [data-action="login-password"]');
     await expect(password).toBeVisible();
     // Both 48px high (SIGNIN.md)
@@ -657,6 +659,8 @@ test('"Before you start" after an update: What changed opens the policy and Back
     await page.locator('#terms-cb').check();
     await page.getByRole('button', { name: 'What changed' }).click();
     await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible();
+    // It opens on the cookies section, the part that changed (canvas, 23.11)
+    await expect(page.getByRole('heading', { name: 'Cookies and browser settings' })).toBeInViewport();
     await page.locator('#login-back').click();
     await expect(page.getByRole('heading', { name: 'Before you start' })).not.toBeFocused();
     await expect(page.locator('#terms-cb')).toBeChecked();
@@ -713,6 +717,7 @@ test('a panel that does not answer says so with its status and offers Retry', as
     const panel = await mockPanel(page, { meFails: [502] });
     await expect(page.locator('#login-title')).toHaveText('The panel isn’t answering: Account check failed (502)');
     await expect(page.locator('#login-code')).toHaveText('502 · Bad Gateway');
+    expect(await page.locator('.login-problem-icon use').getAttribute('href')).toBe('#i-wifi-off');
     await page.getByRole('button', { name: 'Retry' }).click();
     await expect(page.locator('#login-gate')).toBeHidden();
     expect(panel.account.sent.filter((r) => r.path === '/api/account/me')).toHaveLength(2);
@@ -1455,6 +1460,9 @@ test('QR code: the same digits as Telegram, and leaving cancels the pending atte
     expect((await qr.boundingBox()).width).toBe(232);
     await expect(page.locator('#login-digits')).toContainText('The bot will show 042 719');
     await expect(page.locator('#login-timer')).toHaveText(/^Code expires in [45]:\d\d$/);
+    // The timer line is the status itself: no separate empty one
+    await expect(page.locator('#login-digits [role="status"] #login-timer')).toHaveCount(1);
+    await expect(page.locator('#login-body [role="status"]')).toHaveCount(1);
     await expect(page.getByRole('link', { name: 'Open Telegram on this device' })).toHaveAttribute('href', /t\.me/);
     expect(panel.account.signedIn).toBe(false);
     // New code: a new one, the old one cancelled

@@ -21,19 +21,19 @@ for (const section of ['my-subs']) {
         await expect(page.locator('#mine-q')).toBeFocused();
     });
 
-    test(`Cancel clears search and returns to ${section}`, async ({ page }) => {
+    test(`Back clears search and returns to ${section}`, async ({ page }) => {
         await mockPanel(page, { role: 'user' });
         await openSection(page, section);
         await page.locator(`#${section}-section [data-action="mine-search-open"]`).first().click();
         const input = page.locator('#mine-q');
         await input.fill('Дюна');
         await expect(page.locator('#mine-results .search-row')).toHaveCount(3);
-        const cancel = page.getByRole('button', { name: 'Cancel', exact: true });
-        const [fieldBox, cancelBox] = await Promise.all([input.boundingBox(), cancel.boundingBox()]);
-        expect(cancelBox.x).toBeGreaterThan(fieldBox.x + fieldBox.width);
-        expect(cancelBox.height).toBeGreaterThanOrEqual(44);
-        expect(cancelBox.x + cancelBox.width).toBeLessThanOrEqual(page.viewportSize().width);
-        await cancel.click();
+        // Back is the only way out: no Cancel, the field runs to the bar's edge (canvas, 23.11)
+        await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toHaveCount(0);
+        const bar = await page.locator('#my-search-section .search-bar').boundingBox();
+        const field = await page.locator('#my-search-section .search-field').boundingBox();
+        expect(Math.abs(field.x + field.width - (bar.x + bar.width))).toBeLessThanOrEqual(1);
+        await page.getByRole('button', { name: 'Back to Following', exact: true }).click();
         await expect(page.locator(`#${section}-section`)).toHaveClass(/active/);
         await expect(input).toHaveValue('');
         await expect(input).not.toBeFocused();
@@ -55,7 +55,7 @@ test('search input has an iOS-safe font size without disabling pinch zoom', asyn
     expect(viewport).not.toMatch(/user-scalable\s*=\s*no|maximum-scale\s*=\s*1(?:\D|$)/);
 });
 
-test('Cancel ignores a search response arriving after reopening', async ({ page }) => {
+test('Back ignores a search response arriving after reopening', async ({ page }) => {
     await mockPanel(page, { role: 'user' });
     await openSection(page, 'my-subs');
     let release;
@@ -71,7 +71,7 @@ test('Cancel ignores a search response arriving after reopening', async ({ page 
     await page.locator('#mine-q').fill('late');
     await page.locator('#mine-q').press('Enter');
     await started;
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to Following', exact: true }).click();
     await page.locator('#my-subs-section [data-action="mine-search-open"]').click();
     const answered = page.waitForResponse((response) => response.url().includes('/search?q=late'));
     release();

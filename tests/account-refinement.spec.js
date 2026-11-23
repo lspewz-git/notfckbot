@@ -88,7 +88,8 @@ test.describe('shared cards and calendar unfollow', () => {
             const above = el.querySelector('.tc-link').getBoundingClientRect();
             return el.querySelector('.tc-actions').getBoundingClientRect().top - above.bottom;
         });
-        expect(gap).toBe(8);
+        // Kinopoisk sits with the description now, the actions keep their own group below (canvas, 23.11)
+        expect(gap).toBeGreaterThanOrEqual(16);
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-calendar');
         await page.locator('[data-action="mine-cal-what"][data-what="films"]').click();

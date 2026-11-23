@@ -22,7 +22,7 @@ test("a series card lists who is subscribed, with each chat's mode", async ({ pa
     await openSeriesCard(page);
 
     const group = card(page).locator('.people-group');
-    await expect(group.locator('h4')).toHaveText('Subscribers · 3');
+    await expect(group.locator('h3')).toHaveText('Subscribers · 3');
     const rows = group.locator('li');
     await expect(rows).toHaveCount(3);
     await expect(rows.filter({ hasText: 'alice' })).toContainText('Every episode');
@@ -65,14 +65,14 @@ test('a film card splits chats into waiting and already notified', async ({ page
 
     await page.locator('#upcoming-list [data-id="movie_6"]').click();
     await expect(card(page).locator('#detail-title')).toHaveText('Dune');
-    await expect(card(page).locator('.people-group h4')).toHaveText(['Already notified · 1']);
+    await expect(card(page).locator('.people-group h3')).toHaveText(['Already notified · 1']);
     await expect(card(page).locator('.people-group li')).toContainText('alice');
     await expect(card(page).locator('.tc-link')).toHaveAttribute('href', /\/film\/435\/$/);
 
     await page.keyboard.press('Escape');
     await page.locator('#upcoming-list [data-id="movie_1"]').click();
     await expect(card(page).locator('#detail-title')).toHaveText('Dune: Part Three');
-    await expect(card(page).locator('.people-group h4')).toHaveText(['Waiting for release · 1']);
+    await expect(card(page).locator('.people-group h3')).toHaveText(['Waiting for release · 1']);
 });
 
 test("the Kinopoisk button keeps its size when the title's page replaces the search", async ({ page }) => {

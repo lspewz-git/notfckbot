@@ -1051,10 +1051,8 @@ export const accountActions = {
     'mine-search-open': () => {
         const from = visibleSection();
         if (from && from !== 'my-search') searchFrom = from;
-        for (const id of ['mine-search-back', 'mine-search-cancel']) {
-            const back = $(id);
-            if (back) back.dataset.section = searchFrom;
-        }
+        const back = $('mine-search-back');
+        if (back) back.dataset.section = searchFrom;
         // A title added from the catalog must show in Following on return, so its filter goes
         const field = /** @type {HTMLInputElement | null} */ (document.querySelector('[data-tab-find="subs"]'));
         if (field?.value) {

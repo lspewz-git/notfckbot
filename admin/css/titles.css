@@ -456,7 +456,7 @@
     display: none;
 }
 
-.tc-footer .tc-link,
+.tc-scroll > .tc-link,
 .tc-footer .tc-actions,
 .tc-footer .sheet-error {
     margin: 0;
@@ -1216,18 +1216,6 @@
     gap: var(--space-2);
 }
 
-.search-cancel {
-    flex: none;
-    min-height: 44px;
-    padding: 0 var(--space-1);
-    border: none;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: var(--text-lg);
-    cursor: pointer;
-}
-
 .search-field {
     display: flex;
     flex: 1;
@@ -1268,7 +1256,7 @@
     color: var(--text-dim);
 }
 
-/* Its own clear cross: 44 target, a small light circle */
+/* Its own clear cross: 44 target, a small dark circle (quieter, like iOS) */
 .search-clear {
     display: grid;
     place-items: center;
@@ -1278,7 +1266,7 @@
     padding: 0;
     border: none;
     background: transparent;
-    color: var(--bg);
+    color: var(--text-secondary);
     cursor: pointer;
 }
 
@@ -1288,7 +1276,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: var(--text-secondary);
+    background: var(--switch-off);
 }
 
 .search-clear .icon {

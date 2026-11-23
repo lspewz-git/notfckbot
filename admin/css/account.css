@@ -668,7 +668,7 @@ body.signed-out .tabbar {
 
 /* Only the spent code fades: its label stays readable (AA contrast) */
 .login-digits.is-ended .login-digits-value,
-.login-qr-wrap.is-ended {
+.login-qr-wrap.is-ended > :not(#login-status) {
     opacity: 0.4;
 }
 
@@ -690,10 +690,6 @@ body.signed-out .tabbar {
     height: 18px;
     stroke-width: 2.4;
     color: var(--accent);
-}
-
-.login-status-empty {
-    margin: 0;
 }
 
 .login-status.is-ended {
@@ -1083,6 +1079,16 @@ body.signed-out .tabbar {
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 17px;
+}
+
+/* The server's own words under the status line */
+.login-problem-detail {
+    max-width: 36ch;
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 20px;
+    text-wrap: pretty;
 }
 
 .login-fail .login-panel > .login-actions {

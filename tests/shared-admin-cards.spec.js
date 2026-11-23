@@ -12,7 +12,7 @@ test('admin details use the shared title sheet and poster viewer', async ({ page
     await expect(modal.locator('.title-sheet .tc-head h2')).toHaveText('Stranger Things');
     await expect(modal.locator('.tc-scroll')).toHaveCount(1);
     await expect(modal.locator('.sheet-grabber')).toHaveCount(1);
-    await expect(modal.locator('.people-group h4')).toHaveText('Subscribers · 3');
+    await expect(modal.locator('.people-group h3')).toHaveText('Subscribers · 3');
     if (process.env.ADMIN_CARD_CAPTURES) {
         await modal.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
         await modal.locator('.tc-link').waitFor();

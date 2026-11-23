@@ -391,7 +391,7 @@ function pendingBody(start, mode) {
     const left = clock(secondsLeft(start));
     const status = WAIT_TEXT[mode]
         ? `<div class="login-status" id="login-status" role="status" aria-live="polite">${SPINNER}<span>${WAIT_TEXT[mode]} <span id="login-timer" aria-hidden="true">· ${left}</span></span></div>`
-        : '<div class="login-status login-status-empty" id="login-status" role="status" aria-live="polite"></div>';
+        : '';
     const digitsBlock = (label, large = false) =>
         `<div class="login-digits${large ? ' login-digits-lg' : ''}" id="login-digits"><span class="login-digits-label">${label}</span>${digits(start.check)}</div>`;
     const link = (cls, text, url, iconName = '') =>
@@ -405,7 +405,8 @@ function pendingBody(start, mode) {
             '<div class="login-qr-wrap" id="login-digits">' +
             `<div class="login-qr-box" role="img" aria-label="QR code for signing in"><img src="${escapeHtml(start.qr)}" alt="" /></div>` +
             `<p class="login-qr-meta">The bot will show <span class="login-mono">${escapeHtml(String(start.check).replace(/^(\d{3})(\d{3})$/, '$1 $2'))}</span></p>` +
-            `<p class="login-qr-meta" id="login-timer">Code expires in ${left}</p></div>` +
+            // The timer line itself is the status; the ticking stays silent, why it ended is read out
+            `<p class="login-qr-meta" id="login-status" role="status" aria-live="polite"><span id="login-timer" aria-hidden="true">Code expires in ${left}</span></p></div>` +
             status +
             '<div class="login-actions" id="login-actions">' +
             `<button type="button" class="btn login-neutral" data-action="login-renew-qr">${icon('refresh-cw')}<span>New code</span></button>` +
@@ -557,8 +558,8 @@ function passwordScreen() {
     focusStep();
 }
 
-/** @param {{title: string, body: string}} document */
-function legalScreen({ title, body }) {
+/** @param {{title: string, body: string}} document @param {string} [section] a heading id to open on */
+function legalScreen({ title, body }, section = '') {
     discardChallenges();
     // Opened from "Before you start": Back returns there, not to the ways in
     const head = termsNeeded
@@ -568,7 +569,10 @@ function legalScreen({ title, body }) {
         `<div class="login-panel"><div class="login-terms-top">${head}</div><div class="login-terms">${body}</div></div>`,
         'step login-terms-screen'
     );
-    focusStep();
+    if (!section) return focusStep();
+    // WebKit scrolls to a focused element later, which would undo the jump to the section
+    $('login-back')?.focus({ preventScroll: true });
+    document.getElementById(section)?.scrollIntoView({ block: 'start' });
 }
 
 /**
@@ -580,20 +584,20 @@ function termsScreen(state) {
     discardChallenges();
     termsNeeded = state;
     gate(
-        '<main class="login-panel terms-panel" aria-labelledby="bys-title">' +
+        '<section class="login-panel terms-panel" aria-labelledby="bys-title">' +
             '<div class="terms-main">' +
             `<div class="rail-logo login-logo terms-logo" aria-hidden="true">${icon('file-text')}</div>` +
             '<h1 id="bys-title" class="login-step-title">Before you start</h1>' +
             (state === 'updated'
                 ? '<p class="login-lead">We’ve updated the Terms of Service and the Privacy Policy. Accept them to continue.</p>' +
-                  '<button type="button" class="terms-changed" data-action="login-privacy">What changed</button>'
+                  '<button type="button" class="terms-changed" data-action="login-privacy" data-section="privacy-cookies">What changed</button>'
                 : '<p class="login-lead">To use NotFckBot, accept the terms. We keep a sign-in cookie on this device so you stay signed in.</p>') +
             termsCheckbox() +
             '</div>' +
             '<div class="login-actions terms-actions">' +
             '<button type="button" class="btn btn-primary" data-action="terms-accept">Continue</button>' +
             '<button type="button" class="login-text-btn" data-action="logout">Sign out</button>' +
-            '</div></main>',
+            '</div></section>',
         'accept'
     );
 }
@@ -622,12 +626,16 @@ const linkScreen = (error = '') => {
     );
 };
 
-/** A failure with its HTTP status line: the icon, the message, then what can be done. */
-const problem = (title, status, actions, alert = false) =>
+/**
+ * A failure with its HTTP status line: the icon, the message, the status, the server's words, then
+ * what can be done.
+ */
+const problem = (title, status, actions, { alert = false, iconName = 'circle-alert', detail = '' } = {}) =>
     '<div class="login-panel">' +
-    `<div class="login-problem"${alert ? ' role="alert"' : ''}><span class="login-problem-icon">${icon('circle-alert')}</span>` +
+    `<div class="login-problem"${alert ? ' role="alert"' : ''}><span class="login-problem-icon">${icon(iconName)}</span>` +
     `<h1 id="login-title" tabindex="-1">${escapeHtml(title)}</h1>` +
     (status ? `<p class="login-code" id="login-code">${escapeHtml(status)}</p>` : '') +
+    (detail ? `<p class="login-problem-detail">${escapeHtml(detail)}</p>` : '') +
     `</div><div class="login-actions">${actions}</div></div>`;
 
 const STATUS_TEXT = {
@@ -656,7 +664,7 @@ const panelDownScreen = (err) =>
             `The panel isn’t answering: ${err.message}`,
             statusLine(err),
             `<button type="button" class="btn btn-primary" data-action="login-retry">${icon('refresh-cw')}<span>Retry</span></button>`,
-            true
+            { alert: true, iconName: 'wifi-off' }
         ),
         'fail'
     );
@@ -685,14 +693,15 @@ function miniAppScreen(error, restoreFocus, status = '') {
               : next === 'signout'
                 ? '<button type="button" class="btn btn-primary" data-action="miniapp-signout">Sign out</button>'
                 : '';
+    // The title never changes; the status line says what failed, the server's own words go under it
     gate(
         problem(
-            error || 'Couldn’t sign you in through Telegram',
+            'Couldn’t sign you in through Telegram',
             status,
             main +
                 '<div class="login-or login-or-plain"><span>Or</span></div>' +
                 `<button type="button" class="btn login-neutral" data-action="login-password">${icon('key-round')}<span>Password</span></button>`,
-            Boolean(error)
+            { alert: Boolean(error), detail: error }
         ),
         'fail'
     );
@@ -1004,7 +1013,7 @@ export function sessionActions(onSignedIn) {
         },
         'terms-back': () => termsScreen(termsNeeded || 'first'),
         'login-terms': () => legalScreen(TERMS),
-        'login-privacy': () => legalScreen(PRIVACY),
+        'login-privacy': (el) => legalScreen(PRIVACY, el.dataset.section),
         'login-password': () => passwordScreen(),
         'login-cancel': () => signInScreen('', true),
         'miniapp-close': () => miniApp?.bridge.postEvent('web_app_close', '{}'),

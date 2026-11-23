@@ -146,8 +146,8 @@ export function fitTitleSheet(root) {
             }
             copy.textContent = prefix(low);
         }
-        const used = expanded || !phone ? text.scrollHeight : room;
-        description.style.height = `${used}px`;
+        // Only the text's own height: Kinopoisk follows it, the free room goes above the footer (canvas, 23.11)
+        description.style.height = `${text.scrollHeight}px`;
     }
     sheet.style.height = phone ? `${base}px` : 'auto';
     if (!phone && !modal.style.getPropertyValue('--title-top')) {

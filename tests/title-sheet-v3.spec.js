@@ -27,7 +27,11 @@ for (const tab of ['my-calendar','my-aired','my-subs']) {
     test(`${tab} uses a fixed frame, flowing actions and inline description link`, async ({page}) => {
         const {card} = await openCard(page,tab);
         await expect(card.locator('.tc-scroll')).toHaveCount(1);
-        await expect(card.locator('.tc-footer .tc-link')).toBeVisible();
+        // Kinopoisk follows the description; the footer holds only the actions (canvas, 23.11)
+        await expect(card.locator('.tc-description + .tc-link')).toBeVisible();
+        await expect(card.locator('.tc-footer .tc-link')).toHaveCount(0);
+        // Right under the text, also on a phone where the frame keeps its free room above the footer
+        expect(await card.evaluate(el => el.querySelector('.tc-link').getBoundingClientRect().top - el.querySelector('.tc-overview').getBoundingClientRect().bottom)).toBeLessThanOrEqual(32);
         await expect(card.locator('.tc-footer').getByRole('link',{name:'Watch on SSPoisk'})).toBeVisible();
         await expect(card.locator('.tc-footer').getByRole('button',{name:'Unfollow',exact:true})).toBeVisible();
         const copy = card.locator('.tc-copy');

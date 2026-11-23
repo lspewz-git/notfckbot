@@ -164,9 +164,11 @@ export function titleCard(
         `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating)}${about ? `<p>${escapeHtml(about)}</p>` : ''}</div></div>` +
         (t.premieres?.length ? seasonPremieres(t.premieres, titleId) : date) +
         overview +
+        // Reference link next to the description; Notify me and the actions stay together below (canvas, 23.11)
+        kinopoisk +
         notify +
         extra +
-        `<div class="tc-footer">${kinopoisk}${error}${actions ? `<div class="tc-actions">${actions}</div>` : ''}</div></div>`
+        `<div class="tc-footer">${error}${actions ? `<div class="tc-actions">${actions}</div>` : ''}</div></div>`
     );
 }
 

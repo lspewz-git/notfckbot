@@ -26,7 +26,7 @@ function peopleGroup(label, rows) {
             return `<li>${chatDisplayName(chat)}${tag}</li>`;
         })
         .join('');
-    return `<div class="people-group"><h4>${escapeHtml(label)} · ${rows.length}</h4><ul class="people-list">${items}</ul></div>`;
+    return `<div class="people-group"><h3>${escapeHtml(label)} · ${rows.length}</h3><ul class="people-list">${items}</ul></div>`;
 }
 
 /**

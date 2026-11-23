@@ -51,7 +51,7 @@ export const PRIVACY = {
         <p><strong>Google Fonts.</strong> The panel and Mini App load fonts from Google Fonts. The browser may send your IP address and technical request headers to Google. See <a href="https://developers.google.com/fonts/faq/privacy" target="_blank" rel="noopener noreferrer">Google Fonts and privacy</a>.</p>
         <p><strong>Service infrastructure.</strong> When you open the panel, a server proxy processes your IP address and forwards the request to the app. When you email us, the email service processes your address and message for delivery.</p>
         <p>When you follow an external link, the destination receives the browser request and applies its own rules. The operator may provide data to competent authorities when required by law.</p>
-        <h2>Cookies and browser settings</h2>
+        <h2 id="privacy-cookies">Cookies and browser settings</h2>
         <p>To sign you in and protect your account, the panel stores these records in your browser:</p>
         <ul class="legal-records">
             <li class="legal-records-head" aria-hidden="true"><span>Name</span><span>Kind</span><span>Purpose</span><span>Kept</span></li>
