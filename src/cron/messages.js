@@ -54,8 +54,14 @@ const NO_DIGITAL_DATE = '💻 Дата цифрового релиза неиз�
 function buildFilmMessage({ entry, data, links, now = new Date(), today, ru = {} }) {
     const online = onlineDate(data, ru);
     const release = releaseDate(data, ru);
-    const where =
-        release && worldwideRelease(data)?.date === release.date ? 'мировой прокат' : countryList(release?.countries);
+    // The release may be a day into the wave that worldwideRelease starts at a lone early market
+    const wave = worldwideRelease(data);
+    const inWave =
+        wave &&
+        release &&
+        release.date >= wave.date &&
+        Date.parse(release.date) <= Date.parse(wave.date) + 6 * 24 * 60 * 60 * 1000;
+    const where = inWave ? 'мировой прокат' : countryList(release?.countries);
     const dates = extraFilmDates(
         {
             ...data,

@@ -43,6 +43,17 @@ test('limited cinema counts, including a film with no wide release at all', () =
     assert.equal(releaseDate(movie([['NZ', 2, '2026-03-05']])).date, '2026-03-05');
 });
 
+test('the world release: one early market does not lead, the home country and Russia do', () => {
+    const wave = ['AR', 'BR', 'GB'].map((code) => [code, 2, '2026-11-25']);
+    // Cliff Booth: Azerbaijan alone a day ahead of 20+ countries
+    assert.equal(releaseDate(movie([['AZ', 3, '2026-11-24'], ...wave])).date, '2026-11-25');
+    assert.equal(releaseDate(movie([['AZ', 3, '2026-11-24'], ...wave.slice(1)])).date, '2026-11-24');
+    assert.equal(releaseDate(movie([['US', 3, '2026-11-20'], ...wave])).date, '2026-11-20');
+    assert.equal(releaseDate(movie([['RU', 3, '2026-11-20'], ...wave])).date, '2026-11-20');
+    // Only within a week of the first release
+    assert.equal(releaseDate(movie([['AZ', 3, '2026-11-17'], ...wave])).date, '2026-11-17');
+});
+
 test('Russian films use Russia, regardless of an earlier foreign screening or language', () => {
     const film = movie(
         [

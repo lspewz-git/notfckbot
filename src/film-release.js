@@ -61,11 +61,37 @@ function worldwideRelease(data) {
     return null;
 }
 
-function isRussian(data) {
-    const origin = data.origin_country?.length
+function originOf(data) {
+    return data.origin_country?.length
         ? data.origin_country
         : (data.production_countries || []).map((country) => country.iso_3166_1);
-    return origin.includes('RU');
+}
+
+function isRussian(data) {
+    return originOf(data).includes('RU');
+}
+
+/**
+ * The world release: the first day the film opens in 3+ countries, its home country or Russia,
+ * so one early market (Azerbaijan a day ahead, France's Wednesdays) doesn't set the date. Only within
+ * 7 days of the first release: a lone release months ahead of the rest stays the release.
+ */
+function massRelease(data) {
+    const events = eventsOf(data, [2, 3]);
+    const home = new Set([...originOf(data), 'RU']);
+    const days = [...new Set(events.map((event) => event.date))].sort();
+    const limit = days.length ? Date.parse(days[0]) + 6 * 24 * 60 * 60 * 1000 : 0;
+    const day = days.find((date) => {
+        if (Date.parse(date) > limit) return false;
+        const codes = new Set(
+            events
+                .filter((event) => event.date === date)
+                .map((event) => event.country)
+                .filter(Boolean)
+        );
+        return codes.size >= 3 || [...codes].some((code) => home.has(code));
+    });
+    return firstOf(day ? events.filter((event) => event.date === day) : events);
 }
 
 function russianCinema(data, ru) {
@@ -74,11 +100,11 @@ function russianCinema(data, ru) {
     return firstOf(eventsOf(data, [2, 3], 'RU')) || firstOf([{ date: dayOf(data.cinema_ru_date), country: 'RU' }]);
 }
 
-/** First public cinema release worldwide; Russian films use Russia's cinema release. */
+/** The world cinema release (massRelease); Russian films use Russia's cinema release. */
 function cinemaDate(data, ru = {}) {
     if (isRussian(data)) return russianCinema(data, ru);
     return (
-        firstOf(eventsOf(data, [2, 3])) ||
+        massRelease(data) ||
         firstOf([
             { date: dayOf(data.cinema_release_date), country: data.cinema_release_country || null },
             { date: dayOf(data.limited_release_date), country: data.limited_release_country || null }

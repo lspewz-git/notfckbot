@@ -833,7 +833,7 @@ function settingsView(data) {
                     s.notify_digital
                 ),
             'In quiet hours notifications wait and come in the morning as one message. ' +
-                'Films follow the first release worldwide, or in Russia for Russian films. Digital alerts are optional.'
+                'Films follow the world release (the first day in several countries or the home country), or in Russia for Russian films. Digital alerts are optional.'
         ) +
         group(
             'Digests',

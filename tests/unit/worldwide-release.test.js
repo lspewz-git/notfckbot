@@ -25,6 +25,12 @@ test('exactly ten markets across three regions qualify; nine markets do not', ()
     assert.equal(worldwideRelease(movie(wave(markets.slice(1)))), null);
 });
 
+test('a lone early market before the wave keeps the world label on the wave day', () => {
+    const data = movie([['AZ', 3, '2026-10-31'], ...wave()]);
+    assert.equal(releaseDate(data).date, '2026-11-01');
+    assert.match(message(data), /1 ноября 2026 г\.<\/b> \(мировой прокат\)/);
+});
+
 test('ten markets in one or two regions do not qualify', () => {
     const europe = ['FR', 'DE', 'GB', 'IT', 'ES', 'PT', 'BE', 'NL', 'AT', 'PL'];
     assert.equal(worldwideRelease(movie(wave(europe))), null);
