@@ -44,6 +44,20 @@ test('the dashboard counts only active subscriptions and notes the archived ones
     await expect(page.locator('#subs-archived-count')).toHaveText(`${ARCHIVED} archived`);
 });
 
+test('the + beside the chips leaves them as far from the search as on Chats', async ({ page }) => {
+    // Search pill bottom to the first chip's top, in a section
+    const gap = (id) =>
+        page.locator(`#${id}`).evaluate((s) => {
+            const pill = s.querySelector('.search-pill').getBoundingClientRect();
+            const chip = s.querySelector('.tab-filters .btn').getBoundingClientRect();
+            return Math.round(chip.top - pill.bottom);
+        });
+    await openSection(page, 'chats');
+    const chats = await gap('chats-section');
+    await goToSubs(page);
+    expect(await gap('subs-section')).toBe(chats);
+});
+
 test('the tabs show counts and split the rows', async ({ page }) => {
     await goToSubs(page);
     await expect(page.locator('#subs-section h1')).toHaveText('Serials');
