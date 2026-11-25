@@ -186,14 +186,18 @@ async function withTvmazeQuick(details, zoneId = DEFAULT_ZONE) {
 function nextDayIn(series, zoneId) {
     const date = series.next_episode_date;
     if (!date) return null;
-    const time = timeOf(
+    const time = nextTimeOf(series);
+    return time ? releaseDay(time, zoneId) : date;
+}
+
+/** TVmaze's cached time for the series' next episode, else null (cache only) */
+const nextTimeOf = (series) =>
+    timeOf(
         tvmaze.cachedAirTimes(series.tmdb_id),
         series.next_episode_season,
         series.next_episode_number,
-        date
+        series.next_episode_date
     );
-    return time ? releaseDay(time, zoneId) : date;
-}
 
 module.exports = {
     timeOf,
@@ -203,6 +207,7 @@ module.exports = {
     withTvmaze,
     withTvmazeQuick,
     nextDayIn,
+    nextTimeOf,
     dayIn,
     MAX_SHIFT_DAYS
 };

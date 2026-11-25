@@ -11,7 +11,7 @@ const axios = require('axios');
 process.env.KINOPOISK_API_KEY = 'test-key';
 
 const kinopoisk = require('../../src/api/kinopoisk');
-const { digitalReleaseDate, digitalRelease } = require('../../src/api/tmdb');
+const { digitalRelease } = require('../../src/api/tmdb');
 const { extraFilmDates, premiereMonthOnly } = require('../../src/constants');
 const { filmCard } = require('../../src/bot/search-views');
 const { buildFilmMessage } = require('../../src/cron');
@@ -125,7 +125,10 @@ describe("TMDB's digital release", () => {
 
     test('Russia first, then the US, then the earliest anywhere; with its country', () => {
         const list = (...countries) => ({ results: countries });
-        assert.equal(digitalReleaseDate(list(country('US', '2027-02-06'), country('RU', '2027-02-27'))), '2027-02-27');
+        assert.deepEqual(digitalRelease(list(country('US', '2027-02-06'), country('RU', '2027-02-27'))), {
+            date: '2027-02-27',
+            country: 'RU'
+        });
         assert.deepEqual(digitalRelease(list(country('DE', '2027-03-01'), country('US', '2027-02-06'))), {
             date: '2027-02-06',
             country: 'US'
@@ -139,8 +142,8 @@ describe("TMDB's digital release", () => {
 
     test('a theatrical date is not a digital one; nothing known at all', () => {
         const theatrical = { iso_3166_1: 'RU', release_dates: [{ type: 3, release_date: '2027-02-27' }] };
-        assert.equal(digitalReleaseDate({ results: [theatrical] }), null);
-        assert.equal(digitalReleaseDate(undefined), null);
+        assert.equal(digitalRelease({ results: [theatrical] }).date, null);
+        assert.equal(digitalRelease(undefined).date, null);
     });
 });
 

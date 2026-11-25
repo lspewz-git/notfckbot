@@ -89,11 +89,15 @@ function episodeSendAt(item, interval = UPDATE_INTERVAL_HOURS) {
  *   out the same day; `outAt`: the moment it is out by TVmaze
  * @param {{ timezone?: string | null, quiet_start?: number | null, quiet_end?: number | null } | null} chat
  * @param {number} [interval] hours between update checks
- * @returns {string | null} the chat's local "YYYY-MM-DD" of the message
+ * @returns {{ notifyOn: string, sendAt: string, sendKind: 'timed' | 'quiet' | 'day' | 'not_before' } | null}
+ *   the chat's local "YYYY-MM-DD" of the message, its moment (ISO, UTC) and how sure it is: `timed`
+ *   by TVmaze's hour, `quiet` held to the end of quiet hours, `day` the hour unknown (streaming
+ *   without one, TMDB only), `not_before` a film waiting for TMDB's Released
  */
 function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) || !messages(item)) return null;
     const tv = item.kind === 'tv';
+    const kind = !tv ? 'not_before' : Number.isFinite(item.outAt) && !item.dayOnly ? 'timed' : 'day';
     const midnight = Date.parse(`${item.date}T00:00:00Z`);
     let sendAt = new Date(tv ? episodeSendAt(item, interval) : midnight + (24 + episodeSendHour(interval)) * 36e5);
     if (!tv) {
@@ -108,11 +112,27 @@ function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
         }
     }
     const { day, hour } = localOf(sendAt, chat?.timezone);
-    if (!hasQuietHours(chat)) return day;
+    const send = (notifyOn, at, sendKind) => ({ notifyOn, sendAt: new Date(at).toISOString(), sendKind });
+    if (!hasQuietHours(chat)) return send(day, sendAt, kind);
     const { quiet_start: start, quiet_end: end } = chat;
     const quiet = start < end ? hour >= start && hour < end : hour >= start || hour < end;
-    // Held until the hours end: later the same morning, or the next one when they started before midnight
-    return quiet && start > end && hour >= start ? nextDay(day) : day;
+    if (!quiet) return send(day, sendAt, kind);
+    // Held until the hours end: later the same morning, or the next one when they started before midnight;
+    // the 10-minute pass at the end hour sends it (src/cron/held.js). Our zones keep a fixed offset.
+    const heldDay = start > end && hour >= start ? nextDay(day) : day;
+    const endAt = Date.parse(`${heldDay}T00:00:00Z`) + (end - zoneOf(chat.timezone).offset) * 36e5;
+    return send(heldDay, endAt, tv ? 'quiet' : kind);
+}
+
+/**
+ * The separate digital release message of a calendar or list film (rowFilmDates()): null unless
+ * the chat wants it, or when it comes the day of the main release (src/cron/films.js puts it into
+ * that message). Sent like the release: its day has come and TMDB says Released.
+ */
+function digitalSend(film, chat, interval = UPDATE_INTERVAL_HOURS) {
+    const date = film.online?.date;
+    if (!film.notifyDigital || !date || date === film.release?.date) return null;
+    return notifyDay({ kind: 'movie', event: 'release', date }, chat, interval);
 }
 
 /**
@@ -123,7 +143,8 @@ function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
  * @param {{ timezone?: string | null } | null} chat
  */
 const episodeArrivalDay = (tmdbDate, chat, interval = UPDATE_INTERVAL_HOURS) =>
-    notifyDay({ kind: 'tv', date: tmdbDate, mode: 'episode' }, { timezone: chat ? chat.timezone : null }, interval);
+    notifyDay({ kind: 'tv', date: tmdbDate, mode: 'episode' }, { timezone: chat ? chat.timezone : null }, interval)
+        ?.notifyOn ?? null;
 
 /**
  * notifyDay() for a whole calendar: episodes the same check finds give one message, about the
@@ -160,4 +181,4 @@ function notifyDays(rows, chat, interval = UPDATE_INTERVAL_HOURS) {
     );
 }
 
-module.exports = { notifyDay, notifyDays, episodeSendHour, episodeArrivalDay, firstCheckFrom };
+module.exports = { notifyDay, notifyDays, digitalSend, episodeSendHour, episodeArrivalDay, firstCheckFrom };

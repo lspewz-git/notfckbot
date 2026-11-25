@@ -117,8 +117,8 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
  *   rating?: number | null, genres?: string | null, networks?: string | null, overview?: string | null,
  *   kinopoiskUrl?: string | null, status?: string | null,
  *   premieres?: { season: number, date?: string | null }[],
- *   date?: DateBlock | DateBlock[] | null
- * }} t
+ *   date?: DateBlock | DateBlock[] | null, send?: string
+ * }} t `send`: when the bot messages about it, a line under the date blocks
  * @typedef {{ label: string, value: string, when?: string, bell?: boolean, note?: string, hint?: string, icon?: string }} DateBlock
  *   `hint`: a quieter line under the note
  * @param {{ titleId?: string, notify?: string, extra?: string, error?: string, actions?: string, close?: string }} [options]
@@ -148,6 +148,7 @@ export function titleCard(
                 '</div>'
         )
         .join('');
+    const send = t.send ? `<p class="tc-send">${icon('bell')}<span>${escapeHtml(t.send)}</span></p>` : '';
     const description = t.overview?.trim();
     const overview = description
         ? `<div class="tc-description"><p class="tc-overview" data-clamp><span class="tc-copy">${escapeHtml(description)}</span><span class="tc-tail" hidden><span class="tc-ellipsis">… </span><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false">Show more</button></span></p></div>`
@@ -162,7 +163,7 @@ export function titleCard(
             : '') +
         `<div class="tc-scroll"><div class="tc-head">${poster}<div class="tc-facts"><h2 id="${titleId}">${escapeHtml(t.title)}</h2>` +
         `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating)}${about ? `<p>${escapeHtml(about)}</p>` : ''}</div></div>` +
-        (t.premieres?.length ? seasonPremieres(t.premieres, titleId) : date) +
+        (t.premieres?.length ? seasonPremieres(t.premieres, titleId) : date + send) +
         overview +
         // Reference link next to the description; Notify me and the actions stay together below (canvas, 23.11)
         kinopoisk +

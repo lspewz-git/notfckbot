@@ -2,6 +2,9 @@ const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
 const { watchConsole, openSection, pickChat } = require('./helpers');
 
+// A film's separate digital release message (src/account/notify-day.js digitalSend())
+const DIGITAL = { notifyOn: '2026-11-20', sendAt: '2026-11-19T21:00:00.000Z', sendKind: 'not_before' };
+
 const confirmUnfollow = (page) => page.locator('#confirm-modal').getByRole('button', { name: 'Unfollow', exact: true });
 
 test.describe('shared cards and calendar unfollow', () => {
@@ -42,6 +45,7 @@ test.describe('shared cards and calendar unfollow', () => {
     });
 
     test('notification mode can be changed in Following and is absent from Calendar', async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-11-04T12:00:00Z'));
         const panel = await mockPanel(page, { role: 'user' });
         await openSection(page, 'my-calendar');
         await page.locator('#my-calendar-body button.cal-row').first().click();
@@ -51,9 +55,13 @@ test.describe('shared cards and calendar unfollow', () => {
         await card.getByRole('button', { name: 'Close', exact: true }).click();
         await openSection(page, 'my-subs');
         await page.locator('#my-subs-body button.title-row').first().click();
+        // The next episode's message, under its date block
+        await expect(card.locator('.tc-date + .tc-send')).toHaveText('The bot will message you on Nov 5, around 06:00');
         await card.getByRole('button', { name: /Notify me/ }).click();
         await card.getByText('When the whole season is out').click();
         await expect(page.locator('.toast').last()).toContainText('Notifications changed');
+        // Worked out for the old mode: gone until the list reloads
+        await expect(card.locator('.tc-send')).toHaveCount(0);
         expect(panel.account.sent.find((r) => r.method === 'POST' && r.path.endsWith('/series')).body).toEqual({
             tmdbId: 'tv_100',
             mode: 'season'
@@ -62,6 +70,19 @@ test.describe('shared cards and calendar unfollow', () => {
         await openSection(page, 'my-calendar');
         await page.locator('#my-calendar-body button.cal-row').first().click();
         await expect(card.locator('.mine-modes')).toHaveCount(0);
+    });
+
+    test('an announced film says its line is about the digital release', async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-11-04T12:00:00Z'));
+        const panel = await mockPanel(page, { role: 'user' });
+        // Already announced: only the separate digital message is still to come
+        Object.assign(panel.account.films[0], { notifyDigital: true, digitalSend: DIGITAL });
+        await openSection(page, 'my-subs');
+        await page.locator('[data-action="mine-subs-tab"][data-tab="films"]').click();
+        await page.locator('#my-subs-body button.title-row', { hasText: 'Дюна' }).click();
+        await expect(page.locator('#mine-card-modal .tc-send')).toHaveText(
+            'The bot will message you about the digital release not before Nov 20'
+        );
     });
 
     test('Following and Calendar share the title card: rows without data are left out', async ({ page }) => {
@@ -107,28 +128,41 @@ test.describe('shared cards and calendar unfollow', () => {
     });
 
     test('the calendar bell marks the days the bot writes, and the card says when', async ({ page }) => {
-        await mockPanel(page, { role: 'user' });
+        // The mock's calendar is on 04.11: its messages are still to come
+        await page.clock.setFixedTime(new Date('2026-11-04T12:00:00Z'));
+        const panel = await mockPanel(page, { role: 'user' });
+        const dune = panel.account.calendar.items.find((i) => i.title === 'Дюна: Часть третья');
+        Object.assign(dune, { notifyDigital: true, digitalSend: DIGITAL });
         await openSection(page, 'my-calendar');
-        const rows = page.locator('#my-calendar-body button.cal-row');
+        const body = page.locator('#my-calendar-body');
+        const rows = body.locator('button.cal-row');
         await expect(rows.filter({ hasText: 'Одни из нас' }).locator('.cal-bell')).toHaveCount(1);
         await expect(rows.filter({ hasText: 'Gone Show' }).locator('.cal-bell')).toHaveCount(0);
+        // One footnote under the list explains the bells; the rows keep no time
+        await expect(body.locator('.cal-footnote')).toHaveText('The bot will message you about these.');
+        await expect(rows.filter({ hasText: 'Одни из нас' })).not.toContainText('12:00');
         await rows.filter({ hasText: 'Одни из нас' }).click();
         const card = page.locator('#mine-card-modal');
         await expect(card.locator('.tc-date .tc-bell')).toHaveCount(1);
-        await expect(card.locator('.tc-date')).toContainText('The bot messages you on Nov 5');
-        // Only the day is known: a quieter line says why the message waits, under the note
-        const hint = card.locator('.tc-date .tc-date-hint');
-        await expect(hint).toHaveText('No release hour is announced, so the message comes after the day ends.');
-        await card
-            .locator('.title-sheet')
-            .evaluate((el) => Promise.all(el.getAnimations().map((animation) => animation.finished)));
-        const [noteBox, hintBox] = await Promise.all([
-            card.locator('.tc-date .tc-date-label').last().boundingBox(),
-            hint.boundingBox()
-        ]);
-        // Below the note, not beside it (subpixel rounding on the phone: within 1px)
-        expect(hintBox.y).toBeGreaterThan(noteBox.y + noteBox.height - 1);
+        // Its own line right under the date block, in the chat's zone; the old note inside the block is gone
+        const send = card.locator('.tc-date + .tc-send');
+        await expect(send).toHaveText('The bot will message you on Nov 5, around 12:00, after your quiet hours');
+        await expect(send.locator('.icon')).toHaveAttribute('aria-hidden', 'true');
+        await expect(card.locator('.tc-date')).not.toContainText('The bot');
         await expect(card.getByRole('link', { name: 'Watch on SSPoisk' })).toBeVisible();
+        await card.locator('.sheet-close').click();
+        await body.locator('[data-action="mine-cal-what"][data-what="films"]').click();
+        await body.locator('button.cal-row', { hasText: 'Дюна' }).click();
+        await expect(card.locator('.tc-send')).toHaveText('The bot will message you not before Nov 6');
+        await card.locator('.sheet-close').click();
+        // The release still waits for TMDB's Released: the digital date may come inside its message, so no label
+        await page.clock.setFixedTime(new Date('2026-11-07T12:00:00Z'));
+        await body.locator('button.cal-row', { hasText: 'Дюна' }).click();
+        await expect(card.locator('.tc-send')).toHaveText('The bot will message you not before Nov 20');
+        await card.locator('.sheet-close').click();
+        // A row without a bell has no line
+        await body.locator('button.cal-row', { hasText: 'Мегалополис' }).click();
+        await expect(card.locator('.tc-send')).toHaveCount(0);
     });
 
     for (const kind of ['series', 'films']) {

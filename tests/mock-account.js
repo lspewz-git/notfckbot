@@ -15,7 +15,15 @@ const series = () => [
         finished: false,
         lastSeason: 2,
         lastEpisode: 4,
-        next: { date: '2026-11-04', season: 2, episode: 5 },
+        // TVmaze's hour: the 03:00 UTC check, 06:00 in Moscow (src/account/notify-day.js)
+        next: {
+            date: '2026-11-04',
+            season: 2,
+            episode: 5,
+            notifyOn: '2026-11-05',
+            sendAt: '2026-11-05T03:00:00.000Z',
+            sendKind: 'timed'
+        },
         genres: 'Драма',
         networks: 'HBO',
         links: [{ label: 'Kinopoisk', url: 'https://www.kinopoisk.ru/series/1/', kind: 'info' }]
@@ -210,6 +218,7 @@ const CALENDAR = {
     from: '2026-11-03',
     to: '2027-01-31',
     today: '2026-11-04',
+    timeZone: 'Europe/Moscow',
     failed: 0,
     items: [
         {
@@ -241,9 +250,10 @@ const CALENDAR = {
             poster: '/p1.jpg',
             kinopoiskUrl: 'https://www.kinopoisk.ru/series/1/',
             links: [{ kind: 'watch', label: 'Watch on SSPoisk', url: 'https://sspoisk.ru/series/1/' }],
-            // The bot writes the next morning (src/account/notify-day.js)
+            // The bot writes the next morning, held by quiet hours until 12:00 (src/account/notify-day.js)
             notifyOn: '2026-11-05',
-            // Streaming without an hour: the card explains the wait
+            sendAt: '2026-11-05T09:00:00.000Z',
+            sendKind: 'quiet',
             dayOnly: true
         },
         {
@@ -274,7 +284,9 @@ const CALENDAR = {
             rating: 7.4,
             poster: null,
             kinopoiskUrl: 'https://www.kinopoisk.ru/index.php?kp_query=x',
-            notifyOn: '2026-11-06'
+            notifyOn: '2026-11-06',
+            sendAt: '2026-11-05T21:00:00.000Z',
+            sendKind: 'not_before'
         },
         {
             date: '2027-01-15',
@@ -449,6 +461,7 @@ function accountAnswer(state, req, url) {
         return {
             access: { edit: true, settings: chat.settings },
             today: state.calendar.today,
+            timeZone: state.calendar.timeZone,
             series: state.series,
             films: state.films,
             ...(target

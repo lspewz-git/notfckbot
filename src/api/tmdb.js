@@ -117,9 +117,6 @@ function firstRelease(releaseDates, type, onlyCountry = null) {
     return first || { date: null, country: null };
 }
 
-/** The digital release date alone. */
-const digitalReleaseDate = (releaseDates) => digitalRelease(releaseDates).date;
-
 /**
  * The columns of a newly tracked series. It starts at the latest episode already aired, so the
  * first update check announces only what comes after; with nothing aired yet, at season 0, so
@@ -339,7 +336,6 @@ module.exports = {
     refreshSeasons,
     getSeasonDetailsCached,
     searchMulti,
-    digitalReleaseDate,
     digitalRelease,
     firstRelease,
     getDetails,

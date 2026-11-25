@@ -1,6 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { notifyDay } = require('../../src/account/notify-day');
+const nd = require('../../src/account/notify-day');
+
+// The day alone, as the bells read it
+const notifyDay = (...args) => nd.notifyDay(...args)?.notifyOn ?? null;
+const notifyDays = (...args) => nd.notifyDays(...args).map((send) => send?.notifyOn ?? null);
 
 const moscow = { timezone: 'Europe/Moscow', quiet_start: null, quiet_end: null };
 
@@ -45,7 +49,6 @@ test('quiet hours that started before midnight move the message to the next day'
 });
 
 test('episodes out the same day give one message, about the last; a one-episode season is its finale', () => {
-    const { notifyDays } = require('../../src/account/notify-day');
     const ep = (episode, extra = {}) => ({
         kind: 'tv',
         tmdbId: 'tv_1',
@@ -96,7 +99,7 @@ test('episodes out the same day give one message, about the last; a one-episode 
 });
 
 test("an episode's arrival day is its message's day in the chat, whatever the mode", () => {
-    const { episodeArrivalDay } = require('../../src/account/notify-day');
+    const { episodeArrivalDay } = nd;
     const moscow = { timezone: 'Europe/Moscow' };
     assert.equal(episodeArrivalDay('2026-11-12', moscow, 3), '2026-11-13');
     assert.equal(episodeArrivalDay('2026-12-31', moscow, 3), '2027-01-01');
@@ -109,12 +112,11 @@ test("an episode's arrival day is its message's day in the chat, whatever the mo
     // Quiet hours hold the message, not the episode: its day stays (the bell's moves)
     const late = { timezone: 'Asia/Kamchatka', quiet_start: 18, quiet_end: 8 };
     assert.equal(episodeArrivalDay('2026-11-12', late, 3), '2026-11-13');
-    const { notifyDay } = require('../../src/account/notify-day');
     assert.equal(notifyDay({ kind: 'tv', date: '2026-11-12', mode: 'episode' }, late, 3), '2026-11-14');
 });
 
 test("an episode out by TVmaze goes with the first check after that, if before TMDB's", () => {
-    const { notifyDay, notifyDays, firstCheckFrom } = require('../../src/account/notify-day');
+    const { firstCheckFrom } = nd;
     const moscow = { timezone: 'Europe/Moscow' };
     assert.equal(firstCheckFrom(Date.parse('2026-11-13T01:50:00Z'), 3), Date.parse('2026-11-13T03:00:00Z'));
     assert.equal(firstCheckFrom(Date.parse('2026-11-13T03:00:00Z'), 3), Date.parse('2026-11-13T03:00:00Z'));
@@ -149,7 +151,7 @@ test("an episode out by TVmaze goes with the first check after that, if before T
 });
 
 test('the episode send time follows the update interval', () => {
-    const { notifyDay, episodeSendHour } = require('../../src/account/notify-day');
+    const { episodeSendHour } = nd;
     // The first check after 08 UTC: 13.11 "12 12 12" (TMDB 12.11) was not out at 06:00 and went at 09:00
     assert.equal(episodeSendHour(3), 9);
     assert.equal(episodeSendHour(4), 12);
@@ -158,4 +160,91 @@ test('the episode send time follows the update interval', () => {
     assert.equal(episodeSendHour(24), 24);
     // Daily checks run at 00 UTC: the next midnight, two days after the TMDB date
     assert.equal(notifyDay({ kind: 'tv', date: '2026-11-12', mode: 'episode' }, moscow, 24), '2026-11-14');
+});
+
+test('the moment and how sure it is: TVmaze hour, a day without one, TMDB only', () => {
+    const tv = { kind: 'tv', mode: 'episode', date: '2026-11-12' };
+    // Out at 01:50 UTC by TVmaze: the 03:00 check, 06:00 in Moscow
+    assert.deepEqual(nd.notifyDay({ ...tv, outAt: Date.parse('2026-11-13T01:50:00Z') }, moscow, 3), {
+        notifyOn: '2026-11-13',
+        sendAt: '2026-11-13T03:00:00.000Z',
+        sendKind: 'timed'
+    });
+    // Streaming without an hour: out once the day is over everywhere, TMDB's move comes first
+    assert.deepEqual(nd.notifyDay({ ...tv, outAt: Date.parse('2026-11-13T12:00:00Z'), dayOnly: true }, moscow, 3), {
+        notifyOn: '2026-11-13',
+        sendAt: '2026-11-13T09:00:00.000Z',
+        sendKind: 'day'
+    });
+    // TMDB only: the first check after its move
+    assert.deepEqual(nd.notifyDay(tv, moscow, 3), {
+        notifyOn: '2026-11-13',
+        sendAt: '2026-11-13T09:00:00.000Z',
+        sendKind: 'day'
+    });
+});
+
+test('quiet hours hold the message to their end, the pass at that hour sends it', () => {
+    const tv = { kind: 'tv', mode: 'episode', date: '2026-11-12' };
+    // 21:00 in Kamchatka inside 15–9 (through midnight): 09:00 the next morning
+    const kamchatka = { timezone: 'Asia/Kamchatka', quiet_start: 15, quiet_end: 9 };
+    assert.deepEqual(nd.notifyDay(tv, kamchatka, 3), {
+        notifyOn: '2026-11-14',
+        sendAt: '2026-11-13T21:00:00.000Z',
+        sendKind: 'quiet'
+    });
+    // 12:00 in Moscow inside 0–13: 13:00 the same day
+    const morning = { timezone: 'Europe/Moscow', quiet_start: 0, quiet_end: 13 };
+    assert.deepEqual(nd.notifyDay(tv, morning, 3), {
+        notifyOn: '2026-11-13',
+        sendAt: '2026-11-13T10:00:00.000Z',
+        sendKind: 'quiet'
+    });
+    // Outside the hours the check's own moment stays
+    const night = { timezone: 'Europe/Moscow', quiet_start: 23, quiet_end: 8 };
+    assert.equal(nd.notifyDay(tv, night, 3).sendKind, 'day');
+});
+
+test('a film waits for Released: not before its first check of the day, quiet hours still hold it', () => {
+    const film = { kind: 'movie', event: 'release', date: '2026-11-11' };
+    assert.deepEqual(nd.notifyDay(film, moscow, 3), {
+        notifyOn: '2026-11-11',
+        sendAt: '2026-11-10T21:00:00.000Z',
+        sendKind: 'not_before'
+    });
+    const night = { timezone: 'Europe/Moscow', quiet_start: 23, quiet_end: 8 };
+    assert.deepEqual(nd.notifyDay(film, night, 3), {
+        notifyOn: '2026-11-11',
+        sendAt: '2026-11-11T05:00:00.000Z',
+        sendKind: 'not_before'
+    });
+});
+
+test('the digital release message: its own day, none on the release day or when the chat is off', () => {
+    const film = { notifyDigital: true, online: { date: '2026-12-03' }, release: { date: '2026-11-11' } };
+    assert.deepEqual(nd.digitalSend(film, moscow, 3), {
+        notifyOn: '2026-12-03',
+        sendAt: '2026-12-02T21:00:00.000Z',
+        sendKind: 'not_before'
+    });
+    // Digital before the cinema release still has its own message
+    assert.equal(nd.digitalSend({ ...film, online: { date: '2026-11-01' } }, moscow, 3).notifyOn, '2026-11-01');
+    assert.equal(
+        nd.digitalSend({ ...film, online: { date: '2026-11-11' } }, moscow, 3),
+        null,
+        'in the release message'
+    );
+    assert.equal(nd.digitalSend({ ...film, notifyDigital: false }, moscow, 3), null);
+    assert.equal(nd.digitalSend({ ...film, online: null }, moscow, 3), null);
+});
+
+test('the moment follows the mode: none where the mode stays silent', () => {
+    const at = Date.parse('2026-11-13T01:50:00Z');
+    const ep = (mode, extra = {}) =>
+        nd.notifyDay({ kind: 'tv', date: '2026-11-12', outAt: at, mode, ...extra }, moscow, 3);
+    assert.equal(ep('episode').sendKind, 'timed');
+    assert.equal(ep('season'), null);
+    assert.equal(ep('season', { mark: 'finale' }).sendAt, '2026-11-13T03:00:00.000Z');
+    assert.equal(ep('first_and_full'), null);
+    assert.equal(ep('first_and_full', { episode: 1 }).sendKind, 'timed');
 });

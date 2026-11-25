@@ -98,10 +98,4 @@ async function migrateChat(fromId, toId) {
     return moved;
 }
 
-/** The new id a failed send names, when the group became a supergroup; else null. */
-function migratedTo(err) {
-    const params = err && err.response && err.response.parameters;
-    return params && params.migrate_to_chat_id ? String(params.migrate_to_chat_id) : null;
-}
-
-module.exports = { migrateChat, migratedTo };
+module.exports = { migrateChat };

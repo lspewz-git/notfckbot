@@ -64,7 +64,7 @@ for (const name of MODELS) {
 
 stub(db.AlertRecipient, 'findByPk', async (id) => tables.AlertRecipient.find((r) => r.chatId === String(id)) || null);
 
-const { migrateChat, migratedTo } = require('../../src/chat-migration');
+const { migrateChat } = require('../../src/chat-migration');
 const { migrationOf } = require('../../src/bot/migration');
 const { deliver, classify } = require('../../src/delivery');
 
@@ -164,7 +164,6 @@ describe('noticing the move', () => {
 
     test('a send to the old id: the error says where it went', () => {
         assert.deepEqual(classify(upgraded()), { kind: 'moved', to: '-1001' });
-        assert.equal(migratedTo(upgraded()), '-1001');
     });
 
     test('a send the bot missed the move for: data moved, the message goes to the supergroup, once', async () => {

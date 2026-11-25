@@ -9,9 +9,9 @@ const tmdb = require('../api/tmdb');
 const kinopoisk = require('../api/kinopoisk');
 const ops = require('../chat-ops');
 const { listPeriod, periodItems, todayIn } = require('../calendar');
-const { nextDayIn } = require('../episode-times');
+const { nextDayIn, nextTimeOf, outAt, dayOnly } = require('../episode-times');
 const history = require('../history');
-const { ZONES, PRESETS } = require('../quiet');
+const { ZONES, PRESETS, zoneOf } = require('../quiet');
 const { getWatchLinks, isFinishedStatus, escapeHtml } = require('../constants');
 const { deliver } = require('../delivery');
 const { z, valid, idOf, chatId, text } = require('../admin/validate');
@@ -26,7 +26,7 @@ const { log } = require('../log');
 const QRCode = require('qrcode');
 const { confirmation } = require('./confirmation');
 const { lruCache } = require('../lru');
-const { notifyDays } = require('./notify-day');
+const { notifyDay, notifyDays, digitalSend } = require('./notify-day');
 const { rowFilmDates, isReleased: filmIsReleased } = require('../film-release');
 const confirmationCooldown = lruCache({ max: 2000, ttl: 60000 });
 
@@ -471,18 +471,53 @@ const titleMetadata = (tmdbId) => {
     };
 };
 
-const filmItem = (f, chat) => ({
-    id: f.id,
-    tmdbId: f.tmdb_id,
-    ...titleMetadata(f.tmdb_id),
-    title: f.title,
-    poster: posterPath(f.poster_url),
-    year: f.year,
-    date: f.premiere_digital,
-    ...rowFilmDates(f, chat?.notify_digital),
-    genres: f.genres,
-    links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
+/** When the bot messages the chat about a row (src/account/notify-day.js), the fields the panel reads */
+const sendOf = (send) => ({
+    notifyOn: send ? send.notifyOn : null,
+    sendAt: send ? send.sendAt : null,
+    sendKind: send ? send.sendKind : null
 });
+
+/**
+ * The next episode's message, as far as the list knows it: only with TVmaze's cached time, as
+ * next_episode_date is TVmaze's day in the bot's zone, not TMDB's US one notifyDay() counts from.
+ * shortcut: no season length here, so a season or first-and-full finale shows no message; read the
+ * season's episodes if that line is wanted
+ */
+function nextSend(s, mode, chat) {
+    const time = nextTimeOf(s);
+    if (!time) return null;
+    return notifyDay(
+        {
+            kind: 'tv',
+            date: s.next_episode_date,
+            mode,
+            episode: s.next_episode_number,
+            outAt: outAt(time),
+            dayOnly: dayOnly(time)
+        },
+        chat
+    );
+}
+
+function filmItem(f, chat) {
+    const dates = rowFilmDates(f, chat?.notify_digital);
+    const release = !f.notified && dates.release?.date;
+    return {
+        id: f.id,
+        tmdbId: f.tmdb_id,
+        ...titleMetadata(f.tmdb_id),
+        title: f.title,
+        poster: posterPath(f.poster_url),
+        year: f.year,
+        date: f.premiere_digital,
+        ...dates,
+        genres: f.genres,
+        ...sendOf(release ? notifyDay({ kind: 'movie', event: 'release', date: release }, chat) : null),
+        digitalSend: digitalSend(dates, chat),
+        links: linksOf(f.title, knownTitleId(f.tmdb_id), 'movie')
+    };
+}
 
 router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
     const query = valid(
@@ -513,7 +548,8 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
                     ? {
                           date: nextDayIn(s, chat && chat.timezone),
                           season: s.next_episode_season,
-                          episode: s.next_episode_number
+                          episode: s.next_episode_number,
+                          ...sendOf(nextSend(s, mode, chat))
                       }
                     : null,
                 genres: s.genres,
@@ -536,6 +572,7 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
         res.json({
             access: req.access,
             today: todayIn(chat?.timezone),
+            timeZone: zoneOf(chat?.timezone).id,
             series,
             films: films.map((f) => filmItem(f, chat)),
             ...(query.title ? { linkedTitle } : {})
@@ -677,6 +714,7 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
         const bells = notifyDays(items, chat);
         res.json({
             ...p,
+            timeZone: zoneOf(chat.timezone).id,
             items: items.map((i, index) => {
                 const metadata = titleMetadata(i.tmdbId);
                 return {
@@ -707,7 +745,8 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
                               countries: i.countries,
                               release: i.release,
                               online: i.online,
-                              notifyDigital: i.notifyDigital
+                              notifyDigital: i.notifyDigital,
+                              digitalSend: digitalSend(i, chat)
                           }),
                     overview: i.overview || metadata.overview,
                     rating: metadata.rating,
@@ -715,8 +754,9 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
                     poster: posterPath(i.poster),
                     kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie'),
                     links: linksOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie'),
-                    // The chat's day the bot writes about this row (the bell), null when its mode stays silent
-                    notifyOn: bells[index]
+                    // The chat's day and moment the bot writes about this row (the bell), null when its mode stays silent
+                    // An announced film's dates may still move: the bot won't write again
+                    ...sendOf(i.kind === 'movie' && i.notified ? null : bells[index])
                 };
             }),
             failed

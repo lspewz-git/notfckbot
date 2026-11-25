@@ -6,7 +6,7 @@
  */
 import { api } from './api.js';
 import { createHistory } from './history.js';
-import { compactCountries, formatReleaseDate } from './format.js';
+import { compactCountries } from './format.js';
 import { openReleasedDetails } from './records.js';
 import { $, escapeHtml, all } from './dom.js';
 import { toast, openModal, closeModal, showConfirm } from './ui.js';
@@ -404,20 +404,12 @@ const CLOSE = 'mine-card-modal';
 function dateBlock(item, event, today) {
     if (event) {
         const when = today ? whenText(event.date, today) : '';
-        const bell = Boolean(event.notifyOn);
-        const note = bell && event.notifyOn !== event.date ? `The bot messages you on ${dateText(event.notifyOn)}` : '';
         if (event.kind === 'tv')
             return {
                 label: `S${event.season}E${event.episode} · ${episodeName(event)}`,
                 value: [dateText(event.date, { withYear: true }), MARKS[event.mark]].filter(Boolean).join(' · '),
                 when,
-                bell,
-                note,
-                // Streaming without an hour: the bot waits for the day to end (src/episode-times.js)
-                hint:
-                    note && event.dayOnly
-                        ? 'No release hour is announced, so the message comes after the day ends.'
-                        : ''
+                bell: Boolean(event.notifyOn)
             };
         return filmDates(item, today, event);
     }
@@ -451,15 +443,10 @@ function filmDates(item, today, event = null) {
         ruDigital: item.ruDigital,
         ruServices: item.ruServices
     });
-    const note =
-        event?.notifyOn && event.notifyOn !== release?.date
-            ? `The bot messages you on ${formatReleaseDate(event.notifyOn)}`
-            : '';
     const digitalDate = online?.date || item.ruDigital;
     return [
         {
             ...main,
-            note: [main.note, note].filter(Boolean).join(' '),
             bell: Boolean(release && (!event || event.notifyOn)),
             when: release && today ? whenText(release.date, today) : ''
         },
@@ -469,6 +456,35 @@ function filmDates(item, today, event = null) {
             when: digitalDate && today ? whenText(digitalDate, today) : ''
         }
     ];
+}
+
+/**
+ * The card's "The bot will message you…" line: the next of its messages still to come, in the
+ * chat's zone (src/account/notify-day.js); '' when the bot won't write
+ * @typedef {{ notifyOn?: string | null, sendAt?: string | null, sendKind?: string | null } | null | undefined} Send
+ * @param {Send} main
+ * @param {Send} digital
+ * @param {string | undefined} timeZone
+ */
+function sendLine(main, digital, timeZone) {
+    const [send] = [main, digital]
+        .filter((s) => s?.sendAt && Date.parse(s.sendAt) > Date.now())
+        .sort((a, b) => Date.parse(a.sendAt) - Date.parse(b.sendAt));
+    if (!send) return '';
+    // A release still waiting for TMDB's Released may take the digital one into its message (src/cron/films.js)
+    const waiting = Boolean(main?.sendAt && Date.parse(main.sendAt) <= Date.now());
+    if (send === digital && !waiting)
+        return `The bot will message you about the digital release not before ${dateText(send.notifyOn)}`;
+    const day = dateText(send.notifyOn);
+    const time = new Date(send.sendAt).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: timeZone || 'Europe/Moscow'
+    });
+    if (send.sendKind === 'timed') return `The bot will message you on ${day}, around ${time}`;
+    if (send.sendKind === 'quiet') return `The bot will message you on ${day}, around ${time}, after your quiet hours`;
+    if (send.sendKind === 'not_before') return `The bot will message you not before ${day}`;
+    return `The bot will message you on ${day}`;
 }
 
 /** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */
@@ -490,7 +506,12 @@ function followingCard(item, { event = null, today }) {
             networks: item.networks,
             overview: item.overview,
             kinopoiskUrl,
-            date: dateBlock(item, event, today)
+            date: dateBlock(item, event, today),
+            send: sendLine(
+                event || (tv ? item.next : item),
+                (event || item).digitalSend,
+                (state.cal || state.list)?.timeZone
+            )
         },
         {
             close: CLOSE,
@@ -690,14 +711,19 @@ function daysBody(data) {
         if (!months.length || months[months.length - 1].key !== key) months.push({ key, rows: [] });
         months[months.length - 1].rows.push(entry);
     }
-    return months
-        .map(
-            ({ key, rows }) =>
-                `<h2 class="group-title">${monthTitle(key, data.today)}</h2><ul class="group-list cal-list">${rows
-                    .map(({ item, index }) => calRow(item, index, data.today))
-                    .join('')}</ul>`
-        )
-        .join('');
+    const footnote = shown.some(({ item }) => item.notifyOn)
+        ? `<p class="group-help cal-footnote">${ICON('bell')}<span>The bot will message you about these.</span></p>`
+        : '';
+    return (
+        months
+            .map(
+                ({ key, rows }) =>
+                    `<h2 class="group-title">${monthTitle(key, data.today)}</h2><ul class="group-list cal-list">${rows
+                        .map(({ item, index }) => calRow(item, index, data.today))
+                        .join('')}</ul>`
+            )
+            .join('') + footnote
+    );
 }
 
 /** One list from yesterday on */
@@ -1177,14 +1203,18 @@ export function setupAccount() {
             try {
                 await api(chatPath('/series'), { method: 'POST', body: { tmdbId: s.id, mode: el.value } });
                 s.mode = el.value;
+                // shortcut: the next episode's message was worked out for the old mode, so it goes until the list reloads
+                if (s.next) s.next.sendAt = null;
                 if (state.chatId !== chatNow) return;
                 const listed = findSeries(s.id);
                 if (listed) listed.mode = el.value;
+                if (listed?.next) listed.next.sendAt = null;
                 if (state.cal) for (const row of state.cal.items) if (row.tmdbId === s.id) row.mode = el.value;
                 // The bells follow the mode: the calendar asks again when it opens
                 state.cal = null;
                 if (activeFollowing && titleKey(activeFollowing.item, activeFollowing.chatId) === key) {
                     activeFollowing.item.mode = el.value;
+                    document.querySelector('#mine-card-body .tc-send')?.remove();
                     for (const radio of all('#mine-card-body input[data-mine="mode"]')) {
                         /** @type {HTMLInputElement} */ (radio).checked =
                             /** @type {HTMLInputElement} */ (radio).value === el.value;

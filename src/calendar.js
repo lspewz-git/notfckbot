@@ -333,6 +333,7 @@ async function periodItems(chatId, from, to, { digitalAlerts = false, local = nu
                 ...dates,
                 tmdbId: f.tmdb_id,
                 listId: f.id,
+                notified: Boolean(f.notified),
                 title: f.title,
                 poster: f.poster_url || null,
                 genres: f.genres
