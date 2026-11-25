@@ -155,10 +155,10 @@ test.describe('shared cards and calendar unfollow', () => {
         await body.locator('button.cal-row', { hasText: 'Дюна' }).click();
         await expect(card.locator('.tc-send')).toHaveText('The bot will message you not before Nov 6');
         await card.locator('.sheet-close').click();
-        // The release still waits for TMDB's Released: the digital date may come inside its message, so no label
+        // Its day passed but the release still waits for TMDB's Released: not the later digital date
         await page.clock.setFixedTime(new Date('2026-11-07T12:00:00Z'));
         await body.locator('button.cal-row', { hasText: 'Дюна' }).click();
-        await expect(card.locator('.tc-send')).toHaveText('The bot will message you not before Nov 20');
+        await expect(card.locator('.tc-send')).toHaveText('The bot will message you as soon as the release is confirmed');
         await card.locator('.sheet-close').click();
         // A row without a bell has no line
         await body.locator('button.cal-row', { hasText: 'Мегалополис' }).click();

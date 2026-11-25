@@ -467,13 +467,14 @@ function filmDates(item, today, event = null) {
  * @param {string | undefined} timeZone
  */
 function sendLine(main, digital, timeZone) {
+    // A release whose day has come still waits for TMDB's Released (src/cron/films.js): it goes first
+    if (main?.sendKind === 'not_before' && main.sendAt && Date.parse(main.sendAt) <= Date.now())
+        return 'The bot will message you as soon as the release is confirmed';
     const [send] = [main, digital]
         .filter((s) => s?.sendAt && Date.parse(s.sendAt) > Date.now())
         .sort((a, b) => Date.parse(a.sendAt) - Date.parse(b.sendAt));
     if (!send) return '';
-    // A release still waiting for TMDB's Released may take the digital one into its message (src/cron/films.js)
-    const waiting = Boolean(main?.sendAt && Date.parse(main.sendAt) <= Date.now());
-    if (send === digital && !waiting)
+    if (send === digital)
         return `The bot will message you about the digital release not before ${dateText(send.notifyOn)}`;
     const day = dateText(send.notifyOn);
     const time = new Date(send.sendAt).toLocaleTimeString('en-GB', {
