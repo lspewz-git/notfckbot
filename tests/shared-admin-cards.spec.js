@@ -4,6 +4,63 @@ const { watchConsole, openSection, isPhone } = require('./helpers');
 
 watchConsole();
 
+test('series details attribute TVmaze and its rating without changing the Kinopoisk link', async ({ page, isMobile }) => {
+    if (process.env.SERIES_SOURCE_CAPTURES && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
+    await mockPanel(page);
+    await page.route('**/api/series/66732', route => route.fulfill({
+        json: {
+            name: 'Stranger Things', number_of_seasons: 4, vote_average: 8.4,
+            data_source: 'tvmaze', rating_source: 'tvmaze',
+            source_url: 'https://www.tvmaze.com/shows/2993/stranger-things', subscribers: []
+        }
+    }));
+    await page.locator('#popular-list [data-action="series"]').first().click();
+    const modal = page.locator('#detail-modal');
+    await expect(modal.locator('.tc-source')).toHaveText('Source: TVmaze');
+    await expect(modal.locator('.tc-source')).toHaveAttribute('href', 'https://www.tvmaze.com/shows/2993/stranger-things');
+    await expect(modal.locator('.tc-rating')).toContainText('/ 10 · TVmaze');
+    await expect(modal.locator('.tc-link:not(.tc-source)')).toHaveAttribute('href', 'https://www.kinopoisk.ru/series/435/');
+    if (process.env.SERIES_SOURCE_CAPTURES) {
+        const sheet = modal.locator('.title-sheet');
+        await sheet.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+        await sheet.screenshot({ path: `${process.env.SERIES_SOURCE_CAPTURES}/${isMobile ? 'iphone' : 'desktop'}.png` });
+    }
+});
+
+test('Following preserves the series source and rating attribution', async ({ page }) => {
+    const panel = await mockPanel(page, { role: 'user' });
+    panel.account.series[0].source = { label: 'TVmaze', url: 'https://www.tvmaze.com/shows/618/the-last-of-us' };
+    panel.account.series[0].ratingSource = 'TVmaze';
+    await openSection(page, 'my-subs');
+    await page.locator('#my-subs-body button.title-row').first().click();
+    const modal = page.locator('#mine-card-modal');
+    await expect(modal.locator('.tc-source')).toHaveText('Source: TVmaze');
+    await expect(modal.locator('.tc-rating')).toContainText('TVmaze');
+});
+
+test('restored ratings show their reserve or unknown source accurately', async ({ page, isMobile }) => {
+    if (process.env.AUDIT_RATING_CAPTURES && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
+    await mockPanel(page);
+    let source = 'tmdb';
+    await page.route('**/api/series/66732', route => route.fulfill({
+        json: { name: 'Stranger Things', vote_average: 8.5, data_source: 'tvmaze', rating_source: source, subscribers: [] }
+    }));
+    const open = () => page.locator('#popular-list [data-action="series"]').first().click();
+    const modal = page.locator('#detail-modal');
+    await open();
+    await expect(modal.locator('.tc-rating')).toContainText('/ 10 · TMDB');
+    await page.keyboard.press('Escape');
+    source = 'unknown';
+    await open();
+    await expect(modal.locator('.tc-rating')).toContainText('/ 10 · Catalog');
+    await expect(modal.locator('.tc-rating')).not.toContainText('TVmaze');
+    if (process.env.AUDIT_RATING_CAPTURES) {
+        const sheet = modal.locator('.title-sheet');
+        await sheet.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+        await sheet.screenshot({ path: `${process.env.AUDIT_RATING_CAPTURES}/${isMobile ? 'iphone' : 'desktop'}.png` });
+    }
+});
+
 test('admin details use the shared title sheet and poster viewer', async ({ page, isMobile }) => {
     if (process.env.ADMIN_CARD_CAPTURES && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
     await mockPanel(page, { poster: true });
@@ -99,12 +156,13 @@ test('table posters use the same JPEG URL normalization as shared thumbnails', a
     await expect(poster).toHaveAttribute('src', '/api/poster/w185/cover.JPEG');
     const formats = await page.evaluate(async () => {
         const { posterSrc, titleThumb } = await import('/js/title-card.js');
-        return ['/path.jpg', 'https://image.tmdb.org/t/p/w500/path.webp', '', null].map(path => {
+        return ['/path.jpg', 'https://image.tmdb.org/t/p/w500/path.webp', '', null,
+            'https://static.tvmaze.com/uploads/images/original_untouched/500/123.jpg'].map(path => {
             const root = document.createElement('div');
             root.innerHTML = titleThumb(path);
             return { src: root.querySelector('img')?.getAttribute('src') || '', expected: posterSrc(path), empty: Boolean(root.querySelector('.title-thumb-empty')) };
         });
     });
-    expect(formats.map(f => f.src)).toEqual(['/api/poster/w185/path.jpg', '/api/poster/w185/path.webp', '', '']);
-    expect(formats.map(f => f.empty)).toEqual([false, false, true, true]);
+    expect(formats.map(f => f.src)).toEqual(['/api/poster/w185/path.jpg', '/api/poster/w185/path.webp', '', '', '/api/poster/w185/tvmaze/500/123.jpg']);
+    expect(formats.map(f => f.empty)).toEqual([false, false, true, true, false]);
 });

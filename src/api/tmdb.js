@@ -7,7 +7,15 @@ require('dotenv').config();
 const { log } = require('../log');
 
 /** A TMDB poster path ("/abc.jpg") as the w500 image URL stored and sent everywhere; null for none. */
-const tmdbPoster = (path) => (path ? `https://image.tmdb.org/t/p/w500${path}` : null);
+const tmdbPoster = (path) => {
+    if (
+        /^https:\/\/static\.tvmaze\.com\/uploads\/images\/(?:original_untouched|medium_portrait)\/\d+\/\d+\.jpg$/.test(
+            path || ''
+        )
+    )
+        return path;
+    return path ? `https://image.tmdb.org/t/p/w500${path}` : null;
+};
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -130,8 +138,10 @@ function newSeriesFields(details) {
         last_season: last ? last.season_number : 0,
         last_episode: last ? last.episode_number : 0,
         last_episode_name: (last && last.name) || '',
-        poster_url: tmdbPoster(details.poster_path),
+        poster_url: details.poster_url || tmdbPoster(details.poster_path),
         status: details.status || null,
+        tvmaze_id: details.tvmaze_id || null,
+        episode_source: details.data_source || 'tmdb',
         ...nextEpisodeFields(details),
         ...titleFacts(details, 'tv')
     };
@@ -161,7 +171,9 @@ function titleFacts(details, mediaType) {
     const rating = Number(details.vote_average);
     return {
         genres: names(details.genres, 255),
-        ...(mediaType === 'tv' ? { networks: names(details.networks, 255) } : {}),
+        ...(mediaType === 'tv'
+            ? { networks: names(details.networks, 255), rating_source: details.rating_source || 'tmdb' }
+            : {}),
         countries: countries.filter(Boolean).join(',').slice(0, 40) || null,
         runtime: Number(runtime) > 0 ? Math.round(Number(runtime)) : null,
         rating: rating > 0 ? Math.round(rating * 10) / 10 : null
@@ -257,17 +269,83 @@ const cacheKey = (id, media_type) => `${media_type}:${id}`;
  * Concurrent calls for the same title share one request.
  * @param {{ seasons?: number[] }} [options] series: seasons to refresh in the same request
  */
-const getDetails = (id, media_type, { seasons = [] } = {}) =>
-    detailsCache.fetch(cacheKey(id, media_type), { forceRefresh: true, context: seasons });
+const getDetails = (id, media_type, { seasons = [], tvmazeBudget = null, fallbackSeries = null } = {}) => {
+    const load = () => detailsCache.fetch(cacheKey(id, media_type), { forceRefresh: true, context: seasons });
+    return media_type === 'tv'
+        ? require('./series-data')
+              .resolve(id, load, { fresh: true, budget: tvmazeBudget, fallback: fallbackSeries })
+              .then((data) => migrationCursor(data, fallbackSeries))
+              .then(localizeSeries)
+        : load();
+};
+
+/** Read the already-announced episode, not just TMDB's newest episode, before changing catalogs. */
+async function migrationCursor(data, previous) {
+    if (
+        !data.tvmaze_primary ||
+        data.tvmaze_missing ||
+        data.seed_only ||
+        !previous?.last_episode ||
+        previous.episode_source === 'tvmaze'
+    )
+        return data;
+    const last = data.tmdb_last_episode;
+    if (last?.season_number === previous.last_season && last?.episode_number === previous.last_episode) {
+        data.tmdb_cursor_episode = last;
+        return data;
+    }
+    const season = await require('./series-data').optional(
+        fetchFresh(seasonCache, seasonKey(String(data.id), previous.last_season, 'ru-RU')),
+        3000
+    );
+    const episode = season?.episodes?.find((e) => e.episode_number === previous.last_episode);
+    data.tmdb_cursor_episode = episode ? { ...episode, season_number: previous.last_season } : null;
+    return data;
+}
 
 /** The cached details when fresh enough, otherwise a fetch. For display only. */
-const getDetailsCached = (id, media_type) => fetchFresh(detailsCache, cacheKey(id, media_type));
+const getDetailsCached = (id, media_type, { deadline = null } = {}) => {
+    const load = () => fetchFresh(detailsCache, cacheKey(id, media_type));
+    return media_type === 'tv'
+        ? require('./series-data')
+              .resolve(id, load, { deadline })
+              .then((data) => localizeSeries(data, deadline))
+        : load();
+};
+
+/** Optional Russian episode text never replaces TVmaze's numbering or dates. */
+async function localizeSeries(data, deadline = null) {
+    if (!data.tvmaze_primary || data.tvmaze_missing || data.seed_only || deadline?.passed()) return data;
+    const episodes = [data.last_episode_to_air, data.next_episode_to_air].filter(Boolean);
+    const numbers = [...new Set(episodes.filter((e) => !/[а-яё]/i.test(e.name || '')).map((e) => e.season_number))];
+    if (!numbers.length) return data;
+    const localize = Promise.all(
+        numbers.map(async (number) => {
+            const season = await getSeasonDetailsCached(String(data.id), number, 'ru-RU', { deadline }).catch(
+                () => null
+            );
+            for (const field of ['last_episode_to_air', 'next_episode_to_air']) {
+                const current = data[field];
+                const translated = season?.episodes?.find(
+                    (e) =>
+                        e.season_number === current?.season_number &&
+                        e.episode_number === current?.episode_number &&
+                        e.air_date === current?.air_date
+                );
+                if (translated) data[field] = { ...current, name: translated.name, overview: translated.overview };
+            }
+        })
+    );
+    await require('./series-data').optional(localize, 3000, null, deadline);
+    return data;
+}
 
 /** Optional display metadata only: never fetch or wait for TMDB on a cache miss. */
-const peekDetails = (id, media_type) => detailsCache.peek(cacheKey(id, media_type));
+const peekDetails = (id, media_type) =>
+    (media_type === 'tv' && require('./series-data').peek(id)) || detailsCache.peek(cacheKey(id, media_type));
 
 // Returns season details including episodes
-const getSeasonDetails = async (tv_id, season_number, language = 'ru-RU') => {
+const getSeasonDetailsRaw = async (tv_id, season_number, language = 'ru-RU') => {
     try {
         const response = await apiClient.get(`/tv/${tv_id}/season/${season_number}`, {
             params: { language }
@@ -279,6 +357,27 @@ const getSeasonDetails = async (tv_id, season_number, language = 'ru-RU') => {
     }
 };
 
+async function preferredSeason(tvId, seasonNumber, load, deadline = null, cached = null) {
+    const show = require('./tvmaze').cachedShow(`tv_${tvId}`);
+    if (!show) {
+        if (require('./series-data').sourceOf(tvId) === 'tvmaze')
+            throw new Error('TVmaze season unavailable; keeping stored statistics');
+        if (!deadline) return load();
+        const season = deadline.passed()
+            ? cached
+            : await require('./series-data').optional(load(), 3000, cached, deadline);
+        if (!season) throw new Error('Series view deadline expired');
+        return season;
+    }
+    const russian = deadline?.passed()
+        ? cached
+        : await require('./series-data').optional(load(), 3000, cached, deadline);
+    return require('./series-data').seasonOf(show, seasonNumber, russian);
+}
+
+const getSeasonDetails = (tvId, seasonNumber, language = 'ru-RU') =>
+    preferredSeason(tvId, seasonNumber, () => getSeasonDetailsRaw(tvId, seasonNumber, language));
+
 // Seasons for the bot's week and month views: the same lifetime as the details. Not refreshed
 // by the update check, which reads only the details
 const seasonCache = lruCache({
@@ -286,7 +385,7 @@ const seasonCache = lruCache({
     ttl: DETAILS_TTL_MS,
     fetchMethod: (key) => {
         const [tvId, seasonNumber, language] = key.split(':');
-        return getSeasonDetails(tvId, seasonNumber, language).then(slimSeason);
+        return getSeasonDetailsRaw(tvId, seasonNumber, language).then(slimSeason);
     }
 }); // "1399:2:ru-RU" -> season
 
@@ -309,8 +408,11 @@ function keepSeasons(tvId, language, data) {
 }
 
 /** A season's episodes, from memory when fresh enough; concurrent calls share one request. */
-const getSeasonDetailsCached = (tvId, seasonNumber, language = 'ru-RU') =>
-    fetchFresh(seasonCache, seasonKey(tvId, seasonNumber, language));
+const getSeasonDetailsCached = (tvId, seasonNumber, language = 'ru-RU', { deadline = null } = {}) => {
+    const key = seasonKey(tvId, seasonNumber, language);
+    const cached = seasonCache.getRemainingTTL(key) > 0 ? seasonCache.peek(key) : null;
+    return preferredSeason(tvId, seasonNumber, () => fetchFresh(seasonCache, key), deadline, cached);
+};
 
 /** Whether the season is in memory and not yet expired. */
 const hasSeason = (tvId, seasonNumber, language = 'ru-RU') =>

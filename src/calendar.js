@@ -144,9 +144,18 @@ function seasonsToAsk(series, details, from, to) {
             byYear.set(y, [...new Set([...(byYear.get(y) || []), ...seasons.keys()])]);
         }
     }
-    // Ended or canceled, nothing announced and the last season out before that year: nothing to ask
+    // Fresh status/continuation wins over a stored archive classification, including an
+    // episode in an old season whose premiere predates this period.
     const lastYear = Math.max(0, ...byYear.keys());
-    if (isFinishedStatus(series.status) && !series.next_episode_season && lastYear && lastYear < year(from)) return [];
+    if (
+        isFinishedStatus(details?.status || series.status) &&
+        !details?.next_episode_to_air &&
+        !series.next_episode_season &&
+        lastYear &&
+        lastYear < year(from) &&
+        !(details?.seasons || []).some((s) => s.air_date && s.air_date >= from)
+    )
+        return [];
     for (const [y, list] of byYear) if (y >= year(from) && y <= year(to)) for (const s of list) seasons.add(s);
     if (series.last_season) seasons.add(series.last_season);
     if (series.next_episode_season) seasons.add(series.next_episode_season);
@@ -172,10 +181,11 @@ const realName = (name) => (name && !PLACEHOLDER_NAME.test(name.trim()) ? name :
  * Episode titles by number: Russian, else English for the episodes TMDB has no Russian title for,
  * else none. English is asked only when needed; without an answer those stay untitled.
  */
-async function episodeNames(numericId, season, episodes) {
+async function episodeNames(numericId, season, episodes, deadline = null) {
     const names = new Map(episodes.map((ep) => [ep.episode_number, realName(ep.name)]));
     if (![...names.values()].some((name) => !name)) return names;
-    const english = await getSeasonDetailsCached(numericId, season, 'en-US').catch(() => null);
+    if (deadline?.passed()) return names;
+    const english = await getSeasonDetailsCached(numericId, season, 'en-US', { deadline }).catch(() => null);
     for (const ep of (english && english.episodes) || []) {
         if (!names.get(ep.episode_number)) names.set(ep.episode_number, realName(ep.name));
     }
@@ -227,12 +237,18 @@ const seasonsAlong = (series) => [...new Set([series.last_season, series.next_ep
  */
 async function seriesEpisodes(series, from, to, local = null) {
     const numericId = String(series.tmdb_id).replace('tv_', '');
-    const details = await getDetailsCached(numericId, 'tv').catch(() => null);
-    const counts = new Map(((details && details.seasons) || []).map((s) => [s.season_number, s.episode_count]));
-    const times =
-        local && details
-            ? await tvmaze.airTimesQuick(series.tmdb_id, tvmaze.externalsOf(details), local.deadline)
-            : null;
+    const deadline = local?.deadline || null;
+    const details = await getDetailsCached(numericId, 'tv', { deadline }).catch(() => null);
+    const counts = new Map(
+        ((details && details.seasons) || [])
+            .filter((s) => !details.tvmaze_primary || s.finale_known)
+            .map((s) => [s.season_number, s.episode_count])
+    );
+    const times = details?.tvmaze_primary
+        ? details.tvmaze_times
+        : local && details
+          ? await tvmaze.airTimesQuick(series.tmdb_id, tvmaze.externalsOf(details), local.deadline)
+          : null;
     const zoneId = local && local.chat ? local.chat.timezone : null;
     const dayOf = (season, ep) => {
         if (!local) return { date: ep.air_date, outAt: null, dayOnly: false };
@@ -247,7 +263,7 @@ async function seriesEpisodes(series, from, to, local = null) {
     const askTo = local && to !== NO_END ? addDays(to, MAX_SHIFT_DAYS) : to;
     const items = [];
     for (const season of seasonsToAsk(series, details, askFrom, askTo)) {
-        const data = await getSeasonDetailsCached(numericId, season);
+        const data = await getSeasonDetailsCached(numericId, season, 'ru-RU', { deadline });
         const inPeriod = ((data && data.episodes) || [])
             .filter((ep) => ep.air_date && ep.air_date >= askFrom && ep.air_date <= askTo)
             .map((ep) => ({ ep, ...dayOf(season, ep) }))
@@ -256,7 +272,8 @@ async function seriesEpisodes(series, from, to, local = null) {
         const names = await episodeNames(
             numericId,
             season,
-            inPeriod.map(({ ep }) => ep)
+            inPeriod.map(({ ep }) => ep),
+            deadline
         );
         for (const { ep, date, outAt: out, dayOnly: untimed } of inPeriod) {
             const total = counts.get(season);
@@ -452,7 +469,7 @@ function calendarText(p, { items, failed }) {
     if (failed)
         lines.push(
             '',
-            `<i>TMDB не ответил по ${plural(failed, 'сериалу', 'сериалам', 'сериалам')} — их здесь нет.</i>`
+            `<i>Не удалось получить расписание по ${plural(failed, 'сериалу', 'сериалам', 'сериалам')} — их серии могут отсутствовать.</i>`
         );
     return lines.join('\n');
 }

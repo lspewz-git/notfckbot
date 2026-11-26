@@ -12,6 +12,7 @@ const { tally, noteFailure } = require('./status');
 const { UPDATE_INTERVAL_HOURS } = require('../constants');
 const { log } = require('../log');
 const { notificationTarget, notificationButton } = require('../app-links');
+const { neutralizeStoredStatus } = require('./messages');
 
 // A day of checks, however often they run, or two days on the calendar: past that the news is stale
 const MAX_ATTEMPTS = Math.ceil(24 / UPDATE_INTERVAL_HOURS);
@@ -210,7 +211,7 @@ async function flushPending(bot, now = new Date()) {
         // A retry after a failed one goes as text: the poster may be why it failed (each poster try
         // that gets no answer costs 30 s)
         const photo = message.attempts ? null : message.photo;
-        const result = await deliver(bot, message.chatId, message.text, {
+        const result = await deliver(bot, message.chatId, neutralizeStoredStatus(message.text), {
             photo,
             extra: (id) => notificationButton(bot, id, message.app_target)
         });

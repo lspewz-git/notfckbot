@@ -62,10 +62,9 @@ export function chatDisplayName(chat) {
     return `<span class="chat-name${chat.username ? '' : ' chat-name-unknown'}">${avatar}<span class="chat-name-text">${label}</span></span>`;
 }
 
-// TMDB reports one of: Returning Series / In Production / Planned / Pilot /
-// Ended / Canceled. There is no "paused" state in the API.
+// Normalized catalog status; a status change alone does not confirm a renewal.
 const SERIES_STATUS = {
-    'Returning Series': { label: 'On air', cls: 'ok' },
+    'Returning Series': { label: 'Running', cls: 'ok' },
     'In Production': { label: 'In production', cls: 'warn' },
     Planned: { label: 'Planned', cls: 'warn' },
     Pilot: { label: 'Pilot', cls: 'warn' },
@@ -79,7 +78,7 @@ export function seriesStatusBadge(status) {
     }
     const known = SERIES_STATUS[status];
     if (!known) return `<span class="badge muted">${escapeHtml(status)}</span>`;
-    return `<span class="badge ${known.cls}" title="TMDB: ${escapeHtml(status)}">${known.label}</span>`;
+    return `<span class="badge ${known.cls}" title="Catalog status: ${escapeHtml(status)}">${known.label}</span>`;
 }
 
 /** "2026-12-15" -> "15 Dec 2026"; "TBA" while TMDB has no date. Plain text — escape it for HTML. */

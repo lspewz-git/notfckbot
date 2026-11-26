@@ -47,7 +47,8 @@ function seasonMonths(season, runtime, now = new Date()) {
     const byMonth = new Map();
     for (const episode of (season && season.episodes) || []) {
         const date = episode.air_date && new Date(episode.air_date);
-        if (!date || isNaN(date.getTime()) || date > now) continue;
+        if (!date || isNaN(date.getTime()) || date > now || (episode.out_at != null && episode.out_at > now.getTime()))
+            continue;
         const month = episode.air_date.slice(0, 7);
         const total = byMonth.get(month) || { count: 0, minutes: 0 };
         total.count += 1;

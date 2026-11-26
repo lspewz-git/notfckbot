@@ -31,10 +31,18 @@ const isValid = (size, file) => SIZES.has(size) && FILE.test(file);
  * The download goes to a temporary name and is renamed only when complete, so a dropped
  * connection never leaves half an image to be served later.
  */
-async function servePoster(size, file, res) {
-    if (!isValid(size, file)) return res.status(400).end();
+async function servePoster(size, file, res, tvmazeBucket = null) {
+    if (!isValid(size, file) || (tvmazeBucket !== null && (!/^\d+$/.test(tvmazeBucket) || !/^\d+\.jpg$/.test(file))))
+        return res.status(400).end();
     const type = TYPES[file.split('.').pop()];
-    const target = path.join(cacheDir(), size, file);
+    const target =
+        tvmazeBucket === null
+            ? path.join(cacheDir(), size, file)
+            : path.join(cacheDir(), size, 'tvmaze', tvmazeBucket, file);
+    const imageUrl =
+        tvmazeBucket === null
+            ? `https://image.tmdb.org/t/p/${size}/${file}`
+            : `https://static.tvmaze.com/uploads/images/${size === 'w500' ? 'original_untouched' : 'medium_portrait'}/${tvmazeBucket}/${file}`;
     res.set('Content-Type', type);
     // Poster files never change under the same name
     res.set('Cache-Control', 'private, max-age=604800, immutable');
@@ -60,7 +68,7 @@ async function servePoster(size, file, res) {
     downloads += 1;
     let upstream;
     try {
-        upstream = await axios.get(`https://image.tmdb.org/t/p/${size}/${file}`, {
+        upstream = await axios.get(imageUrl, {
             responseType: 'stream',
             timeout: 10000,
             signal: AbortSignal.timeout(10000 + bodyTimeout()),
@@ -137,11 +145,17 @@ async function servePoster(size, file, res) {
  * @param {string | null} url a TMDB poster URL, "https://image.tmdb.org/t/p/w500/abc.jpg"
  */
 async function posterBytes(url, size = 'w342', timeout = 8000) {
+    const maze = String(url || '').match(
+        /^https:\/\/static\.tvmaze\.com\/uploads\/images\/(?:original_untouched|medium_portrait)\/(\d+)\/(\d+\.jpg)$/
+    );
     const file = String(url || '')
         .split('/')
         .pop();
     if (!url || !isValid(size, file)) return null;
-    const target = path.join(cacheDir(), size, file);
+    const target = maze ? path.join(cacheDir(), size, 'tvmaze', maze[1], file) : path.join(cacheDir(), size, file);
+    const imageUrl = maze
+        ? `https://static.tvmaze.com/uploads/images/${size === 'w500' ? 'original_untouched' : 'medium_portrait'}/${maze[1]}/${file}`
+        : `https://image.tmdb.org/t/p/${size}/${file}`;
     const stored = await fs.promises.readFile(target).catch(() => null);
     if (stored && stored.length) {
         const now = new Date();
@@ -149,7 +163,7 @@ async function posterBytes(url, size = 'w342', timeout = 8000) {
         return stored;
     }
     try {
-        const answer = await axios.get(`https://image.tmdb.org/t/p/${size}/${file}`, {
+        const answer = await axios.get(imageUrl, {
             responseType: 'arraybuffer',
             timeout,
             signal: AbortSignal.timeout(timeout),
@@ -174,14 +188,19 @@ async function posterBytes(url, size = 'w342', timeout = 8000) {
 async function sweepPosters(now = Date.now()) {
     const root = cacheDir();
     let removed = 0;
-    const sizes = await fs.promises.readdir(root).catch(() => []);
-    for (const size of sizes) {
-        const dir = path.join(root, size);
-        const files = await fs.promises.readdir(dir).catch(() => []);
-        for (const name of files) {
+    const scan = async (dir) => {
+        const files = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => []);
+        for (const file of files) {
+            const name = file.name;
             const full = path.join(dir, name);
+            // Never follow symlinks outside the managed cache.
+            if (file.isDirectory()) {
+                await scan(full);
+                continue;
+            }
+            if (!file.isFile()) continue;
             const st = await fs.promises.stat(full).catch(() => null);
-            if (!st || !st.isFile()) continue;
+            if (!st) continue;
             const old = now - st.mtimeMs > MAX_AGE_DAYS * 86400e3;
             // A .part an hour old is a download that never finished
             const stale = name.endsWith('.part') && now - st.mtimeMs > 3600e3;
@@ -190,7 +209,8 @@ async function sweepPosters(now = Date.now()) {
                 removed += 1;
             }
         }
-    }
+    };
+    await scan(root);
     return removed;
 }
 

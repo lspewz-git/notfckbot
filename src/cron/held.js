@@ -10,6 +10,7 @@ const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
 const { recordFailure, recordSent } = require('../send-failures');
 const { log } = require('../log');
+const { neutralizeStoredStatus } = require('./messages');
 
 // Telegram's limit is 4096 characters; the lines carry HTML, so stop well before it
 const MAX_TEXT = 3500;
@@ -25,12 +26,13 @@ function heldView(items) {
     let length = lines[0].length;
     let left = 0;
     for (const item of items) {
-        if (length + item.line.length + 1 > MAX_TEXT) {
+        const line = neutralizeStoredStatus(item.line);
+        if (length + line.length + 1 > MAX_TEXT) {
             left += 1;
             continue;
         }
-        lines.push(item.line);
-        length += item.line.length + 1;
+        lines.push(line);
+        length += line.length + 1;
     }
     if (left) lines.push(`<i>…и ещё ${left}</i>`);
     lines.push('', '<i>Нажмите кнопку — пришлю уведомление целиком, со ссылками на просмотр.</i>');

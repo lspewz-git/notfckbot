@@ -318,9 +318,9 @@ function register(bot) {
             // subscribers are still to be told about
 
             const typeLabel = NOTIFY_LABELS_SHORT[notifyType] || notifyType;
-            const finished = isFinishedStatus(data.status);
             let nextEpisodeText = 'информации о ближайшей серии пока нет';
             const shown = await withTvmazeQuick(data, ctx.state.chatData && ctx.state.chatData.timezone);
+            const finished = isFinishedStatus(shown.status);
             const nextEp = shown.next_episode_to_air;
             if (nextEp && nextEp.air_date) {
                 nextEpisodeText = `Ближайшая серия (${nextEp.season_number} сезон, ${nextEp.episode_number} серия) ожидается <b>${formatRuDate(nextEp.air_date)}</b>`;
@@ -328,7 +328,7 @@ function register(bot) {
 
             await ctx.answerCbQuery(created ? 'Успешно подписаны! ✅' : 'Режим обновлён ✅');
             const details = finished
-                ? '🗄 Сериал завершён, поэтому подписка лежит в 📺 Мои подписки → 🗄 Завершённые. Если его продлят — сообщу.'
+                ? '🗄 По статусу в каталоге подписка лежит в 📺 Мои подписки → 🗄 Завершённые. Продолжу проверять обновления.'
                 : `🔔 Режим уведомлений: <b>${typeLabel}</b>\n\n📅 ${nextEpisodeText}`;
             const heading = created
                 ? `✅ Вы успешно подписались на <b>«${escapeHtml(series.title)}»</b>`

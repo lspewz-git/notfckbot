@@ -18,12 +18,11 @@ import { subKey } from './store.js';
 import { roleBadge } from './access.js';
 import { titlePoster } from './content-search.js';
 
-// The API decides (series ended or canceled on TMDB); the panel keeps no status list of its own
+// The API decides from the catalog status; the panel keeps no status list of its own
 const isArchivedSub = (sub) => Boolean(sub.archived);
 
 // Small line icons for row buttons (Lucide shapes)
-const svg = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const svg = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 const ICON = {
     more: svg('ellipsis'),
     mode: svg('bell'),
@@ -118,7 +117,7 @@ export const TABLES = {
                 matches: (item) => !isArchivedSub(item),
                 empty: 'No active subscriptions.'
             },
-            // Ended or canceled on TMDB — the notification mode no longer matters
+            // Catalog marks it ended or canceled; monitoring continues in the archive
             archive: {
                 label: 'Archive',
                 matches: isArchivedSub,

@@ -38,10 +38,10 @@ test('all seven alerts the bot sends are on the list', async ({ page }) => {
     expect(options.map((o) => o.split(' (')[1].replace(')', ''))).toEqual([
         'New Episode',
         'Season Premiere',
-        'Whole Season',
+        'Season Schedule',
         'Ended',
         'Canceled',
-        'Renewed',
+        'Active again',
         'Film Released'
     ]);
 });
@@ -57,7 +57,7 @@ test('an episode alert sends the series with its season and episode', async ({ p
 test('a status alert needs no season or episode', async ({ page }) => {
     const panel = await mockPanel(page);
     await openForAlice(page);
-    await pick(page, 'test-notify-mode-select', 'Сериал завершён');
+    await pick(page, 'test-notify-mode-select', 'В каталоге: завершён');
     await expect(dialog(page).locator('#test-notify-episode-fields')).toBeHidden();
     await send(page);
     expect(panel.lastTest).toEqual({ chatId: '101', mode: 'ended', seriesId: '1399' });
@@ -82,7 +82,7 @@ test('back from a film to a series alert, the picker shows series again', async 
     const panel = await mockPanel(page);
     await openForAlice(page);
     await pick(page, 'test-notify-mode-select', 'Фильм вышел');
-    await pick(page, 'test-notify-mode-select', 'Сериал продлили');
+    await pick(page, 'test-notify-mode-select', 'Возврат в активные подписки');
     await expect(dialog(page).locator('#test-title-label')).toHaveText('Series');
     await send(page);
     expect(panel.lastTest).toEqual({ chatId: '101', mode: 'renewed', seriesId: '1399' });

@@ -90,6 +90,11 @@ const order = (season, episode) => season * 100000 + episode;
  * @param {string | null} [zoneId] the next episode's day in this zone (default: the bot's)
  */
 async function withTvmaze(details, times, now = Date.now(), zoneId = DEFAULT_ZONE) {
+    if (details?.tvmaze_primary) {
+        const next = details.next_episode_to_air;
+        const time = next && details.tvmaze_times?.[`${next.season_number}:${next.episode_number}`];
+        return time ? { ...details, next_episode_to_air: { ...next, air_date: releaseDay(time, zoneId) } } : details;
+    }
     if (!details || !times) return details;
     const last = details.last_episode_to_air || null;
     const next = details.next_episode_to_air || null;
@@ -166,6 +171,7 @@ function continuesBy(times, last, now) {
  */
 async function withTvmazeQuick(details, zoneId = DEFAULT_ZONE) {
     if (!details || details.id == null) return details;
+    if (details.tvmaze_primary) return withTvmaze(details, null, Date.now(), zoneId);
     const deadline = tvmaze.viewDeadline();
     try {
         const times = await tvmaze.airTimesQuick(`tv_${details.id}`, tvmaze.externalsOf(details), deadline);
@@ -191,13 +197,14 @@ function nextDayIn(series, zoneId) {
 }
 
 /** TVmaze's cached time for the series' next episode, else null (cache only) */
-const nextTimeOf = (series) =>
-    timeOf(
-        tvmaze.cachedAirTimes(series.tmdb_id),
-        series.next_episode_season,
-        series.next_episode_number,
-        series.next_episode_date
-    );
+const nextTimeOf = (series) => {
+    const times = tvmaze.cachedAirTimes(series.tmdb_id);
+    // The row and schedule already share TVmaze's numbering. Its stored day may be in
+    // another chat zone, so comparing it to neighbouring air dates would reject a valid time.
+    if (series.episode_source === 'tvmaze')
+        return times?.[`${series.next_episode_season}:${series.next_episode_number}`] || null;
+    return timeOf(times, series.next_episode_season, series.next_episode_number, series.next_episode_date);
+};
 
 module.exports = {
     timeOf,

@@ -439,7 +439,14 @@ router.patch('/api/account/chats/:chatId/visibility', openChat, async (req, res)
 });
 
 /** "https://image.tmdb.org/t/p/w500/abc.jpg" → "/abc.jpg", for /api/poster */
-const posterPath = (url) => (url ? (String(url).match(/\/[A-Za-z0-9]+\.(jpg|png)$/) || [null])[0] : null);
+const posterPath = (url) =>
+    /^https:\/\/static\.tvmaze\.com\/uploads\/images\/(?:original_untouched|medium_portrait)\/\d+\/\d+\.jpg$/.test(
+        url || ''
+    )
+        ? url
+        : url
+          ? (String(url).match(/\/[A-Za-z0-9]+\.(jpg|png)$/) || [null])[0]
+          : null;
 
 const linksOf = (title, kinopoiskId, mediaType) =>
     getWatchLinks({ title, kinopoiskId, mediaType }).map(({ url, kind }) => ({
@@ -467,6 +474,12 @@ const titleMetadata = (tmdbId) => {
     return {
         overview: details?.overview || '',
         rating: details?.vote_average || null,
+        ratingSource:
+            details?.rating_source === 'tvmaze' ? 'TVmaze' : details?.rating_source === 'unknown' ? 'Catalog' : 'TMDB',
+        source:
+            kind === 'tv' && details?.data_source === 'tvmaze' && details.source_url
+                ? { label: 'TVmaze', url: details.source_url }
+                : null,
         seasons: kind === 'tv' ? details?.number_of_seasons || null : null
     };
 };
@@ -750,6 +763,8 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
                           }),
                     overview: i.overview || metadata.overview,
                     rating: metadata.rating,
+                    ratingSource: metadata.ratingSource,
+                    source: metadata.source,
                     seasons: metadata.seasons,
                     poster: posterPath(i.poster),
                     kinopoiskUrl: kinopoiskUrlOf(i.title, i.kinopoiskId, i.kind === 'tv' ? 'tv' : 'movie'),

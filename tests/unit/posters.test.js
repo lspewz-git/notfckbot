@@ -21,7 +21,9 @@ const { servePoster, posterBytes, sweepPosters, MAX_AGE_DAYS } = require('../../
 const IMAGE = Buffer.from('a poster, byte by byte');
 let upstream; // () => what axios.get resolves or throws
 let asked;
-mock.method(axios, 'get', async () => {
+let lastUrl;
+mock.method(axios, 'get', async (url) => {
+    lastUrl = url;
     asked += 1;
     return upstream();
 });
@@ -33,6 +35,9 @@ let base;
 before(async () => {
     const app = express();
     app.get('/api/poster/:size/:file', (req, res) => servePoster(req.params.size, req.params.file, res));
+    app.get('/api/poster/:size/tvmaze/:bucket/:file', (req, res) =>
+        servePoster(req.params.size, req.params.file, res, req.params.bucket)
+    );
     ({ base, close } = await listenForTest(app));
     base += '/api/poster';
 });
@@ -42,6 +47,7 @@ after(async () => {
 });
 beforeEach(() => {
     asked = 0;
+    lastUrl = null;
     upstream = ok;
 });
 
@@ -49,6 +55,34 @@ const stored = (size, file) => path.join(DIR, size, file);
 /** The copy is renamed into place once the download ends: wait for it (or for its absence). */
 const settle = () => new Promise((r) => setTimeout(r, 100));
 const leftovers = (size) => (fs.existsSync(path.join(DIR, size)) ? fs.readdirSync(path.join(DIR, size)) : []);
+
+test('TVmaze artwork uses the fixed CDN and an isolated cache path', async (t) => {
+    t.after(() => {
+        fs.unlinkSync(path.join(DIR, 'w185', 'tvmaze', '500', '123.jpg'));
+        fs.rmdirSync(path.join(DIR, 'w185', 'tvmaze', '500'));
+        fs.rmdirSync(path.join(DIR, 'w185', 'tvmaze'));
+    });
+    const response = await fetch(`${base}/w185/tvmaze/500/123.jpg`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), IMAGE);
+    assert.equal(lastUrl, 'https://static.tvmaze.com/uploads/images/medium_portrait/500/123.jpg');
+    await settle();
+    assert.deepEqual(fs.readFileSync(path.join(DIR, 'w185', 'tvmaze', '500', '123.jpg')), IMAGE);
+    assert.equal(await fetch(`${base}/w185/tvmaze/host/123.jpg`).then((r) => r.status), 400);
+    assert.equal(await fetch(`${base}/w185/tvmaze/500/abc.jpg`).then((r) => r.status), 400);
+});
+
+test('recap reads TVmaze artwork from the same CDN and nested cached files expire', async () => {
+    upstream = () => ({ headers: JPEG, data: IMAGE });
+    const url = 'https://static.tvmaze.com/uploads/images/original_untouched/501/124.jpg';
+    assert.deepEqual(await posterBytes(url), IMAGE);
+    assert.equal(lastUrl, 'https://static.tvmaze.com/uploads/images/medium_portrait/501/124.jpg');
+    const target = path.join(DIR, 'w342', 'tvmaze', '501', '124.jpg');
+    const old = new Date(Date.now() - (MAX_AGE_DAYS + 1) * 86400000);
+    fs.utimesSync(target, old, old);
+    await sweepPosters();
+    assert.equal(fs.existsSync(target), false);
+});
 
 test('the first request fetches from TMDB and keeps the poster; the next one is served from disk', async () => {
     const first = await fetch(`${base}/w342/abc.jpg`);

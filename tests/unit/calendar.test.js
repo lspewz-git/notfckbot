@@ -207,6 +207,16 @@ describe('dates', () => {
         assert.deepEqual(calendar.seasonsToAsk(series, { seasons: [] }, '2026-01-01', '2026-12-31'), [2]);
     });
 
+    test('an archived row never hides a fresh continuation of its old season', () => {
+        const series = { status: 'Ended', release_seasons: '2025:1', last_season: 1 };
+        const details = {
+            status: 'Returning Series',
+            seasons: [{ season_number: 1, air_date: '2025-03-01' }],
+            next_episode_to_air: { season_number: 1, episode_number: 9, air_date: '2026-10-15' }
+        };
+        assert.deepEqual(calendar.seasonsToAsk(series, details, '2026-10-14', '2026-10-20'), [1]);
+    });
+
     test("today is the chat's: late on Sunday in Moscow is Monday in Vladivostok", () => {
         const sunday = new Date('2026-10-18T18:00:00Z');
         assert.equal(calendar.todayIn('Europe/Moscow', sunday), '2026-10-18');
@@ -278,7 +288,7 @@ describe('the week', () => {
         tmdbDown = true;
         const view = await calendarView(chat(), 'w', 0, { now: NOW });
         assert.match(view.text, /🎬 Дюна/);
-        assert.match(view.text, /TMDB не ответил по 1 сериалу/);
+        assert.match(view.text, /Не удалось получить расписание по 1 сериалу/);
     });
 });
 

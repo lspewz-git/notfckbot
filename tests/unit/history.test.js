@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const tmdb = require('../../src/api/tmdb');
 const kinopoisk = require('../../src/api/kinopoisk');
 const { Series, Subscription, Watchlist } = require('../../src/db');
+const { mockSeriesWrites } = require('./fakes');
 
 // --- TMDB: seasons with episode air dates, and genres ---
 const SEASONS = {
@@ -99,6 +100,7 @@ describe('ensureReleaseSeasons', () => {
             assert.equal(options, undefined, 'existing values must be included');
             return [row];
         });
+        mockSeriesWrites(t.mock, [row]);
         try {
             await backfillReleaseSeasons();
             assert.equal(row.release_seasons, '2025:17');
@@ -541,7 +543,10 @@ describe('the year view', () => {
         assert.match(view.text, /🎬 <b>Фильмы<\/b>\n<a [^>]+>Будущее<\/a>/);
         assert.doesNotMatch(view.text, /🎬 <a [^>]+>Будущее/);
         const failed = historyView({ thisYear: 2026, year: 2026, series: [], films: [], later: null, failed: 2 });
-        assert.match(failed.text, /TMDB не ответил по 2 сериалам — в «Ещё выйдет» их нет/);
+        assert.match(
+            failed.text,
+            /Не удалось получить расписание по 2 сериалам — в «Ещё выйдет» их серии могут отсутствовать/
+        );
     });
 
     test('a year button: answered at once; a digest stays without the way back; an unknown year is this one', async () => {

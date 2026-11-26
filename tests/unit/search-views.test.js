@@ -88,7 +88,7 @@ describe('seriesCard', () => {
     test('seasons, status, the next episode, the modes and a way back', () => {
         const card = seriesCard(SERIES);
         assert.match(card.caption, /<b>Одни из нас<\/b> \(2023\)/);
-        assert.match(card.caption, /Сериал · 2 сезона · идёт/);
+        assert.match(card.caption, /Сериал · 2 сезона · в каталоге: активный/);
         assert.match(card.caption, /Следующая серия: 3×1, <b>дата не объявлена<\/b>/);
         assert.match(card.caption, /Как уведомлять\?/);
         assert.deepEqual(data(card.keyboard), [
@@ -108,10 +108,25 @@ describe('seriesCard', () => {
 
     test('a finished show: a warning and "subscribe anyway", no next episode', () => {
         const card = seriesCard({ ...SERIES, status: 'Canceled' });
-        assert.match(card.caption, /Сериал · 2 сезона · отменён/);
-        assert.match(card.caption, /новых серий не будет/);
+        assert.match(card.caption, /Сериал · 2 сезона · в каталоге: отменён/);
+        assert.match(card.caption, /По статусу в каталоге/);
+        assert.doesNotMatch(card.caption, /новых серий не будет/);
         assert.doesNotMatch(card.caption, /Следующая серия/);
         assert.deepEqual(labels(card.keyboard), [['🔔 Всё равно подписаться'], ['⬅️ К результатам']]);
+    });
+
+    test('TVmaze series cards attribute their source with the show link', () => {
+        const card = seriesCard({
+            ...SERIES,
+            data_source: 'tvmaze',
+            source_url: 'https://www.tvmaze.com/shows/60458/blade-runner-2099'
+        });
+        assert.match(
+            card.caption,
+            /Источник: <a href="https:\/\/www\.tvmaze\.com\/shows\/60458\/blade-runner-2099">TVmaze<\/a>/
+        );
+        const unsafe = seriesCard({ ...SERIES, data_source: 'tvmaze', source_url: 'javascript:alert(1)' });
+        assert.doesNotMatch(unsafe.caption, /javascript:/);
     });
 
     test("a long overview is cut so the caption stays under Telegram's 1024 characters", () => {

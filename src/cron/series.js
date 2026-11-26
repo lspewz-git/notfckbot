@@ -10,7 +10,8 @@ const { ensureAiredEpisodes, seasonsToRescan } = require('./aired-episodes');
 const { log } = require('../log');
 const { warmSeasons, seasonsAlong } = require('../calendar');
 const tvmaze = require('../api/tvmaze');
-const { withTvmaze } = require('../episode-times');
+const { withTvmaze, outAt } = require('../episode-times');
+const { derivedSeries } = require('./series-derived');
 
 // Tell subscribers when a show crosses the running/finished line. Ended <-> Canceled and
 // Returning <-> In Production changes are not interesting to users and stay silent.
@@ -19,7 +20,12 @@ const notifyStatusChange = async (bot, item, oldStatus, newStatus) => {
     // The first status fill (null -> X) is bookkeeping, not news.
     if (!oldStatus || isFinishedStatus(oldStatus) === isFinishedStatus(newStatus)) return;
 
-    const msg = buildStatusMessage(item.title, newStatus);
+    const source = item.episode_source === 'tvmaze' ? 'TVmaze' : 'TMDB';
+    const url =
+        item.episode_source === 'tvmaze' && item.tvmaze_id
+            ? `https://www.tvmaze.com/shows/${item.tvmaze_id}`
+            : `https://www.themoviedb.org/tv/${item.tmdb_id.replace('tv_', '')}`;
+    const msg = buildStatusMessage(item.title, newStatus, { source, url });
 
     log.info(`[Cron] Status of "${item.title}": ${oldStatus} -> ${newStatus}, notifying subscribers`);
     for (const chat of item.Chats || []) {
@@ -42,6 +48,7 @@ const isSeasonComplete = (data, season, episode) => {
     // Specials (season 0) are no season to finish; without TVmaze's answer a season TMDB lists only
     // up to its last aired episode would read as complete: wait for a check that has it
     if (season < 1 || data.tvmaze_missing) return false;
+    if (data.tvmaze_primary) return Boolean(data.tvmaze_season_complete);
     const seasonObj = (data.seasons || []).find((s) => s.season_number === season);
     const total = seasonObj ? seasonObj.episode_count : 0;
     const next = data.next_episode_to_air;
@@ -163,13 +170,89 @@ const checkSeriesUpdates = async (bot, allSeries) => {
         try {
             const [mediaType, filmId] = item.tmdb_id.split('_');
             // The current and next season come in the same request, for the calendar
-            const tmdbData = await getDetails(filmId, mediaType, { seasons: seasonsAlong(item) });
+            const tmdbData = await getDetails(filmId, mediaType, {
+                seasons: seasonsAlong(item),
+                tvmazeBudget: budget,
+                fallbackSeries: item
+            });
             if (!tmdbData) continue;
+            if (tmdbData.tvmaze_primary && (tmdbData.tvmaze_missing || tmdbData.seed_only)) continue;
             // The last aired and next episode by TVmaze's air times where it knows them, so an
             // episode is announced once it has aired, not once TMDB moves it (≈ a day later)
-            const times = await tvmaze.airTimesForCheck(item.tmdb_id, tvmaze.externalsOf(tmdbData), budget);
+            const times = tmdbData.tvmaze_primary
+                ? tmdbData.tvmaze_times
+                : await tvmaze.airTimesForCheck(item.tmdb_id, tvmaze.externalsOf(tmdbData), budget);
             // undefined: TVmaze didn't answer and nothing is cached (null: the series isn't on TVmaze)
-            const data = { ...(await withTvmaze(tmdbData, times)), tvmaze_missing: times === undefined };
+            const data = {
+                ...(await withTvmaze(tmdbData, times)),
+                tvmaze_missing: tmdbData.tvmaze_missing || times === undefined
+            };
+            const sourceChanged = Boolean(
+                data.data_source &&
+                ((data.data_source !== item.episode_source && (data.tvmaze_primary || item.episode_source)) ||
+                    (data.tvmaze_primary &&
+                        data.tvmaze_id &&
+                        item.tvmaze_id &&
+                        Number(data.tvmaze_id) !== Number(item.tvmaze_id)))
+            );
+            const last = data.last_episode_to_air;
+            const oldEpisode = Object.hasOwn(data, 'source_cursor_episode')
+                ? data.source_cursor_episode
+                : data.tmdb_cursor_episode || data.tmdb_last_episode;
+            const identity =
+                oldEpisode?.season_number === item.last_season &&
+                oldEpisode?.episode_number === item.last_episode &&
+                oldEpisode.air_date
+                    ? oldEpisode
+                    : null;
+            const candidates = identity
+                ? Object.entries(data.tvmaze_times || {}).filter(([, t]) => t.date === identity.air_date)
+                : [];
+            const exact = candidates.find(([key]) => key === `${item.last_season}:${item.last_episode}`);
+            const matched = exact || (candidates.length === 1 ? candidates[0] : null);
+            const mapped = matched ? matched[0].split(':').map(Number) : null;
+            const sameNumberTime = data.tvmaze_times?.[`${item.last_season}:${item.last_episode}`];
+            const uncertainTimes = candidates.length
+                ? candidates.map(([, t]) => t)
+                : sameNumberTime
+                  ? [sameNumberTime]
+                  : Object.values(data.tvmaze_times || {});
+            // Without an unambiguous identity, wait while any candidate could still arrive.
+            // Resetting to TVmaze's earlier cursor here would announce old content again.
+            if (
+                data.tvmaze_primary &&
+                item.last_episode > 0 &&
+                ((!last && !(sourceChanged && mapped)) ||
+                    (sourceChanged && !mapped && uncertainTimes.some((t) => outAt(t) > Date.now())))
+            ) {
+                log.warn(`[Cron] Series ${item.tmdb_id} schedule cannot preserve the saved episode identity yet`);
+                continue;
+            }
+            const preserveCursor =
+                sourceChanged &&
+                mapped &&
+                (!last ||
+                    mapped[0] > last.season_number ||
+                    (mapped[0] === last.season_number && mapped[1] > last.episode_number));
+            const mappedSeason = mapped && data.seasons?.find((s) => s.season_number === mapped[0]);
+            const baseline = preserveCursor
+                ? {
+                      last_season: mapped[0],
+                      last_episode: mapped[1],
+                      last_episode_name: item.last_episode_name || '',
+                      completed_season:
+                          item.completed_season >= item.last_season &&
+                          mappedSeason?.finale_known &&
+                          mapped[1] >= mappedSeason.episode_count
+                              ? mapped[0]
+                              : Math.max(0, mapped[0] - 1)
+                  }
+                : {
+                      last_season: last?.season_number || 0,
+                      last_episode: last?.episode_number || 0,
+                      last_episode_name: last?.name || '',
+                      completed_season: last ? last.season_number - (data.tvmaze_season_complete ? 0 : 1) : 0
+                  };
 
             // Store the status first so a failure in the episode step below can't hold up the
             // archive move. The status message is still sent last: a finale often airs in the
@@ -177,7 +260,14 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             const oldStatus = item.status;
             const statusChanged = Boolean(data.status) && data.status !== oldStatus;
             // The next episode, and what the series is (genres, channel, rating) for the statistics
-            const fresh = { ...nextEpisodeFields(data), ...titleFacts(data, 'tv') };
+            const fresh = {
+                ...nextEpisodeFields(data),
+                ...titleFacts(data, 'tv'),
+                ...(data.tvmaze_id ? { tvmaze_id: data.tvmaze_id } : {}),
+                ...(data.data_source ? { episode_source: data.data_source } : {}),
+                ...(data.poster_url ? { poster_url: data.poster_url } : {}),
+                ...(sourceChanged ? { ...baseline, aired_episodes: null, release_seasons: null } : {})
+            };
             const freshChanged = Object.keys(fresh).some((k) => String(item[k] ?? '') !== String(fresh[k] ?? ''));
             if (statusChanged || freshChanged) {
                 await item.update({ ...(statusChanged ? { status: data.status } : {}), ...fresh });
@@ -188,20 +278,27 @@ const checkSeriesUpdates = async (bot, allSeries) => {
             // Read before notifyNewEpisodes() moves last_season and last_episode on
             const rescan = seasonsToRescan(item, data);
 
+            // Different catalogs may split/number seasons differently. Migrating an existing
+            // cursor is bookkeeping, not a premiere, finale or renewal announcement.
+            if (sourceChanged) {
+                log.info(`[Cron] Series ${item.tmdb_id} switched to ${data.data_source}; existing episodes baselined`);
+            }
+
             try {
-                await notifyNewEpisodes(bot, item, data);
+                if (!data.tvmaze_missing || item.episode_source !== 'tvmaze') await notifyNewEpisodes(bot, item, data);
             } catch (err) {
                 tally('errors');
                 log.error(`[Cron] Episode check failed for ${item.tmdb_id} ("${item.title}"): ${err.message}`);
             }
 
-            if (statusChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
+            if (statusChanged && !sourceChanged) await notifyStatusChange(bot, item, oldStatus, data.status);
 
             // Statistics and release-year counts, after notifications so slow TMDB never holds
             // them up: the season with a new episode is read again; the first time, all of them,
             // in the background for a title whose counts have not been filled yet
-            const airedDone = ensureAiredEpisodes(item, data, rescan)
-                .then(() => ensureReleaseSeasons(item, data))
+            const derived = derivedSeries(item);
+            const airedDone = ensureAiredEpisodes(derived, data, rescan)
+                .then(() => ensureReleaseSeasons(derived, data))
                 .catch((err) => log.error(`[Stats] Aired episodes for ${item.tmdb_id} failed: ${err.message}`));
             if (item.aired_episodes !== null && item.aired_episodes !== undefined) await airedDone;
 

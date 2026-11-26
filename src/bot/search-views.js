@@ -82,7 +82,8 @@ function seriesCard(data, { subscribedMode = null } = {}) {
     const name = data.name || data.original_name || 'Без названия';
     const seasons = data.number_of_seasons || 0;
     const finished = isFinishedStatus(data.status);
-    const state = data.status === 'Canceled' ? 'отменён' : finished ? 'завершён' : 'идёт';
+    const state =
+        data.status === 'Canceled' ? 'в каталоге: отменён' : finished ? 'в каталоге: завершён' : 'в каталоге: активный';
     const kindLine = `Сериал · ${seasons} ${plural(seasons, 'сезон', 'сезона', 'сезонов')} · ${state}`;
 
     const next = data.next_episode_to_air;
@@ -93,12 +94,16 @@ function seriesCard(data, { subscribedMode = null } = {}) {
             : '';
 
     const tmdbId = `tv_${data.id}`;
+    const sourceLine =
+        data.source_url && /^https?:\/\//i.test(data.source_url)
+            ? `\nИсточник: <a href="${escapeHtml(data.source_url)}">${data.data_source === 'tvmaze' ? 'TVmaze' : 'TMDB'}</a>\n`
+            : '';
     let footer;
     let rows;
     if (finished && !subscribedMode) {
         footer =
-            `\n⚠️ Сериал ${state} — новых серий не будет. Если всё же подписаться, он попадёт в ` +
-            '📺 Мои подписки → 🗄 Завершённые, и я сообщу, если его продлят.';
+            '\nℹ️ По статусу в каталоге подписка попадёт в ' +
+            '📺 Мои подписки → 🗄 Завершённые. Проверка обновлений продолжится.';
         rows = [[Markup.button.callback('🔔 Всё равно подписаться', `sub_set_${tmdbId}_episode`)]];
     } else {
         footer = subscribedMode
@@ -115,7 +120,7 @@ function seriesCard(data, { subscribedMode = null } = {}) {
     rows.push(backRow);
 
     return {
-        caption: cardHead(name, yearOf(data), kindLine) + nextLine + overviewBlock(data.overview) + footer,
+        caption: cardHead(name, yearOf(data), kindLine) + nextLine + overviewBlock(data.overview) + sourceLine + footer,
         keyboard: Markup.inlineKeyboard(rows),
         posterUrl: posterOf(data.poster_path)
     };

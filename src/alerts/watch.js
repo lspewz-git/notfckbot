@@ -149,8 +149,12 @@ async function checkLate(now = new Date()) {
 
 const SERVICES = {
     telegram: { key: 'telegram_down', name: 'Telegram', what: 'Сообщения не уходят.' },
-    tmdb: { key: 'tmdb_down', name: 'TMDB', what: 'Новые серии и фильмы не проверяются.' },
-    tvmaze: { key: 'tvmaze_down', name: 'TVmaze', what: 'Даты серий берутся из TMDB.' },
+    tmdb: { key: 'tmdb_down', name: 'TMDB', what: 'Обновления фильмов и части данных сериалов могут задержаться.' },
+    tvmaze: {
+        key: 'tvmaze_down',
+        name: 'TVmaze',
+        what: 'Обновления сериалов могут задержаться. Сохранённые данные остаются доступны.'
+    },
     proxy: { key: 'proxy_down', name: 'Прокси', what: 'Запросы через него не проходят.' },
     kinopoisk: { key: 'kinopoisk_down', name: 'Кинопоиск', what: 'Ссылки на Кинопоиск не находятся.' }
 };

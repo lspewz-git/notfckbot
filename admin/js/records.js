@@ -166,6 +166,8 @@ export function openReleasedDetails(
             seasons: tv ? item.seasonCount : null,
             year: tv ? null : item.year,
             rating: item.rating,
+            ratingSource: item.ratingSource,
+            source: item.source,
             genres,
             networks: item.networks || null,
             overview: item.overview || '',
@@ -213,6 +215,9 @@ export const openSeriesDetails = (tmdbId, source = null) => {
             title: data.name || data.original_name,
             seasons: data.number_of_seasons,
             rating: data.vote_average,
+            ratingSource:
+                data.rating_source === 'tvmaze' ? 'TVmaze' : data.rating_source === 'unknown' ? 'Catalog' : 'TMDB',
+            source: data.data_source === 'tvmaze' && data.source_url ? { label: 'TVmaze', url: data.source_url } : null,
             overview: data.overview,
             date: {
                 label: year ? `Season premiere in ${year}` : 'Premiere',

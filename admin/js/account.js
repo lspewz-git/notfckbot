@@ -322,7 +322,7 @@ const titleRow = ({ action, id, poster, title, note, badge = '' }) =>
 // --- Following ---
 
 const seriesNote = (s) => {
-    if (s.finished) return 'Ended';
+    if (s.finished) return 'Marked as ended in the catalog';
     if (s.next) return `S${s.next.season}E${s.next.episode} · ${dateText(s.next.date)}`;
     return 'Next episode date unknown';
 };
@@ -390,7 +390,11 @@ function subsView() {
             : state.find.subs
               ? noMatch()
               : tab === 'archive'
-                ? empty('No ended series', 'Series that have ended go here. If one is renewed, the bot writes.', 'tv')
+                ? empty(
+                      'No ended series',
+                      'Series marked as ended in the catalog go here. The bot keeps checking for updates.',
+                      'tv'
+                  )
                 : empty('No series yet', 'Find a series and follow its new episodes.', 'tv');
     }
     return top + body;
@@ -414,7 +418,7 @@ function dateBlock(item, event, today) {
         return filmDates(item, today, event);
     }
     if (item.kind === 'tv') {
-        if (item.finished) return { label: 'Status', value: 'The series has ended' };
+        if (item.finished) return { label: 'Catalog status', value: 'Marked as ended' };
         return item.next
             ? {
                   label: 'Next episode',
@@ -503,6 +507,8 @@ function followingCard(item, { event = null, today }) {
             seasons: item.seasons,
             year: item.year,
             rating: item.rating,
+            ratingSource: item.ratingSource,
+            source: item.source,
             genres: item.genres,
             networks: item.networks,
             overview: item.overview,
@@ -732,7 +738,7 @@ function calendarView(data) {
     const body = !data ? loading(4) : daysBody(data);
     const note =
         data && data.failed && state.calWhat === 'series'
-            ? `<p class="group-help">TMDB didn't answer for ${data.failed} series: their episodes may be missing here.</p>`
+            ? `<p class="group-help">The schedule is unavailable for ${data.failed} series: their episodes may be missing here.</p>`
             : '';
     return (
         '<div class="cat-bar mine-cal-bar">' +

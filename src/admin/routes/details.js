@@ -112,6 +112,9 @@ router.get('/api/kinopoisk/:type/:id', async (req, res) => {
 // TMDB posters through this server: image.tmdb.org is blocked on some networks the
 // panel is opened from, while the server can reach it. Kept on disk after the first fetch.
 router.get('/api/poster/:size/:file', (req, res) => servePoster(req.params.size, req.params.file, res));
+router.get('/api/poster/:size/tvmaze/:bucket/:file', (req, res) =>
+    servePoster(req.params.size, req.params.file, res, req.params.bucket)
+);
 
 router.get('/api/tmdb/search', async (req, res) => {
     // One query: ?q=a&q=b arrives as an array

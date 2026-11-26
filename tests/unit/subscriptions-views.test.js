@@ -63,7 +63,8 @@ describe('the lists', () => {
 
     test('the archive: why the series are there, and cards that come back to the archive', () => {
         const view = views.buildArchiveView({ archived: [serial('Лост', { status: 'Ended', id: 'tv_4607' })] }, 0);
-        assert.match(view.text, /Новых серий у этих сериалов не будет/);
+        assert.match(view.text, /отмеченные в каталоге/);
+        assert.doesNotMatch(view.text, /Новых серий у этих сериалов не будет/);
         assert.equal(callbacks(view)[0], 'subs_s_tv_4607_a0');
         assert.equal(views.isArchiveLoc('a0'), true);
         assert.equal(views.isArchiveLoc('0'), false);
@@ -88,7 +89,8 @@ describe('the cards', () => {
 
     test('a finished series: no modes, only removal', () => {
         const view = views.buildSeriesCard({ tmdb_id: 'tv_1', title: 'Лост', status: 'Ended' }, 'episode', '0');
-        assert.match(view.text, /новых серий не будет/);
+        assert.match(view.text, /По данным каталога/);
+        assert.doesNotMatch(view.text, /новых серий не будет/);
         assert.deepEqual(buttons(view), [['❌ Удалить', '⬅️ К списку']]);
     });
 
@@ -126,7 +128,7 @@ describe('the cards', () => {
 
     test('confirmations: yes removes, no returns to the card', () => {
         const unsub = views.buildUnsubscribeConfirm({ title: 'Пацаны', status: 'Ended' }, 'tv_1', '3');
-        assert.match(unsub.text, /Если сериал продлят, уведомление не придёт/);
+        assert.match(unsub.text, /Уведомления об изменении статуса и новых сериях приходить перестанут/);
         assert.deepEqual(callbacks(unsub), ['subs_us_tv_1_3', 'subs_s_tv_1_3']);
 
         const remove = views.buildWatchlistRemoveConfirm(null, 9, 'a0');

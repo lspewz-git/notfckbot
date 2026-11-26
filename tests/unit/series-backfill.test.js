@@ -3,16 +3,48 @@ const assert = require('node:assert/strict');
 const tmdb = require('../../src/api/tmdb');
 const { Series } = require('../../src/db');
 const { log } = require('../../src/log');
+const { mockSeriesWrites } = require('./fakes');
 
 const requests = [];
+let detailsOverride;
 mock.method(tmdb, 'getDetailsCached', async (id, kind) => {
     requests.push([id, kind]);
+    if (detailsOverride) return detailsOverride;
     if (id === '1') throw new Error('TMDB unavailable');
     return { genres: [{ name: 'Drama' }], seasons: [] };
 });
 
 const { backfillAiredEpisodes } = require('../../src/cron/aired-episodes');
 const { backfillReleaseSeasons } = require('../../src/cron/release-seasons');
+
+test('audit: startup retains both indexes when an existing primary schedule is empty', async (t) => {
+    const row = {
+        tmdb_id: 'tv_7',
+        tvmaze_id: 7,
+        episode_source: 'tvmaze',
+        last_episode: 5,
+        aired_episodes: null,
+        release_seasons: '2020:1',
+        async update(changes) {
+            Object.assign(this, changes);
+        }
+    };
+    t.mock.method(Series, 'findAll', async () => [row]);
+    detailsOverride = {
+        tvmaze_id: 7,
+        data_source: 'tvmaze',
+        tvmaze_primary: true,
+        seasons: [],
+        last_episode_to_air: null
+    };
+    t.after(() => {
+        detailsOverride = null;
+    });
+    await backfillAiredEpisodes();
+    await backfillReleaseSeasons();
+    assert.equal(row.aired_episodes, null);
+    assert.equal(row.release_seasons, '2020:1');
+});
 
 for (const [run, field, label, query] of [
     [backfillAiredEpisodes, 'aired_episodes', '[Stats] Aired episodes', { where: { aired_episodes: null } }],
@@ -34,6 +66,7 @@ for (const [run, field, label, query] of [
             assert.deepEqual(options, query);
             return rows;
         });
+        mockSeriesWrites(t.mock, rows);
         const errors = [];
         const info = [];
         t.mock.method(log, 'error', (message) => errors.push(message));

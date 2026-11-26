@@ -81,6 +81,12 @@ async function entry({
         title,
         overview: details?.overview || '',
         rating: details?.vote_average || null,
+        ratingSource:
+            details?.rating_source === 'tvmaze' ? 'TVmaze' : details?.rating_source === 'unknown' ? 'Catalog' : 'TMDB',
+        source:
+            mediaType === 'tv' && details?.data_source === 'tvmaze' && details.source_url
+                ? { label: 'TVmaze', url: details.source_url }
+                : null,
         status: details?.status || null,
         seasonCount: details?.number_of_seasons || null,
         dates:

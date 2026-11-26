@@ -84,7 +84,7 @@ const buildOverview = ({ active, archived }) => {
         return { text: EMPTY_SUBS_TEXT, keyboard: Markup.inlineKeyboard([]) };
     }
     const lines = [`📺 <b>Мои подписки</b> · ${active.length}`];
-    if (active.length === 0) lines.push('', 'Активных подписок нет — все ваши сериалы завершены.');
+    if (active.length === 0) lines.push('', 'Активных подписок нет. Подписки в архиве продолжают проверяться.');
 
     const shown = active.slice(0, OVERVIEW_MAX_LINES);
     let section = null;
@@ -126,7 +126,7 @@ const buildArchiveView = ({ archived }, requestedPage) => {
     const lines = [
         `🗄 <b>Завершённые</b> · ${archived.length}`,
         '',
-        'Новых серий у этих сериалов не будет. Если какой-то продлят — пришлю уведомление и верну его в активные.',
+        'Сериалы, отмеченные в каталоге как завершённые или отменённые. Проверяю обновления и верну подписку в активные, если статус изменится.',
         ''
     ];
     for (const item of pageItems) {
@@ -145,8 +145,8 @@ const buildSeriesCard = (series, notifyType, loc) => {
     if (isFinishedStatus(series.status)) {
         return {
             text:
-                `${title}\n\n${FINISHED_STATUS_LABELS[series.status]} — новых серий не будет.\n\n` +
-                'Подписка лежит в архиве: если сериал продлят, я пришлю уведомление и верну его в активные.',
+                `${title}\n\nПо данным каталога: ${FINISHED_STATUS_LABELS[series.status]}.\n\n` +
+                'Подписка в архиве. Продолжу проверять обновления и верну её в активные, если статус изменится.',
             keyboard: Markup.inlineKeyboard([
                 [
                     Markup.button.callback('❌ Удалить', `subs_cs_${series.tmdb_id}_${loc}`),
@@ -189,7 +189,7 @@ const buildMovieCard = (item, loc) => ({
 /** "Unsubscribe from …?": yes removes it, no goes back to the card. */
 const buildUnsubscribeConfirm = (series, tmdbId, loc) => {
     const consequence = isFinishedStatus(series?.status)
-        ? 'Если сериал продлят, уведомление не придёт.'
+        ? 'Уведомления об изменении статуса и новых сериях приходить перестанут.'
         : 'Уведомления о новых сериях приходить перестанут.';
     return {
         text: `Отписаться от <b>${escapeHtml(series?.title || 'сериала')}</b>?\n\n${consequence}`,

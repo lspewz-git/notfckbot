@@ -21,6 +21,7 @@ async function trackedTitles() {
         Watchlist.findAll({ attributes: ['tmdb_id'], group: ['tmdb_id'] })
     ]);
     const rows = new Map(series.map((row) => [row.tmdb_id, row]));
+    for (const row of series) require('./api/series-data').seed(row);
     return { ids: [...new Set([...series, ...films].map((row) => row.tmdb_id))], rows };
 }
 
@@ -41,7 +42,7 @@ async function warmDetailsCache() {
             if (mediaType === 'tv' && rows.has(tmdbId)) {
                 await warmSeasons(rows.get(tmdbId), details).catch(() => {});
                 // And TVmaze's air times for those dates: queued, paced, in the background
-                tvmaze.warm(tmdbId, tvmaze.externalsOf(details));
+                if (!details.tvmaze_primary) tvmaze.warm(tmdbId, tvmaze.externalsOf(details));
             }
         } catch {
             // Already logged by tmdb.js; that card will just ask TMDB when opened

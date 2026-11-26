@@ -15,6 +15,10 @@ const KP_LOGO =
 
 /** A stored poster path ("/abc.jpg") or a full TMDB URL, at a size, through the panel's cache */
 export function posterSrc(path, size = 'w185') {
+    const maze = String(path || '').match(
+        /^https:\/\/static\.tvmaze\.com\/uploads\/images\/(?:original_untouched|medium_portrait)\/(\d+)\/(\d+\.jpg)$/
+    );
+    if (maze) return `/api/poster/${size}/tvmaze/${maze[1]}/${maze[2]}`;
     const file = String(path || '').match(/\/[^/]+\.(?:jpg|jpeg|png|webp)$/i)?.[0];
     return file ? `/api/poster/${size}${file}` : '';
 }
@@ -79,11 +83,11 @@ function kindLine(t) {
     return ['Film', t.year].filter(Boolean).join(' · ');
 }
 
-function ratingLine(value) {
+function ratingLine(value, source = 'TMDB') {
     const rated = Number.isFinite(value) && value > 0 && value <= 10;
     return rated
-        ? `<p class="tc-rating">${icon('star')}<strong>${value.toFixed(1)}</strong><span>/ 10 · TMDB</span></p>`
-        : `<p class="tc-rating tc-unrated">${icon('star')}<span>Not rated on TMDB yet</span></p>`;
+        ? `<p class="tc-rating">${icon('star')}<strong>${value.toFixed(1)}</strong><span>/ 10 · ${escapeHtml(source)}</span></p>`
+        : `<p class="tc-rating tc-unrated">${icon('star')}<span>Not rated on ${escapeHtml(source)} yet</span></p>`;
 }
 
 /**
@@ -114,7 +118,8 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
 /**
  * @param {{
  *   kind: string, title: string, poster?: string | null, seasons?: number | null, year?: string | number | null,
- *   rating?: number | null, genres?: string | null, networks?: string | null, overview?: string | null,
+ *   rating?: number | null, ratingSource?: string, source?: { label: string, url: string } | null,
+ *   genres?: string | null, networks?: string | null, overview?: string | null,
  *   kinopoiskUrl?: string | null, status?: string | null,
  *   premieres?: { season: number, date?: string | null }[],
  *   date?: DateBlock | DateBlock[] | null, send?: string
@@ -156,17 +161,22 @@ export function titleCard(
     const kinopoisk = t.kinopoiskUrl
         ? `<a class="tc-link" href="${escapeHtml(t.kinopoiskUrl)}" target="_blank" rel="noopener noreferrer">${KP_LOGO}<span>Open on Kinopoisk</span>${icon('external-link')}</a>`
         : '';
+    const source =
+        t.source?.url && /^https?:\/\//i.test(t.source.url)
+            ? `<a class="tc-link tc-source" href="${escapeHtml(t.source.url)}" target="_blank" rel="noopener noreferrer"><span>Source: ${escapeHtml(t.source.label)}</span>${icon('external-link')}</a>`
+            : '';
     return (
         '<span class="sheet-grabber tc-grabber" aria-hidden="true"></span>' +
         (close
             ? `<button type="button" class="sheet-close" data-close="${close}" aria-label="Close">${icon('x')}</button>`
             : '') +
         `<div class="tc-scroll"><div class="tc-head">${poster}<div class="tc-facts"><h2 id="${titleId}">${escapeHtml(t.title)}</h2>` +
-        `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating)}${about ? `<p>${escapeHtml(about)}</p>` : ''}</div></div>` +
+        `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating, t.ratingSource)}${about ? `<p>${escapeHtml(about)}</p>` : ''}</div></div>` +
         (t.premieres?.length ? seasonPremieres(t.premieres, titleId) : date + send) +
         overview +
         // Reference link next to the description; Notify me and the actions stay together below (canvas, 23.11)
         kinopoisk +
+        source +
         notify +
         extra +
         `<div class="tc-footer">${error}${actions ? `<div class="tc-actions">${actions}</div>` : ''}</div></div>`
@@ -296,17 +306,18 @@ function loadPoster(src, fresh = false) {
     const large = new window.Image();
     loader = large;
     large.onload = large.onerror = (e) => {
-        if (loader !== large || !modal.open) return;
-        if (e.type === 'error' && left > 0) {
+        const event = /** @type {Event} */ (e);
+        if (loader !== large || !modal.hasAttribute('open')) return;
+        if (event.type === 'error' && left > 0) {
             left -= 1;
             url = next();
             setTimeout(() => loader === large && (large.src = url), 1500);
             return;
         }
         view.removeAttribute('aria-busy');
-        if (e.type === 'load') img.src = url;
+        if (event.type === 'load') img.src = url;
         else view.classList.add('poster-failed');
-        retry.hidden = e.type === 'load';
+        retry.hidden = event.type === 'load';
     };
     view.classList.remove('poster-failed');
     retry.hidden = true;

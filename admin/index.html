@@ -46,6 +46,7 @@
         <link rel="modulepreload" href="js/format.js" />
         <link rel="modulepreload" href="js/history.js" />
         <link rel="modulepreload" href="js/logs.js" />
+        <link rel="modulepreload" href="js/legal.js" />
         <link rel="modulepreload" href="js/maintenance.js" />
         <link rel="modulepreload" href="js/pager.js" />
         <link rel="modulepreload" href="js/proxy-url.js" />
@@ -63,6 +64,7 @@
         <link rel="modulepreload" href="js/render.js" />
         <link rel="modulepreload" href="js/select.js" />
         <link rel="modulepreload" href="js/services.js" />
+        <link rel="modulepreload" href="js/service-health.js" />
         <link rel="modulepreload" href="js/sends.js" />
         <link rel="modulepreload" href="js/settings.js" />
         <link rel="modulepreload" href="js/store.js" />
@@ -1837,8 +1839,8 @@
                                 </button>
                             </div>
                             <p id="subs-archive-hint" class="tab-hint" hidden>
-                                Series that ended or were canceled. They return to Active automatically if TMDB marks
-                                them as renewed.
+                                Series marked as ended or canceled in the catalog. The bot keeps checking for updates
+                                and returns them to Active if their status changes.
                             </p>
                             <div class="table-wrap">
                                 <table id="subs-table" data-tab="active">
@@ -2800,10 +2802,10 @@
                     <select id="test-notify-mode-select" class="select-field">
                         <option value="episode">⚡️ Новая серия (New Episode)</option>
                         <option value="first_and_full">🆕 Премьера сезона (Season Premiere)</option>
-                        <option value="season">✅ Весь сезон вышел (Whole Season)</option>
-                        <option value="ended">🏁 Сериал завершён (Ended)</option>
-                        <option value="canceled">⛔ Сериал отменён (Canceled)</option>
-                        <option value="renewed">🎉 Сериал продлили (Renewed)</option>
+                        <option value="season">✅ Вышли известные серии сезона (Season Schedule)</option>
+                        <option value="ended">ℹ️ В каталоге: завершён (Ended)</option>
+                        <option value="canceled">ℹ️ В каталоге: отменён (Canceled)</option>
+                        <option value="renewed">ℹ️ Возврат в активные подписки (Active again)</option>
                         <option value="film">🎬 Фильм вышел (Film Released)</option>
                     </select>
                 </div>

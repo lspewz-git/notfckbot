@@ -224,13 +224,151 @@ async function airTimesForCheck(tmdbId, externals, budget = null) {
 // A schedule older than its lifetime by this much isn't used any more: a fortnight-old one may have
 // lost a moved episode. The update check refreshes the tracked series every few hours.
 const STALE_MAX_MS = DAY_MS;
+const runtimeFallbacks = lruCache({ max: 300, ttl: 2 * UPDATE_INTERVAL_HOURS * 3600000 + STALE_MAX_MS });
+
+/** Known reserve runtime for a show whose own schedule omits all lengths. */
+function setRuntimeFallback(showId, runtime) {
+    if (Number.isFinite(runtime) && runtime > 0) runtimeFallbacks.set(showId, runtime);
+}
+
+// Full snapshots are separate from the small timing cache: history needs old and undated
+// episodes too. One embedded response keeps status, seasons and episodes from the same refresh.
+const shows = lruCache({
+    max: 300,
+    maxSize: 32 * 1024 * 1024,
+    sizeCalculation: (value) => Math.max(1, JSON.stringify(value).length * 2),
+    ttl: 2 * UPDATE_INTERVAL_HOURS * 60 * 60 * 1000,
+    fetchMethod: async (id) => {
+        const { data } = await get(`/shows/${id}`, {
+            params: { 'embed[]': ['episodes', 'seasons', 'cast', 'crew'] },
+            timeout: EPISODES_TIMEOUT_MS
+        });
+        if (
+            !data ||
+            data.id !== Number(id) ||
+            !Array.isArray(data._embedded?.episodes) ||
+            !Array.isArray(data._embedded?.seasons)
+        )
+            throw new Error('Incomplete TVmaze show snapshot');
+        return data;
+    }
+});
+
+/** Last usable full snapshot; never uses an arbitrarily old schedule during an outage. */
+function cachedShow(tmdbId, knownId = null) {
+    const id = knownId || showIds.peek(tmdbId, { allowStale: true });
+    if (id === NOT_FOUND) return showIds.getRemainingTTL(tmdbId) > 0 ? null : undefined;
+    if (!id || shows.getRemainingTTL(id) < -STALE_MAX_MS) return undefined;
+    return shows.peek(id, { allowStale: true });
+}
+
+/** Exact external-ID lookup only. A saved TVmaze ID also works when TMDB is unavailable. */
+async function show(tmdbId, externals, { fresh = false, knownId = null, deadline = null } = {}) {
+    if (!knownId) externals = await externals;
+    if (deadline?.passed()) throw new Error('TVmaze view deadline expired');
+    if (!knownId && !hasIds(externals)) return null;
+    const id =
+        knownId ||
+        (await showIds.fetch(tmdbId, { context: externals, allowStale: showIds.getRemainingTTL(tmdbId) > 0 }));
+    if (!id) return null;
+    if (deadline?.passed()) throw new Error('TVmaze view deadline expired');
+    showIds.set(tmdbId, id);
+    const load = (showId) =>
+        fresh ? shows.fetch(showId, { forceRefresh: true, allowStale: false }) : fetchFresh(shows, showId);
+    try {
+        return await load(id);
+    } catch (err) {
+        if (err.response?.status !== 404) throw err;
+        if (deadline?.passed()) throw err;
+        // The primary request may have started from a saved ID before optional TMDB
+        // metadata answered. Only ID recovery needs to wait for its external identifiers.
+        externals = await externals;
+        if (deadline?.passed() || !hasIds(externals)) throw err;
+        // A removed/merged show can have a new ID. Retry the exact external lookup once;
+        // keep the old mapping and cached schedule unless the replacement fully validates.
+        try {
+            const replacement = await showIds.fetch(tmdbId, {
+                forceRefresh: true,
+                allowStale: false,
+                context: externals
+            });
+            if (!replacement || replacement === id || deadline?.passed()) throw err;
+            const data = await load(replacement);
+            showIds.set(tmdbId, replacement);
+            return data;
+        } catch (lookupError) {
+            showIds.set(tmdbId, id);
+            throw lookupError;
+        }
+    }
+}
+
+/** Bounded by the check's shared budget or the caller's view deadline. */
+async function showFor(
+    tmdbId,
+    externals,
+    { fresh = false, knownId = null, budget = null, waitMs = 3000, deadline = null } = {}
+) {
+    const cached = () => cachedShow(tmdbId, knownId);
+    const unavailable = () => {
+        const value = cached();
+        return value ? { ...value, unavailable: true } : value;
+    };
+    if (deadline?.passed()) return cached();
+    if (budget && budget.left <= 0) return unavailable();
+    const cachedId = knownId || showIds.peek(tmdbId, { allowStale: true });
+    if (!fresh && cached() !== undefined) {
+        if (cachedId && shows.getRemainingTTL(cachedId) <= 0 && (deadline?.patient || roomForViews()))
+            show(tmdbId, externals, { knownId, deadline }).catch(() => {});
+        return cached();
+    }
+    if (!fresh && !deadline?.patient && !roomForViews()) return unavailable();
+    const started = Date.now();
+    let timer;
+    try {
+        const timeout = deadline
+            ? deadline.promise.then(unavailable)
+            : new Promise((resolve) => {
+                  timer = setTimeout(() => resolve(unavailable()), budget ? Math.max(0, budget.left) : waitMs);
+              });
+        return await Promise.race([show(tmdbId, externals, { fresh, knownId, deadline }).catch(unavailable), timeout]);
+    } finally {
+        clearTimeout(timer);
+        if (budget) budget.left -= Date.now() - started;
+    }
+}
 
 /** What the caches already hold for a series, without asking: times, null (not on TVmaze) or undefined */
 function cachedAirTimes(tmdbId) {
+    const full = cachedShow(tmdbId);
+    if (full) return timesOf(full);
     const showId = showIds.peek(tmdbId, { allowStale: true });
     if (showId === NOT_FOUND) return null;
     if (!showId || schedules.getRemainingTTL(showId) < -STALE_MAX_MS) return undefined;
     return schedules.peek(showId, { allowStale: true });
+}
+
+/** Timing dictionary for all dated regular episodes in a full snapshot. */
+function timesOf(data) {
+    const times = {};
+    for (const ep of data._embedded.episodes) {
+        if (!Number.isInteger(ep.season) || !Number.isInteger(ep.number) || ep.number < 1) continue;
+        const stamp = Date.parse(ep.airstamp);
+        const date = /^\d{4}-\d{2}-\d{2}$/.test(ep.airdate || '') ? ep.airdate : null;
+        if (!date && !Number.isFinite(stamp)) continue;
+        times[`${ep.season}:${ep.number}`] = {
+            stamp: Number.isFinite(stamp) ? stamp : null,
+            date,
+            runtime:
+                Number(ep.runtime) > 0
+                    ? Number(ep.runtime)
+                    : Number(data.averageRuntime || data.runtime) > 0
+                      ? Number(data.averageRuntime || data.runtime)
+                      : runtimeFallbacks.get(data.id) || null,
+            timed: Boolean(ep.airtime)
+        };
+    }
+    return times;
 }
 
 /**
@@ -276,6 +414,11 @@ function warm(tmdbId, externals) {
 }
 
 module.exports = {
+    show,
+    showFor,
+    cachedShow,
+    timesOf,
+    setRuntimeFallback,
     airTimes,
     airTimesForCheck,
     checkBudget,

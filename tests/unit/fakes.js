@@ -68,11 +68,26 @@ const tmdbSeries = ({ last, next = null, seasons = {} }) => ({
 function kindOf(text) {
     if (text.includes('Новая серия')) return 'episode';
     if (text.includes('Премьера сезона')) return 'premiere';
-    if (text.includes('Весь сезон вышел')) return 'complete';
-    if (text.includes('Сериал завершён')) return 'ended';
-    if (text.includes('Сериал отменён')) return 'canceled';
-    if (text.includes('Сериал продлили')) return 'renewed';
+    if (text.includes('Вышли известные серии сезона')) return 'complete';
+    if (text.includes('отмечен как завершённый')) return 'ended';
+    if (text.includes('отмечен как отменённый')) return 'canceled';
+    if (text.includes('Сериал снова в активных подписках')) return 'renewed';
     return 'other';
 }
 
-module.exports = { fakeBot, fakeSeries, ep, tmdbSeries, kindOf };
+/** In-memory conditional UPDATE: the current saved row can differ from a worker's snapshot. */
+function mockSeriesWrites(mock, rows) {
+    const matching = (where) => {
+        const row = rows instanceof Map ? rows.get(where.tmdb_id) : rows.find((r) => r.tmdb_id === where.tmdb_id);
+        return row && Object.entries(where).every(([key, value]) => (row[key] ?? null) === value) ? row : null;
+    };
+    mock.method(require('../../src/db').Series, 'count', async ({ where }) => (matching(where) ? 1 : 0));
+    return mock.method(require('../../src/db').Series, 'update', async (changes, { where }) => {
+        const row = matching(where);
+        if (!row) return [0];
+        await row.update(changes);
+        return [1];
+    });
+}
+
+module.exports = { fakeBot, fakeSeries, ep, tmdbSeries, kindOf, mockSeriesWrites };

@@ -20,23 +20,45 @@ function buildSeriesMessages({ title, season, episode, episodeName, links }) {
     return {
         episode: `${head}\n\n${links}`,
         // "Every episode" mode at the season's last episode
-        finale: `${head}\n🏁 <b>Финал сезона</b> — сезон ${season} вышел целиком.\n\n${links}`,
+        finale: `${head}\n🏁 <b>Последняя известная серия сезона</b> — по текущему расписанию, сезон ${season}.\n\n${links}`,
         // Several episodes out at once reach the check as the last of them: name the range then
-        premiere: `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${t}</b>\n🎞 Сезон ${season}, ${Number(episode) > 1 ? `серии 1–${episode} (последняя: ${ep})` : `Серия 1: ${ep}`}\n\n${links}\n\n<i>(Вы также получите уведомление, когда сезон выйдет целиком)</i>`,
-        complete: `✅ <b>Весь сезон вышел!</b>\n\n📺 <b>${t}</b>\n📦 Сезон ${season} полностью доступен (${episode} сер.).\n\n${links}`
+        premiere: `🆕 <b>Премьера сезона!</b>\n\n📺 <b>${t}</b>\n🎞 Сезон ${season}, ${Number(episode) > 1 ? `последняя вышедшая серия ${episode}: ${ep}` : `Серия 1: ${ep}`}\n\n${links}\n\n<i>(Вы также получите уведомление, когда по расписанию выйдет весь сезон)</i>`,
+        complete: `✅ <b>Вышли известные серии сезона</b>\n\n📺 <b>${t}</b>\n📦 Сезон ${season}: по текущему расписанию вышли все известные серии (${episode} сер.).\n\n${links}`
     };
 }
 
 /** A show crossed the running/finished line: cancelled, finished, or renewed. */
-function buildStatusMessage(title, newStatus) {
+function buildStatusMessage(title, newStatus, { source = null, url = null } = {}) {
     const t = escapeHtml(title);
+    const sourceName = source ? escapeHtml(source) : null;
+    const attribution = sourceName
+        ? `По данным ${url && /^https?:\/\//i.test(url) ? `<a href="${escapeHtml(url)}">${sourceName}</a>` : sourceName}`
+        : 'В каталоге';
     // The title on a line of its own, as in the episode alerts: inside a sentence it got lost
     return isFinishedStatus(newStatus)
-        ? `${newStatus === 'Canceled' ? '⛔ <b>Сериал отменён</b>' : '🏁 <b>Сериал завершён</b>'}\n\n` +
+        ? 'ℹ️ <b>Обновился статус сериала</b>\n\n' +
               `📺 <b>${t}</b>\n\n` +
-              'Новых серий не будет. Перенёс его в 📺 Мои подписки → 🗄 Завершённые. Если сериал продлят, я сообщу.'
-        : `🎉 <b>Сериал продлили!</b>\n\n📺 <b>${t}</b>\n\n` +
-              'Он снова в активных подписках — уведомления о новых сериях придут как обычно.';
+              `${attribution} сериал отмечен как ${newStatus === 'Canceled' ? 'отменённый' : 'завершённый'}. ` +
+              'Перенёс его в 📺 Мои подписки → 🗄 Завершённые. Продолжу проверять обновления.'
+        : `ℹ️ <b>Обновился статус сериала</b>\n\n📺 <b>${t}</b>\n\n` +
+              `${attribution} статус изменился. Сериал снова в активных подписках. Продолжу сообщать о новых сериях.`;
+}
+
+/** Old queued status observations keep their title, never their categorical claims. */
+function neutralizeStoredStatus(text) {
+    if (typeof text !== 'string') return text;
+    const status = text.match(
+        /^(🧪 <b>\[Тестовое уведомление\]<\/b>\n\n)?(?:🏁|⛔|🎉) (?:<b>)?Сериал (?:заверш[её]н|отмен[её]н|продлили!?)(?:<\/b>)?\n\n(📺 (?:<b>)?[^\n]+)\n\n/u
+    );
+    if (status)
+        return (
+            `${status[1] || ''}ℹ️ <b>Обновился статус сериала</b>\n\n${status[2]}\n\n` +
+            'На момент подготовки уведомления в каталоге изменился статус сериала. Проверка обновлений продолжается.'
+        );
+    return text.replace(
+        /^(📺 <b>[^\n]+<\/b> — )сериал (?:заверш[её]н|отмен[её]н|продлили)$/u,
+        '$1в каталоге изменился статус на момент подготовки уведомления'
+    );
 }
 
 /** A film message's title and director lines. */
@@ -108,12 +130,13 @@ const TEST_PREFIX = '🧪 <b>[Тестовое уведомление]</b>\n\n';
  * The real message for `mode`, marked as a test.
  * @param {string} mode one of TEST_MODES
  * @param {{ title?: string, season?: number, episode?: number, episodeName?: string, links?: string,
+ *   source?: { source?: string | null, url?: string | null },
  *   film?: { entry: object, data: object, ru?: object, now?: Date, today?: string } }} parts
  *   what that mode's message is made of
  */
-function buildTestMessage(mode, { title, season, episode, episodeName, links, film }) {
+function buildTestMessage(mode, { title, season, episode, episodeName, links, film, source }) {
     if (mode === 'film') return TEST_PREFIX + buildFilmMessage({ ...film, links });
-    if (STATUS_MODES[mode]) return TEST_PREFIX + buildStatusMessage(title, STATUS_MODES[mode]);
+    if (STATUS_MODES[mode]) return TEST_PREFIX + buildStatusMessage(title, STATUS_MODES[mode], source);
     const messages = buildSeriesMessages({ title, season, episode, episodeName, links });
     const real =
         mode === 'season' ? messages.complete : mode === 'first_and_full' ? messages.premiere : messages.episode;
@@ -135,19 +158,22 @@ function heldLine({ kind, title, season, episode, episodeName, status, finale = 
             return {
                 line:
                     `📺 <b>${t}</b> — серия ${code}${episodeName ? ` «${escapeHtml(episodeName)}»` : ''}` +
-                    (finale ? ', финал сезона' : ''),
+                    (finale ? ', последняя известная серия сезона по текущему расписанию' : ''),
                 label: `${title} ${code}`
             };
         case 'premiere':
             return { line: `📺 <b>${t}</b> — премьера ${season} сезона`, label: `${title} ${code}` };
         case 'complete':
-            return { line: `📺 <b>${t}</b> — вышел весь ${season} сезон`, label: `${title}: ${season} сезон` };
+            return {
+                line: `📺 <b>${t}</b> — по текущему расписанию вышел весь ${season} сезон`,
+                label: `${title}: ${season} сезон`
+            };
         case 'status': {
             const what = !isFinishedStatus(status)
-                ? 'сериал продлили'
+                ? 'снова в активных подписках'
                 : status === 'Canceled'
-                  ? 'сериал отменён'
-                  : 'сериал завершён';
+                  ? 'в каталоге отмечен как отменённый'
+                  : 'в каталоге отмечен как завершённый';
             return { line: `📺 <b>${t}</b> — ${what}`, label: title };
         }
         case 'digital':
@@ -158,6 +184,7 @@ function heldLine({ kind, title, season, episode, episodeName, status, finale = 
 }
 
 module.exports = {
+    neutralizeStoredStatus,
     heldLine,
     buildSeriesMessages,
     buildStatusMessage,

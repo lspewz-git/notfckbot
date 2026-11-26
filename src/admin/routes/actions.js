@@ -122,11 +122,23 @@ async function seriesTest(seriesId, mode, { season, episode, episodeName }) {
     let currentSeason = season ? parseInt(season, 10) : series?.last_season || 1;
     let currentEpisode = episode ? parseInt(episode, 10) : series?.last_episode || 1;
     let epName = episodeName || series?.last_episode_name || '';
+    let source = series?.episode_source
+        ? {
+              source: series.episode_source === 'tvmaze' ? 'TVmaze' : 'TMDB',
+              url:
+                  series.episode_source === 'tvmaze' && series.tvmaze_id
+                      ? `https://www.tvmaze.com/shows/${series.tvmaze_id}`
+                      : `https://www.themoviedb.org/tv/${numericId}`
+          }
+        : undefined;
 
     // 2. Fresh or missing details from TMDB
     try {
         const details = await tmdb.getDetails(numericId, 'tv');
         if (details) {
+            source = details.data_source
+                ? { source: details.data_source === 'tvmaze' ? 'TVmaze' : 'TMDB', url: details.source_url }
+                : source;
             if (!title) title = details.name || details.original_name;
             if (!posterUrl && details.poster_path) {
                 posterUrl = tmdb.tmdbPoster(details.poster_path);
@@ -163,6 +175,7 @@ async function seriesTest(seriesId, mode, { season, episode, episodeName }) {
         season: currentSeason,
         episode: currentEpisode,
         episodeName: epName || `Серия ${currentEpisode}`,
+        source,
         links: formatWatchLinks({ title, kinopoiskId, mediaType: 'tv' })
     });
     // Status alerts go out as plain text, without the poster, like the real ones

@@ -358,13 +358,16 @@ function farewells(stats, options) {
     const gone = stats.finished.slice(0, 3);
     const wait = stats.films.longestWait;
     const content = [
-        kicker('Попрощались в этом году'),
+        kicker('Статусы сериалов'),
         gone.length
             ? ranks(
-                  gone.map((s) => ({ name: s.title, note: s.status === 'Canceled' ? 'отменён' : 'завершён' })),
+                  gone.map((s) => ({
+                      name: s.title,
+                      note: s.status === 'Canceled' ? 'в каталоге: отменён' : 'в каталоге: завершён'
+                  })),
                   () => '×'
               )
-            : sub('Ни одного финала — все ваши сериалы ещё идут.', { marginTop: 20 }),
+            : sub('В этой подборке нет сериалов с отметкой о завершении в каталоге.', { marginTop: 20 }),
         divider(theme)
     ];
     if (wait && wait.waited) {

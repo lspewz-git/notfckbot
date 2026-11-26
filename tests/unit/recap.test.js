@@ -91,7 +91,7 @@ describe('what the cards say', () => {
     test('the best, the farewells, what comes next', () => {
         assert.match(cards[3], /Гангстерленд \| 8\.5/);
         assert.match(cards[3], /14 серий, 12 часов/);
-        assert.match(cards[4], /Пацаны \| завершён/);
+        assert.match(cards[4], /Пацаны \| в каталоге: завершён/);
         assert.match(cards[4], /189/);
         assert.match(cards[5], /На 2027 уже анонсировано \| 1 сериал \| 9 фильмов/);
         assert.match(cards[5], /«Пацаны» — кроме вас его никто не смотрит с ботом/);
@@ -102,7 +102,7 @@ describe('what the cards say', () => {
         assert.match(empty[1], /Пауза/);
         assert.match(empty[2], /Загадка/);
         assert.match(empty[3], /Всё впереди/);
-        assert.match(empty[4], /Ни одного финала/);
+        assert.match(empty[4], /нет сериалов с отметкой о завершении в каталоге/);
         assert.match(empty[5], /Пока ничего не объявлено/);
     });
 });

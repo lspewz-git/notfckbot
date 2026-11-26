@@ -4,19 +4,21 @@
  */
 const { HeldNotification } = require('../db');
 const { notificationButton } = require('../app-links');
+const { neutralizeStoredStatus } = require('../cron/messages');
 
 function register(bot) {
     bot.action(/^held_(\d+)$/, async (ctx) => {
         const item = await HeldNotification.findOne({ where: { id: Number(ctx.match[1]), chatId: ctx.chat.id } });
         if (!item) return ctx.answerCbQuery('Это уведомление уже недоступно.', { show_alert: true });
         await ctx.answerCbQuery();
+        const text = neutralizeStoredStatus(item.text);
         const extra = { parse_mode: 'HTML', ...notificationButton(ctx, ctx.chat.id, item.app_target) };
         if (item.photo) {
             // A poster Telegram can't fetch any more: the text still goes
-            const sent = await ctx.replyWithPhoto(item.photo, { caption: item.text, ...extra }).catch(() => null);
+            const sent = await ctx.replyWithPhoto(item.photo, { caption: text, ...extra }).catch(() => null);
             if (sent) return;
         }
-        await ctx.reply(item.text, extra);
+        await ctx.reply(text, extra);
     });
 }
 

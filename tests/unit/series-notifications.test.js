@@ -75,11 +75,11 @@ describe('notifyNewEpisodes: "every episode" mode', () => {
         await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } }));
 
         assert.deepEqual(kinds(bot), ['10:episode']);
-        assert.match(bot.sent[0].text, /Финал сезона/);
+        assert.match(bot.sent[0].text, /Последняя известная серия сезона/);
         assert.equal(show.completed_season, 2);
         // ...and in the list after quiet hours
         const held = heldLine({ kind: 'episode', title: 'X', season: 2, episode: 10, finale: true });
-        assert.match(held.line, /S2E10, финал сезона$/);
+        assert.match(held.line, /S2E10, последняя известная серия сезона по текущему расписанию$/);
     });
 
     test('completion seen on a later check is announced once', async () => {
@@ -96,7 +96,7 @@ describe('notifyNewEpisodes: "every episode" mode', () => {
         const show = fakeSeries({ last_season: 2, last_episode: 9, completed_season: 1 }, [[10, 'episode']]);
         const data = tmdbSeries({ last: ep(2, 10), seasons: { 2: 10 } });
         await notifyNewEpisodes(bot, show, { ...data, tvmaze_missing: true });
-        assert.doesNotMatch(bot.sent[0].text, /Финал сезона/);
+        assert.doesNotMatch(bot.sent[0].text, /Последняя известная серия сезона/);
         assert.equal(show.completed_season, 1);
 
         await notifyNewEpisodes(bot, show, data);
@@ -143,7 +143,7 @@ describe('notifyNewEpisodes: "whole season" mode', () => {
 
         await notifyNewEpisodes(bot, show, finale);
         assert.deepEqual(kinds(bot), ['10:complete']);
-        assert.match(bot.sent[0].text, /Сезон 2 полностью доступен \(8 сер\.\)/);
+        assert.match(bot.sent[0].text, /Сезон 2: по текущему расписанию вышли все известные серии \(8 сер\.\)/);
         assert.equal(show.completed_season, 2);
 
         // The next check sees the same data: nothing again
@@ -185,7 +185,7 @@ describe('notifyNewEpisodes: "1st episode + season" mode', () => {
         await notifyNewEpisodes(bot, show, tmdbSeries({ last: ep(2, 3), next: ep(2, 4), seasons: { 2: 8 } }));
 
         assert.deepEqual(kinds(bot), ['10:premiere']);
-        assert.match(bot.sent[0].text, /Сезон 2, серии 1–2 \(последняя: Two\)/);
+        assert.match(bot.sent[0].text, /Сезон 2, последняя вышедшая серия 2: Two/);
     });
 
     test('a row stored at a special (S0) does not call a mid-season episode a premiere', async () => {

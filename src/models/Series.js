@@ -27,9 +27,19 @@ const Series = sequelize.define('Series', {
         type: DataTypes.STRING,
         allowNull: true
     },
-    // TMDB production status: Returning Series / In Production / Planned /
+    // Effective catalog status (TVmaze first, TMDB fallback), normalized for existing consumers:
+    // Returning Series / In Production / Planned /
     // Pilot / Ended / Canceled. Null until the next update check fills it in.
     status: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    tvmaze_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    // Also identifies the episode cursor's numbering. A source change is baselined silently.
+    episode_source: {
         type: DataTypes.STRING,
         allowNull: true
     },
@@ -71,6 +81,8 @@ const Series = sequelize.define('Series', {
     countries: { type: DataTypes.STRING(40), allowNull: true },
     runtime: { type: DataTypes.INTEGER, allowNull: true },
     rating: { type: DataTypes.FLOAT, allowNull: true },
+    // Independent of episode_source: an unrated TVmaze show can use TMDB's rating.
+    rating_source: { type: DataTypes.STRING, allowNull: true },
     // The years in which an episode aired, with their seasons, as "2024:2;2025:2,3", for the
     // release history. Null until every season has been looked at once
     // (src/cron/release-seasons.js); "" when none aired yet.
