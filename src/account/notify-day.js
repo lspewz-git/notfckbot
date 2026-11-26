@@ -2,8 +2,9 @@
  * The day the bot will message a chat about a calendar row, for the bell in the panel's Calendar:
  * null when the subscription's mode stays silent on that row.
  *
- * When it goes out (an estimate, the bot has no air times):
- * - an episode reaches the update check about a day after its TMDB date: TMDB moves it to
+ * When it goes out (planned, actual delivery may be delayed):
+ * - a TVmaze-primary episode uses the first check once its outAt moment has passed;
+ * - the TMDB fallback reaches the update check about a day after its date: TMDB moves it to
  *   last_episode_to_air once that US day ends, by 08 UTC (seen 13.11: still not at 06:00, done by
  *   08:10, sent at the 09:00 check), and it goes out with the first check after 08 UTC (checks run
  *   at the hours UPDATE_INTERVAL_HOURS divides; .claude/notes/bot.md);
@@ -73,33 +74,38 @@ function firstCheckFrom(ms, interval = UPDATE_INTERVAL_HOURS) {
 }
 
 /**
- * The moment the update check sends an episode: once TMDB moves it to the aired ones (the day
- * after its TMDB date, `date`), or once it is out by TVmaze (`outAt`, src/episode-times.js),
- * whichever comes first — the check takes the later episode of the two (withTvmaze()).
+ * A primary series follows TVmaze's outAt only. The legacy TMDB fallback can still take
+ * the earlier of its estimated catalog move and the matching TVmaze episode's outAt.
  */
 function episodeSendAt(item, interval = UPDATE_INTERVAL_HOURS) {
+    if (item.episodeSource === 'tvmaze')
+        return Number.isFinite(item.outAt) ? firstCheckFrom(item.outAt, interval) : null;
     const byTmdb = Date.parse(`${item.date}T00:00:00Z`) + (24 + episodeSendHour(interval)) * 36e5;
     return Number.isFinite(item.outAt) ? Math.min(byTmdb, firstCheckFrom(item.outAt, interval)) : byTmdb;
 }
 
 /**
  * @param {{ kind: string, date: string, mode?: string | null, mark?: string, episode?: number,
- *   last?: boolean, lastOfDay?: boolean, premiereDay?: boolean, outAt?: number | null }} item a
+ *   last?: boolean, lastOfDay?: boolean, premiereDay?: boolean, outAt?: number | null,
+ *   episodeSource?: string | null, dayOnly?: boolean }} item a
  *   calendar row (`date`: TMDB's for an episode); `premiereDay`: the season's first episode comes
  *   out the same day; `outAt`: the moment it is out by TVmaze
  * @param {{ timezone?: string | null, quiet_start?: number | null, quiet_end?: number | null } | null} chat
  * @param {number} [interval] hours between update checks
  * @returns {{ notifyOn: string, sendAt: string, sendKind: 'timed' | 'quiet' | 'day' | 'not_before' } | null}
  *   the chat's local "YYYY-MM-DD" of the message, its moment (ISO, UTC) and how sure it is: `timed`
- *   by TVmaze's hour, `quiet` held to the end of quiet hours, `day` the hour unknown (streaming
- *   without one, TMDB only), `not_before` a film waiting for TMDB's Released
+ *   by TVmaze's hour, `quiet` a known hour held to the end of quiet hours, `day` the hour unknown
+ *   (streaming without one, TMDB only, including quiet-hour shifts), `not_before` a film waiting
+ *   for TMDB's Released
  */
 function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) || !messages(item)) return null;
     const tv = item.kind === 'tv';
     const kind = !tv ? 'not_before' : Number.isFinite(item.outAt) && !item.dayOnly ? 'timed' : 'day';
     const midnight = Date.parse(`${item.date}T00:00:00Z`);
-    let sendAt = new Date(tv ? episodeSendAt(item, interval) : midnight + (24 + episodeSendHour(interval)) * 36e5);
+    const episodeAt = tv ? episodeSendAt(item, interval) : null;
+    if (tv && episodeAt === null) return null;
+    let sendAt = new Date(tv ? episodeAt : midnight + (24 + episodeSendHour(interval)) * 36e5);
     if (!tv) {
         const every = Number.isInteger(interval) && interval > 0 ? interval : 3;
         // Cron hours restart at UTC midnight; a chat's first slot may be on the previous UTC day.
@@ -121,7 +127,7 @@ function notifyDay(item, chat, interval = UPDATE_INTERVAL_HOURS) {
     // the 10-minute pass at the end hour sends it (src/cron/held.js). Our zones keep a fixed offset.
     const heldDay = start > end && hour >= start ? nextDay(day) : day;
     const endAt = Date.parse(`${heldDay}T00:00:00Z`) + (end - zoneOf(chat.timezone).offset) * 36e5;
-    return send(heldDay, endAt, tv ? 'quiet' : kind);
+    return send(heldDay, endAt, kind === 'timed' ? 'quiet' : kind);
 }
 
 /**

@@ -284,6 +284,7 @@ async function seriesEpisodes(series, from, to, local = null) {
                 outAt: out,
                 dayOnly: untimed,
                 kind: 'tv',
+                episodeSource: details?.data_source || series.episode_source || 'tmdb',
                 tmdbId: series.tmdb_id,
                 title: series.title,
                 season,

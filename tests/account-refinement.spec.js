@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { mockPanel } = require('./mock-panel');
 const { watchConsole, openSection, pickChat } = require('./helpers');
+const { notifyDay } = require('../src/account/notify-day');
 
 // A film's separate digital release message (src/account/notify-day.js digitalSend())
 const DIGITAL = { notifyOn: '2026-11-20', sendAt: '2026-11-19T21:00:00.000Z', sendKind: 'not_before' };
@@ -9,6 +10,38 @@ const confirmUnfollow = (page) => page.locator('#confirm-modal').getByRole('butt
 
 test.describe('shared cards and calendar unfollow', () => {
     watchConsole();
+
+    for (const kind of ['timed', 'quiet', 'day']) {
+        test(`TVmaze planned notification: ${kind} agrees in Following and Calendar`, async ({ page, isMobile }) => {
+            await page.clock.setFixedTime(new Date('2026-11-04T12:00:00Z'));
+            if (process.env.NOTIFY_TIME_CAPTURES && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
+            const panel = await mockPanel(page, { role: 'user' });
+            const chat = { timezone: 'Europe/Moscow', quiet_start: kind === 'quiet' ? 23 : 0,
+                quiet_end: kind === 'quiet' ? 8 : kind === 'day' ? 18 : 0 };
+            const send = notifyDay({ kind: 'tv', mode: 'episode', episodeSource: 'tvmaze', date: '2026-11-05',
+                dayOnly: kind === 'day', outAt: Date.parse(kind === 'quiet' ? '2026-11-06T00:15:00Z' : '2026-11-06T10:15:00Z') }, chat, 3);
+            Object.assign(panel.account.series[0].next, send);
+            const item = panel.account.calendar.items.find(i => i.kind === 'tv' && i.title === 'Одни из нас');
+            Object.assign(item, send, { date: '2026-11-06' });
+            const expected = kind === 'timed' ? 'The bot will message you on Nov 6, around 15:00'
+                : kind === 'quiet' ? 'The bot will message you on Nov 6, around 08:00, after your quiet hours'
+                : 'The bot will message you on Nov 6';
+            await openSection(page, 'my-subs');
+            await page.locator('#my-subs-body button.title-row').first().click();
+            const card = page.locator('#mine-card-modal');
+            await expect(card.locator('.tc-date + .tc-send')).toHaveText(expected);
+            await card.locator('.sheet-close').click();
+            await openSection(page, 'my-calendar');
+            await page.locator('#my-calendar-body button.cal-row', { hasText: 'Одни из нас' })
+                .filter({ hasText: `S${item.season}E${item.episode}` }).click();
+            await expect(card.locator('.tc-date + .tc-send')).toHaveText(expected);
+            if (kind === 'day') await expect(card.locator('.tc-send')).not.toContainText(/\d{2}:\d{2}/);
+            if (process.env.NOTIFY_TIME_CAPTURES && kind === 'timed') {
+                await card.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+                await card.locator('.tc-send').screenshot({ path: `${process.env.NOTIFY_TIME_CAPTURES}/${isMobile ? 'iphone' : 'desktop'}.png` });
+            }
+        });
+    }
 
     test('a pending mode save blocks unfollow even after reopening the calendar card', async ({ page }) => {
         const panel = await mockPanel(page, { role: 'user' });

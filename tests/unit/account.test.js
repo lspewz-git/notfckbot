@@ -1144,6 +1144,41 @@ test('the API: Following films use cached Kinopoisk ids and IMDb context without
     assert.equal(response.body.films[0].links[1].url, 'https://www.kinopoisk.ru/film/12464471/');
 });
 
+test('the API: a primary Following card plans its message from TVmaze, with no TMDB shortcut', async (t) => {
+    const maze = require('../../src/api/tvmaze');
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private', timezone: 'Europe/Moscow' }));
+    t.mock.method(Watchlist, 'findAll', async () => []);
+    t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => null);
+    t.mock.method(maze, 'cachedAirTimes', () => ({
+        '1:2': {
+            date: '2026-11-27',
+            stamp: Date.parse('2026-11-28T09:30:00Z'),
+            runtime: 45,
+            timed: true
+        }
+    }));
+    t.mock.method(Subscription, 'findAll', async () => [
+        {
+            notify_type: 'episode',
+            Series: {
+                tmdb_id: 'tv_7',
+                episode_source: 'tvmaze',
+                title: 'Primary',
+                next_episode_date: '2026-11-27',
+                next_episode_season: 1,
+                next_episode_number: 2
+            }
+        }
+    ]);
+    const cookie = await signIn(call, 7);
+    const response = await call('GET', '/api/account/chats/7/list', { cookie });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.series[0].next.sendAt, '2026-11-28T12:00:00.000Z');
+    assert.equal(response.body.series[0].next.sendKind, 'timed');
+});
+
 test('the API: Aired is scoped to an accessible chat and validates its year', async (t) => {
     t.mock.method(require('../../src/api/tmdb'), 'peekDetails', () => {
         throw new Error('History already contains shared display metadata');

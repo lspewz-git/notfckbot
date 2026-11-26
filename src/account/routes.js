@@ -503,6 +503,7 @@ function nextSend(s, mode, chat) {
     return notifyDay(
         {
             kind: 'tv',
+            episodeSource: s.episode_source || 'tmdb',
             date: s.next_episode_date,
             mode,
             episode: s.next_episode_number,

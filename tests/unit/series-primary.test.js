@@ -1289,3 +1289,27 @@ test('agent review: a late startup scan cannot overwrite the migrated episode co
     assert.equal(row.aired_episodes, '2020-01:1=2/90');
     assert.equal(row.release_seasons, '2020:1');
 });
+
+test('planned notification time: primary calendar rows retain their source through bell calculation', async (t) => {
+    const id = 91501;
+    routes(
+        id,
+        show(id, {
+            _embedded: {
+                seasons: [{ number: 1, episodeOrder: 2, premiereDate: '2026-11-24' }],
+                episodes: [ep(1), ep(2, { airdate: '2026-11-27', airstamp: '2026-11-28T09:30:00Z', airtime: '23:30' })]
+            }
+        })
+    );
+    const row = fakeSeries({ tmdb_id: `tv_${id}`, last_season: 1, episode_source: 'tvmaze' });
+    t.mock.method(db.Subscription, 'findAll', async () => [{ Series: row, notify_type: 'episode' }]);
+    t.mock.method(db.Watchlist, 'findAll', async () => []);
+    const { items } = await require('../../src/calendar').periodItems(1, '2026-11-24', '2026-11-30', {
+        local: { chat: { timezone: 'Europe/Moscow' } }
+    });
+    const item = items.find((i) => i.episode === 2);
+    assert.equal(item.episodeSource, 'tvmaze');
+    const send = require('../../src/account/notify-day').notifyDays([item], { timezone: 'Europe/Moscow' })[0];
+    assert.equal(send.sendAt, '2026-11-28T12:00:00.000Z');
+    assert.equal(send.sendKind, 'timed');
+});

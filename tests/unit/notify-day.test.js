@@ -191,14 +191,14 @@ test('quiet hours hold the message to their end, the pass at that hour sends it'
     assert.deepEqual(nd.notifyDay(tv, kamchatka, 3), {
         notifyOn: '2026-11-14',
         sendAt: '2026-11-13T21:00:00.000Z',
-        sendKind: 'quiet'
+        sendKind: 'day'
     });
     // 12:00 in Moscow inside 0–13: 13:00 the same day
     const morning = { timezone: 'Europe/Moscow', quiet_start: 0, quiet_end: 13 };
     assert.deepEqual(nd.notifyDay(tv, morning, 3), {
         notifyOn: '2026-11-13',
         sendAt: '2026-11-13T10:00:00.000Z',
-        sendKind: 'quiet'
+        sendKind: 'day'
     });
     // Outside the hours the check's own moment stays
     const night = { timezone: 'Europe/Moscow', quiet_start: 23, quiet_end: 8 };
@@ -247,4 +247,88 @@ test('the moment follows the mode: none where the mode stays silent', () => {
     assert.equal(ep('season', { mark: 'finale' }).sendAt, '2026-11-13T03:00:00.000Z');
     assert.equal(ep('first_and_full'), null);
     assert.equal(ep('first_and_full', { episode: 1 }).sendKind, 'timed');
+});
+
+test('primary TVmaze clocks never use an earlier TMDB estimate', () => {
+    const item = {
+        kind: 'tv',
+        mode: 'episode',
+        date: '2026-11-12',
+        episodeSource: 'tvmaze',
+        outAt: Date.parse('2026-11-14T01:50:00Z')
+    };
+    assert.deepEqual(nd.notifyDay(item, moscow, 3), {
+        notifyOn: '2026-11-14',
+        sendAt: '2026-11-14T03:00:00.000Z',
+        sendKind: 'timed'
+    });
+    assert.equal(nd.notifyDay({ ...item, outAt: null }, moscow), null);
+    assert.equal(nd.notifyDay({ ...item, outAt: NaN }, moscow), null);
+    assert.equal(nd.notifyDay({ ...item, episodeSource: 'tmdb' }, moscow, 3).sendAt, '2026-11-13T09:00:00.000Z');
+});
+
+test('primary bells group episodes by their actual check slot, without the TMDB shortcut', () => {
+    const item = {
+        kind: 'tv',
+        mode: 'episode',
+        tmdbId: 'tv_7',
+        season: 1,
+        episodeSource: 'tvmaze',
+        date: '2026-11-12',
+        tmdbDate: '2026-11-12'
+    };
+    const rows = [
+        { ...item, episode: 1, outAt: Date.parse('2026-11-14T01:00:00Z') },
+        { ...item, episode: 2, outAt: Date.parse('2026-11-14T10:00:00Z') }
+    ];
+    assert.deepEqual(
+        nd.notifyDays(rows, moscow, 3).map((s) => s?.sendAt),
+        ['2026-11-14T03:00:00.000Z', '2026-11-14T12:00:00.000Z']
+    );
+    rows[1].outAt = Date.parse('2026-11-14T02:00:00Z');
+    assert.deepEqual(
+        nd.notifyDays(rows, moscow, 3).map((s) => s?.sendAt ?? null),
+        [null, '2026-11-14T03:00:00.000Z']
+    );
+});
+
+test('a date-only primary episode stays date-only after quiet hours', () => {
+    const item = {
+        kind: 'tv',
+        mode: 'episode',
+        date: '2026-11-12',
+        episodeSource: 'tvmaze',
+        dayOnly: true,
+        outAt: Date.parse('2026-11-13T12:00:00Z')
+    };
+    const chat = { timezone: 'Asia/Kamchatka', quiet_start: 15, quiet_end: 9 };
+    assert.deepEqual(nd.notifyDay(item, chat, 3), {
+        notifyOn: '2026-11-14',
+        sendAt: '2026-11-13T21:00:00.000Z',
+        sendKind: 'day'
+    });
+    assert.deepEqual(nd.notifyDay(item, moscow, 3), {
+        notifyOn: '2026-11-13',
+        sendAt: '2026-11-13T12:00:00.000Z',
+        sendKind: 'day'
+    });
+});
+
+test('a known primary time respects quiet hours and UTC midnight cron boundaries', () => {
+    const item = {
+        kind: 'tv',
+        mode: 'episode',
+        date: '2026-11-12',
+        episodeSource: 'tvmaze',
+        outAt: Date.parse('2026-11-13T01:50:00Z')
+    };
+    assert.deepEqual(nd.notifyDay(item, { timezone: 'Europe/Moscow', quiet_start: 23, quiet_end: 8 }, 3), {
+        notifyOn: '2026-11-13',
+        sendAt: '2026-11-13T05:00:00.000Z',
+        sendKind: 'quiet'
+    });
+    assert.equal(
+        nd.notifyDay({ ...item, outAt: Date.parse('2026-11-14T23:10:00Z') }, moscow, 5).sendAt,
+        '2026-11-15T00:00:00.000Z'
+    );
 });
