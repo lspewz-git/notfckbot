@@ -1,5 +1,5 @@
 import { t as i18nText } from './i18n.js';
-import { displayTitle, titleMarkup, warmTitles } from './catalog-text.js';
+import { displayTitle, titleMarkup } from './catalog-text.js';
 /** One Released view for the whole database and a person's selected chat. */
 import { $, escapeHtml } from './dom.js';
 import { api } from './api.js';
@@ -165,12 +165,6 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
             draw(kind);
         }
     }
-    window.addEventListener('catalog-names-ready', () => {
-        if (query && data) {
-            draw('series');
-            draw('films');
-        }
-    });
     async function load() {
         mount();
         if (!data)
@@ -204,14 +198,6 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
         },
         filter(value) {
             query = value.trim().toLocaleLowerCase();
-            if (query) {
-                const wanted = query;
-                const year = selectedYear;
-                warmTitles(
-                    Object.values(lists).flatMap((list) => list.items.map((item) => item.tmdbId)),
-                    () => query === wanted && selectedYear === year && root.getClientRects().length > 0
-                );
-            }
             Object.values(lists).forEach((list) => {
                 list.page = 0;
             });

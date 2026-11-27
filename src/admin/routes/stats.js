@@ -15,6 +15,7 @@ const { DEFAULT_ZONE } = require('../../quiet');
 const { unwritten } = require('../../stats-log');
 const { getCronStatus } = require('../../cron');
 const { getVersion } = require('../version');
+const { sendPanel } = require('../catalog-names');
 const { FINISHED_STATUS_LABELS, isFinishedStatus } = require('../../constants');
 const { LEFT } = require('../../bot-status');
 const { MAX_ATTEMPTS } = require('../../cron/outbox');
@@ -257,7 +258,7 @@ router.get('/api/stats/popular', async (req, res) => {
             limit: 5,
             include: [{ model: Series }]
         });
-        res.json(popular);
+        await sendPanel(req, res, popular);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -325,7 +326,7 @@ router.get('/api/upcoming', async (req, res) => {
         for (const f of byFilm.values()) items.push({ ...f, chats: f.chats.size });
 
         items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title)));
-        res.json(items.slice(0, UPCOMING_LIMIT));
+        await sendPanel(req, res, items.slice(0, UPCOMING_LIMIT));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

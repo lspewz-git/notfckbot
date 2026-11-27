@@ -6,6 +6,7 @@
 const router = require('express').Router();
 const { Chat, Series, Subscription, Watchlist, HiddenChat, AccountPreference } = require('../db');
 const tmdb = require('../api/tmdb');
+const { sendPanel } = require('../admin/catalog-names');
 const kinopoisk = require('../api/kinopoisk');
 const ops = require('../chat-ops');
 const { listPeriod, periodItems, todayIn } = require('../calendar');
@@ -621,7 +622,7 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
             const item = series.find((s) => s.id === query.title);
             if (item) linkedTitle = { ...item, kind: 'tv' };
         }
-        res.json({
+        await sendPanel(req, res, {
             access: req.access,
             today: todayIn(chat?.timezone),
             timeZone: zoneOf(chat?.timezone).id,
@@ -743,7 +744,7 @@ router.get('/api/account/chats/:chatId/aired', openChat, async (req, res) => {
                 label: kind === 'watch' ? 'Watch on SSPoisk' : 'Kinopoisk'
             }))
         });
-        res.json({
+        await sendPanel(req, res, {
             ...data,
             series: data.series.map(card),
             films: data.films.map(card)
@@ -764,7 +765,7 @@ router.get('/api/account/chats/:chatId/calendar', openChat, async (req, res) => 
             local: { chat }
         });
         const bells = notifyDays(items, chat);
-        res.json({
+        await sendPanel(req, res, {
             ...p,
             timeZone: zoneOf(chat.timezone).id,
             items: items.map((i, index) => {

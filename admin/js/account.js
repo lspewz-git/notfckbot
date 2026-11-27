@@ -1,6 +1,6 @@
 import { locale } from './i18n.js';
 import { t as i18nText } from './i18n.js';
-import { displayTitle, titleMarkup, warmTitles } from './catalog-text.js';
+import { displayTitle, titleMarkup } from './catalog-text.js';
 /**
  * The user's own chats inside the panel (src/account/routes.js): Calendar, Released, Following, the
  * title search and Chat settings for the chat picked on Account (the
@@ -1300,10 +1300,6 @@ export const accountActions = {
 
 /** The mode radios and the search field. */
 export function setupAccount() {
-    window.addEventListener('catalog-names-ready', () => {
-        if (state.find.subs && state.list) $('my-subs-body').innerHTML = subsView();
-        if (state.find.calendar && state.cal) showCalendar();
-    });
     // The search runs as the person types (after a pause), or at once on Enter (setupSearchForms)
     document.addEventListener('input', (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
@@ -1311,21 +1307,6 @@ export function setupAccount() {
         if (tab) {
             // A tab's own field filters only what that tab already shows; the catalog is Following's +
             state.find[tab] = input.value.trim().toLocaleLowerCase();
-            if ((tab === 'subs' || tab === 'calendar') && state.find[tab]) {
-                const query = state.find[tab];
-                const chat = state.chatId;
-                const ids =
-                    tab === 'subs'
-                        ? [
-                              ...(state.list?.series || []).map((s) => s.id),
-                              ...(state.list?.films || []).map((f) => f.tmdbId)
-                          ]
-                        : (state.cal?.items || []).map((item) => item.tmdbId);
-                warmTitles(
-                    ids,
-                    () => state.chatId === chat && state.find[tab] === query && input.getClientRects().length > 0
-                );
-            }
             if (tab === 'aired') getAiredHistory().filter(input.value);
             else if (tab === 'subs' && state.list) $('my-subs-body').innerHTML = subsView();
             else if (tab === 'calendar' && state.cal) $('my-calendar-body').innerHTML = calendarView(state.cal);

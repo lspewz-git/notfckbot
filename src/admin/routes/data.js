@@ -7,6 +7,7 @@ const { log } = require('../../log');
 const { isTelegramReady } = require('../../telegram-ready');
 const { rolesOf } = require('../../account/roles');
 const { withPasswords } = require('../../account/password');
+const { sendPanel } = require('../catalog-names');
 
 // A name's wait: the table doesn't hang on a Telegram that doesn't answer
 const NAME_TIMEOUT_MS = 5000;
@@ -80,7 +81,8 @@ router.get('/api/data/:type', async (req, res) => {
                     : { ...c.toJSON(), panelRole: null }
             );
         }
-        res.json(data);
+        if (type === 'chats') res.json(data);
+        else await sendPanel(req, res, data);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

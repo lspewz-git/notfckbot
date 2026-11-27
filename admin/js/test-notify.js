@@ -1,6 +1,5 @@
 import { t as i18nText } from './i18n.js';
-import { displayTitle, warmTitles } from './catalog-text.js';
-import { syncSelectText } from './select.js';
+import { displayTitle } from './catalog-text.js';
 /** Test notifications: send any alert the bot can send (episode, status, film) to a chosen chat. */
 
 import { $, $field, escapeHtml, debounce } from './dom.js';
@@ -106,15 +105,6 @@ export async function openTestNotifyModal(chatId = null, seriesId = null) {
     }
 
     openModal('test-notify-modal');
-    warmTrackedTitles();
-}
-
-function warmTrackedTitles() {
-    const current = kind;
-    warmTitles(
-        (kind === 'tv' ? trackedSeries : trackedFilms).map((t) => t.tmdb_id),
-        () => kind === current && $('test-notify-modal').hasAttribute('open')
-    );
 }
 
 /** Labels, the tracked list and the tabs for the current kind (series or film). */
@@ -137,7 +127,6 @@ function applyKind() {
         : `<option value="">${kind === 'tv' ? i18nText('No tracked series in database') : i18nText('No films on any list')}</option>`;
     setSelectValue('test-notify-series-select', tracked.length ? tracked[0].tmdb_id : '');
     switchSeriesTab(tracked.length ? 'db' : 'search');
-    warmTrackedTitles();
 }
 
 /** The alert type decides the kind of title and whether season and episode apply. */
@@ -291,15 +280,6 @@ export async function sendTestNotification() {
 }
 
 export function setupTestNotifyDialog() {
-    window.addEventListener('catalog-names-ready', () => {
-        const select = /** @type {HTMLSelectElement} */ ($('test-notify-series-select'));
-        for (const option of select.options) {
-            if (option.dataset.titleFallback !== undefined)
-                option.textContent =
-                    displayTitle(option.value, option.dataset.titleFallback) + option.dataset.titleSuffix;
-        }
-        syncSelectText(select);
-    });
     $('tab-test-series-db').onclick = () => switchSeriesTab('db');
     $('tab-test-series-search').onclick = () => switchSeriesTab('search');
 

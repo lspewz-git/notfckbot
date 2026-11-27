@@ -3,7 +3,6 @@ import { t as i18nText } from './i18n.js';
 
 import { $, all, closest } from './dom.js';
 import { translatePage } from './i18n.js';
-import { setupCatalogTitles } from './catalog-text.js';
 import { runCheckNow, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setSubsChart, openRecentSends } from './dashboard-charts.js';
@@ -354,7 +353,6 @@ function sectionFromHash(role) {
  * on the dashboard and a user's on Calendar, the first personal tab.
  */
 function afterSignIn(role) {
-    setupCatalogTitles();
     activeView = role === 'admin' && window.history.state?.view !== 'mine' ? 'admin' : 'mine';
     // Opened from a group (a Mini App or a group's sign-in link): that chat's Calendar
     const start = !launchedInChat() && role === 'admin' ? activeSection : DEFAULT_PERSONAL_SECTION;

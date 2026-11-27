@@ -70,6 +70,7 @@ describe('the API', () => {
     after(() => close());
 
     beforeEach(async () => {
+        mock.method(require('../../src/api/tmdb'), 'getPanelText', async () => ({ title: '' }));
         mock.method(DailyStat, 'findOrCreate', async () => {});
         mock.method(DailyStat, 'increment', async () => {});
         await stats.flushStats();

@@ -60,6 +60,7 @@ function deviceMatch(row, where) {
 }
 
 beforeEach(() => {
+    mock.method(require('../../src/api/tmdb'), 'getPanelText', async () => ({ title: '', overview: '', genres: '' }));
     const preferences = new Map();
     mock.method(AccountPreference, 'findByPk', async (id) => preferences.get(String(id)) || null);
     mock.method(AccountPreference, 'upsert', async (row) => preferences.set(String(row.userId), { ...row }));
@@ -1171,6 +1172,27 @@ test('the API: a film is removed only from the chat in the path', async (t) => {
     const res = await call('DELETE', '/api/account/chats/42/films/5', { cookie });
     assert.deepEqual(res.body, { removed: false });
     assert.equal(destroyed, false);
+});
+
+test('the API: Following sends localized names in the first payload without changing stored rows', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const saved = { tmdb_id: 'tv_990031', title: 'Stored series' };
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private' }));
+    t.mock.method(Subscription, 'findAll', async () => [{ notify_type: 'each', Series: saved }]);
+    t.mock.method(Watchlist, 'findAll', async () => [{ id: 1, tmdb_id: 'movie_990032', title: 'Stored film' }]);
+    t.mock.method(require('../../src/api/tmdb'), 'getPanelText', async (id, kind, language) => ({
+        title: `${language}:${kind}:${id}`
+    }));
+    const cookie = await signIn(call, 7);
+    for (const language of ['en', 'ru']) {
+        const response = await call('GET', '/api/account/chats/7/list', { cookie, language });
+        assert.equal(response.status, 200);
+        assert.equal(response.body.series[0].title, `${language === 'ru' ? 'ru-RU' : 'en-US'}:tv:990031`);
+        assert.equal(response.body.films[0].title, `${language === 'ru' ? 'ru-RU' : 'en-US'}:movie:990032`);
+        assert.match(response.headers.get('vary'), /X-Panel-Language/i);
+    }
+    assert.equal(saved.title, 'Stored series');
 });
 
 test('the API: Following preserves stored ratings only when catalog metadata is absent', async (t) => {

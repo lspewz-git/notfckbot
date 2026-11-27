@@ -351,18 +351,9 @@ export function fitDescriptions(root) {
     fitTitleSheet(root);
     for (const card of root.querySelectorAll('.tc-scroll[data-catalog]:not([data-localized])')) {
         card.dataset.localized = 'loading';
-        catalogCopy(card.dataset.catalog, true)
+        catalogCopy(card.dataset.catalog)
             .then((copy) => {
                 if (!card.isConnected) return;
-                if (typeof copy.title === 'string' && copy.title.trim()) {
-                    const name = copy.title.trim();
-                    card.querySelector('h2 [data-catalog-title]').textContent = name;
-                    const poster = card.querySelector('.tc-poster');
-                    if (poster) {
-                        poster.dataset.title = name;
-                        poster.setAttribute('aria-label', i18nText('Open the poster of {{v3}}', { v3: name }));
-                    }
-                }
                 const text = card.querySelector('.tc-copy');
                 if (text) {
                     if (typeof copy.overview === 'string' && copy.overview.trim()) setTitleCopy(text, copy.overview);

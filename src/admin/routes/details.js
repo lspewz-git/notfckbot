@@ -4,6 +4,7 @@ const tmdb = require('../../api/tmdb');
 const { findKinopoiskIdQuick } = require('../../api/kinopoisk');
 const { getWatchLinks } = require('../../constants');
 const { servePoster } = require('../posters');
+const { sendPanel } = require('../catalog-names');
 
 // What the card shows of a chat: enough for its name and avatar
 const CHAT_FIELDS = ['id', 'username', 'type'];
@@ -28,7 +29,7 @@ router.get('/api/series/:tmdbId', async (req, res) => {
             })
         ]);
         const subscribers = subs.filter((s) => s.Chat).map((s) => ({ chat: s.Chat, mode: s.notify_type }));
-        res.json({ ...details, subCount: subs.length, subscribers });
+        await sendPanel(req, res, { ...details, subCount: subs.length, subscribers }, `tv_${numericId}`);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -73,13 +74,18 @@ router.get('/api/movie/:tmdbId', async (req, res) => {
             ruServices: (ruRow && ruRow.ru_services) || null
         };
         const list = [...chats.values()];
-        res.json({
-            ...details,
-            dates,
-            waiting: list.filter((c) => !c.notified).length,
-            notified: list.filter((c) => c.notified).length,
-            chats: list
-        });
+        await sendPanel(
+            req,
+            res,
+            {
+                ...details,
+                dates,
+                waiting: list.filter((c) => !c.notified).length,
+                notified: list.filter((c) => c.notified).length,
+                chats: list
+            },
+            id
+        );
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

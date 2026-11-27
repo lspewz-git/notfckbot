@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { accountState, accountAnswer, changesPage } = require('./mock-account');
+const { createPanelLocalizer } = require('../src/admin/catalog-names');
 
 /**
  * Serves the panel straight from admin/ with a canned API, entirely inside the
@@ -422,6 +423,30 @@ function recapSchedule() {
 }
 
 async function mockPanel(page, options = {}) {
+    // Use the real response preparer with an isolated provider/cache, never the external catalog.
+    const localize = createPanelLocalizer(async (id, kind, language) => {
+        const provider = options.titleText || options.contentText;
+        if (!provider) return {};
+        const copy = await provider({
+            path: `/api/account/content/${kind}/${id}`,
+            language: language === 'ru-RU' ? 'ru' : 'en'
+        });
+        if (copy?.status >= 400) throw new Error('Mock catalog unavailable');
+        return copy;
+    });
+    const prepare = (answer, pathname, req) => {
+        const detail = /^\/api\/(series|movie)\/(?:tv_|movie_)?([1-9]\d*)$/.exec(pathname);
+        const selected =
+            /^\/api\/(?:data\/(?:series|subs|films)|stats\/popular|upcoming|history|chat\/[^/]+\/stats|account\/chats\/[^/]+\/(?:list|calendar|aired))$/.test(
+                pathname
+            );
+        if ((!selected && !detail) || answer?.error || answer?.status) return answer;
+        return localize(
+            { get: (name) => req.headers()[name.toLowerCase()] },
+            answer,
+            detail ? `${detail[1] === 'series' ? 'tv' : 'movie'}_${detail[2]}` : null
+        );
+    };
     // The localized-copy endpoint uses the same provider fixture as the list/detail that opened it.
     function rememberCopy(answer, route = '') {
         if (!answer || typeof answer !== 'object') return;
@@ -1106,7 +1131,10 @@ async function mockPanel(page, options = {}) {
                 if (route.request().headers()['x-requested-by'] !== 'notfckbot-panel')
                     return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
                 if (mine.status && mine.body) return route.fulfill({ status: mine.status, json: mine.body });
-                return route.fulfill({ status: 200, json: posters(mine) });
+                return route.fulfill({
+                    status: 200,
+                    json: posters(await prepare(mine, url.pathname, route.request()))
+                });
             }
             // As src/account/guard.js: the rest of the API is for a signed-in admin (posters are open)
             if (!url.pathname.startsWith('/api/poster/')) {
@@ -1135,7 +1163,7 @@ async function mockPanel(page, options = {}) {
             // A handler may pick the status: { status, body }
             if (answer && answer.status && answer.body)
                 return route.fulfill({ status: answer.status, json: answer.body });
-            return route.fulfill({ status: 200, json: posters(answer) });
+            return route.fulfill({ status: 200, json: posters(await prepare(answer, url.pathname, route.request())) });
         }
 
         // A sign-in link from the bot is the panel's own page

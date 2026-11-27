@@ -1,5 +1,4 @@
 import { t as i18nText } from './i18n.js';
-import { rememberTitle } from './catalog-text.js';
 /** Shared search results and preview cards for the admin panel and My subscriptions. */
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
@@ -96,7 +95,6 @@ const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use hre
 
 /** Adapt TMDB's response once; the account API already returns this shape. */
 export function searchItem(r) {
-    rememberTitle(`${r.media_type}_${r.id}`, r.media_type === 'tv' ? r.name || r.title : r.title || r.name);
     const date = r.media_type === 'tv' ? r.first_air_date : r.release_date;
     return {
         tmdbId: `${r.media_type}_${r.id}`,
@@ -167,7 +165,6 @@ export function searchResults(items, { open, series, film }) {
 
 /** The search's Follow sheet: the title card with Notify me for a series, Follow and Cancel */
 export function searchCard(r, { modeName, submit, modal, buttonId = '', titleId = 'mine-card-title' }) {
-    rememberTitle(r.tmdbId, r.title);
     const label = r.added ? i18nText('Following') : i18nText('Follow');
     return titleCard(
         {

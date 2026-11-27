@@ -3,6 +3,7 @@
  * year's recap cards as images.
  */
 const { loadChatStats } = require('../../chat-stats');
+const { sendPanel } = require('../catalog-names');
 const { recapImages } = require('../../recap/render');
 const { z, valid, chatId } = require('../validate');
 const { log } = require('../../log');
@@ -26,7 +27,7 @@ router.get('/api/chat/:chatId/stats', async (req, res) => {
     try {
         const stats = await loadChatStats(params.chatId, period);
         if (!stats) return res.status(404).json({ error: 'Chat not found' });
-        res.json(stats);
+        await sendPanel(req, res, stats);
     } catch (err) {
         log.error(`[Admin] Chat stats for ${params.chatId} failed: ${err.message}`);
         res.status(500).json({ error: err.message });

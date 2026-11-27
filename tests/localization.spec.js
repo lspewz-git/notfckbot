@@ -131,6 +131,7 @@ test('an older catalog reply cannot overwrite the next title card', async ({ pag
     const held = new Promise((resolve) => (release = resolve));
     const panel = await mockPanel(page, {
         role: 'user',
+        titleText: () => ({}),
         contentText: async ({ path }) => {
             if (path.endsWith('/100')) {
                 await held;

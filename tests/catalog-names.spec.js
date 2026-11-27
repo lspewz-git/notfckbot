@@ -4,6 +4,105 @@ const { watchConsole, openSection, openProfilePage, openActions } = require('./h
 
 watchConsole();
 
+async function trackNames(page) {
+    await page.addInitScript(() => {
+        window.__catalogNames = [];
+        new MutationObserver(() => {
+            const node = document.querySelector('#my-subs-body [data-catalog-title="tv_100"]');
+            if (node && window.__catalogNames.at(-1) !== node.textContent) window.__catalogNames.push(node.textContent);
+        }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+}
+
+for (const language of ['en', 'ru'])
+    for (const blocked of [false, true]) {
+        test(
+            language + ': first payload renders one name without browser lookup or storage, blocked=' + blocked,
+            async ({ page }) => {
+                await trackNames(page);
+                await page.addInitScript(
+                    ({ language, blocked }) => {
+                        if (blocked)
+                            Object.defineProperty(window, 'localStorage', {
+                                get() {
+                                    throw new Error('Blocked');
+                                }
+                            });
+                        else {
+                            localStorage.setItem('nfb.language', language);
+                            localStorage.setItem(
+                                'nfb.catalog-names.v1.' + language,
+                                JSON.stringify([['tv_100', 'Stale browser name', Date.now() + 60000]])
+                            );
+                        }
+                    },
+                    { language, blocked }
+                );
+                const panel = await mockPanel(page, { role: 'user', language, titleText: provider });
+                const name = language === 'ru' ? 'Локализованное русское название' : 'The Last of Us';
+                await openSection(page, 'my-subs');
+                const title = page.locator('#my-subs-body [data-catalog-title="tv_100"]');
+                await expect(title).toHaveText(name);
+                await expect(title).not.toHaveAttribute('aria-busy');
+                await expect(title).not.toHaveCSS('color', 'rgba(0, 0, 0, 0)');
+                expect(await page.evaluate(() => window.__catalogNames)).toEqual([name]);
+                expect(panel.account.sent.filter((r) => r.path.includes('/account/content/'))).toEqual([]);
+                await page.reload();
+                await expect(title).toHaveText(name);
+                expect(await page.evaluate(() => window.__catalogNames)).toEqual([name]);
+                expect(panel.account.sent.filter((r) => r.path.includes('/account/content/'))).toEqual([]);
+            }
+        );
+    }
+
+test('a delayed page response inserts the ready name once and card enrichment never renames it', async ({ page }) => {
+    await trackNames(page);
+    let releaseNames;
+    let releaseCopy;
+    const names = new Promise((resolve) => (releaseNames = resolve));
+    const copy = new Promise((resolve) => (releaseCopy = resolve));
+    await mockPanel(page, {
+        role: 'user',
+        language: 'en',
+        titleText: async (request) => {
+            await names;
+            return provider(request);
+        },
+        contentText: async () => {
+            await copy;
+            return { title: 'Unexpected late name', overview: 'Description', genres: '' };
+        }
+    });
+    await openSection(page, 'my-subs');
+    const title = page.locator('#my-subs-body [data-catalog-title="tv_100"]');
+    await expect(title).toHaveCount(0);
+    releaseNames();
+    await expect(title).toHaveText('The Last of Us');
+    await page.locator('#my-subs-body [data-id="tv_100"]').click();
+    await expect(page.locator('#mine-card-body h2')).toHaveText('The Last of Us');
+    releaseCopy();
+    await expect(page.locator('#mine-card-body .tc-copy')).toHaveText('Description');
+    await expect(page.locator('#mine-card-body h2')).toHaveText('The Last of Us');
+    expect(await page.evaluate(() => window.__catalogNames)).toEqual(['The Last of Us']);
+});
+
+test('tracked choices are localized when the picker opens and preserve edited fields', async ({ page }) => {
+    const panel = await mockPanel(page, { language: 'en', titleText: () => ({ title: 'Catalog title' }) });
+    await openSection(page, 'dashboard');
+    await openActions(page);
+    await page.locator('#test-notify-btn').click();
+    await expect(page.locator('#test-notify-modal')).toBeVisible();
+    const select = page.locator('#test-notify-series-select');
+    const selected = await select.inputValue();
+    await expect(select.locator('option').first()).toContainText('Catalog title');
+    await page.locator('#test-notify-season').fill('9');
+    await page.locator('#test-notify-episode').fill('17');
+    await expect(select).toHaveValue(selected);
+    await expect(page.locator('#test-notify-season')).toHaveValue('9');
+    await expect(page.locator('#test-notify-episode')).toHaveValue('17');
+    expect(panel.lastTest).toBeUndefined();
+});
+
 const provider = ({ path, language }) => ({
     title: path.endsWith('/100')
         ? language === 'ru'
@@ -113,177 +212,6 @@ test('admin tables and action sheets use the localized name without changing ids
     await expect(page.locator('#subs-body tr:visible').first()).toContainText('Localized catalog title');
 });
 
-test('an already open Mode dialog follows a late localized name', async ({ page, isMobile }) => {
-    let release;
-    const gate = new Promise((resolve) => (release = resolve));
-    await mockPanel(page, {
-        language: 'en',
-        contentText: async ({ path }) => {
-            if (!path.endsWith('/66732')) return { title: '', overview: '', genres: '' };
-            await gate;
-            return { title: 'Late localized title', overview: 'Copy', genres: '' };
-        }
-    });
-    await openSection(page, 'subs');
-    const row = page
-        .locator('#subs-body tr')
-        .filter({ has: page.locator('[data-action="series"][data-id="66732"]') })
-        .first();
-    if (isMobile) {
-        await row.locator('[data-action="sub-actions"]').click();
-        await page.locator('#sub-action-mode').click();
-    } else await row.locator('[data-action="mode"]').click();
-    await expect(page.locator('#mode-modal')).toBeVisible();
-    release();
-    await expect(page.locator('#mode-target')).toContainText('Late localized title');
-});
-
-test('an already open Unfollow confirmation follows a late localized name', async ({ page }) => {
-    let release;
-    const gate = new Promise((resolve) => (release = resolve));
-    await mockPanel(page, {
-        role: 'user',
-        language: 'en',
-        contentText: async ({ path }) => {
-            if (!path.endsWith('/100')) return { title: '', overview: '', genres: '' };
-            await gate;
-            return { title: 'Late localized title', overview: 'Copy', genres: '' };
-        }
-    });
-    await openSection(page, 'my-subs');
-    await page.locator('#my-subs-body [data-id="tv_100"]').click();
-    await page.locator('#mine-card-body [data-action="mine-ask-unfollow"]').click();
-    await expect(page.locator('#confirm-modal')).toBeVisible();
-    release();
-    await expect(page.locator('#confirm-title')).toContainText('Late localized title');
-});
-
-test('visible name lookups are bounded and share requests with an opened card', async ({ page }) => {
-    let release;
-    const gate = new Promise((resolve) => (release = resolve));
-    let active = 0;
-    let peak = 0;
-    const panel = await mockPanel(page, {
-        role: 'user',
-        language: 'en',
-        contentText: async ({ path }) => {
-            peak = Math.max(peak, ++active);
-            await gate;
-            active--;
-            return { title: `Localized ${path.split('/').pop()}`, overview: 'Copy', genres: '' };
-        }
-    });
-    panel.account.series = Array.from({ length: 12 }, (_, i) => ({
-        ...panel.account.series[0],
-        id: `tv_${100 + i}`,
-        title: `Stored ${i}`
-    }));
-    await openSection(page, 'my-subs');
-    await expect.poll(() => active).toBe(4);
-    await page.locator('#my-subs-body [data-id="tv_100"]').click();
-    release();
-    await expect(page.locator('#mine-card-body h2')).toHaveText('Localized 100');
-    expect(peak).toBe(4);
-    expect(panel.account.sent.filter((r) => r.path === '/api/account/content/tv/100')).toHaveLength(1);
-});
-
-test('a late name updates the tracked-title picker without resetting the selected id or edited episode', async ({
-    page
-}) => {
-    let release;
-    const gate = new Promise((resolve) => (release = resolve));
-    const panel = await mockPanel(page, {
-        language: 'en',
-        contentText: async () => {
-            await gate;
-            return { title: 'Late catalog title', overview: '', genres: '' };
-        }
-    });
-    await openSection(page, 'dashboard');
-    await openActions(page);
-    await page.locator('#test-notify-btn').click();
-    await expect(page.locator('#test-notify-modal')).toBeVisible();
-    const select = page.locator('#test-notify-series-select');
-    const selected = await select.inputValue();
-    await page.locator('#test-notify-season').fill('9');
-    await page.locator('#test-notify-episode').fill('17');
-    const trigger = page.locator('.custom-select:has(#test-notify-series-select) .custom-select-trigger');
-    await trigger.click();
-    release();
-    await expect(trigger).toContainText('Late catalog title');
-    await expect(page.locator('.custom-select-option').first()).toContainText('Late catalog title');
-    await expect(select).toHaveValue(selected);
-    await expect(page.locator('#test-notify-season')).toHaveValue('9');
-    await expect(page.locator('#test-notify-episode')).toHaveValue('17');
-    expect(panel.lastTest).toBeUndefined();
-});
-
-test('a hidden page stops its queued name lookups and resumes after a cached-page restore', async ({ page }) => {
-    let release;
-    const gate = new Promise((resolve) => (release = resolve));
-    let requests = 0;
-    let active = 0;
-    const panel = await mockPanel(page, {
-        role: 'user',
-        language: 'en',
-        contentText: async ({ path }) => {
-            requests++;
-            active++;
-            await gate;
-            active--;
-            return { title: `Localized ${path.split('/').pop()}`, overview: '', genres: '' };
-        }
-    });
-    panel.account.series = Array.from({ length: 12 }, (_, i) => ({
-        ...panel.account.series[0],
-        id: `tv_${100 + i}`,
-        title: `Stored ${i}`
-    }));
-    await openSection(page, 'my-subs');
-    await expect.poll(() => active).toBe(4);
-    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
-    release();
-    await expect.poll(() => active).toBe(0);
-    await page.waitForTimeout(150);
-    expect(requests).toBe(4);
-    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
-    await expect.poll(() => requests).toBeGreaterThan(4);
-    await expect(page.locator('#my-subs-body [data-catalog-title="tv_104"]')).toHaveText('Localized 104');
-});
-
-test('a cancelled navigation resumes queued names on the next interaction', async ({ page }) => {
-    let release;
-    const gate = new Promise((resolve) => (release = resolve));
-    let requests = 0;
-    let active = 0;
-    const panel = await mockPanel(page, {
-        role: 'user',
-        language: 'en',
-        contentText: async ({ path }) => {
-            requests++;
-            active++;
-            await gate;
-            active--;
-            return { title: `Localized ${path.split('/').pop()}`, overview: '', genres: '' };
-        }
-    });
-    panel.account.series = Array.from({ length: 12 }, (_, i) => ({
-        ...panel.account.series[0],
-        id: `tv_${100 + i}`,
-        title: `Stored ${i}`
-    }));
-    await openSection(page, 'my-subs');
-    await expect.poll(() => active).toBe(4);
-    await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')));
-    release();
-    await expect.poll(() => active).toBe(0);
-    await page.waitForTimeout(150);
-    expect(requests).toBe(4);
-    await page.keyboard.press('Shift');
-    await expect.poll(() => requests).toBeGreaterThan(4);
-    await expect(page.locator('#my-subs-body [data-catalog-title="tv_104"]')).toHaveText('Localized 104');
-});
-
 test('a failed name lookup keeps the stored title', async ({ page }) => {
     const panel = await mockPanel(page, {
         role: 'user',
@@ -292,6 +220,7 @@ test('a failed name lookup keeps the stored title', async ({ page }) => {
     });
     await openSection(page, 'my-subs');
     await expect(page.locator('#my-subs-body [data-catalog-title="tv_100"]')).toHaveText(panel.account.series[0].title);
+    await expect(page.locator('#my-subs-body [data-catalog-title="tv_100"]')).not.toHaveAttribute('aria-busy');
     await page.locator('#my-subs-body [data-id="tv_100"]').click();
     await expect(page.locator('#mine-card-body [data-localized="failed"]')).toBeVisible();
     await expect(page.locator('#mine-card-body h2')).toHaveText(panel.account.series[0].title);

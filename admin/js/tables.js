@@ -1,5 +1,4 @@
 import { t as i18nText } from './i18n.js';
-import { warmTitles } from './catalog-text.js';
 /** The three data tables on screen: tabs, the filter, placeholders and rendering the rows. */
 
 import { $, $field, all, escapeHtml } from './dom.js';
@@ -108,22 +107,11 @@ export function applyTableFilter(type) {
 }
 
 export function setupFilters() {
-    window.addEventListener('catalog-names-ready', () => {
-        for (const type of Object.keys(TABLES)) applyTableFilter(type);
-    });
     Object.entries(TABLES).forEach(([type, { filter }]) => {
         const el = $(filter);
         if (el)
             el.oninput = () => {
                 resetPage(type);
-                const query = /** @type {HTMLInputElement} */ (el).value.trim();
-                if (query)
-                    warmTitles(
-                        (lastData[type] || []).map((item) => item.seriesId || item.tmdb_id),
-                        () =>
-                            /** @type {HTMLInputElement} */ (el).value.trim() === query &&
-                            el.getClientRects().length > 0
-                    );
                 applyTableFilter(type);
             };
     });
