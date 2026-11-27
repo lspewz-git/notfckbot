@@ -3,7 +3,7 @@
  * (src/recap/backgrounds.js) and the finished sets kept on disk (src/recap/store.js).
  */
 const multer = require('multer');
-const { Chat, Subscription } = require('../../db');
+const { Chat, Subscription, Watchlist } = require('../../db');
 const backgrounds = require('../../recap/backgrounds');
 const store = require('../../recap/store');
 const render = require('../../recap/render');
@@ -50,7 +50,13 @@ const png = (res, bytes, cache = 'no-store') => {
 /** A chat to draw the picker's preview for: one already drawn that year, else any that follows something. */
 async function sampleChat(year) {
     const [set] = await store.listSets(year);
-    const id = set ? set.chatId : ((await Subscription.findOne({ attributes: ['chatId'], raw: true })) || {}).chatId;
+    const id = set
+        ? set.chatId
+        : (
+              (await Subscription.findOne({ attributes: ['chatId'], raw: true })) ||
+              (await Watchlist.findOne({ attributes: ['chatId'], raw: true })) ||
+              {}
+          ).chatId;
     if (!id) return null;
     const chat = await Chat.findByPk(id);
     return chat ? { id: String(chat.id), name: chat.username || String(chat.id) } : null;

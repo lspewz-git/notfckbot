@@ -1,3 +1,5 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
 /**
  * Signing in with a password (src/account/password.js): the form on the sign-in screen, the
  * "Sign-in methods" group on Account settings, the Password sheet (its state, Change, Remove) and the
@@ -22,7 +24,13 @@ export const signedInUser = () => me;
 /** A password field with a borderless show/hide button inside its right edge. */
 const passwordField = (id, autocomplete, label) =>
     `<div class="password-input"><input id="${id}" class="input-field" type="password" autocomplete="${autocomplete}" maxlength="128" aria-label="${label}" />` +
-    `<button type="button" class="password-toggle" data-action="password-show" data-for="${id}" aria-label="Show password" aria-pressed="false">${PASSWORD_EYE}</button></div>`;
+    ('<button type="button" class="password-toggle" data-action="password-show" data-for="' +
+        id +
+        '" aria-label="' +
+        i18nText('Show password') +
+        '" aria-pressed="false">' +
+        PASSWORD_EYE +
+        '</button></div>');
 
 /**
  * A sign-in screen's error: the icon and the text on the danger fill (hidden while empty).
@@ -45,16 +53,22 @@ export function setLoginAlert(id, text) {
 /** The sign-in form (session.js draws the screen around it); the system account signs in here too. */
 export const signInForm = () =>
     '<form class="login-form" data-login="password" novalidate>' +
-    '<label class="login-label" for="login-name">Telegram username or ID</label>' +
-    '<input id="login-name" class="input-field" name="login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="@username or ID" maxlength="64" />' +
-    '<label class="login-label" for="login-pass">Password</label>' +
-    passwordField('login-pass', 'current-password', 'Password') +
-    '<p class="login-note">Forgot it? Sign in with Telegram and set a new one in Account settings.</p>' +
+    ('<label class="login-label" for="login-name">' + i18nText('Telegram username or ID') + '</label>') +
+    ('<input id="login-name" class="input-field" name="login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="' +
+        i18nText('@username or ID') +
+        '" maxlength="64" />') +
+    ('<label class="login-label" for="login-pass">' + i18nText('Password') + '</label>') +
+    passwordField('login-pass', 'current-password', i18nText('Password')) +
+    ('<p class="login-note">' +
+        i18nText('Forgot it? Sign in with Telegram and set a new one in Account settings.') +
+        '</p>') +
     loginAlert('login-pass-error') +
     '<div class="login-actions"><button type="submit" class="btn btn-primary" disabled>' +
     '<svg class="icon login-spin" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-loader-circle" /></svg>' +
-    '<span>Sign in</span></button>' +
-    '<button type="button" class="login-text-btn" data-action="login-cancel">Use another way</button></div>' +
+    ('<span>' + i18nText('Sign in') + '</span></button>') +
+    ('<button type="button" class="login-text-btn" data-action="login-cancel">' +
+        i18nText('Use another way') +
+        '</button></div>') +
     '</form>';
 
 /** Sign in waits for both fields, and for the answer to the last press. */
@@ -107,12 +121,11 @@ export function setMe(user) {
     renderSignIn();
 }
 
-const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 // "3 Nov", or with the year when it isn't this one
-const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
-const dayMonthYear = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const dayMonth = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' });
+const dayMonthYear = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 const changedDay = (iso) => {
     const at = new Date(iso);
     if (Number.isNaN(at.getTime())) return '';
@@ -122,8 +135,8 @@ const changedDay = (iso) => {
 /** "● On" in green, or a quiet "Off": the password's one state signal */
 const passwordState = (on) =>
     on
-        ? '<span class="row-status"><span class="status-dot" aria-hidden="true"></span>On</span>'
-        : '<span class="row-status row-status-off">Off</span>';
+        ? '<span class="row-status"><span class="status-dot" aria-hidden="true"></span>' + i18nText('On') + '</span>'
+        : '<span class="row-status row-status-off">' + i18nText('Off') + '</span>';
 
 /** Account settings → Sign-in methods: Telegram (always connected) and the password, which opens its sheet */
 function renderSignIn() {
@@ -132,25 +145,43 @@ function renderSignIn() {
     if (me.system) {
         // The local account's password lives in Settings → Panel access: its dialog, no sheet
         holder.innerHTML =
-            '<h2 class="group-title">Sign-in methods</h2><ul class="group-list">' +
+            '<h2 class="group-title">' +
+            i18nText('Sign-in methods') +
+            '</h2><ul class="group-list">' +
             '<li><button type="button" class="group-row" data-action="access-system-password" aria-haspopup="dialog">' +
             `<span class="row-tile">${icon('key-round')}</span>` +
-            '<span class="row-text"><span class="row-name">Password</span><span class="row-meta">Signs in the local account</span></span>' +
+            ('<span class="row-text"><span class="row-name">' +
+                i18nText('Password') +
+                '</span><span class="row-meta">' +
+                i18nText('Signs in the local account') +
+                '</span></span>') +
             `${passwordState(true)}<span class="row-chevron">${icon('chevron-right')}</span></button></li></ul>`;
         return;
     }
     const changed = me.changedAt ? changedDay(me.changedAt) : '';
-    const meta = me.hasPassword ? (changed ? `Changed ${changed}` : 'Set') : 'Not set';
+    const meta = me.hasPassword
+        ? changed
+            ? i18nText('Changed {{v0}}', { v0: changed })
+            : i18nText('Set')
+        : i18nText('Not set');
     holder.innerHTML =
-        '<h2 class="group-title">Sign-in methods</h2><ul class="group-list">' +
+        '<h2 class="group-title">' +
+        i18nText('Sign-in methods') +
+        '</h2><ul class="group-list">' +
         `<li><div class="group-row group-row-static"><span class="row-tile">${icon('send')}</span>` +
         '<span class="row-text"><span class="row-name">Telegram</span></span>' +
-        '<span class="row-status"><span class="status-dot" aria-hidden="true"></span>Connected</span></div></li>' +
+        ('<span class="row-status"><span class="status-dot" aria-hidden="true"></span>' +
+            i18nText('Connected') +
+            '</span></div></li>') +
         `<li><button type="button" class="group-row" data-action="password-open" aria-haspopup="dialog">` +
         `<span class="row-tile">${icon('key-round')}</span>` +
-        `<span class="row-text"><span class="row-name">Password</span><span class="row-meta">${meta}</span></span>` +
+        ('<span class="row-text"><span class="row-name">' +
+            i18nText('Password') +
+            '</span><span class="row-meta">' +
+            meta +
+            '</span></span>') +
         `${passwordState(me.hasPassword)}<span class="row-chevron">${icon('chevron-right')}</span></button></li></ul>` +
-        '<p class="group-help">A password lets you sign in when Telegram isn’t responding.</p>';
+        ('<p class="group-help">' + i18nText('A password lets you sign in when Telegram isn’t responding.') + '</p>');
 }
 
 // --- The Password sheet: its state, Change, Remove (removal only here, never on the page) ---
@@ -161,16 +192,26 @@ let removing = false;
 function sheetHtml() {
     const changed = me.changedAt ? changedDay(me.changedAt) : '';
     return (
-        `<button type="button" class="sheet-close" data-close="password-sheet" aria-label="Close">${icon('x')}</button>` +
+        '<button type="button" class="sheet-close" data-close="password-sheet" aria-label="' +
+        i18nText('Close') +
+        '">' +
+        icon('x') +
+        '</button>' +
         `<div class="sheet-head"><span class="row-tile row-tile-xl">${icon('key-round')}</span>` +
-        '<h2 id="password-sheet-title">Password</h2>' +
+        ('<h2 id="password-sheet-title">' + i18nText('Password') + '</h2>') +
         '<p class="sheet-state"><span class="status-dot" aria-hidden="true"></span>' +
-        `<span><span class="sheet-state-on">On</span>${changed ? ` · changed ${changed}` : ''}</span></p>` +
-        '<p class="sheet-text">Use it to sign in when Telegram isn’t responding.</p></div>' +
+        ('<span><span class="sheet-state-on">' +
+            i18nText('On') +
+            '</span>' +
+            (changed ? ' ' + i18nText('· changed {{v0}}', { v0: changed }) : '') +
+            '</span></p>') +
+        ('<p class="sheet-text">' + i18nText('Use it to sign in when Telegram isn’t responding.') + '</p></div>') +
         '<p class="sheet-error" id="password-sheet-error" role="alert" hidden></p>' +
-        '<button type="button" class="sheet-btn-primary" data-action="password-change">Change password</button>' +
-        `<button type="button" class="sheet-btn-danger-soft" data-action="password-remove-own"${removing ? ' disabled aria-busy="true"' : ''}>${removing ? 'Removing…' : 'Remove password'}</button>` +
-        '<p class="sheet-note">After removal you can only sign in with Telegram.</p>'
+        ('<button type="button" class="sheet-btn-primary" data-action="password-change">' +
+            i18nText('Change password') +
+            '</button>') +
+        `<button type="button" class="sheet-btn-danger-soft" data-action="password-remove-own"${removing ? ' disabled aria-busy="true"' : ''}>${removing ? 'Removing…' : i18nText('Remove password')}</button>` +
+        ('<p class="sheet-note">' + i18nText('After removal you can only sign in with Telegram.') + '</p>')
     );
 }
 
@@ -195,7 +236,7 @@ function setRemoving(on) {
     if (!button) return;
     button.disabled = on;
     button.toggleAttribute('aria-busy', on);
-    button.textContent = on ? 'Removing…' : 'Remove password';
+    button.textContent = on ? 'Removing…' : i18nText('Remove password');
 }
 
 /**
@@ -233,7 +274,7 @@ export function openPasswordDialog({ title, sub, hint, save }) {
     }
     for (const button of document.querySelectorAll('#password-modal [data-action="password-show"]')) {
         button.setAttribute('aria-pressed', 'false');
-        button.setAttribute('aria-label', 'Show password');
+        button.setAttribute('aria-label', i18nText('Show password'));
     }
     showError('');
     openModal('password-modal');
@@ -243,9 +284,11 @@ export function openPasswordDialog({ title, sub, hint, save }) {
 function openOwn() {
     if (!me) return;
     openPasswordDialog({
-        title: me.hasPassword ? 'Change password' : 'Set a password',
-        sub: "For signing in when Telegram isn't answering, with your @username or ID.",
-        hint: 'At least 8 characters. A change signs you out on your other devices; the bot tells you about it.',
+        title: me.hasPassword ? i18nText('Change password') : i18nText('Set a password'),
+        sub: i18nText("For signing in when Telegram isn't answering, with your @username or ID."),
+        hint: i18nText(
+            'At least 8 characters. A change signs you out on your other devices; the bot tells you about it.'
+        ),
         save: async (password) => {
             const who = me;
             const changed = me.hasPassword;
@@ -255,7 +298,7 @@ function openOwn() {
             me.hasPassword = true;
             me.changedAt = result.passwordChangedAt || null;
             renderSignIn();
-            toast(changed ? 'Password changed' : 'Password set', 'success');
+            toast(changed ? i18nText('Password changed') : i18nText('Password set'), 'success');
         }
     });
 }
@@ -268,8 +311,8 @@ function showError(text) {
 
 async function save(form) {
     const password = $field('password-new').value;
-    if (password.length < MIN_LENGTH) return showError(`At least ${MIN_LENGTH} characters.`);
-    if (password !== $field('password-again').value) return showError("The passwords don't match.");
+    if (password.length < MIN_LENGTH) return showError(i18nText('At least {{v0}} characters.', { v0: MIN_LENGTH }));
+    if (password !== $field('password-again').value) return showError(i18nText("The passwords don't match."));
     const button = /** @type {HTMLButtonElement} */ (form.querySelector('[type="submit"]'));
     button.disabled = true;
     try {
@@ -286,10 +329,10 @@ async function save(form) {
 function removeOwn() {
     if (removing || !me?.hasPassword) return;
     showConfirm({
-        title: 'Remove password?',
-        text: 'You’ll only be able to sign in with Telegram.',
-        confirmLabel: 'Remove',
-        cancelLabel: 'Cancel',
+        title: i18nText('Remove password?'),
+        text: i18nText('You’ll only be able to sign in with Telegram.'),
+        confirmLabel: i18nText('Remove'),
+        cancelLabel: i18nText('Cancel'),
         onConfirm: async () => {
             if (removing) return;
             const who = me;
@@ -305,7 +348,7 @@ function removeOwn() {
                 closeModal('password-sheet');
                 renderSignIn();
                 refocusRow();
-                toast('Password removed', 'success');
+                toast(i18nText('Password removed'), 'success');
             } catch (err) {
                 setRemoving(false);
                 // The sheet stays open with the reason (a device signed in today may not remove it)
@@ -332,15 +375,15 @@ export const passwordActions = {
         const show = field.type === 'password';
         field.type = show ? 'text' : 'password';
         el.setAttribute('aria-pressed', String(show));
-        el.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        el.setAttribute('aria-label', show ? i18nText('Hide password') : i18nText('Show password'));
     }
 };
 
 /** The dialog's form; the sign-in form is session.js's. */
 export function setupPassword() {
     // The same field as the sign-in form's, drawn into the placeholders that hold its id
-    $('password-new').outerHTML = passwordField('password-new', 'new-password', 'New password');
-    $('password-again').outerHTML = passwordField('password-again', 'new-password', 'Repeat it');
+    $('password-new').outerHTML = passwordField('password-new', 'new-password', i18nText('New password'));
+    $('password-again').outerHTML = passwordField('password-again', 'new-password', i18nText('Repeat it'));
     $('password-form').addEventListener('submit', (event) => {
         event.preventDefault();
         save(event.target);

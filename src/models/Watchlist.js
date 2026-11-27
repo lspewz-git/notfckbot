@@ -34,6 +34,8 @@ const Watchlist = sequelize.define('Watchlist', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    // A planned date alone does not confirm that the film has come out.
+    release_status: { type: DataTypes.STRING, allowNull: true },
     // The film's known digital date and country, kept by the check; Kinopoisk once a day,
     // the premiere in Russia, the online release there and its cinemas ("Okko, START")
     digital_date: { type: DataTypes.STRING(10), allowNull: true },

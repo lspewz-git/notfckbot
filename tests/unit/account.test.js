@@ -20,6 +20,7 @@ const {
     PanelRole,
     HiddenChat,
     TermsAcceptance,
+    AccountPreference,
     Chat,
     Watchlist,
     Subscription
@@ -59,6 +60,9 @@ function deviceMatch(row, where) {
 }
 
 beforeEach(() => {
+    const preferences = new Map();
+    mock.method(AccountPreference, 'findByPk', async (id) => preferences.get(String(id)) || null);
+    mock.method(AccountPreference, 'upsert', async (row) => preferences.set(String(row.userId), { ...row }));
     mock.method(sequelize, 'transaction', async (options, run = options) => run({ LOCK: { UPDATE: 'UPDATE' } }));
     mock.method(require('../../src/api/kinopoisk'), 'knownKinopoiskId', () => null);
     savedEnv = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
@@ -564,11 +568,12 @@ async function serve(bot, { trustLoopback = false } = {}) {
     const server = app.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const call = (method, path, { body, cookie, device, raw, address, https, ua } = {}) =>
+    const call = (method, path, { body, cookie, device, raw, address, https, ua, language } = {}) =>
         fetch(`${base}${path}`, {
             method,
             headers: {
                 'X-Requested-By': 'notfckbot-panel',
+                ...(language ? { 'X-Panel-Language': language } : {}),
                 ...(ua ? { 'User-Agent': ua } : {}),
                 ...(https ? { 'X-Forwarded-Proto': 'https' } : {}),
                 ...(address ? { 'X-Forwarded-For': address } : {}),
@@ -599,6 +604,50 @@ async function signIn(call, userId) {
     assert.match(cookie, /SameSite=Lax/);
     return /nfb_session=([^;]+)/.exec(cookie)[1];
 }
+
+test('language preference belongs to the signed-in account and persists across sessions', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const user = await signIn(call, 7);
+    const other = await signIn(call, 8);
+    const path = '/api/account/preferences';
+    assert.equal((await call('PATCH', path, { body: { language: 'ru' } })).status, 401);
+    assert.equal((await call('PATCH', path, { cookie: user, body: { language: 'fr' } })).status, 400);
+    assert.equal((await call('PATCH', path, { cookie: user, body: { language: 'ru', userId: '8' } })).status, 400);
+    assert.deepEqual((await call('PATCH', path, { cookie: user, body: { language: 'ru' } })).body, { language: 'ru' });
+    const newSession = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/account/me', { cookie: newSession })).body.user.language, 'ru');
+    assert.equal((await call('GET', '/api/account/me', { cookie: other })).body.user.language, 'auto');
+    await call('PATCH', path, { cookie: newSession, body: { language: 'auto' } });
+    assert.equal((await call('GET', '/api/account/me', { cookie: user })).body.user.language, 'auto');
+    process.env.SYSTEM_PASSWORD_HASH = await password.hashPassword('system-pass');
+    const system = await auth.startSession({ userId: '0', userName: 'admin' });
+    assert.equal((await call('PATCH', path, { cookie: system, body: { language: 'en' } })).status, 200);
+    assert.equal((await call('GET', '/api/account/me', { cookie: system })).body.user.language, 'en');
+});
+
+test('localized catalog copy requires a session, validates ids and passes only supported locales', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const requests = [];
+    t.mock.method(require('../../src/api/tmdb'), 'getPanelText', async (...args) => {
+        requests.push(args);
+        return { overview: 'Localized copy', genres: 'Drama' };
+    });
+    const path = '/api/account/content/tv/123';
+    assert.equal((await call('GET', path)).status, 401);
+    const cookie = await signIn(call, 7);
+    assert.equal((await call('GET', '/api/account/content/tv/123abc', { cookie })).status, 400);
+    assert.equal((await call('GET', '/api/account/content/person/123', { cookie })).status, 400);
+    assert.equal((await call('GET', path, { cookie, language: 'en' })).body.overview, 'Localized copy');
+    await call('GET', path, { cookie, language: 'ru' });
+    await call('GET', path, { cookie, language: 'fr' });
+    assert.deepEqual(requests, [
+        ['123', 'tv', 'en-US'],
+        ['123', 'tv', 'ru-RU'],
+        ['123', 'tv', 'en-US']
+    ]);
+});
 
 test('Mini App sign-in checks HTTPS, signature, freshness and the panel role', async (t) => {
     const used = new Set();
@@ -857,7 +906,8 @@ test('the API: a session for everything but signing in; the panel itself for adm
         role: 'user',
         hasPassword: false,
         passwordChangedAt: null,
-        system: false
+        system: false,
+        language: 'auto'
     });
     assert.deepEqual((await call('GET', '/api/account/chats', { cookie: user })).body, { chats: [], partial: false });
 
@@ -1881,7 +1931,8 @@ test('the API: the system account has no chats and no own password here, its pas
         role: 'admin',
         hasPassword: true,
         passwordChangedAt: null,
-        system: true
+        system: true,
+        language: 'auto'
     });
     assert.deepEqual((await call('GET', '/api/account/chats', { cookie: token })).body, { chats: [], partial: false });
     const own = await call('PUT', '/api/account/password', { cookie: token, body: { password: 'long-enough' } });

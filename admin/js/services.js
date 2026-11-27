@@ -1,3 +1,5 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
 /**
  * The dialog behind the TG / TMDB / TVmaze / KP health badges: status, quota, the masked
  * current token (with a pencil to replace it; none for TVmaze) and a link to the status page.
@@ -42,7 +44,7 @@ function setStatusLink(url, label) {
     link.style.visibility = url ? '' : 'hidden';
     if (!url) return;
     link.href = url;
-    link.firstChild.textContent = `${label || 'Status page'} `;
+    link.firstChild.textContent = `${label || i18nText('Status page')} `;
 }
 
 /** Save is only possible while a new token is being typed in. */
@@ -74,12 +76,12 @@ function renderInfo(info) {
     setText('service-title', info.label);
     setKeyless(Boolean(info.keyless));
     $('service-current').classList.remove('is-loading');
-    setText('service-current', info.masked || 'not set');
+    setText('service-current', info.masked || i18nText('not set'));
     setStatusLink(info.statusUrl, info.statusLabel);
     setHint(info.restartOnChange);
     if (!info.configured) {
         // Nothing to check without a token
-        setText('service-state', 'Not configured');
+        setText('service-state', i18nText('Not configured'));
         $('service-state').className = 'modal-sub';
         renderDetails([]);
     }
@@ -95,7 +97,7 @@ function renderCheck(check, health = null) {
     if (!check.configured) return;
     const state = $('service-state');
     if (check.ok) {
-        state.textContent = '● Working';
+        state.textContent = i18nText('● Working');
         state.className = 'modal-sub state-ok';
         renderDetails(check.details || []);
         return;
@@ -104,14 +106,20 @@ function renderCheck(check, health = null) {
     // no status: it didn't answer (down or unreachable)
     const { status } = check;
     state.textContent =
-        status === 401 || status === 403 ? '● Token rejected' : status ? '● Service error' : '● Not responding';
+        status === 401 || status === 403
+            ? i18nText('● Token rejected')
+            : status
+              ? i18nText('● Service error')
+              : i18nText('● Not responding');
     state.className = 'modal-sub state-error';
     // The reason goes where the details would be, two rows like the loading placeholder,
     // so the dialog keeps its height
     const problem = health && health.problem;
     renderDetails([
-        ['Error', check.checkError || 'unreachable'],
-        problem ? ['Failing', sinceText(problem)] : ['Checked', new Date().toLocaleTimeString('en-GB')]
+        [i18nText('Error'), check.checkError || 'unreachable'],
+        problem
+            ? [i18nText('Failing'), sinceText(problem)]
+            : [i18nText('Checked'), new Date().toLocaleTimeString(locale)]
     ]);
 }
 
@@ -120,8 +128,10 @@ const setHint = (restarts) =>
     setText(
         'service-hint',
         restarts
-            ? 'The token is checked with Telegram, then saved to .env. Saving restarts the bot: it is offline for a few seconds.'
-            : 'The token is checked with the service, then saved to .env and used straight away.'
+            ? i18nText(
+                  'The token is checked with Telegram, then saved to .env. Saving restarts the bot: it is offline for a few seconds.'
+              )
+            : i18nText('The token is checked with the service, then saved to .env and used straight away.')
     );
 
 /**
@@ -171,7 +181,7 @@ export async function openServiceModal(name, known = {}) {
             // The panel's own request failed: keep what the badge knew
             $('service-current').classList.remove('is-loading');
             setText('service-current', 'unknown');
-            setText('service-state', `Could not load: ${e.message}`);
+            setText('service-state', i18nText('Could not load: {{v0}}', { v0: e.message }));
             $('service-state').className = 'modal-sub state-error';
             renderDetails([]);
             return null;
@@ -203,24 +213,24 @@ export async function saveServiceToken() {
 
     const btn = saveBtn();
     btn.disabled = true;
-    btn.textContent = 'Checking…';
+    btn.textContent = i18nText('Checking…');
     try {
         const res = await api(`/services/${current}`, { method: 'POST', body: { token } });
         if (res.restarting) {
-            toast('Token saved. The bot is restarting — back in a few seconds.', 'success');
+            toast(i18nText('Token saved. The bot is restarting — back in a few seconds.'), 'success');
             closeModal('service-modal');
             return;
         }
         if (res.restartPending) {
             toast(
-                'Token saved. An update check is about to run: restart the bot in Settings afterwards.',
+                i18nText('Token saved. An update check is about to run: restart the bot in Settings afterwards.'),
                 'warning',
                 8000
             );
             closeModal('service-modal');
             return;
         }
-        toast('Token saved', 'success');
+        toast(i18nText('Token saved'), 'success');
         const link = /** @type {HTMLAnchorElement} */ ($('service-status-link'));
         await openServiceModal(current, {
             label: $('service-title').textContent,
@@ -231,7 +241,7 @@ export async function saveServiceToken() {
     } catch (e) {
         toast(e.message, 'error');
     } finally {
-        btn.textContent = 'Save token';
+        btn.textContent = i18nText('Save token');
         syncSave();
     }
 }

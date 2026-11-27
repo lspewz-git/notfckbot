@@ -1,3 +1,5 @@
+import { locale, language } from './i18n.js';
+import { t as i18nText } from './i18n.js';
 /**
  * A chat's change log (src/chat-changes.js): who changed its list or settings, from where and when,
  * with a search and pages. The panel shows it in a dialog (English), a group's admins under its
@@ -12,51 +14,30 @@ import { PAGE_SIZES } from './pager.js';
 const SIZE_KEY = 'admin.pageSize.changes';
 
 const WORDS = {
-    en: {
-        locale: 'en-GB',
-        search: 'Search by title or name',
-        rows: 'Rows per page',
-        of: 'of',
-        prev: 'Previous page',
-        next: 'Next page',
-        empty: 'No changes',
-        nothingFound: 'Nothing found',
-        failed: 'Failed to load',
-        kept: (days) => `Kept for ${days} days`,
-        source: { panel: 'panel', account: 'account', bot: '' },
-        modes: { episode: 'every episode', season: 'whole season', first_and_full: '1st + season' },
-        line: {
-            subscribed: (t) => `Subscribed: ${t}`,
-            mode: (t, mode) => `${t}: now ${mode}`,
-            unsubscribed: (t) => `Unsubscribed: ${t}`,
-            film_added: (t) => `Film added: ${t}`,
-            film_removed: (t) => `Film removed: ${t}`,
-            bot_on: () => 'Bot added or started',
-            bot_off: () => 'Bot removed or stopped'
-        }
+    locale,
+    search: i18nText('Search by title or name'),
+    rows: i18nText('Rows per page'),
+    of: i18nText('of'),
+    prev: i18nText('Previous page'),
+    next: i18nText('Next page'),
+    empty: i18nText('No changes'),
+    nothingFound: i18nText('Nothing found'),
+    failed: i18nText('Failed to load'),
+    kept: (days) => i18nText('Kept for {{v0}} days', { v0: days }),
+    source: { panel: i18nText('panel'), account: i18nText('account'), bot: '' },
+    modes: {
+        episode: i18nText('every episode'),
+        season: i18nText('whole season'),
+        first_and_full: i18nText('1st + season')
     },
-    ru: {
-        locale: 'ru-RU',
-        search: 'Поиск по названию или имени',
-        rows: 'Строк на странице',
-        of: 'из',
-        prev: 'Назад',
-        next: 'Дальше',
-        empty: 'Изменений пока нет',
-        nothingFound: 'Ничего не нашлось',
-        failed: 'Не удалось загрузить',
-        kept: (days) => `Хранится ${days} дн.`,
-        source: { panel: 'панель', account: 'сайт', bot: '' },
-        modes: { episode: 'каждая серия', season: 'весь сезон', first_and_full: '1-я + сезон' },
-        line: {
-            subscribed: (t) => `Подписка: ${t}`,
-            mode: (t, mode) => `${t}: теперь ${mode}`,
-            unsubscribed: (t) => `Отписка: ${t}`,
-            film_added: (t) => `Фильм добавлен: ${t}`,
-            film_removed: (t) => `Фильм убран: ${t}`,
-            bot_on: () => 'Бота добавили или запустили',
-            bot_off: () => 'Бота убрали или остановили'
-        }
+    line: {
+        subscribed: (t) => i18nText('Subscribed: {{v0}}', { v0: t }),
+        mode: (t, mode) => i18nText('{{v0}}: now {{v1}}', { v0: t, v1: mode }),
+        unsubscribed: (t) => i18nText('Unsubscribed: {{v0}}', { v0: t }),
+        film_added: (t) => i18nText('Film added: {{v0}}', { v0: t }),
+        film_removed: (t) => i18nText('Film removed: {{v0}}', { v0: t }),
+        bot_on: () => i18nText('Bot added or started'),
+        bot_off: () => i18nText('Bot removed or stopped')
     }
 };
 
@@ -75,8 +56,46 @@ const views = new Map();
 const loaders = new WeakMap();
 
 /** What happened, in words; a settings row has its own line already (in Russian, as the bot says it). */
+const SETTING_COPY = {
+    'Тихие часы': i18nText('Quiet hours'),
+    'Часовой пояс': i18nText('Time zone'),
+    'Сводка недели': i18nText('Weekly digest'),
+    'Сводка месяца': i18nText('Monthly digest'),
+    'Цифровые релизы': i18nText('Digital releases'),
+    'Кнопки бота нажимают': i18nText('Buttons pressed by'),
+    'Нижнее меню': i18nText('Bottom menu')
+};
+const SETTING_VALUES = {
+    выключены: 'off',
+    выключена: 'off',
+    выключено: 'off',
+    включено: 'on',
+    'по понедельникам в 10:00': i18nText('Mondays at 10:00'),
+    '1-го числа в 10:00': i18nText('On the 1st at 10:00'),
+    присылать: 'on',
+    'не присылать': 'off',
+    'все участники': i18nText('Every member'),
+    'только тот, кто их вызвал': i18nText('Whoever called them')
+};
+// Historical settings events contain only these bot-generated words. Never scan titles or user names.
+function settingLine(line) {
+    if (language === 'ru') return line;
+    const split = line.indexOf(': ');
+    const name = SETTING_COPY[line.slice(0, split)];
+    if (!name) return line;
+    return (
+        name +
+        ': ' +
+        line
+            .slice(split + 2)
+            .split(' → ')
+            .map((value) => SETTING_VALUES[value] || value)
+            .join(' → ')
+    );
+}
+
 function lineOf(row, words) {
-    if (row.kind === 'settings') return row.title || row.detail || '';
+    if (row.kind === 'settings') return settingLine(row.title || row.detail || '');
     const make = words.line[row.kind];
     const title = row.title || '—';
     if (!make) return title;
@@ -137,8 +156,8 @@ function frame(root, view, words) {
  * @param {HTMLElement} root
  * @param {{ path: string, lang?: 'en' | 'ru' }} options path: the API path without ?…
  */
-export function showChanges(root, { path, lang = 'en' }) {
-    const words = WORDS[lang];
+export function showChanges(root, { path }) {
+    const words = WORDS;
     if (!views.has(path)) views.set(path, { page: 1, q: '' });
     const view = views.get(path);
     let asked = 0;

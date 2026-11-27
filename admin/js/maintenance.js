@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /** Operations that affect everyone at once: update check, broadcast. */
 
 import { $field } from './dom.js';
@@ -10,16 +11,16 @@ export function triggerCheck() {
     closeModal('actions-modal');
     setReturnTo(() => openModal('actions-modal'));
     showConfirm({
-        title: 'Run update check?',
-        text: 'Check for updates now and send any new notifications to subscribed chats.',
-        confirmLabel: 'Run check',
-        cancelLabel: 'Cancel',
+        title: i18nText('Run update check?'),
+        text: i18nText('Check for updates now and send any new notifications to subscribed chats.'),
+        confirmLabel: i18nText('Run check'),
+        cancelLabel: i18nText('Cancel'),
         onConfirm: async () => {
             try {
                 await api('/trigger-check', { method: 'POST' });
-                toast('Update check triggered', 'success');
+                toast(i18nText('Update check triggered'), 'success');
             } catch (e) {
-                toast('Failed to trigger: ' + e.message, 'error');
+                toast(i18nText('Failed to trigger:') + ' ' + e.message, 'error');
             }
         }
     });
@@ -36,33 +37,38 @@ export function openBroadcastModal() {
 
 export function sendBroadcast() {
     const message = $field('broadcast-msg').value.trim();
-    if (!message) return toast('Enter a message first', 'warning');
+    if (!message) return toast(i18nText('Enter a message first'), 'warning');
 
     const target = $field('broadcast-target').value;
 
     showConfirm({
-        title: '📢 Send broadcast?',
-        text: `This sends the message to ${BROADCAST_AUDIENCE_LABELS[target]}. Delivery cannot be undone or recalled.`,
-        confirmLabel: 'Yes, send',
-        cancelLabel: 'No, cancel',
+        title: i18nText('📢 Send broadcast?'),
+        text: i18nText('This sends the message to {{v0}}. Delivery cannot be undone or recalled.', {
+            v0: BROADCAST_AUDIENCE_LABELS[target]
+        }),
+        confirmLabel: i18nText('Yes, send'),
+        cancelLabel: i18nText('No, cancel'),
         onConfirm: async () => {
             const btn = $field('send-broadcast');
             btn.disabled = true;
-            btn.innerText = 'Sending...';
+            btn.innerText = i18nText('Sending...');
 
             try {
                 const res = await api('/broadcast', { method: 'POST', body: { message, target } });
-                const failed = res.failCount ? `, ${res.failCount} failed` : '';
-                const left = res.leftCount ? `, ${res.leftCount} left the bot (skipped)` : '';
-                toast(`Delivered to ${res.successCount} chats${failed}${left}`, res.failCount ? 'warning' : 'success');
+                const failed = res.failCount ? i18nText(', {{v0}} failed', { v0: res.failCount }) : '';
+                const left = res.leftCount ? i18nText(', {{v0}} left the bot (skipped)', { v0: res.leftCount }) : '';
+                toast(
+                    i18nText('Delivered to {{v0}} chats{{v1}}{{v2}}', { v0: res.successCount, v1: failed, v2: left }),
+                    res.failCount ? 'warning' : 'success'
+                );
                 clearReturnTo();
                 closeModal('broadcast-modal');
                 $field('broadcast-msg').value = '';
             } catch (e) {
-                toast('Broadcast failed: ' + e.message, 'error');
+                toast(i18nText('Broadcast failed:') + ' ' + e.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.innerText = 'Send Broadcast';
+                btn.innerText = i18nText('Send Broadcast');
             }
         }
     });

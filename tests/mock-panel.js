@@ -422,6 +422,24 @@ function recapSchedule() {
 }
 
 async function mockPanel(page, options = {}) {
+    // The localized-copy endpoint uses the same provider fixture as the list/detail that opened it.
+    function rememberCopy(answer, route = '') {
+        if (!answer || typeof answer !== 'object') return;
+        const rows = ['series', 'films', 'items'].flatMap((key) => (Array.isArray(answer[key]) ? answer[key] : []));
+        const detail = /^\/api\/(series|movie)\/(?:tv_|movie_)?([1-9]\d*)$/.exec(route);
+        if (detail) rows.push({ ...answer, tmdbId: `${detail[1] === 'series' ? 'tv' : 'movie'}_${detail[2]}` });
+        for (const row of rows) {
+            const id = row.tmdbId || row.id;
+            if (!/^(tv|movie)_[1-9]\d*$/.test(id || '')) continue;
+            const genres = Array.isArray(row.genres)
+                ? row.genres.map((genre) => (typeof genre === 'string' ? genre : genre.name)).join(', ')
+                : row.genres || '';
+            panel.account.catalogCopies.set(id, {
+                overview: row.overview || '',
+                genres
+            });
+        }
+    }
     const panel = {
         // Signing in and the user's own chats (tests/mock-account.js): an admin unless told
         account: accountState(options),
@@ -1084,6 +1102,7 @@ async function mockPanel(page, options = {}) {
                 await panel.account.visibilityWait;
             const mine = await accountAnswer(panel.account, route.request(), url);
             if (mine) {
+                rememberCopy(mine);
                 if (route.request().headers()['x-requested-by'] !== 'notfckbot-panel')
                     return route.fulfill({ status: 403, json: { error: 'The API answers the admin panel only' } });
                 if (mine.status && mine.body) return route.fulfill({ status: mine.status, json: mine.body });
@@ -1109,6 +1128,7 @@ async function mockPanel(page, options = {}) {
             if (options.failing && options.failing.includes(url.pathname))
                 return route.fulfill({ status: 500, json: { error: 'Test failure' } });
             const answer = await handler(route.request());
+            rememberCopy(answer, url.pathname);
             // An image: { image: Buffer }
             if (answer && answer.image)
                 return route.fulfill({ status: 200, contentType: 'image/png', body: answer.image });

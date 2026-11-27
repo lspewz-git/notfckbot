@@ -1,4 +1,5 @@
 /** The only place that talks to the network. */
+import { language, t } from './i18n.js';
 
 const API_URL = '/api';
 
@@ -9,7 +10,7 @@ async function jsonResponse(res) {
     if (res.status === 428 && data.terms) window.dispatchEvent(new Event('terms-needed'));
     if (!res.ok || data.error) {
         const err = /** @type {Error & { status?: number, data?: any }} */ (
-            new Error(data.error || `HTTP ${res.status}`)
+            new Error(data.error ? t(data.error) : `HTTP ${res.status}`)
         );
         err.status = res.status;
         err.data = data;
@@ -32,7 +33,11 @@ export async function api(path, options = {}) {
     const res = await fetch(`${API_URL}${path}`, {
         method,
         // The server answers only requests carrying this (src/admin/panel-only.js)
-        headers: { 'Content-Type': 'application/json', 'X-Requested-By': 'notfckbot-panel' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-By': 'notfckbot-panel',
+            'X-Panel-Language': language
+        },
         body: body === undefined ? undefined : JSON.stringify(body)
     });
 
@@ -49,7 +54,7 @@ export async function api(path, options = {}) {
 export async function apiUpload(path, form) {
     const res = await fetch(`${API_URL}${path}`, {
         method: 'POST',
-        headers: { 'X-Requested-By': 'notfckbot-panel' },
+        headers: { 'X-Requested-By': 'notfckbot-panel', 'X-Panel-Language': language },
         body: form
     });
     return jsonResponse(res);
@@ -62,7 +67,9 @@ export async function apiUpload(path, form) {
  * @returns {Promise<Blob>}
  */
 export async function apiImage(path) {
-    const res = await fetch(`${API_URL}${path}`, { headers: { 'X-Requested-By': 'notfckbot-panel' } });
+    const res = await fetch(`${API_URL}${path}`, {
+        headers: { 'X-Requested-By': 'notfckbot-panel', 'X-Panel-Language': language }
+    });
     if (!res.ok) await jsonResponse(res);
     return res.blob();
 }

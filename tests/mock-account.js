@@ -122,6 +122,11 @@ function accountState(options) {
         // Called before each Mini App sign-in answer (its try number from 1): a promise holds that answer
         miniAppWait: options.miniAppWait,
         miniAppTries: 0,
+        miniAppData: options.miniAppData || 'auth_date=123&hash=test',
+        contentText: options.contentText,
+        catalogOverview: options.overview,
+        catalogCopies: new Map(),
+        languageSaveError: options.languageSaveError,
         // Hold the answer to the Telegram code / a password until the promise they return settles
         telegramWait: options.telegramWait,
         passwordWait: options.passwordWait,
@@ -136,6 +141,7 @@ function accountState(options) {
         meFails: /** @type {number[]} */ ([...(options.meFails || [])]),
         // Signed in as the system account (not a Telegram user)
         system: Boolean(options.system),
+        language: options.language || 'auto',
         role: options.role || 'admin',
         sent: /** @type {{ method: string, path: string, body: any }[]} */ ([]),
         polls: 0,
@@ -361,7 +367,7 @@ function accountAnswer(state, req, url) {
     }
     if (p === '/api/login/telegram/cancel') return { success: true };
     if (p === '/api/login/miniapp') {
-        if (body?.initData !== 'auth_date=123&hash=test')
+        if (body?.initData !== state.miniAppData)
             return { status: 401, body: { error: 'Invalid Telegram launch data' } };
         const fail = state.miniAppFails.shift();
         if (fail) return { status: fail, body: { error: `Mini App sign-in failed (${fail})` } };
@@ -382,6 +388,27 @@ function accountAnswer(state, req, url) {
         state.terms = 'ok';
         return { terms: 'ok' };
     }
+    if (p === '/api/account/preferences' && method === 'PATCH') {
+        if (state.languageSaveError) return { status: 500, body: { error: 'Language save failed' } };
+        if (!['auto', 'en', 'ru'].includes(body.language)) return { status: 400, body: { error: 'Bad language' } };
+        state.language = body.language;
+        return { language: state.language };
+    }
+    if (/^\/api\/account\/content\/(tv|movie)\/[1-9]\d*$/.test(p)) {
+        if (state.contentText) return state.contentText({ path: p, language: req.headers()['x-panel-language'] });
+        const [, kind, id] = p.match(/content\/(tv|movie)\/(\d+)$/);
+        const row =
+            state.catalogCopies.get(`${kind}_${id}`) ||
+            [...state.series, ...state.films].find((item) => (item.tmdbId || item.id) === `${kind}_${id}`);
+        return {
+            // Names are unspecified in the legacy fixtures; name-localization cases supply contentText.
+            title: '',
+            overview: row
+                ? row.overview || ''
+                : (state.catalogOverview ?? (kind === 'tv' ? 'A test series.' : 'A test film.')),
+            genres: row?.genres || ''
+        };
+    }
     if (p === '/api/account/me')
         return {
             terms: state.terms,
@@ -391,7 +418,8 @@ function accountAnswer(state, req, url) {
                 role: state.role,
                 hasPassword: state.hasPassword,
                 passwordChangedAt: state.passwordChangedAt || null,
-                system: state.system
+                system: state.system,
+                language: state.language
             }
         };
     if (p === '/api/account/password' && method === 'DELETE' && state.passwordRemoveFails.length) {

@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * Settings: the server's .env as fields, in three tabs. Services and Proxy keep their changes on the
  * page, marked, until the card's own Save sends them; the update interval is saved when picked. The
@@ -17,7 +18,7 @@ const TAB_KEY = 'settings-tab';
 // Which fields' errors each card shows
 const CARD_ERRORS = { services: SERVICES, panel: ['panelProxyIp'], proxy: ['proxy'], interval: ['interval'], none: [] };
 
-const PENDING_NAMES = { interval: 'the update interval', telegram: 'the new Telegram token' };
+const PENDING_NAMES = { interval: i18nText('the update interval'), telegram: i18nText('the new Telegram token') };
 
 /** What the server last said; the fields are compared against it. Null until the first load. */
 let saved = null;
@@ -124,8 +125,10 @@ function refreshChanges() {
         const { count } = cards[card];
         const foot = $(`settings-foot-${card}`);
         foot.hidden = count === 0;
-        /** @type {HTMLElement} */ (foot.querySelector('.settings-foot-text')).textContent =
-            `${count} unsaved ${count === 1 ? 'change' : 'changes'}`;
+        /** @type {HTMLElement} */ (foot.querySelector('.settings-foot-text')).textContent = i18nText(
+            '{{count}} unsaved change',
+            { count }
+        );
     }
     // A tab with changes left in it says so: they'd be easy to forget behind another tab
     const connections = /** @type {HTMLElement} */ (
@@ -155,16 +158,21 @@ function showErrors(fields = {}, names = [...REPLACE_FIELDS, 'proxy', 'interval'
 
 /** Why a restart can't happen now, in words. */
 function blockText(blocked) {
-    if (blocked.reason === 'running') return 'An update check is running. Restart once it finishes.';
+    if (blocked.reason === 'running') return i18nText('An update check is running. Restart once it finishes.');
     const when =
-        blocked.reason === 'due' ? `runs at ${clock(blocked.checkAt)}` : `started at ${clock(blocked.checkAt)}`;
+        blocked.reason === 'due'
+            ? i18nText('runs at {{v0}}', { v0: clock(blocked.checkAt) })
+            : i18nText('started at {{v0}}', { v0: clock(blocked.checkAt) });
     // Before a check its length is unknown: the latest it can be is all we can say
     if (blocked.reason === 'due')
-        return `An update check ${when}. Restart once it finishes, by ${clock(blocked.until)} at the latest.`;
+        return i18nText('An update check {{v0}}. Restart once it finishes, by {{v1}} at the latest.', {
+            v0: when,
+            v1: clock(blocked.until)
+        });
     // Seconds left: a clock without seconds would read as "now"
     const left = Math.ceil((new Date(blocked.until).getTime() - Date.now()) / 1000);
-    if (left > 0 && left < 60) return `An update check ${when}. Restart in ${left} s.`;
-    return `An update check ${when}. Restart after ${clock(blocked.until)}.`;
+    if (left > 0 && left < 60) return i18nText('An update check {{v0}}. Restart in {{v1}} s.', { v0: when, v1: left });
+    return i18nText('An update check {{v0}}. Restart after {{v1}}.', { v0: when, v1: clock(blocked.until) });
 }
 
 function renderRestart(settings) {
@@ -177,24 +185,26 @@ function renderRestart(settings) {
             ? 'today'
             : since.toLocaleDateString([], { day: 'numeric', month: 'short' });
     text.textContent = pending.length
-        ? `Waiting for a restart: ${pending.join(' and ')}.`
+        ? i18nText('Waiting for a restart: {{v0}}.', { v0: pending.join(' and ') })
         : // Short enough for one line on a phone, as tall as the placeholder before it
-          `Running since ${day}, ${clock(settings.startedAt)}.`;
+          i18nText('Running since {{v0}}, {{v1}}.', { v0: day, v1: clock(settings.startedAt) });
 }
 
 /** The connection check's lines: blank (not checked, or the proxy changed since), or the result. */
 function renderChecks(res = null, at = null) {
     const names = ['telegram', 'tmdb', 'internet'];
     $('settings-checks-when').textContent = at
-        ? `${res.direct ? 'Direct' : 'Through the proxy'}, ${clock(at)}`
-        : 'Press Test to check';
+        ? `${res.direct ? i18nText('Direct') : i18nText('Through the proxy')}, ${clock(at)}`
+        : i18nText('Press Test to check');
     for (const name of names) {
         const cell = /** @type {HTMLElement} */ (document.querySelector(`[data-check="${name}"]`));
         const check = res && res.checks[name];
         cell.dataset.state = !check ? '' : check.ok ? 'ok' : 'error';
         if (!check) cell.textContent = '—';
-        else if (!check.ok) cell.textContent = `✗ ${res.proxyDown ? `proxy: ${res.proxyDown}` : check.error}`;
-        else cell.textContent = `✓ ${check.ms} ms${check.ip ? ` · IP ${check.ip}` : ''}`;
+        else if (!check.ok)
+            cell.textContent = `✗ ${res.proxyDown ? i18nText('proxy: {{v0}}', { v0: res.proxyDown }) : check.error}`;
+        else
+            cell.textContent = i18nText('✓ {{v0}} ms{{v1}}', { v0: check.ms, v1: check.ip ? ` · IP ${check.ip}` : '' });
     }
 }
 
@@ -220,7 +230,7 @@ function fillFields(settings, card) {
     const proxyBefore = proxyOnScreen();
     if (!card || card === 'services') fillServices(settings);
     if (!card || card === 'panel') {
-        $('settings-masked-panelProxyIp').textContent = settings.panelProxyIp || 'Not configured';
+        $('settings-masked-panelProxyIp').textContent = settings.panelProxyIp || i18nText('Not configured');
         $('settings-masked-panelProxyIp').hidden = false;
         tokenInput('panelProxyIp').hidden = true;
         tokenInput('panelProxyIp').value = '';
@@ -248,7 +258,7 @@ function setReplaceButton(name, open) {
         document.querySelector(`[data-action="settings-replace"][data-service="${name}"]`)
     );
     const configured = name === 'panelProxyIp' ? saved?.panelProxyIp : saved?.tokens[name].configured;
-    const label = open ? 'Cancel' : configured ? 'Replace' : 'Set';
+    const label = open ? i18nText('Cancel') : configured ? i18nText('Replace') : i18nText('Set');
     button.setAttribute('aria-expanded', String(open));
     button.setAttribute('aria-label', label);
     button.title = label;
@@ -257,7 +267,7 @@ function setReplaceButton(name, open) {
 function fillServices(settings) {
     for (const name of SERVICES) {
         const token = settings.tokens[name];
-        $(`settings-masked-${name}`).textContent = token.configured ? token.masked : 'Not set';
+        $(`settings-masked-${name}`).textContent = token.configured ? token.masked : i18nText('Not set');
         const input = tokenInput(name);
         input.value = '';
         input.hidden = true;
@@ -268,7 +278,7 @@ function fillServices(settings) {
 
 function fillProxy(settings) {
     const parts = parseProxyUrl(settings.proxy.url);
-    if (!parts) toast("The saved proxy URL can't be read: set it again", 'warning');
+    if (!parts) toast(i18nText("The saved proxy URL can't be read: set it again"), 'warning');
     const { scheme, host, port, user } = parts || { scheme: '', host: '', port: '', user: '' };
     setSelectValue('settings-proxy-scheme', scheme);
     proxyField('host').value = host;
@@ -276,8 +286,8 @@ function fillProxy(settings) {
     proxyField('user').value = user;
     proxyField('pass').value = '';
     /** @type {HTMLInputElement} */ (proxyField('pass')).placeholder = settings.proxy.hasPassword
-        ? 'Saved — leave empty to keep'
-        : 'Password';
+        ? i18nText('Saved — leave empty to keep')
+        : i18nText('Password');
 }
 
 function fillInterval(settings) {
@@ -285,7 +295,10 @@ function fillInterval(settings) {
     const choices = settings.interval.choices.map(String).join(',');
     if (interval.dataset.choices !== choices) {
         interval.innerHTML = settings.interval.choices
-            .map((h) => `<option value="${h}">${h === 1 ? '1 hour' : `${h} hours`}</option>`)
+            .map(
+                (h) =>
+                    `<option value="${h}">${h === 1 ? i18nText('1 hour') : i18nText('{{v0}} hours', { v0: h })}</option>`
+            )
             .join('');
         interval.dataset.choices = choices;
     }
@@ -298,7 +311,9 @@ function fillChangesKeep(settings) {
     const select = $field('settings-changes');
     const choices = settings.changes.choices.map(String).join(',');
     if (select.dataset.choices !== choices) {
-        select.innerHTML = settings.changes.choices.map((d) => `<option value="${d}">${d} days</option>`).join('');
+        select.innerHTML = settings.changes.choices
+            .map((d) => '<option value="' + d + '">' + i18nText('{{v1}} days', { v1: d }) + '</option>')
+            .join('');
         select.dataset.choices = choices;
     }
     setSelectValue('settings-changes', String(settings.changes.days));
@@ -311,7 +326,7 @@ async function saveChangesKeep() {
         const res = await api('/settings', { method: 'POST', body: { changesKeepDays: Number(select.value) } });
         saves += 1;
         saved = { ...saved, changes: res.settings.changes };
-        toast('Change log period saved.', 'success');
+        toast(i18nText('Change log period saved.'), 'success');
     } catch (err) {
         // A refused pick goes back to the saved value
         if (saved) {
@@ -363,10 +378,10 @@ function toggleReplace(name) {
 }
 
 const SAVED_TEXT = {
-    services: 'Token saved.',
-    panel: 'VPS IP saved.',
-    proxy: 'Proxy saved.',
-    interval: 'Update interval saved.'
+    services: i18nText('Token saved.'),
+    panel: i18nText('VPS IP saved.'),
+    proxy: i18nText('Proxy saved.'),
+    interval: i18nText('Update interval saved.')
 };
 
 /**
@@ -383,7 +398,7 @@ async function save(card) {
     }
     const { cards, proxyIncomplete } = collectChanges();
     if (card === 'proxy' && proxyIncomplete) {
-        showErrors({ proxy: 'Fill in the host and the port, or set the mode to Off' }, ['proxy']);
+        showErrors({ proxy: i18nText('Fill in the host and the port, or set the mode to Off') }, ['proxy']);
         return;
     }
     const { body, count } = cards[card];
@@ -401,11 +416,15 @@ async function save(card) {
         saved = res.settings;
         // A newer pick on screen stays there: it is sent next
         fill(saved, card === 'interval' && intervalAgain ? 'none' : card);
-        const what = card === 'services' && count > 1 ? 'Tokens saved.' : SAVED_TEXT[card];
+        const what = card === 'services' && count > 1 ? i18nText('Tokens saved.') : SAVED_TEXT[card];
         // Only what this save left waiting: an older pending one is in the Bot card already
         const waits =
             (card === 'interval' || (card === 'services' && body.tokens.telegram)) && saved.restart.pending.length;
-        toast(waits ? `${what} Restart the bot to apply it.` : what, 'success', waits ? 6000 : 3500);
+        toast(
+            waits ? i18nText('{{v0}} Restart the bot to apply it.', { v0: what }) : what,
+            'success',
+            waits ? 6000 : 3500
+        );
     } catch (err) {
         // The interval has no Discard: a refused one goes back to the saved value (before the
         // reason is shown: the refill clears the card's errors)
@@ -456,7 +475,7 @@ async function testProxy(button) {
     const parts = proxyParts();
     const url = composeProxyUrl({ ...parts, pass: proxyField('pass').value });
     if (parts.scheme && !url) {
-        showErrors({ proxy: 'Fill in the host and the port first' });
+        showErrors({ proxy: i18nText('Fill in the host and the port first') });
         return;
     }
     showErrors();
@@ -480,18 +499,18 @@ async function waitForComeback() {
         try {
             saved = await api('/settings');
             fill(saved);
-            toast('The bot is back', 'success');
+            toast(i18nText('The bot is back'), 'success');
             return;
         } catch {
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
     }
-    toast("The bot hasn't come back in 90 s. Check the server.", 'error', 8000);
+    toast(i18nText("The bot hasn't come back in 90 s. Check the server."), 'error', 8000);
 }
 
 function restart() {
     if (hasUnsavedSettings()) {
-        toast('Save or discard the changes first', 'warning');
+        toast(i18nText('Save or discard the changes first'), 'warning');
         return;
     }
     if (saved && saved.restart.blocked) {
@@ -499,12 +518,13 @@ function restart() {
         return;
     }
     showConfirm({
-        title: 'Restart the bot?',
+        title: i18nText('Restart the bot?'),
         text:
-            'The bot stops and starts again with the saved .env. It is back in about 5 seconds; ' +
-            'messages and button presses sent meanwhile are answered once it is up.',
-        confirmLabel: 'Restart',
-        cancelLabel: 'Cancel',
+            i18nText('The bot stops and starts again with the saved .env. It is back in about 5 seconds;') +
+            ' ' +
+            i18nText('messages and button presses sent meanwhile are answered once it is up.'),
+        confirmLabel: i18nText('Restart'),
+        cancelLabel: i18nText('Cancel'),
         onConfirm: async () => {
             try {
                 await api('/restart', { method: 'POST' });

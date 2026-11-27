@@ -1,5 +1,5 @@
-const CHECK_ICON =
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check" /></svg>';
+import { t as i18nText } from './i18n.js';
+const CHECK_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check" /></svg>';
 
 /**
  * Settings → Alerts (src/admin/routes/alerts.js): who gets the bot's alerts, one row each; a row
@@ -13,7 +13,7 @@ import { toast, openModal, closeModal, showConfirm } from './ui.js';
 import { setSelectValue } from './select.js';
 import { activeLine, leftLabel, seenInLine, shortDay } from './format.js';
 
-const PRESET_LABELS = { all: 'Everything', critical: 'Critical only' };
+const PRESET_LABELS = { all: i18nText('Everything'), critical: i18nText('Critical only') };
 
 /** The last answer of /api/alerts; null until the first. */
 let state = null;
@@ -48,24 +48,31 @@ function initials(r) {
 
 function summary(r) {
     if (r.preset !== 'custom') return { dot: r.preset, text: PRESET_LABELS[r.preset] };
-    return { dot: 'custom', text: `${r.events.length} of ${state.events.length}` };
+    return { dot: 'custom', text: i18nText('{{v0}} of {{v1}}', { v0: r.events.length, v1: state.events.length }) };
 }
 
 function metaLine(r) {
     if (r.unreachable) {
         // missing: the chat is gone from the bot's list; left: lost moments ago, not written yet
-        const how = leftLabel({ bot_status: r.unreachable, type: r.type }) || 'The bot lost this chat';
+        const how = leftLabel({ bot_status: r.unreachable, type: r.type }) || i18nText('The bot lost this chat');
         const when = r.unreachableAt ? ` · ${shortDay(r.unreachableAt)}` : '';
-        return { text: `Can't reach: ${how}${when}`, bad: true };
+        return { text: i18nText("Can't reach: {{v0}}{{v1}}", { v0: how, v1: when }), bad: true };
     }
-    return { text: r.lastAlertAt ? `Last alert ${seenInLine(r.lastAlertAt)}` : 'No alerts yet', bad: false };
+    return {
+        text: r.lastAlertAt
+            ? i18nText('Last alert {{v0}}', { v0: seenInLine(r.lastAlertAt) })
+            : i18nText('No alerts yet'),
+        bad: false
+    };
 }
 
 function renderPeople() {
     const box = $('alerts-people');
     if (!state.recipients.length) {
         box.innerHTML =
-            '<p class="alerts-empty">No one gets alerts yet. Start the bot in Telegram, then add your chat here.</p>';
+            '<p class="alerts-empty">' +
+            i18nText('No one gets alerts yet. Start the bot in Telegram, then add your chat here.') +
+            '</p>';
         $('alerts-test-all').hidden = true;
         return;
     }
@@ -100,7 +107,7 @@ function logTime(iso, now = new Date()) {
 function renderLog() {
     const list = $('alerts-log');
     if (!state.log.length) {
-        list.innerHTML = '<li class="alerts-empty">Nothing this week.</li>';
+        list.innerHTML = '<li class="alerts-empty">' + i18nText('Nothing this week.') + '</li>';
         return;
     }
     const events = eventsByKey();
@@ -109,9 +116,9 @@ function renderLog() {
             const event = events.get(row.event);
             const title =
                 row.kind === 'test'
-                    ? 'Test alert'
+                    ? i18nText('Test alert')
                     : row.kind === 'fixed'
-                      ? `Fixed: ${event ? event.title : row.event}`
+                      ? i18nText('Fixed: {{v0}}', { v0: event ? event.title : row.event })
                       : event
                         ? event.title
                         : row.event;
@@ -120,7 +127,7 @@ function renderLog() {
             const who = [
                 row.sent === 1 && row.sentTo ? row.sentTo : `${row.sent} ${row.sent === 1 ? 'person' : 'people'}`
             ];
-            if (row.failed) who.push(`${row.failed} not reached`);
+            if (row.failed) who.push(i18nText('{{v0}} not reached', { v0: row.failed }));
             return `<li><time>${escapeHtml(logTime(row.at))}</time><span class="alert-dot is-${tone}" aria-hidden="true"></span>
                 <span>${escapeHtml(title)} <span class="alert-log-who">· ${escapeHtml(who.join(', '))}</span></span></li>`;
         })
@@ -143,7 +150,11 @@ function renderRules() {
 }
 
 function render(next) {
-    state = next;
+    state = {
+        ...next,
+        events: next.events.map((event) => ({ ...event, title: i18nText(event.title), label: i18nText(event.label) })),
+        groups: next.groups.map((group) => ({ ...group, title: i18nText(group.title) }))
+    };
     $('alerts-people').removeAttribute('aria-busy');
     renderPeople();
     renderLog();
@@ -158,7 +169,7 @@ export function loadAlerts() {
             // A later refresh that fails keeps what is shown; the first one leaves a dead end, not
             // shimmering rows and default rules that look saved (the rules stay inert)
             if (state) return;
-            const failed = `Failed to load: ${escapeHtml(err.message)}`;
+            const failed = i18nText('Failed to load: {{v0}}', { v0: escapeHtml(err.message) });
             const people = $('alerts-people');
             people.removeAttribute('aria-busy');
             people.innerHTML = `<p class="alerts-empty">${failed}</p>`;
@@ -180,9 +191,13 @@ function renderEditing() {
         .map((g) => {
             const events = state.events.filter((e) => e.group === g.key);
             const count = events.filter((e) => on.has(e.key)).length;
-            return `<div class="alert-group">
-                <div class="alert-group-head"><span>${escapeHtml(g.title)}</span><span>${count} of ${events.length}</span></div>
-                ${events
+            return (
+                '<div class="alert-group">\n                <div class="alert-group-head"><span>' +
+                escapeHtml(g.title) +
+                '</span><span>' +
+                i18nText('{{v1}} of {{v2}}', { v1: count, v2: events.length }) +
+                '</span></div>\n                ' +
+                events
                     .map(
                         (
                             e
@@ -193,8 +208,9 @@ function renderEditing() {
                             <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
                         </button>`
                     )
-                    .join('')}
-            </div>`;
+                    .join('') +
+                '\n            </div>'
+            );
         })
         .join('');
 }
@@ -208,7 +224,7 @@ function openPerson(chatId) {
     const meta = metaLine(r);
     $('alert-person-sub').textContent = r.unreachable
         ? meta.text
-        : `${r.type === 'private' ? 'Private chat' : 'Group'} · ${r.chatId}`;
+        : `${r.type === 'private' ? i18nText('Private chat') : i18nText('Group')} · ${r.chatId}`;
     renderEditing();
     openModal('alert-person-modal');
 }
@@ -233,7 +249,7 @@ async function savePerson() {
         render(await api(`/alerts/recipients/${encodeURIComponent(editing.chatId)}`, { method: 'PUT', body }));
         closeModal('alert-person-modal');
     } catch (err) {
-        toast(`Not saved: ${err.message}`, 'error');
+        toast(i18nText('Not saved: {{v0}}', { v0: err.message }), 'error');
     }
 }
 
@@ -242,16 +258,16 @@ function removePerson() {
     const r = state.recipients.find((x) => x.chatId === chatId);
     closeModal('alert-person-modal');
     showConfirm({
-        title: 'Remove recipient?',
-        text: `${r ? r.name || chatId : chatId} will get no more alerts.`,
-        confirmLabel: 'Remove',
-        cancelLabel: 'Keep',
+        title: i18nText('Remove recipient?'),
+        text: i18nText('{{v0}} will get no more alerts.', { v0: r ? r.name || chatId : chatId }),
+        confirmLabel: i18nText('Remove'),
+        cancelLabel: i18nText('Keep'),
         onConfirm: async () => {
             try {
                 render(await api(`/alerts/recipients/${encodeURIComponent(chatId)}`, { method: 'DELETE' }));
-                toast('Removed', 'success');
+                toast(i18nText('Removed'), 'success');
             } catch (err) {
-                toast(`Not removed: ${err.message}`, 'error');
+                toast(i18nText('Not removed: {{v0}}', { v0: err.message }), 'error');
             }
         }
     });
@@ -260,11 +276,12 @@ function removePerson() {
 async function sendTest(chatId) {
     try {
         const { sent, failed } = await api('/alerts/test', { method: 'POST', body: chatId ? { chatId } : {} });
-        if (sent && !failed) toast(sent === 1 ? 'Test sent' : `Test sent to ${sent}`, 'success');
-        else if (sent) toast(`Test sent to ${sent}, ${failed} not reached`, 'error');
-        else toast("Test didn't go out: the bot can't reach them", 'error');
+        if (sent && !failed)
+            toast(sent === 1 ? i18nText('Test sent') : i18nText('Test sent to {{v0}}', { v0: sent }), 'success');
+        else if (sent) toast(i18nText('Test sent to {{v0}}, {{v1}} not reached', { v0: sent, v1: failed }), 'error');
+        else toast(i18nText("Test didn't go out: the bot can't reach them"), 'error');
     } catch (err) {
-        toast(`Test failed: ${err.message}`, 'error');
+        toast(i18nText('Test failed: {{v0}}', { v0: err.message }), 'error');
         // Removed meanwhile (another tab): the dialog is about no one now
         if (err.status === 404) closeModal('alert-person-modal');
     }
@@ -287,7 +304,7 @@ async function searchCandidates(q) {
         list.innerHTML = chats.length
             ? chats
                   .map((c) => {
-                      const kind = c.type === 'private' ? 'Private' : 'Group';
+                      const kind = c.type === 'private' ? i18nText('Private') : i18nText('Group');
                       const seen = c.lastSeenAt ? ` · ${activeLine(c.lastSeenAt)}` : '';
                       const selected = c.chatId === picked;
                       return `<button type="button" class="alert-pick${selected ? ' is-picked' : ''}" aria-pressed="${selected}"
@@ -299,10 +316,13 @@ async function searchCandidates(q) {
                     </button>`;
                   })
                   .join('')
-            : `<p class="alerts-empty">${q ? 'No chat matches.' : 'No chats to add: everyone the bot knows is here already.'}</p>`;
+            : `<p class="alerts-empty">${q ? i18nText('No chat matches.') : i18nText('No chats to add: everyone the bot knows is here already.')}</p>`;
     } catch (err) {
         if (seq === searchSeq)
-            list.innerHTML = `<p class="alerts-empty">Failed to load: ${escapeHtml(err.message)}</p>`;
+            list.innerHTML =
+                '<p class="alerts-empty">' +
+                i18nText('Failed to load: {{v0}}', { v0: escapeHtml(err.message) }) +
+                '</p>';
     }
 }
 
@@ -331,9 +351,9 @@ async function confirmAdd() {
     try {
         render(await api('/alerts/recipients', { method: 'POST', body: { chatId: picked } }));
         closeModal('alert-add-modal');
-        toast('Added: critical alerts only', 'success');
+        toast(i18nText('Added: critical alerts only'), 'success');
     } catch (err) {
-        toast(`Not added: ${err.message}`, 'error');
+        toast(i18nText('Not added: {{v0}}', { v0: err.message }), 'error');
     }
 }
 
@@ -344,9 +364,9 @@ async function saveRules(change) {
     const body = { ...state.rules, ...change };
     try {
         render(await api('/alerts/rules', { method: 'PUT', body }));
-        toast('Saved', 'success');
+        toast(i18nText('Saved'), 'success');
     } catch (err) {
-        toast(`Not saved: ${err.message}`, 'error');
+        toast(i18nText('Not saved: {{v0}}', { v0: err.message }), 'error');
         renderRules();
     }
 }

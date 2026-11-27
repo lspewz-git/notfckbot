@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /** Toasts, modals and the confirmation dialog. */
 
 import { $, setText } from './dom.js';
@@ -289,10 +290,10 @@ export function closeModalReturning(id) {
  *           dismissStack?: boolean, onConfirm: () => void | Promise<void> }} options
  */
 export function showConfirm({
-    title = 'Are you sure?',
+    title = i18nText('Are you sure?'),
     text,
-    confirmLabel = 'Yes',
-    cancelLabel = 'No, cancel',
+    confirmLabel = i18nText('Yes'),
+    cancelLabel = i18nText('No, cancel'),
     dismissStack = false,
     onConfirm
 }) {

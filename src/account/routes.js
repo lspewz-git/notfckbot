@@ -4,7 +4,7 @@
  * is src/account/guard.js; changes go through src/chat-ops.js, like the panel's own.
  */
 const router = require('express').Router();
-const { Chat, Series, Subscription, Watchlist, HiddenChat } = require('../db');
+const { Chat, Series, Subscription, Watchlist, HiddenChat, AccountPreference } = require('../db');
 const tmdb = require('../api/tmdb');
 const kinopoisk = require('../api/kinopoisk');
 const ops = require('../chat-ops');
@@ -284,10 +284,46 @@ router.get('/api/account/me', async (req, res) => {
         const changed = system ? null : await password.passwordChangedAt(userId);
         const hasPassword = system || Boolean(changed);
         const termsState = await terms.termsState(req.user);
+        const preference = await AccountPreference.findByPk(userId, { attributes: ['language'], raw: true });
         res.json({
-            user: { id: userId, name, role, hasPassword, passwordChangedAt: changed, system },
+            user: {
+                id: userId,
+                name,
+                role,
+                hasPassword,
+                passwordChangedAt: changed,
+                system,
+                language: preference?.language || 'auto'
+            },
             terms: termsState
         });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+router.patch('/api/account/preferences', async (req, res) => {
+    const body = valid(z.object({ language: z.enum(['auto', 'en', 'ru']) }).strict(), req.body, res);
+    if (!body) return;
+    try {
+        await AccountPreference.upsert({ userId: req.user.userId, language: body.language });
+        res.json({ language: body.language });
+    } catch (err) {
+        fail(res, err);
+    }
+});
+
+// Catalog copy only: public title metadata, never another chat's subscription data or bot facts.
+router.get('/api/account/content/:kind/:id', async (req, res) => {
+    const params = valid(
+        z.object({ kind: z.enum(['tv', 'movie']), id: idOf(/^[1-9]\d{0,9}$/, 'Bad title id') }),
+        req.params,
+        res
+    );
+    if (!params) return;
+    try {
+        const language = req.get('X-Panel-Language') === 'ru' ? 'ru-RU' : 'en-US';
+        res.json(await tmdb.getPanelText(params.id, params.kind, language));
     } catch (err) {
         fail(res, err);
     }
@@ -656,7 +692,7 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
     if (!query) return;
     try {
         const [results, subs, films, chat] = await Promise.all([
-            tmdb.searchMulti(query.q.slice(0, 100)),
+            tmdb.searchMulti(query.q.slice(0, 100), req.get('X-Panel-Language') === 'en' ? 'en-US' : 'ru-RU'),
             Subscription.findAll({ where: { chatId: req.chatId }, attributes: ['seriesId'] }),
             Watchlist.findAll({ where: { chatId: req.chatId, notified: false }, attributes: ['tmdb_id'] }),
             Chat.findByPk(req.chatId)

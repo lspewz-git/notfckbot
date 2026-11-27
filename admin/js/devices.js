@@ -1,3 +1,5 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
 /**
  * Account → Devices: the browsers signed in to this account (GET /api/account/sessions). This one on
  * its own card; the others in a list, each opening a sheet with its details and "Sign out this
@@ -8,8 +10,7 @@ import { api } from './api.js';
 import { $, escapeHtml } from './dom.js';
 import { toast, openModal, closeModal, showConfirm, isTouch } from './ui.js';
 
-const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 /** Other sessions shown before "Show more" */
 const SHOWN = 4;
@@ -65,23 +66,23 @@ let regions;
 function countryName(code) {
     if (!code) return '';
     try {
-        regions ??= new Intl.DisplayNames(['en'], { type: 'region' });
+        regions ??= new Intl.DisplayNames([locale], { type: 'region' });
         return regions.of(code) || code;
     } catch {
         return code;
     }
 }
 
-const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
-const dayMonthYear = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+const dayMonth = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' });
+const dayMonthYear = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /** "5 minutes ago", "2 hours ago", "yesterday", then "2 Nov" */
 export function seenWhen(iso, now = Date.now()) {
     const at = new Date(iso);
     const minutes = Math.floor((now - at.getTime()) / 60000);
     if (!(minutes >= 0)) return '';
-    if (minutes < 1) return 'Active now';
+    if (minutes < 1) return i18nText('Active now');
     if (minutes < 60) return relative.format(-minutes, 'minute');
     if (minutes < 24 * 60) return relative.format(-Math.floor(minutes / 60), 'hour');
     const today = new Date(now);
@@ -90,7 +91,10 @@ export function seenWhen(iso, now = Date.now()) {
     return (at.getFullYear() === today.getFullYear() ? dayMonth : dayMonthYear).format(at);
 }
 
-const nameOf = (device) => device.name || 'Unknown browser';
+const nameOf = (device) =>
+    (device.name && locale !== 'ru-RU'
+        ? device.name.replace(/^Яндекс Браузер(?=,|$)/, 'Yandex Browser')
+        : device.name) || i18nText('Unknown browser');
 const placeOf = (device) => [countryName(device.country), device.network].filter(Boolean).join(', ');
 const kindIcon = (device) =>
     icon(
@@ -103,10 +107,7 @@ const kindIcon = (device) =>
 
 // --- The Account settings row ---
 
-// "1 active", "3 active": the word is the same in English, the rule still picks it by count
-const plural = new Intl.PluralRules('en');
-const ACTIVE = { one: 'active', other: 'active' };
-const activeCount = (n) => `${n} ${ACTIVE[plural.select(n)] || ACTIVE.other}`;
+const activeCount = (count) => i18nText('{{count}} active', { count });
 
 function renderEntry() {
     const holder = $('my-devices');
@@ -114,10 +115,12 @@ function renderEntry() {
     // From the list already loaded for the page: no request of its own
     const count = list ? activeCount(list.length) : '';
     holder.innerHTML =
-        '<h2 class="group-title">Security</h2><ul class="group-list">' +
+        '<h2 class="group-title">' +
+        i18nText('Security') +
+        '</h2><ul class="group-list">' +
         '<li><button type="button" class="group-row" data-action="devices-open" data-section="my-devices">' +
         `<span class="row-tile">${icon('monitor-smartphone')}</span>` +
-        '<span class="row-text"><span class="row-name">Devices</span></span>' +
+        ('<span class="row-text"><span class="row-name">' + i18nText('Devices') + '</span></span>') +
         `<span class="row-value" data-devices-count>${escapeHtml(count)}</span>` +
         `<span class="row-chevron">${icon('chevron-right')}</span></button></li></ul>`;
 }
@@ -138,7 +141,9 @@ function currentCard(device) {
     return (
         `<div class="group-card"><span class="row-tile row-tile-lg">${kindIcon(device)}</span>` +
         `<span class="row-text"><span class="card-name">${escapeHtml(nameOf(device))}</span>` +
-        '<span class="row-status"><span class="status-dot" aria-hidden="true"></span>This device · Active now</span>' +
+        ('<span class="row-status"><span class="status-dot" aria-hidden="true"></span>' +
+            i18nText('This device · Active now') +
+            '</span>') +
         (place ? `<span class="row-meta">${escapeHtml(place)}</span>` : '') +
         '</span></div>'
     );
@@ -164,7 +169,9 @@ function render() {
         body.setAttribute('aria-busy', String(loading || !error));
         body.innerHTML = error
             ? `<div class="group-empty" role="alert"><p>${escapeHtml(error)}</p>` +
-              '<button type="button" class="btn btn-outline" data-action="devices-retry">Try again</button></div>'
+              ('<button type="button" class="btn btn-outline" data-action="devices-retry">' +
+                  i18nText('Try again') +
+                  '</button></div>')
             : SKELETON;
         return;
     }
@@ -177,18 +184,24 @@ function render() {
         (current ? currentCard(current) : '') +
         (others.length
             ? `<button type="button" class="devices-end-others" data-action="devices-end-others"${busy ? ' disabled aria-busy="true"' : ''}>` +
-              `${icon('log-out')}<span>${busy ? 'Signing out…' : 'Sign out of other sessions'}</span></button>` +
-              '<p class="group-help">This device stays signed in. Signed-out devices will need to sign in again.</p>'
+              `${icon('log-out')}<span>${busy ? i18nText('Signing out…') : i18nText('Sign out of other sessions')}</span></button>` +
+              ('<p class="group-help">' +
+                  i18nText('This device stays signed in. Signed-out devices will need to sign in again.') +
+                  '</p>')
             : '') +
-        `<h2 class="group-title">Other sessions · ${others.length}</h2>` +
+        ('<h2 class="group-title">' + i18nText('Other sessions · {{v0}}', { v0: others.length }) + '</h2>') +
         (others.length
             ? `<ul class="group-list">${shown.map(row).join('')}` +
               (more
                   ? `<li><button type="button" class="group-row devices-more" data-action="devices-more">` +
-                    `<span class="row-name">Show ${more} more</span><span class="row-chevron">${icon('chevron-down')}</span></button></li>`
+                    ('<span class="row-name">' +
+                        i18nText('Show {{v0}} more', { v0: more }) +
+                        '</span><span class="row-chevron">' +
+                        icon('chevron-down') +
+                        '</span></button></li>')
                   : '') +
               '</ul>'
-            : '<p class="group-empty">No other active sessions</p>');
+            : '<p class="group-empty">' + i18nText('No other active sessions') + '</p>');
 }
 
 // --- One session's sheet ---
@@ -207,13 +220,17 @@ function ipHtml(ip) {
 
 function sheetHtml(device) {
     const details = [
-        ['Location', countryName(device.country)],
-        ['Network', device.network],
-        ['IP address', device.ip],
-        ['Last active', seenWhen(device.seenAt)]
+        [i18nText('Location'), countryName(device.country)],
+        [i18nText('Network'), device.network],
+        [i18nText('IP address'), device.ip],
+        [i18nText('Last active'), seenWhen(device.seenAt)]
     ].filter(([, value]) => value);
     return (
-        `<button type="button" class="sheet-close" data-close="device-modal" aria-label="Close">${icon('x')}</button>` +
+        '<button type="button" class="sheet-close" data-close="device-modal" aria-label="' +
+        i18nText('Close') +
+        '">' +
+        icon('x') +
+        '</button>' +
         `<div class="sheet-head"><span class="row-tile row-tile-xl">${kindIcon(device)}</span>` +
         `<h2 id="device-title">${escapeHtml(nameOf(device))}</h2></div>` +
         (details.length
@@ -226,8 +243,14 @@ function sheetHtml(device) {
                   .join('')}</dl>`
             : '') +
         '<p class="sheet-error" id="device-error" role="alert" hidden></p>' +
-        `<button type="button" class="sheet-btn-danger" data-action="device-end">${icon('log-out')}<span>Sign out this device</span></button>` +
-        '<button type="button" class="sheet-btn-secondary" data-close="device-modal">Cancel</button>'
+        ('<button type="button" class="sheet-btn-danger" data-action="device-end">' +
+            icon('log-out') +
+            '<span>' +
+            i18nText('Sign out this device') +
+            '</span></button>') +
+        ('<button type="button" class="sheet-btn-secondary" data-close="device-modal">' +
+            i18nText('Cancel') +
+            '</button>')
     );
 }
 
@@ -265,7 +288,7 @@ function setOutBusy(on) {
     if (!button) return;
     button.disabled = on;
     button.toggleAttribute('aria-busy', on);
-    button.querySelector('span').textContent = on ? 'Signing out…' : 'Sign out this device';
+    button.querySelector('span').textContent = on ? i18nText('Signing out…') : i18nText('Sign out this device');
 }
 
 /** The row slides away (200 ms; none with reduced motion), then the list is drawn without it */
@@ -318,7 +341,7 @@ async function endOne() {
         closeModal('device-modal');
     }
     dropRow(device.id);
-    toast('Signed out', 'success');
+    toast(i18nText('Signed out'), 'success');
 }
 
 async function endOthers() {
@@ -332,7 +355,7 @@ async function endOthers() {
             // A list asked for before this would bring the ended sessions back
             loadNo += 1;
             list = list && list.filter((d) => d.current);
-            toast('Signed out of other sessions', 'success');
+            toast(i18nText('Signed out of other sessions'), 'success');
         }
     } catch (err) {
         toast(err.message, 'error');
@@ -367,10 +390,10 @@ export const deviceActions = {
         if (busy || !list) return;
         const n = list.filter((d) => !d.current).length;
         showConfirm({
-            title: `Sign out of ${n} other session${n === 1 ? '' : 's'}?`,
-            text: 'They will need to sign in again.',
-            confirmLabel: 'Sign out',
-            cancelLabel: 'Cancel',
+            title: i18nText('Sign out of {{v0}} other session{{v1}}?', { v0: n, v1: n === 1 ? '' : 's' }),
+            text: i18nText('They will need to sign in again.'),
+            confirmLabel: i18nText('Sign out'),
+            cancelLabel: i18nText('Cancel'),
             onConfirm: endOthers
         });
     }

@@ -1,6 +1,9 @@
+import { t as i18nText } from './i18n.js';
 /** Entry point: navigation, the refresh timer, and all event wiring. */
 
 import { $, all, closest } from './dom.js';
+import { translatePage } from './i18n.js';
+import { setupCatalogTitles } from './catalog-text.js';
 import { runCheckNow, openFailingService } from './dashboard.js';
 import { fetchData, setSection } from './data.js';
 import { setSubsChart, openRecentSends } from './dashboard-charts.js';
@@ -87,10 +90,10 @@ function switchSection(id) {
     // Leaving Settings with changes not saved: ask, rather than lose them silently
     if (activeSection === 'settings' && id !== 'settings' && hasUnsavedSettings()) {
         showConfirm({
-            title: 'Leave without saving?',
-            text: 'The changes in Settings will be lost.',
-            confirmLabel: 'Discard changes',
-            cancelLabel: 'Stay',
+            title: i18nText('Leave without saving?'),
+            text: i18nText('The changes in Settings will be lost.'),
+            confirmLabel: i18nText('Discard changes'),
+            cancelLabel: i18nText('Stay'),
             onConfirm: () => {
                 discardSettings();
                 switchSection(id);
@@ -105,7 +108,7 @@ function switchSection(id) {
     setSection(id);
     // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
     // not pushed: Back still leaves the panel instead of stepping through its tabs
-    window.history.replaceState({ view: activeView }, '', `#${id}`);
+    window.history.replaceState({ view: activeView }, '', `/${location.search}#${id}`);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('active', s.id === `${id}-section`));
     syncTelegramBack();
     // Each section opens at its top: the page keeps one scroll position for all of them, and the
@@ -145,7 +148,7 @@ function updateAutoRefreshSwitch() {
 /** "7 s" next to the switch while it is on: shows that it is counting, and to when. */
 function renderCountdown() {
     const el = $('refresh-countdown');
-    if (el) el.textContent = isPaused ? '' : `${secondsLeft} s`;
+    if (el) el.textContent = isPaused ? '' : i18nText('{{v0}} s', { v0: secondsLeft });
 }
 
 // A refresh is usually over in a blink; the turn of the icon should still be seen
@@ -351,6 +354,7 @@ function sectionFromHash(role) {
  * on the dashboard and a user's on Calendar, the first personal tab.
  */
 function afterSignIn(role) {
+    setupCatalogTitles();
     activeView = role === 'admin' && window.history.state?.view !== 'mine' ? 'admin' : 'mine';
     // Opened from a group (a Mini App or a group's sign-in link): that chat's Calendar
     const start = !launchedInChat() && role === 'admin' ? activeSection : DEFAULT_PERSONAL_SECTION;
@@ -358,6 +362,7 @@ function afterSignIn(role) {
 }
 
 async function init() {
+    translatePage();
     setupNavigation();
     // First: the selects inside are what setupFilters, setupHistory and enhanceSelects work on
     fillPagers();

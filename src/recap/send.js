@@ -175,6 +175,9 @@ let running = false;
 // Telegram asked to wait (a flood ban over a minute): no sending before this moment
 let floodUntil = 0;
 
+const waiting = (chat, now) =>
+    (chat.blockedUntil && new Date(chat.blockedUntil) > now) || isLeft(chat) || isQuietNow(chat, now);
+
 /**
  * Sends what is queued, oldest first, one chat at a time; a chat in its quiet hours waits for the
  * next round. One run at a time.
@@ -199,16 +202,19 @@ async function processQueue(bot, { now = () => new Date(), pause = PAUSE_MS, wai
             if (!queued.length) break;
             for (const row of queued) {
                 seen.add(row.id);
-                const chat = await Chat.findByPk(row.chatId);
+                let chat = await Chat.findByPk(row.chatId);
                 if (!chat) {
                     await row.update({ status: 'failed', error: 'Chat not found' });
                     continue;
                 }
-                if (isQuietNow(chat, now())) continue;
+                if (waiting(chat, now())) continue;
                 // Drawn while still queued: a restart while drawing (it can take half a minute)
                 // leaves it queued, not "may have been sent"
-                const recap = await drawFor(row);
+                const recap = await drawFor(row, chat);
                 if (!recap) continue;
+                // Rendering can cross quiet hours, or the chat can be blocked/removed meanwhile.
+                chat = await Chat.findByPk(row.chatId);
+                if (!chat || waiting(chat, now())) continue;
                 // Taken only if still queued: Stop may have removed it meanwhile. From here on a
                 // restart can't tell whether it arrived
                 const [taken] = await RecapSend.update(
@@ -237,7 +243,7 @@ async function processQueue(bot, { now = () => new Date(), pause = PAUSE_MS, wai
  * before anything reached Telegram (the database, the drawing thread, memory): tried again on a
  * later round, up to MAX_ATTEMPTS, like a send that failed for a moment.
  */
-async function drawFor(row) {
+async function drawFor(row, chat) {
     try {
         const recap = await recapImages(row.chatId, row.year);
         if (!recap) await row.update({ status: 'failed', error: 'Chat not found' });
@@ -246,8 +252,12 @@ async function drawFor(row) {
         const attempts = row.attempts + 1;
         const final = attempts >= MAX_ATTEMPTS;
         const error = `Drawing failed: ${err.message}`.slice(0, 255);
-        await row.update({ status: final ? 'failed' : 'queued', attempts, error }).catch(() => {});
+        const [changed] = await RecapSend.update(
+            { status: final ? 'failed' : 'queued', attempts, error },
+            { where: { id: row.id, status: 'queued' } }
+        ).catch(() => [0]);
         log.error(`[Recap] ${row.year} for chat ${row.chatId} not drawn: ${err.message}`);
+        if (final && changed) recapFailed(row, chat, error, 'failed');
         return null;
     }
 }

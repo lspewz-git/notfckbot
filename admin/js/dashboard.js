@@ -1,3 +1,6 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
+import { titleMarkup } from './catalog-text.js';
 /** The dashboard: counters, service statuses and the error banner, upcoming releases, popularity, the update check. */
 
 import { $, all, setText, updateBadge, escapeHtml } from './dom.js';
@@ -44,20 +47,20 @@ function setAside(id, n, text) {
 
 export function updateStats(stats) {
     setText('chats-count', stats.chatsCount);
-    setDelta('chats-delta', stats.chatsNew30, 'new in 30 days', 'None new in 30 days');
+    setDelta('chats-delta', stats.chatsNew30, i18nText('new in 30 days'), i18nText('None new in 30 days'));
     // Blocked the bot or took it out of the group
     setAside('chats-left-count', stats.chatsLeft, 'left');
     // activeSubsCount is newer than the panel's first backend — fall back to the total
     setText('subs-count', stats.activeSubsCount ?? stats.subsCount);
-    setDelta('subs-delta', stats.subsNew30, 'new in 30 days', 'None new in 30 days');
+    setDelta('subs-delta', stats.subsNew30, i18nText('new in 30 days'), i18nText('None new in 30 days'));
     setAside('subs-archived-count', stats.archivedSubsCount, 'archived');
     setText('films-count', stats.activeFilmsCount ?? stats.filmsCount);
     // Added minus released: how the waiting list changed
     setDelta(
         'films-delta',
         (stats.filmsAdded30 || 0) - (stats.filmsReleased30 || 0),
-        'in 30 days',
-        'No change in 30 days'
+        i18nText('in 30 days'),
+        i18nText('No change in 30 days')
     );
     setAside('films-released-count', stats.releasedFilmsCount, 'released');
     setText('series-count', stats.seriesCount);
@@ -65,15 +68,15 @@ export function updateStats(stats) {
     setDelta(
         'sent-delta',
         (stats.sent7 || 0) - (stats.sentPrev7 || 0),
-        'from the week before',
-        'Same as the week before'
+        i18nText('from the week before'),
+        i18nText('Same as the week before')
     );
     setText('failed-count', stats.failed7 ?? 0);
     setDelta(
         'failed-delta',
         (stats.failed7 || 0) - (stats.failedPrev7 || 0),
-        'from the week before',
-        'Same as the week before',
+        i18nText('from the week before'),
+        i18nText('Same as the week before'),
         'down'
     );
 }
@@ -85,7 +88,7 @@ export function updateStats(stats) {
 const serviceState = {};
 /** The problem the server reports per service while it fails: { since, reason, checks } */
 const serviceProblem = {};
-const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', tvmaze: 'TVmaze', kinopoisk: 'KP', proxy: 'Proxy' };
+const SERVICE_NAMES = { telegram: 'TG', tmdb: 'TMDB', tvmaze: 'TVmaze', kinopoisk: 'KP', proxy: i18nText('Proxy') };
 // The badge of each service; clicking one opens its dialog
 const SERVICE_BADGES = {
     telegram: 'health-tg',
@@ -99,7 +102,11 @@ function setService(key, badgeId, state) {
     serviceState[key] = state;
     const name = SERVICE_NAMES[key];
     const [text, cls] =
-        state === 'ok' ? [name, 'ok'] : state === 'error' ? [`${name}: ERR`, 'error'] : [`${name}: OFF`, 'ghost'];
+        state === 'ok'
+            ? [name, 'ok']
+            : state === 'error'
+              ? [i18nText('{{v0}}: ERR', { v0: name }), 'error']
+              : [i18nText('{{v0}}: OFF', { v0: name }), 'ghost'];
     updateBadge(badgeId, text, cls);
 }
 
@@ -115,16 +122,21 @@ function renderServiceAlert() {
     banner.hidden = failing.length === 0;
     if (!failing.length) return;
     const action = $('service-alert-action');
-    action.textContent = `Open ${failing[0]}`;
+    action.textContent = i18nText('Open {{v0}}', { v0: failing[0] });
     action.dataset.badge = SERVICE_BADGES[failingKeys[0]];
     const names =
-        failing.length === 1 ? failing[0] : `${failing.slice(0, -1).join(', ')} and ${failing[failing.length - 1]}`;
+        failing.length === 1
+            ? failing[0]
+            : i18nText('{{v0}} and {{v1}}', { v0: failing.slice(0, -1).join(', '), v1: failing[failing.length - 1] });
     // One service: why and since when ("Proxy is reporting an error: timeout · since 22:37")
     const problem = failing.length === 1 ? serviceProblem[failingKeys[0]] : null;
     const text =
         failing.length > 1
-            ? `${names} are reporting errors`
-            : `${names} is reporting an error${problem ? `: ${problem.reason} · ${sinceText(problem)}` : ''}`;
+            ? i18nText('{{v0}} are reporting errors', { v0: names })
+            : i18nText('{{v0}} is reporting an error{{v1}}', {
+                  v0: names,
+                  v1: problem ? `: ${problem.reason} · ${sinceText(problem)}` : ''
+              });
     // The banner is a live region: rewriting the same words would make screen readers repeat them
     const el = $('service-alert-text');
     if (el.textContent !== text) el.textContent = text;
@@ -156,16 +168,15 @@ export function updateHealth(h) {
         const q = h.kinopoiskQuota;
         if (kpBadge)
             kpBadge.title = q
-                ? `Kinopoisk API: ${q.used} of ${q.limit} requests used today`
-                : 'Kinopoisk API: key, quota and status';
+                ? i18nText('Kinopoisk API: {{v0}} of {{v1}} requests used today', { v0: q.used, v1: q.limit })
+                : i18nText('Kinopoisk API: key, quota and status');
     }
     renderServiceAlert();
 }
 
 // --- Coming up ---
 const DAY = 24 * 60 * 60 * 1000;
-const svg = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const svg = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 const KIND_ICON = {
     tv: svg('tv'),
     movie: svg('film')
@@ -181,10 +192,10 @@ function localDay(iso) {
 function dateParts(iso, today) {
     const day = localDay(iso);
     return {
-        day: day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        day: day.toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
         sub:
             day.getFullYear() === today.getFullYear()
-                ? day.toLocaleDateString('en-GB', { weekday: 'short' })
+                ? day.toLocaleDateString(locale, { weekday: 'short' })
                 : String(day.getFullYear())
     };
 }
@@ -194,12 +205,12 @@ function relativeDay(iso, today) {
     const diff = Math.round((localDay(iso).getTime() - today.getTime()) / DAY);
     if (diff === 0) return 'today';
     if (diff === 1) return 'tomorrow';
-    if (diff < 14) return `in ${diff} days`;
-    if (diff < 60) return `in ${Math.round(diff / 7)} weeks`;
+    if (diff < 14) return i18nText('in {{v0}} days', { v0: diff });
+    if (diff < 60) return i18nText('in {{v0}} weeks', { v0: Math.round(diff / 7) });
     // Months up to a year and a half; beyond that whole years read better than "in 20 months"
-    if (diff < 548) return `in ${Math.round(diff / 30.4)} months`;
+    if (diff < 548) return i18nText('in {{v0}} months', { v0: Math.round(diff / 30.4) });
     const years = Math.round(diff / 365);
-    return `in ${years} ${years === 1 ? 'year' : 'years'}`;
+    return i18nText('in {{v0}} {{v1}}', { v0: years, v1: years === 1 ? 'year' : 'years' });
 }
 
 let upcoming = null;
@@ -227,7 +238,7 @@ const popularRow = (r) => `
 
 // A request that fails before its first answer: the page's placeholders give way to a dead end
 // rather than shimmering on for ever (as the tables do); the next refresh fills them in
-const FAILED_NOTE = '<p class="empty-note">Failed to load. Retrying on the next refresh.</p>';
+const FAILED_NOTE = '<p class="empty-note">' + i18nText('Failed to load. Retrying on the next refresh.') + '</p>';
 
 /** /api/stats failed: a dash where a number has never come. */
 export function statsFailed() {
@@ -254,21 +265,21 @@ function renderUpcoming() {
     if (isUnchanged('upcoming', [today.getTime(), upcoming])) return;
     const items = upcoming.filter((i) => localDay(i.date) >= today);
     if (items.length === 0) {
-        container.innerHTML = '<p class="empty-note">No dates announced yet.</p>';
+        container.innerHTML = '<p class="empty-note">' + i18nText('No dates announced yet.') + '</p>';
         return;
     }
 
     container.innerHTML = items
         .slice(0, UPCOMING_SHOWN)
         .map((item) => {
-            const what = item.kind === 'tv' ? item.episode || 'New episode' : 'Film release';
-            const chats = `${item.chats} ${item.chats === 1 ? 'chat' : 'chats'}`;
+            const what = item.kind === 'tv' ? item.episode || i18nText('New episode') : i18nText('Film release');
+            const chats = i18nText('{{count}} chat', { count: item.chats });
             const { day, sub } = dateParts(item.date, today);
             return upcomingRow({
                 attrs: `data-action="${item.kind === 'tv' ? 'series' : 'film'}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0"`,
                 date: `<span class="up-day">${escapeHtml(day)}</span><span class="up-weekday">${escapeHtml(sub)}</span>`,
                 icon: KIND_ICON[item.kind],
-                title: escapeHtml(item.title),
+                title: titleMarkup(item.id, item.title),
                 meta: escapeHtml(`${what} · ${chats}`),
                 when: escapeHtml(relativeDay(item.date, today))
             });
@@ -289,7 +300,7 @@ export function updatePopular(list) {
     const container = $('popular-list');
     container.removeAttribute('aria-busy');
     if (!list || list.length === 0) {
-        container.innerHTML = '<p class="empty-note">No data yet.</p>';
+        container.innerHTML = '<p class="empty-note">' + i18nText('No data yet.') + '</p>';
         return;
     }
 
@@ -299,7 +310,7 @@ export function updatePopular(list) {
             return popularRow({
                 attrs: `data-action="series" data-id="${escapeHtml(item.seriesId)}" role="button" tabindex="0"`,
                 rank: String(idx + 1),
-                title: escapeHtml(item.Series.title),
+                title: titleMarkup(item.seriesId, item.Series.title),
                 count: `<b>${count}</b> ${count === 1 ? 'subscriber' : 'subscribers'}`
             });
         })
@@ -315,21 +326,21 @@ let runPending = false;
 /** 41 s, 12 min, 2 h 5 min */
 function duration(ms) {
     const s = Math.max(0, Math.round(ms / 1000));
-    if (s < 60) return `${s} s`;
+    if (s < 60) return i18nText('{{v0}} s', { v0: s });
     const m = Math.round(s / 60);
-    if (m < 60) return `${m} min`;
+    if (m < 60) return i18nText('{{v0}} min', { v0: m });
     const h = Math.floor(m / 60);
-    return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+    return m % 60 ? i18nText('{{v0}} h {{v1}} min', { v0: h, v1: m % 60 }) : i18nText('{{v0}} h', { v0: h });
 }
 
-const clock = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const clock = (iso) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
 function renderRunButton() {
     const btn = /** @type {HTMLButtonElement} */ ($('run-check'));
     if (!btn) return;
     const busy = runPending || Boolean(cron && cron.running);
     btn.disabled = busy;
-    btn.textContent = busy ? 'Running…' : 'Run now';
+    btn.textContent = busy ? i18nText('Running…') : i18nText('Run now');
 }
 
 function renderCron() {
@@ -340,31 +351,34 @@ function renderCron() {
 
     if (cron.running) {
         const elapsed = duration(now - new Date(cron.startedAt).getTime());
-        updateBadge('cron-state', 'Running', 'warn');
-        setText('cron-last', `Running now, started ${elapsed} ago`);
-        setText('cron-duration', `${elapsed} so far`);
+        updateBadge('cron-state', i18nText('Running'), 'warn');
+        setText('cron-last', i18nText('Running now, started {{v0}} ago', { v0: elapsed }));
+        setText('cron-duration', i18nText('{{v0}} so far', { v0: elapsed }));
     } else if (!last) {
-        updateBadge('cron-state', 'Not run yet', 'muted');
-        setText('cron-last', 'No check since the bot started');
+        updateBadge('cron-state', i18nText('Not run yet'), 'muted');
+        setText('cron-last', i18nText('No check since the bot started'));
         setText('cron-duration', '—');
     } else {
         // Undelivered messages are not counted: a chat that blocked the bot fails on every
         // run and would keep the state amber for good. They are listed under Notifications.
         const problems = (last.errors || 0) + (last.fatal ? 1 : 0);
-        if (last.fatal) updateBadge('cron-state', 'Failed', 'error');
-        else if (problems) updateBadge('cron-state', `${problems} ${problems === 1 ? 'error' : 'errors'}`, 'warn');
+        if (last.fatal) updateBadge('cron-state', i18nText('Failed'), 'error');
+        else if (problems) updateBadge('cron-state', i18nText('{{count}} error', { count: problems }), 'warn');
         else updateBadge('cron-state', 'OK', 'ok');
-        setText('cron-last', `${duration(now - new Date(last.finishedAt).getTime())} ago`);
+        setText('cron-last', i18nText('{{v0}} ago', { v0: duration(now - new Date(last.finishedAt).getTime()) }));
         setText('cron-duration', duration(last.durationMs));
     }
-    if (state) state.title = last && last.fatal ? `Last check failed: ${last.fatal}` : '';
+    if (state) state.title = last && last.fatal ? i18nText('Last check failed: {{v0}}', { v0: last.fatal }) : '';
 
     if (last) {
-        const errors = last.errors ? `, ${last.errors} ${last.errors === 1 ? 'error' : 'errors'}` : '';
-        setText('cron-checked', `${last.series} series, ${last.films} films${errors}`);
+        const errors = last.errors ? ', ' + i18nText('{{count}} error', { count: last.errors }) : '';
+        setText(
+            'cron-checked',
+            i18nText('{{v0}} series, {{v1}} films{{v2}}', { v0: last.series, v1: last.films, v2: errors })
+        );
         // Usually a chat that blocked the bot or was deleted
-        const failed = last.failed ? `, ${last.failed} not delivered` : '';
-        setText('cron-sent', `${last.sent} sent${failed}`);
+        const failed = last.failed ? i18nText(', {{v0}} not delivered', { v0: last.failed }) : '';
+        setText('cron-sent', i18nText('{{v0}} sent{{v1}}', { v0: last.sent, v1: failed }));
     } else {
         setText('cron-checked', '—');
         setText('cron-sent', '—');
@@ -374,10 +388,15 @@ function renderCron() {
     const until = new Date(cron.nextRunAt).getTime() - now;
     setText(
         'cron-next',
-        until > 0 ? `In ${duration(until)}, at ${clock(cron.nextRunAt)}` : `Due now, every ${cron.intervalHours} h`
+        until > 0
+            ? i18nText('In {{v0}}, at {{v1}}', { v0: duration(until), v1: clock(cron.nextRunAt) })
+            : i18nText('Due now, every {{v0}} h', { v0: cron.intervalHours })
     );
     const hours = cron.intervalHours;
-    setText('series-interval', hours === 1 ? 'Checked every hour' : `Checked every ${hours} hours`);
+    setText(
+        'series-interval',
+        hours === 1 ? i18nText('Checked every hour') : i18nText('Checked every {{v0}} hours', { v0: hours })
+    );
     renderRunButton();
 }
 
@@ -407,10 +426,11 @@ export async function runCheckNow(refresh) {
             updateCron(status);
             running = status.running;
         }
-        if (running) toast('The update check is still running; the dashboard will show it when it ends', 'info');
-        else toast('Update check finished', 'success');
+        if (running)
+            toast(i18nText('The update check is still running; the dashboard will show it when it ends'), 'info');
+        else toast(i18nText('Update check finished'), 'success');
     } catch (e) {
-        toast(`Update check failed to start: ${e.message}`, 'error');
+        toast(i18nText('Update check failed to start: {{v0}}', { v0: e.message }), 'error');
     } finally {
         runPending = false;
         renderRunButton();

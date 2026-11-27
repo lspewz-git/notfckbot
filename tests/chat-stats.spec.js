@@ -29,10 +29,7 @@ test("a group's year: the figures, its tastes by name, its members", async ({ pa
     await expect(body.locator('.stats-chart-box .stats-box-title span')).toHaveText('busiest: Mar, 34');
     await expect(body.locator('.stats-col-label')).toHaveCount(12);
     // TMDB's genres come lower case; countries as codes
-    await expect(body.locator('.stats-cols-3 .stats-box').nth(0).locator('.stats-name')).toHaveText([
-        'Драма',
-        'Криминал'
-    ]);
+    await expect(body.locator('.stats-cols-3 .stats-box').nth(0).locator('.stats-name')).toHaveText(['Drama', 'Crime']);
     await expect(body.locator('.stats-cols-3 .stats-box').nth(2).locator('.stats-name')).toHaveText([
         'United States',
         'South Korea'
@@ -53,7 +50,9 @@ test('a private chat has no members list; the periods ask for their own days', a
     const panel = await mockPanel(page);
     await openStats(page, 101);
     await expect(page.locator('#chat-stats-body .stats-kpi-value').first()).toHaveText('187');
-    await expect(page.locator('#chat-stats-body .stats-subtitle', { hasText: /Added most|Used the bot/ })).toHaveCount(0);
+    await expect(page.locator('#chat-stats-body .stats-subtitle', { hasText: /Added most|Used the bot/ })).toHaveCount(
+        0
+    );
 
     await page.locator('#chat-stats-periods .btn', { hasText: String(YEAR - 1) }).click();
     await expect(page.locator('#chat-stats-periods .btn.active')).toHaveText(String(YEAR - 1));

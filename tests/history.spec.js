@@ -27,7 +27,7 @@ test('the latest year: series (with their seasons) and films in two lists, with 
 
     const first = page.locator('#history-series .history-item').first();
     await expect(first.locator('.row-name')).toHaveText('Stranger Things');
-    await expect(first.locator('.history-genres')).toHaveText('Seasons 4, 5 · drama, mystery');
+    await expect(first.locator('.history-genres')).toHaveText('Seasons 4, 5 · Drama, Mystery');
     await expect(page.locator('#history-series .history-genres').nth(1)).toHaveText('Season 2');
     await expect(page.locator('#history-films .history-genres')).toHaveText('sci-fi');
     await expect(page.locator('#history-section .kp-link')).toHaveCount(0);
@@ -164,4 +164,3 @@ test('a whole row is the title button and opens from the keyboard', async ({ pag
     await page.keyboard.press('Enter');
     await expect(page.locator('#released-title')).toHaveText('Stranger Things');
 });
-

@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * The proxy URL in parts, and the proxy test's result in words: for the proxy dialog (proxy.js)
  * and Settings (settings.js). No DOM, no requests.
@@ -36,7 +37,7 @@ export function parseProxyUrl(url) {
     }
 }
 
-const TARGET_NAMES = { telegram: 'Telegram', tmdb: 'TMDB', internet: 'Internet' };
+const TARGET_NAMES = { telegram: 'Telegram', tmdb: 'TMDB', internet: i18nText('Internet') };
 
 /**
  * "Telegram ✓ 180 ms · TMDB ✗ replied 503 · Internet ✓ 95 ms (IP 1.2.3.4)", or the proxy's own
@@ -44,13 +45,14 @@ const TARGET_NAMES = { telegram: 'Telegram', tmdb: 'TMDB', internet: 'Internet' 
  * @param {{ direct: boolean, proxyDown: string | null, checks: Record<string, { ok: boolean, ms: number, error?: string, ip?: string }> }} res
  */
 export function describeTest(res) {
-    const via = res.direct ? 'Direct connection' : 'Proxy';
-    if (res.proxyDown) return { text: `${via} unreachable: ${res.proxyDown}`, type: 'error' };
+    const via = res.direct ? i18nText('Direct connection') : i18nText('Proxy');
+    if (res.proxyDown)
+        return { text: i18nText('{{v0}} unreachable: {{v1}}', { v0: via, v1: res.proxyDown }), type: 'error' };
     const checks = Object.entries(res.checks);
     const parts = checks.map(([name, c]) => {
         const label = TARGET_NAMES[name] || name;
         if (!c.ok) return `${label} ✗ ${c.error}`;
-        return `${label} ✓ ${c.ms} ms${c.ip ? ` (IP ${c.ip})` : ''}`;
+        return i18nText('{{v0}} ✓ {{v1}} ms{{v2}}', { v0: label, v1: c.ms, v2: c.ip ? ` (IP ${c.ip})` : '' });
     });
     const passed = checks.filter(([, c]) => c.ok).length;
     const type = passed === checks.length ? 'success' : passed ? 'warning' : 'error';

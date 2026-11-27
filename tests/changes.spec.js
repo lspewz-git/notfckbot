@@ -32,7 +32,7 @@ test('the panel: ten rows a page, the arrows, another page size, a search', asyn
     // Who and where from, then what: a settings line as the bot says it, the panel's own as panel
     await expect(log.locator('.changes-line').nth(0)).toHaveText('Subscribed: The Bear');
     await expect(log.locator('.changes-meta').nth(0)).toContainText('@igor');
-    await expect(log.locator('.changes-line').nth(1)).toHaveText('Тихие часы: выключены → 23:00–08:00');
+    await expect(log.locator('.changes-line').nth(1)).toHaveText('Quiet hours: off → 23:00–08:00');
     await expect(log.locator('.changes-line').nth(2)).toHaveText('Severance: now whole season');
     await expect(log.locator('.changes-meta').nth(2)).toContainText('Admin · panel');
     await expect(log.locator('.changes-kept')).toHaveText('Kept for 30 days');

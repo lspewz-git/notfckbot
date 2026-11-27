@@ -423,7 +423,11 @@ test('each tab: two columns that end on one line', async ({ page }) => {
     const columns = async (pane) =>
         page.locator(`#settings-pane-${pane} > .settings-col`).evaluateAll((cols) =>
             cols.map((col) => ({
-                titles: [...col.querySelectorAll('.settings-title')].map((t) => t.firstChild.textContent.trim()),
+                titles: [...col.querySelectorAll('.settings-title')].map((t) => {
+                    const label = t.cloneNode(true);
+                    label.querySelectorAll('.settings-optional').forEach((note) => note.remove());
+                    return label.textContent.trim();
+                }),
                 bottom: Math.round(col.lastElementChild.getBoundingClientRect().bottom)
             }))
         );

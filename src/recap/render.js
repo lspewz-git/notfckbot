@@ -75,7 +75,7 @@ async function elementsFor(inputs, year, looks = inputs.looks) {
 // Bumped when a chat's files or the backgrounds change: a drawing started before doesn't write
 // its (now old) set back. One counter for all, as "every chat" changes are rare
 let generation = 0;
-// A chat's year drawn once at a time: a second ask joins the drawing under way
+// Share a drawing only while its inputs have not been invalidated.
 const drawingNow = new Map();
 
 async function drawAndKeep(chatId, year, now) {
@@ -92,7 +92,7 @@ async function drawAndKeep(chatId, year, now) {
         const thumbs = await Promise.all(images.map((png) => draw({ kind: 'thumb', png })));
         // A disk that refuses the write still gets the chat its cards
         await store
-            .writeSet(chatId, year, inputs.hash, images, thumbs)
+            .writeSet(chatId, year, inputs.hash, images, thumbs, () => started === generation)
             .catch((err) => log.error(`[Recap] Could not keep the cards of ${chatId}: ${err.message}`));
     }
     return { images, stats: inputs.stats };
@@ -104,7 +104,7 @@ async function drawAndKeep(chatId, year, now) {
  * by the memory cache) for a chat that isn't there.
  */
 function drawRecap(chatId, year, now = new Date()) {
-    const key = `${chatId}:${year}`;
+    const key = `${chatId}:${year}:${generation}`;
     if (!drawingNow.has(key)) {
         drawingNow.set(
             key,
@@ -175,6 +175,7 @@ function drawInBackground(chatIds, year) {
             try {
                 // Straight to the disk: through the memory cache it would fill it with every chat
                 await drawRecap(chatId, year);
+                recapCache.delete(`${chatId}:${year}`);
             } catch (err) {
                 log.error(`[Recap] Drawing the cards of ${chatId} failed: ${err.message}`);
             }

@@ -1,11 +1,63 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
 /** Turning API values into the strings and badges the UI shows. */
 
 import { escapeHtml } from './dom.js';
 
+// Stored catalog genres use Russian labels; keep the source's genre membership in every view.
+const GENRE_KEYS = Object.fromEntries(
+    Object.entries({
+        Боевик: 'Action',
+        Приключения: 'Adventure',
+        Аниме: 'Anime',
+        Мультфильм: 'Animation',
+        Комедия: 'Comedy',
+        Криминал: 'Crime',
+        Документальный: 'Documentary',
+        Драма: 'Drama',
+        Шпионский: 'Espionage',
+        Семейный: 'Family',
+        Фэнтези: 'Fantasy',
+        История: 'History',
+        Ужасы: 'Horror',
+        Медицина: 'Medical',
+        Музыка: 'Music',
+        Детектив: 'Mystery',
+        Мелодрама: 'Romance',
+        Фантастика: 'Science-Fiction',
+        Спорт: 'Sports',
+        Сверхъестественное: 'Supernatural',
+        'Телевизионный фильм': 'TV Movie',
+        Триллер: 'Thriller',
+        Военный: 'War',
+        Вестерн: 'Western',
+        'Боевик и приключения': 'Action & Adventure',
+        'НФ и Фэнтези': 'Sci-Fi & Fantasy',
+        Детский: 'Kids',
+        Новости: 'News',
+        'Реалити-шоу': 'Reality',
+        'Мыльная опера': 'Soap',
+        'Ток-шоу': 'Talk',
+        'Война и политика': 'War & Politics'
+    }).flatMap(([ru, en]) => [
+        [ru.toLowerCase(), en],
+        [en.toLowerCase(), en]
+    ])
+);
+// TMDB spells this label with a space; TVmaze uses a hyphen.
+GENRE_KEYS['science fiction'] = 'Science-Fiction';
+
+/** Display only; unfamiliar provider labels stay intact. */
+export function genreName(name) {
+    const value = String(name || '').trim();
+    const key = GENRE_KEYS[value.toLowerCase()];
+    return key ? i18nText(key) : value;
+}
+
 /** A country code in the panel's language, falling back to the code itself. */
 export function countryName(code) {
     try {
-        return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
+        return new Intl.DisplayNames([locale], { type: 'region' }).of(code) || code;
     } catch {
         return code;
     }
@@ -23,7 +75,7 @@ export function compactCountries(codes, { withCount = true } = {}) {
 
 export function chatLabel(chat) {
     if (chat.username) return chat.username;
-    return chat.type === 'private' ? 'Unknown user' : 'Unnamed group';
+    return chat.type === 'private' ? i18nText('Unknown user') : i18nText('Unnamed group');
 }
 
 // Avatar tints: hues spread round the wheel; the CSS turns each into a quiet background
@@ -64,31 +116,45 @@ export function chatDisplayName(chat) {
 
 // Normalized catalog status; a status change alone does not confirm a renewal.
 const SERIES_STATUS = {
-    'Returning Series': { label: 'Running', cls: 'ok' },
-    'In Production': { label: 'In production', cls: 'warn' },
-    Planned: { label: 'Planned', cls: 'warn' },
-    Pilot: { label: 'Pilot', cls: 'warn' },
-    Ended: { label: 'Ended', cls: 'muted' },
-    Canceled: { label: 'Canceled', cls: 'error' }
+    'Returning Series': { label: i18nText('Running'), cls: 'ok' },
+    'In Production': { label: i18nText('In production'), cls: 'warn' },
+    Planned: { label: i18nText('Planned'), cls: 'warn' },
+    Pilot: { label: i18nText('Pilot'), cls: 'warn' },
+    Ended: { label: i18nText('Ended'), cls: 'muted' },
+    Canceled: { label: i18nText('Canceled'), cls: 'error' }
 };
 
 export function seriesStatusBadge(status) {
     if (!status) {
-        return '<span class="badge muted" title="Filled in by the next update check">Unknown</span>';
+        return (
+            '<span class="badge muted" title="' +
+            i18nText('Filled in by the next update check') +
+            '">' +
+            i18nText('Unknown') +
+            '</span>'
+        );
     }
     const known = SERIES_STATUS[status];
     if (!known) return `<span class="badge muted">${escapeHtml(status)}</span>`;
-    return `<span class="badge ${known.cls}" title="Catalog status: ${escapeHtml(status)}">${known.label}</span>`;
+    return (
+        '<span class="badge ' +
+        known.cls +
+        '" title="' +
+        i18nText('Catalog status: {{v1}}', { v1: escapeHtml(status) }) +
+        '">' +
+        known.label +
+        '</span>'
+    );
 }
 
 /** "2026-12-15" -> "15 Dec 2026"; "TBA" while TMDB has no date. Plain text — escape it for HTML. */
 export function formatReleaseDate(iso) {
-    if (!iso) return 'TBA';
+    if (!iso) return i18nText('TBA');
     const d = new Date(iso);
     if (isNaN(d.getTime())) return String(iso);
     // "YYYY-MM-DD" parses as UTC midnight; formatting it in local time would show the
     // day before for anyone west of UTC
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 /**
@@ -105,7 +171,7 @@ function premiereMonthOnly(iso) {
 /** "16 Jan 2027", or "Feb 2027" for a premiere known only to the month. */
 export function formatPremiereRu(iso) {
     return premiereMonthOnly(iso)
-        ? new Date(`${String(iso).slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+        ? new Date(`${String(iso).slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, {
               month: 'short',
               year: 'numeric',
               timeZone: 'UTC'
@@ -136,16 +202,28 @@ export function releaseExtras(film) {
     if (film.ru_premiere) {
         // A month alone keeps its year: "cinema Feb 2027"
         russia.push(
-            `cinema ${premiereMonthOnly(film.ru_premiere) ? formatPremiereRu(film.ru_premiere) : shortDate(film.ru_premiere, main)}`
+            i18nText('cinema {{v0}}', {
+                v0: premiereMonthOnly(film.ru_premiere)
+                    ? formatPremiereRu(film.ru_premiere)
+                    : shortDate(film.ru_premiere, main)
+            })
         );
     }
     if (film.ru_digital)
-        russia.push(`digital ${shortDate(film.ru_digital, main)}${film.ru_services ? `, ${film.ru_services}` : ''}`);
-    if (russia.length) lines.push(`Russia: ${russia.join(' · ')}`);
+        russia.push(
+            i18nText('digital {{v0}}{{v1}}', {
+                v0: shortDate(film.ru_digital, main),
+                v1: film.ru_services ? `, ${film.ru_services}` : ''
+            })
+        );
+    if (russia.length) lines.push(i18nText('Russia: {{v0}}', { v0: russia.join(' · ') }));
     const sameAsRussia = film.digital_country === 'RU' && film.digital_date === film.ru_digital;
     if (film.digital_date && !sameAsRussia) {
         lines.push(
-            `Digital ${shortDate(film.digital_date, main)}${film.digital_country ? ` (${film.digital_country})` : ''}`
+            i18nText('Digital {{v0}}{{v1}}', {
+                v0: shortDate(film.digital_date, main),
+                v1: film.digital_country ? ` (${film.digital_country})` : ''
+            })
         );
     }
     return lines;
@@ -156,7 +234,7 @@ export function releaseExtras(film) {
  * no date yet, plain "TBA" when TMDB announces nothing. Plain text.
  */
 export function formatNextEpisode(series) {
-    if (!series) return 'TBA';
+    if (!series) return i18nText('TBA');
     const { next_episode_season: season, next_episode_number: episode, next_episode_date: date } = series;
     const known = (n) => n !== null && n !== undefined;
     const num = known(season) && known(episode) ? `S${season}E${episode} · ` : '';
@@ -164,15 +242,15 @@ export function formatNextEpisode(series) {
 }
 
 export const MODE_LABELS = {
-    episode: 'Every episode',
-    season: 'Whole season',
-    first_and_full: '1st + season'
+    episode: i18nText('Every episode'),
+    season: i18nText('Whole season'),
+    first_and_full: i18nText('1st + season')
 };
 
 export const BROADCAST_AUDIENCE_LABELS = {
-    all: 'every private chat and group',
-    private: 'every private chat',
-    groups: 'every group and channel'
+    all: i18nText('every private chat and group'),
+    private: i18nText('every private chat'),
+    groups: i18nText('every group and channel')
 };
 
 /** "12 Oct", with the year when it isn't this one; in the viewer's time. Plain text. */
@@ -180,7 +258,7 @@ export function shortDay(iso, now = new Date()) {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
     const year = d.getFullYear() === now.getFullYear() ? undefined : 'numeric';
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year });
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year });
 }
 
 /** When a chat last used the bot: "Just now", "5 min ago", "2 h ago", "Yesterday", "9 Oct"; "-" if never seen. */
@@ -188,25 +266,25 @@ export function lastSeenText(iso, now = new Date()) {
     const d = iso ? new Date(iso) : null;
     if (!d || isNaN(d.getTime())) return '-';
     const minutes = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 60000));
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes} min ago`;
-    if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+    if (minutes < 1) return i18nText('Just now');
+    if (minutes < 60) return i18nText('{{v0}} min ago', { v0: minutes });
+    if (minutes < 24 * 60) return i18nText('{{v0}} h ago', { v0: Math.floor(minutes / 60) });
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    return d.toDateString() === yesterday.toDateString() ? 'Yesterday' : shortDay(iso, now);
+    return d.toDateString() === yesterday.toDateString() ? i18nText('Yesterday') : shortDay(iso, now);
 }
 
 /** "active 2 h ago", "active yesterday" for a line after a chat's name; empty if never seen. */
 export function activeLine(iso, now = new Date()) {
     const seen = lastSeenText(iso, now);
-    return seen === '-' ? '' : `active ${seenInLine(iso, now)}`;
+    return seen === '-' ? '' : i18nText('active {{v0}}', { v0: seenInLine(iso, now) });
 }
 
 /** The statuses of a chat the bot can't reach (src/bot-status.js); the panel's block is separate. */
 const LEFT_LABELS = {
-    stopped: () => 'Stopped the bot',
-    removed: () => 'Removed from group',
-    deleted: (chat) => (chat.type === 'private' ? 'Account deleted' : 'Chat deleted')
+    stopped: () => i18nText('Stopped the bot'),
+    removed: () => i18nText('Removed from group'),
+    deleted: (chat) => (chat.type === 'private' ? i18nText('Account deleted') : i18nText('Chat deleted'))
 };
 
 /** Whether the bot has lost the chat: blocked by the user, removed from the group, deleted. */
@@ -227,8 +305,8 @@ export const seenInLine = (iso, now = new Date()) =>
 export function chatStatus(chat, now = new Date()) {
     const since = chat.bot_status_at ? shortDay(chat.bot_status_at, now) : '';
     if (botLeft(chat)) {
-        const by = chat.bot_status_by ? `by ${chat.bot_status_by}` : '';
-        const note = by ? [by, since].filter(Boolean).join(' · ') : since && `since ${since}`;
+        const by = chat.bot_status_by ? i18nText('by {{v0}}', { v0: chat.bot_status_by }) : '';
+        const note = by ? [by, since].filter(Boolean).join(' · ') : since && i18nText('since {{v0}}', { v0: since });
         return {
             badge: `<span class="badge warn">${LEFT_LABELS[chat.bot_status](chat)}</span>`,
             note
@@ -236,13 +314,19 @@ export function chatStatus(chat, now = new Date()) {
     }
     const until = chat.blockedUntil ? new Date(chat.blockedUntil) : null;
     if (until && until > now) {
-        const when = until.toLocaleString('en-GB', {
+        const when = until.toLocaleString(locale, {
             day: 'numeric',
             month: 'short',
             hour: '2-digit',
             minute: '2-digit'
         });
-        return { badge: '<span class="badge error">Blocked</span>', note: `until ${when}` };
+        return {
+            badge: '<span class="badge error">' + i18nText('Blocked') + '</span>',
+            note: i18nText('until {{v0}}', { v0: when })
+        };
     }
-    return { badge: '<span class="badge ok">Active</span>', note: since ? `came back ${since}` : '' };
+    return {
+        badge: '<span class="badge ok">' + i18nText('Active') + '</span>',
+        note: since ? i18nText('came back {{v0}}', { v0: since }) : ''
+    };
 }

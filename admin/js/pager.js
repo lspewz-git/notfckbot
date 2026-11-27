@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /** Pages for the long tables: the page size (remembered per table), the current page, the pager. */
 
 import { $, escapeHtml } from './dom.js';
@@ -16,8 +17,8 @@ function storedPageSize(type) {
 }
 
 const ARROWS = [
-    [-1, 'Previous page', 'chevron-left'],
-    [1, 'Next page', 'chevron-right']
+    [-1, i18nText('Previous page'), 'chevron-left'],
+    [1, i18nText('Next page'), 'chevron-right']
 ];
 
 /**
@@ -36,22 +37,25 @@ export function fillPagers(root = document) {
         const target = history
             ? `data-action="history-page" data-list="${name}"`
             : `data-action="page" data-table="${name}"`;
-        el.innerHTML = `
-            <div class="pager-size">
-                <span class="pager-label">Rows per page</span>
-                <select class="select-field" ${sizeAttr}="${name}" aria-label="${escapeHtml(pagerLabel)}">
-                    ${PAGE_SIZES.map((n) => `<option value="${n}">${n}</option>`).join('')}
-                </select>
-            </div>
-            <span class="pager-info" aria-live="polite"></span>
-            <div class="pager-nav">
-                ${ARROWS.map(
-                    ([step, label, name]) => `
+        el.innerHTML =
+            '\n            <div class="pager-size">\n                <span class="pager-label">' +
+            i18nText('Rows per page') +
+            '</span>\n                <select class="select-field" ' +
+            sizeAttr +
+            '="' +
+            name +
+            '" aria-label="' +
+            escapeHtml(i18nText(pagerLabel)) +
+            '">\n                    ' +
+            PAGE_SIZES.map((n) => `<option value="${n}">${n}</option>`).join('') +
+            '\n                </select>\n            </div>\n            <span class="pager-info" aria-live="polite"></span>\n            <div class="pager-nav">\n                ' +
+            ARROWS.map(
+                ([step, label, name]) => `
                     <button class="btn btn-ghost btn-icon" ${target} data-step="${step}" aria-label="${label}">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>
                     </button>`
-                ).join('')}
-            </div>`;
+            ).join('') +
+            '\n            </div>';
     });
 }
 
@@ -74,7 +78,11 @@ export function renderPager(type, total) {
     el.hidden = total === 0;
     const pages = Math.max(1, Math.ceil(total / state.size));
     const start = (state.page - 1) * state.size;
-    el.querySelector('.pager-info').textContent = `${start + 1}–${Math.min(start + state.size, total)} of ${total}`;
+    el.querySelector('.pager-info').textContent = i18nText('{{v0}}–{{v1}} of {{v2}}', {
+        v0: start + 1,
+        v1: Math.min(start + state.size, total),
+        v2: total
+    });
     el.querySelectorAll('[data-step]').forEach((btn) => {
         const step = Number(/** @type {HTMLElement} */ (btn).dataset.step);
         /** @type {HTMLButtonElement} */ (btn).disabled = step < 0 ? state.page <= 1 : state.page >= pages;

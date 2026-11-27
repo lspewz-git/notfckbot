@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * TMDB proxy settings.
  *
@@ -57,7 +58,7 @@ function fillForm(url) {
         $field('proxy-pass').value = '';
     } else {
         // Hand-edited .env value we can't parse — start from a clean form
-        toast('Stored proxy URL could not be parsed', 'warning');
+        toast(i18nText('Stored proxy URL could not be parsed'), 'warning');
         setSelectValue('proxy-scheme', '');
         clear();
     }
@@ -80,22 +81,26 @@ function renderStatus(h) {
     problemList.hidden = true;
     if (h === 'checking') {
         state.hidden = false;
-        state.textContent = 'Checking…';
+        state.textContent = i18nText('Checking…');
         state.className = 'modal-sub';
     } else if (!h || h.proxy === 'off') {
         state.hidden = true;
     } else if (h.proxy === 'ok') {
         state.hidden = false;
-        state.textContent = '● Working';
+        state.textContent = i18nText('● Working');
         state.className = 'modal-sub state-ok';
     } else {
         state.hidden = false;
-        state.textContent = '● Not responding';
+        state.textContent = i18nText('● Not responding');
         state.className = 'modal-sub state-error';
         if (h.problem) {
             problemList.innerHTML =
-                `<dt>Error</dt><dd>${escapeHtml(h.problem.reason)}</dd>` +
-                `<dt>Failing</dt><dd>${escapeHtml(sinceText(h.problem))}</dd>`;
+                '<dt>' +
+                i18nText('Error') +
+                '</dt><dd>' +
+                escapeHtml(h.problem.reason) +
+                '</dd>' +
+                ('<dt>' + i18nText('Failing') + '</dt><dd>' + escapeHtml(sinceText(h.problem)) + '</dd>');
             problemList.hidden = false;
         }
     }
@@ -112,9 +117,9 @@ export async function openProxyModal() {
         const cfg = await api('/config');
         saved = cfg.tmdbProxyUrl || '';
         fillForm(saved);
-        $field('proxy-pass').placeholder = cfg.proxyHasPassword ? '•••••• saved — leave empty to keep' : '';
+        $field('proxy-pass').placeholder = cfg.proxyHasPassword ? i18nText('•••••• saved — leave empty to keep') : '';
     } catch (e) {
-        toast('Could not load current proxy settings', 'error');
+        toast(i18nText('Could not load current proxy settings'), 'error');
         syncForm();
     }
     renderStatus(saved ? 'checking' : null);
@@ -133,7 +138,7 @@ function urlOrWarn() {
     const scheme = $field('proxy-scheme').value;
     const url = urlFromForm();
     if (scheme && !url) {
-        toast('Fill in host and port first', 'warning');
+        toast(i18nText('Fill in host and port first'), 'warning');
         return null;
     }
     return url;
@@ -149,7 +154,7 @@ export function setupProxyForm() {
 
         const btn = target(e);
         btn.disabled = true;
-        btn.innerText = 'Testing...';
+        btn.innerText = i18nText('Testing...');
         try {
             // A URL the server refuses comes back as an { error } body, which api() turns into
             // a throw; otherwise each target has its own result
@@ -157,10 +162,10 @@ export function setupProxyForm() {
             const { text, type } = describeTest(res);
             toast(text, type, 8000);
         } catch (err) {
-            toast(`Failed: ${err.message}`, 'error');
+            toast(i18nText('Failed: {{v0}}', { v0: err.message }), 'error');
         } finally {
             btn.disabled = false;
-            btn.innerText = 'Test';
+            btn.innerText = i18nText('Test');
         }
     };
 
@@ -171,7 +176,7 @@ export function setupProxyForm() {
         const ok = await mutate(
             '/config',
             { method: 'POST', body: { tmdbProxyUrl: url } },
-            url ? 'Proxy enabled' : 'Proxy disabled — connecting directly'
+            url ? i18nText('Proxy enabled') : i18nText('Proxy disabled — connecting directly')
         );
         if (!ok) return;
         // A check of the old proxy still running must not repaint the badge

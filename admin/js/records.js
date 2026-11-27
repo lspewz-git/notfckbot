@@ -1,3 +1,5 @@
+import { t as i18nText } from './i18n.js';
+import { displayTitle, titleMarkup } from './catalog-text.js';
 /** Acting on one subscription or watchlist entry. */
 
 import { $, $field, setText, escapeHtml } from './dom.js';
@@ -37,7 +39,7 @@ function peopleGroup(label, rows) {
 function setKinopoiskLink(url, direct) {
     const link = /** @type {HTMLAnchorElement} */ ($('detail-body').querySelector('.tc-link'));
     link.href = url;
-    link.title = direct ? '' : 'Kinopoisk search by title';
+    link.title = direct ? '' : i18nText('Kinopoisk search by title');
 }
 
 /**
@@ -70,7 +72,7 @@ async function openDetails(load) {
         if (focused) body.focus({ preventScroll: true });
     };
     body.innerHTML = titleCard(
-        { kind: 'tv', title: 'Loading details…' },
+        { kind: 'tv', title: i18nText('Loading details…') },
         { titleId: 'detail-title', close: 'detail-modal' }
     );
     openModal('detail-modal');
@@ -95,7 +97,7 @@ async function openDetails(load) {
         if (request !== detailRequest || !modal.hasAttribute('open')) return;
         fill(
             titleCard(
-                { kind: 'tv', title: 'Failed to load details.' },
+                { kind: 'tv', title: i18nText('Failed to load details.') },
                 { titleId: 'detail-title', close: 'detail-modal' }
             )
         );
@@ -107,15 +109,17 @@ async function openDetails(load) {
 function titlePeople(details, tv) {
     if (tv) {
         const subs = details.subscribers || [];
-        return subs.length ? peopleGroup('Subscribers', subs) : '<p class="people-none">No subscribers.</p>';
+        return subs.length
+            ? peopleGroup(i18nText('Subscribers'), subs)
+            : '<p class="people-none">' + i18nText('No subscribers.') + '</p>';
     }
     const chats = details.chats || [];
     const waiting = chats.filter((chat) => !chat.notified);
     const notified = chats.filter((chat) => chat.notified);
     return (
-        (waiting.length ? peopleGroup('Waiting for release', waiting) : '') +
-            (notified.length ? peopleGroup('Already notified', notified) : '') ||
-        '<p class="people-none">No chat has this film on its list.</p>'
+        (waiting.length ? peopleGroup(i18nText('Waiting for release'), waiting) : '') +
+            (notified.length ? peopleGroup(i18nText('Already notified'), notified) : '') ||
+        '<p class="people-none">' + i18nText('No chat has this film on its list.') + '</p>'
     );
 }
 
@@ -134,9 +138,13 @@ function releasedDate(item) {
         const premiere = (season) => (item.seasonPremieres || []).find((s) => s.season === season)?.date;
         const [first, ...more] = seasons;
         return {
-            label: `Season ${first} premiere`,
+            label: i18nText('Season {{v0}} premiere', { v0: first }),
             value: formatReleaseDate(premiere(first)),
-            note: more.map((season) => `Season ${season}: ${formatReleaseDate(premiere(season))}`).join(' · ')
+            note: more
+                .map((season) =>
+                    i18nText('Season {{v0}}: {{v1}}', { v0: season, v1: formatReleaseDate(premiere(season)) })
+                )
+                .join(' · ')
         };
     }
     const d = item.dates || { release: item.date, ruPremiere: item.ruPremiere, ruDigital: item.ruDigital };
@@ -161,6 +169,7 @@ export function openReleasedDetails(
     $('released-body').innerHTML = titleCard(
         {
             kind: item.kind,
+            catalogId: item.tmdbId || String(item.id),
             title: item.title,
             poster: item.poster,
             seasons: tv ? item.seasonCount : null,
@@ -186,7 +195,9 @@ export function openReleasedDetails(
             actions,
             error,
             extra: admin
-                ? '<div id="released-people" class="detail-people"><p class="people-none">Loading chat information…</p></div>'
+                ? '<div id="released-people" class="detail-people"><p class="people-none">' +
+                  i18nText('Loading chat information…') +
+                  '</p></div>'
                 : ''
         }
     );
@@ -200,7 +211,7 @@ export function openReleasedDetails(
     };
     releasedPeople(item)
         .then(fill)
-        .catch(() => fill('<p class="people-none">Chat information unavailable.</p>'));
+        .catch(() => fill('<p class="people-none">' + i18nText('Chat information unavailable.') + '</p>'));
 }
 
 export const openSeriesDetails = (tmdbId, source = null) => {
@@ -212,16 +223,21 @@ export const openSeriesDetails = (tmdbId, source = null) => {
         const data = await api(`/series/${tmdbId}`);
         return {
             kind: 'tv',
+            catalogId: String(tmdbId).startsWith('tv_') ? String(tmdbId) : `tv_${tmdbId}`,
             title: data.name || data.original_name,
             seasons: data.number_of_seasons,
             rating: data.vote_average,
             ratingSource:
-                data.rating_source === 'tvmaze' ? 'TVmaze' : data.rating_source === 'unknown' ? 'Catalog' : 'TMDB',
+                data.rating_source === 'tvmaze'
+                    ? 'TVmaze'
+                    : data.rating_source === 'unknown'
+                      ? i18nText('Catalog')
+                      : 'TMDB',
             source: data.data_source === 'tvmaze' && data.source_url ? { label: 'TVmaze', url: data.source_url } : null,
             overview: data.overview,
             date: {
-                label: year ? `Season premiere in ${year}` : 'Premiere',
-                value: year ? 'None listed' : formatReleaseDate(data.first_air_date)
+                label: year ? i18nText('Season premiere in {{v0}}', { v0: year }) : i18nText('Premiere'),
+                value: year ? i18nText('None listed') : formatReleaseDate(data.first_air_date)
             },
             premieres: year
                 ? seasons.map((season) => ({
@@ -241,9 +257,10 @@ export const openFilmDetails = (tmdbId, source = null) =>
         const data = await api(`/movie/${tmdbId}`);
         return {
             kind: 'movie',
+            catalogId: String(tmdbId).startsWith('movie_') ? String(tmdbId) : `movie_${tmdbId}`,
             title: data.title || data.original_title,
             year: (data.dates?.release || data.release_date || '').slice(0, 4) || null,
-            status: data.status || 'Unknown status',
+            status: data.status || i18nText('Unknown status'),
             rating: data.vote_average,
             overview: data.overview,
             date: releasedDate({ kind: 'movie', dates: data.dates || {} }),
@@ -257,9 +274,9 @@ export function openModeModal(key) {
     const sub = subsByKey.get(key);
     if (!sub) return;
 
-    const title = sub.Series ? sub.Series.title : sub.seriesId;
+    const title = displayTitle(sub.seriesId, sub.Series ? sub.Series.title : sub.seriesId);
     const who = sub.Chat ? chatLabel(sub.Chat) : sub.chatId;
-    setText('mode-target', `${title} • ${who}`);
+    $('mode-target').innerHTML = `${titleMarkup(sub.seriesId, title)} • ${escapeHtml(who)}`;
     setSelectValue('mode-select', sub.notify_type);
 
     $('confirm-mode').onclick = async () => {
@@ -274,7 +291,7 @@ export function openModeModal(key) {
         const ok = await mutate(
             '/subscription',
             { method: 'POST', body: { chatId: sub.chatId, tmdbId: sub.seriesId, notify_type } },
-            `Mode set to "${MODE_LABELS[notify_type]}"`
+            i18nText('Mode set to "{{v0}}"', { v0: MODE_LABELS[notify_type] })
         );
         if (ok) {
             clearReturnTo();
@@ -294,9 +311,9 @@ export function openSubActions(key) {
     if (!sub) return;
     const back = () => openSubActions(key);
 
-    setText('sub-actions-title', sub.Series ? sub.Series.title : sub.seriesId);
+    $('sub-actions-title').innerHTML = titleMarkup(sub.seriesId, sub.Series ? sub.Series.title : sub.seriesId);
     setText('sub-actions-sub', sub.Chat ? chatLabel(sub.Chat) : String(sub.chatId));
-    setText('sub-action-mode-desc', `Now: ${MODE_LABELS[sub.notify_type] || sub.notify_type}`);
+    setText('sub-action-mode-desc', i18nText('Now: {{v0}}', { v0: MODE_LABELS[sub.notify_type] || sub.notify_type }));
 
     $('sub-action-mode').onclick = () => {
         closeModal('sub-actions-modal');
@@ -314,20 +331,21 @@ export function openSubActions(key) {
 
 export function deleteSub(chatId, seriesId) {
     showConfirm({
-        title: 'Delete subscription?',
-        text: 'The user will stop receiving notifications for this series.',
-        confirmLabel: 'Yes, delete',
-        cancelLabel: 'No, keep it',
-        onConfirm: () => mutate(`/subscription/${chatId}/${seriesId}`, { method: 'DELETE' }, 'Subscription deleted')
+        title: i18nText('Delete subscription?'),
+        text: i18nText('The user will stop receiving notifications for this series.'),
+        confirmLabel: i18nText('Yes, delete'),
+        cancelLabel: i18nText('No, keep it'),
+        onConfirm: () =>
+            mutate(`/subscription/${chatId}/${seriesId}`, { method: 'DELETE' }, i18nText('Subscription deleted'))
     });
 }
 
 export function deleteWatchlistItem(id) {
     showConfirm({
-        title: 'Remove from watchlist?',
-        text: "The user will no longer be notified about this film's release.",
-        confirmLabel: 'Yes, remove',
-        cancelLabel: 'No, keep it',
-        onConfirm: () => mutate(`/watchlist/${id}`, { method: 'DELETE' }, 'Removed from watchlist')
+        title: i18nText('Remove from watchlist?'),
+        text: i18nText("The user will no longer be notified about this film's release."),
+        confirmLabel: i18nText('Yes, remove'),
+        cancelLabel: i18nText('No, keep it'),
+        onConfirm: () => mutate(`/watchlist/${id}`, { method: 'DELETE' }, i18nText('Removed from watchlist'))
     });
 }

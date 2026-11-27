@@ -21,6 +21,7 @@ const AccountPassword = require('./models/AccountPassword');
 const PanelRole = require('./models/PanelRole');
 const HiddenChat = require('./models/HiddenChat');
 const TermsAcceptance = require('./models/TermsAcceptance');
+const AccountPreference = require('./models/AccountPreference');
 const { log } = require('./log');
 
 const initDb = async () => {
@@ -61,5 +62,6 @@ module.exports = {
     AccountPassword,
     PanelRole,
     HiddenChat,
-    TermsAcceptance
+    TermsAcceptance,
+    AccountPreference
 };

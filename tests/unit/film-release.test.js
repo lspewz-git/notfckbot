@@ -85,6 +85,13 @@ test('no 45-day estimate: an unknown digital release stays unknown after cinema'
     assert.equal(dates.online_estimate, false);
 });
 
+test('stored dates preserve factual release status independently of the planned date', () => {
+    const planned = movie([['US', 3, '2026-01-01']], { status: 'Post Production' });
+    assert.equal(storedDates(planned).release_status, 'Post Production');
+    assert.equal(storedDates({ ...planned, status: 'Released' }).release_status, 'Released');
+    assert.equal(storedDates({}).release_status, null);
+});
+
 test('digital date and country are selected together, independently of cinema', () => {
     const film = movie([
         ['US', 3, '2026-08-28'],

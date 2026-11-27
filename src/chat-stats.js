@@ -101,13 +101,31 @@ function filmDay(film) {
  * @param {{ from: string, to: string }} period inclusive days
  */
 function computeStats(
-    { chat, series, films, events: chatEvents, followers = new Map(), firstEvent },
+    { chat, series, films: filmRows, events: chatEvents, followers = new Map(), firstEvent },
     period,
     now = new Date()
 ) {
     const zone = (chat && chat.timezone) || DEFAULT_ZONE;
     const dayOf = (date) => (date ? todayIn(zone, new Date(date)) : null);
     const today = todayIn(zone, now);
+    const legacyReleased = new Set(filmRows.filter((film) => film.notified).map((film) => film.tmdb_id));
+    // An old bot card may add a waiting row beside an already released row of the same title.
+    const titles = new Map();
+    for (const film of [...filmRows].sort(
+        (a, b) =>
+            new Date(a.updatedAt || a.createdAt || 0).getTime() - new Date(b.updatedAt || b.createdAt || 0).getTime() ||
+            (Number(a.id) || 0) - (Number(b.id) || 0)
+    )) {
+        const previous = titles.get(film.tmdb_id);
+        const createdAt =
+            previous?.createdAt && (!film.createdAt || new Date(previous.createdAt) < new Date(film.createdAt))
+                ? previous.createdAt
+                : film.createdAt;
+        titles.set(film.tmdb_id, { ...film, createdAt });
+    }
+    const films = [...titles.values()];
+    const aheadUntil = `${Number(period.to.slice(0, 4)) + 1}-12-31`;
+    const coming = (day) => Boolean(day) && day > period.to && day <= aheadUntil;
 
     // Episodes out in the period, from each series' months
     const byMonth = {};
@@ -147,6 +165,7 @@ function computeStats(
             title: s.title,
             kind: 'series',
             rating: s.rating || null,
+            rating_source: s.rating_source || (s.episode_source === 'tvmaze' ? 'unknown' : 'tmdb'),
             tmdb_id: s.tmdb_id,
             poster_url: s.poster_url || null
         });
@@ -160,6 +179,11 @@ function computeStats(
     const services = {};
     for (const f of films) {
         const day = filmDay(f);
+        const releaseDay = f.cinema_date || f.premiere_digital;
+        const confirmed = f.release_status
+            ? f.release_status === 'Released' && releaseDay && releaseDay <= today
+            : legacyReleased.has(f.tmdb_id);
+        if (!confirmed) continue;
         if (!inPeriod(day, period) || day > today) continue;
         const added = dayOf(f.createdAt);
         const waited = added && added < day ? Math.round((Date.parse(day) - Date.parse(added)) / DAY_MS) : 0;
@@ -175,6 +199,7 @@ function computeStats(
             title: f.title,
             kind: 'film',
             rating: f.rating || null,
+            rating_source: 'tmdb',
             tmdb_id: f.tmdb_id,
             poster_url: f.poster_url || null
         });
@@ -226,7 +251,7 @@ function computeStats(
         },
         added: {
             series: series.filter((s) => inPeriod(dayOf(s.subscribedAt), period)).length,
-            films: films.filter((f) => inPeriod(dayOf(f.createdAt), period)).length,
+            films: filmRows.filter((f) => inPeriod(dayOf(f.createdAt), period)).length,
             unsubscribed: inside.filter((e) => e.kind === 'unsubscribed').length,
             filmsRemoved: inside.filter((e) => e.kind === 'film_removed').length
         },
@@ -260,15 +285,15 @@ function computeStats(
         best,
         finished: finishedInPeriod,
         ahead: {
-            series: series.filter((s) => s.next_episode_date && s.next_episode_date > period.to).length,
-            films: films.filter((f) => !f.notified && (!filmDay(f) || filmDay(f) > period.to)).length,
+            series: series.filter((s) => coming(s.next_episode_date)).length,
+            films: films.filter((f) => !f.notified && coming(filmDay(f))).length,
             // What comes first after the period, with a date: the next episode or the film's release
             next: [
                 ...series
-                    .filter((s) => s.next_episode_date && s.next_episode_date > period.to)
+                    .filter((s) => coming(s.next_episode_date))
                     .map((s) => ({ title: s.title, day: s.next_episode_date, kind: 'series' })),
                 ...films
-                    .filter((f) => !f.notified && filmDay(f) > period.to)
+                    .filter((f) => !f.notified && coming(filmDay(f)))
                     .map((f) => ({ title: f.title, day: filmDay(f), kind: 'film' }))
             ]
                 .sort((a, b) => a.day.localeCompare(b.day))

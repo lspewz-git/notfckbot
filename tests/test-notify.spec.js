@@ -28,21 +28,21 @@ async function pick(page, selectId, text) {
 
 const send = async (page) => {
     await dialog(page).locator('#send-test-notify-btn').click();
-    await expect(page.locator('.toast', { hasText: 'Тестовое уведомление успешно отправлено' })).toBeVisible();
+    await expect(page.locator('.toast', { hasText: 'Test notification sent!' })).toBeVisible();
 };
 
 test('all seven alerts the bot sends are on the list', async ({ page }) => {
     await mockPanel(page);
     await openForAlice(page);
     const options = await page.locator('#test-notify-mode-select option').allTextContents();
-    expect(options.map((o) => o.split(' (')[1].replace(')', ''))).toEqual([
-        'New Episode',
-        'Season Premiere',
-        'Season Schedule',
-        'Ended',
-        'Canceled',
-        'Active again',
-        'Film Released'
+    expect(options.map((o) => o.trim())).toEqual([
+        '⚡️ New episode',
+        '🆕 Season premiere',
+        '✅ Known season episodes released',
+        'ℹ️ Catalog: ended',
+        'ℹ️ Catalog: canceled',
+        'ℹ️ Back to active subscriptions',
+        '🎬 Film released'
     ]);
 });
 
@@ -57,7 +57,7 @@ test('an episode alert sends the series with its season and episode', async ({ p
 test('a status alert needs no season or episode', async ({ page }) => {
     const panel = await mockPanel(page);
     await openForAlice(page);
-    await pick(page, 'test-notify-mode-select', 'В каталоге: завершён');
+    await pick(page, 'test-notify-mode-select', 'Catalog: ended');
     await expect(dialog(page).locator('#test-notify-episode-fields')).toBeHidden();
     await send(page);
     expect(panel.lastTest).toEqual({ chatId: '101', mode: 'ended', seriesId: '1399' });
@@ -66,7 +66,7 @@ test('a status alert needs no season or episode', async ({ page }) => {
 test('the film alert switches the picker to films and sends a film', async ({ page }) => {
     const panel = await mockPanel(page);
     await openForAlice(page);
-    await pick(page, 'test-notify-mode-select', 'Фильм вышел');
+    await pick(page, 'test-notify-mode-select', 'Film released');
 
     await expect(dialog(page).locator('#test-title-label')).toHaveText('Film');
     await expect(dialog(page).locator('#tab-test-series-db')).toHaveText('Films on lists');
@@ -81,8 +81,8 @@ test('the film alert switches the picker to films and sends a film', async ({ pa
 test('back from a film to a series alert, the picker shows series again', async ({ page }) => {
     const panel = await mockPanel(page);
     await openForAlice(page);
-    await pick(page, 'test-notify-mode-select', 'Фильм вышел');
-    await pick(page, 'test-notify-mode-select', 'Возврат в активные подписки');
+    await pick(page, 'test-notify-mode-select', 'Film released');
+    await pick(page, 'test-notify-mode-select', 'Back to active subscriptions');
     await expect(dialog(page).locator('#test-title-label')).toHaveText('Series');
     await send(page);
     expect(panel.lastTest).toEqual({ chatId: '101', mode: 'renewed', seriesId: '1399' });

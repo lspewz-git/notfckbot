@@ -64,6 +64,7 @@ beforeEach(() => {
 test("the film's rows get TMDB's digital release and Kinopoisk's Russian dates", async () => {
     await checkWatchlistReleases({});
     for (const r of rows) {
+        assert.equal(r.release_status, 'Post Production');
         assert.equal(r.digital_date, '2027-02-06');
         assert.equal(r.digital_country, 'US');
         assert.equal(r.ru_premiere, '2027-01-16');
@@ -195,6 +196,7 @@ test('cinema release: once to every waiting chat, regardless of the old premiere
     assert.match(sent[0].text, /Дата цифрового релиза неизвестна/);
     assert.doesNotMatch(sent[0].text, /SSPoisk/);
     assert.ok(rows.every((r) => r.notified));
+    assert.ok(rows.every((r) => r.release_status === 'Released'));
     await checkWatchlistReleases({});
     assert.equal(sent.length, 2);
 });

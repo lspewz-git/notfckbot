@@ -7,6 +7,12 @@ const pixels = (value) => Number.parseFloat(value) || 0;
 // Entry animations scale the frame; layout measurements must not include that transform.
 const height = (element) => element.offsetHeight;
 
+/** Replace asynchronous catalog copy without restoring the layout engine's previous full text. */
+export function setTitleCopy(element, text) {
+    copies.set(element, text);
+    element.textContent = text;
+}
+
 /** Keep the frame fixed; expanded details and actions share the same scrolling flow. */
 export function fitTitleSheet(root) {
     const sheet = /** @type {HTMLElement | null} */ (

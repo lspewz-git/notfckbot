@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * Panel access (src/admin/routes/access.js): a person's role from Users → Actions → Settings → Panel access,
  * saved when picked; in Settings → Bot the sign-up switch and the system account's password.
@@ -13,7 +14,7 @@ import { setSelectValue } from './select.js';
 import { chatsById } from './store.js';
 import { signedInUser, openPasswordDialog } from './password.js';
 
-export const ROLE_LABELS = { admin: 'Admin', user: 'User', none: 'No access' };
+export const ROLE_LABELS = { admin: i18nText('Admin'), user: i18nText('User'), none: i18nText('No access') };
 
 /** The role pill next to a chat's name in Users. Nothing for someone without a role (sign-up closed). */
 export const roleBadge = (role) =>
@@ -35,7 +36,7 @@ export function showAccessIn(chat, back = returnToSettings) {
     $field('action-access-role').dataset.id = String(chat.id);
     // setSelectValue fires "change": saveRole skips a value that is the saved one
     setSelectValue('action-access-role', chat.panelRole || 'none');
-    setText('action-access-desc', 'Applies immediately');
+    setText('action-access-desc', i18nText('Applies immediately'));
     $('action-password-remove').dataset.id = String(chat.id);
 }
 
@@ -59,7 +60,9 @@ async function saveRole(select) {
     const done = await mutate(
         '/access',
         { method: 'POST', body: { userId, role } },
-        role === 'none' ? `${name} has no access now.` : `${name} is ${ROLE_LABELS[role]} now.`
+        role === 'none'
+            ? i18nText('{{v0}} has no access now.', { v0: name })
+            : i18nText('{{v0}} is {{v1}} now.', { v0: name, v1: ROLE_LABELS[role] })
     );
     if (done) {
         chat.panelRole = done.role;
@@ -74,15 +77,18 @@ function removePassword(id) {
     closeModal('chat-settings-modal');
     setReturnTo(returnToSettings);
     showConfirm({
-        title: 'Remove the password?',
-        text: `${name} is signed out everywhere and will sign in with Telegram only. They can set a new password on their account page.`,
-        confirmLabel: 'Remove',
+        title: i18nText('Remove the password?'),
+        text: i18nText(
+            '{{v0}} is signed out everywhere and will sign in with Telegram only. They can set a new password on their account page.',
+            { v0: name }
+        ),
+        confirmLabel: i18nText('Remove'),
         dismissStack: true,
         onConfirm: async () => {
             await mutate(
                 `/access/${encodeURIComponent(id)}/password`,
                 { method: 'DELETE' },
-                `${name} has no password now.`
+                i18nText('{{v0}} has no password now.', { v0: name })
             );
         }
     });
@@ -97,8 +103,14 @@ function render() {
     if (!access) return;
     $('access-signup').setAttribute('aria-checked', String(access.openSignup));
     setText('access-system-login', access.system.login);
-    setText('access-system-state', access.system.passwordSet ? 'Password set' : "No password: it can't sign in");
-    setText('access-system-password', access.system.passwordSet ? 'Change password' : 'Set password');
+    setText(
+        'access-system-state',
+        access.system.passwordSet ? i18nText('Password set') : i18nText("No password: it can't sign in")
+    );
+    setText(
+        'access-system-password',
+        access.system.passwordSet ? i18nText('Change password') : i18nText('Set password')
+    );
 }
 
 export async function loadAccess() {
@@ -112,7 +124,9 @@ async function toggleSignup() {
     try {
         access = await api('/access/signup', { method: 'PUT', body: { open } });
         toast(
-            open ? 'Anyone who starts the bot can sign in now.' : 'Only people with a role can sign in now.',
+            open
+                ? i18nText('Anyone who starts the bot can sign in now.')
+                : i18nText('Only people with a role can sign in now.'),
             'success'
         );
     } catch (err) {
@@ -131,13 +145,13 @@ async function systemPassword() {
         }
     }
     openPasswordDialog({
-        title: `Password for "${access.system.login}"`,
-        sub: "The system account isn't tied to Telegram: the way in when every other is lost.",
-        hint: 'At least 8 characters. Its other sessions end.',
+        title: i18nText('Password for "{{v0}}"', { v0: access.system.login }),
+        sub: i18nText("The system account isn't tied to Telegram: the way in when every other is lost."),
+        hint: i18nText('At least 8 characters. Its other sessions end.'),
         save: async (password) => {
             access = await api('/access/system-password', { method: 'PUT', body: { password } });
             render();
-            toast('System account password saved', 'success');
+            toast(i18nText('System account password saved'), 'success');
         }
     });
 }

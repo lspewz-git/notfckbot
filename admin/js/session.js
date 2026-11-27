@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * Who is using the panel (src/account/auth.js). Without a session the sign-in screens cover it
  * (SIGNIN.md, 13.11): the ways in, then one screen per way. "Continue with Telegram", the QR code
@@ -17,6 +18,7 @@ import { signInForm, submitSignIn, setMe, loginAlert, setLoginAlert, syncSignInB
 import { setProfile } from './profile.js';
 import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
 import { PRIVACY, TERMS } from './legal.js';
+import { accountLanguage, languageLaunch } from './i18n.js';
 
 const POLL_MS = 1500;
 const POLL_FOR_MS = 5 * 60 * 1000;
@@ -43,12 +45,21 @@ let termsDone = () => {};
 const termsCheckbox = () =>
     '<div class="terms-check"><label class="terms-row">' +
     `<span class="terms-box"><input id="terms-cb" type="checkbox"${termsChecked ? ' checked' : ''} />${icon('check', 'terms-tick')}</span>` +
-    '<span class="terms-text">I accept the ' +
-    '<button type="button" class="login-terms-link" data-action="login-terms">Terms of Service</button> and the ' +
+    ('<span class="terms-text">' + i18nText('I accept the') + ' ') +
+    ('<button type="button" class="login-terms-link" data-action="login-terms">' +
+        i18nText('Terms of Service') +
+        '</button>' +
+        ' ' +
+        i18nText('and the') +
+        ' ') +
     // WebKit wraps before a comma after a button: the two stay together
-    '<span class="terms-nowrap"><button type="button" class="login-terms-link" data-action="login-privacy">Privacy Policy</button>,</span> ' +
-    'including the sign-in cookies they describe</span></label>' +
-    '<p class="terms-err" id="terms-err" role="alert" hidden>Accept the terms to continue</p></div>';
+    ('<span class="terms-nowrap"><button type="button" class="login-terms-link" data-action="login-privacy">' +
+        i18nText('Privacy Policy') +
+        '</button>,</span> ') +
+    (i18nText('including the sign-in cookies they describe') + '</span></label>') +
+    ('<p class="terms-err" id="terms-err" role="alert" hidden>' +
+        i18nText('Accept the terms to continue') +
+        '</p></div>');
 
 /** Pressed without the checkbox: the error under it, focus on it. @returns {boolean} whether it's checked */
 function termsGuard() {
@@ -63,17 +74,26 @@ function termsGuard() {
 
 /** A way's screen: the round Back to the ways in, then its title. */
 const stepHead = (title) =>
-    `<button type="button" id="login-back" class="login-back" data-action="login-cancel" aria-label="Back to sign-in options">${icon('chevron-left')}</button>` +
+    '<button type="button" id="login-back" class="login-back" data-action="login-cancel" aria-label="' +
+    i18nText('Back to sign-in options') +
+    '">' +
+    icon('chevron-left') +
+    '</button>' +
     `<h1 id="login-step" class="login-step-title" tabindex="-1">${title}</h1>`;
 
-const ANOTHER_WAY = '<button type="button" class="login-text-btn" data-action="login-cancel">Use another way</button>';
+const ANOTHER_WAY =
+    '<button type="button" class="login-text-btn" data-action="login-cancel">' +
+    i18nText('Use another way') +
+    '</button>';
 
 /** m:ss of whole seconds. */
 const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** "482 913" for the eye, "Code 4 8 2 9 1 3" for a screen reader. */
 const digits = (check) =>
-    `<span class="sr-only">Code ${escapeHtml(String(check).split('').join(' '))}</span>` +
+    '<span class="sr-only">' +
+    i18nText('Code {{v0}}', { v0: escapeHtml(String(check).split('').join(' ')) }) +
+    '</span>' +
     `<span class="login-digits-value" aria-hidden="true">${escapeHtml(String(check).replace(/^(\d{3})(\d{3})$/, '$1 $2'))}</span>`;
 
 // The first check of the session has answered: a 401 before it is that check's own, not an ended session
@@ -290,18 +310,20 @@ function signInScreen(banner = '', restoreFocus = $('login-body').contains(docum
             '<div class="login-panel login-pick-panel">' +
             '<section class="login-pick" aria-labelledby="login-title">' +
             BRAND +
-            '<h2 class="login-heading">Sign in</h2>' +
+            ('<h2 class="login-heading">' + i18nText('Sign in') + '</h2>') +
             termsCheckbox() +
             // A first time in signs up too: the bot is started on the way (with sign-up open)
             `<a id="login-tg" class="btn btn-primary login-tg"${botTarget()} aria-disabled="true" aria-busy="true" aria-describedby="login-tg-hint" data-action="login-telegram">` +
-            `${SPINNER}${icon('send', 'login-tg-send')}<span>Continue with Telegram</span></a>` +
-            '<p class="login-lead" id="login-tg-hint">You’ll confirm the sign-in in the NotFckBot chat.</p>' +
+            (SPINNER + icon('send', 'login-tg-send') + '<span>' + i18nText('Continue with Telegram') + '</span></a>') +
+            ('<p class="login-lead" id="login-tg-hint">' +
+                i18nText('You’ll confirm the sign-in in the NotFckBot chat.') +
+                '</p>') +
             loginAlert('login-tg-error') +
-            '<div class="login-or"><h2>Other ways to sign in</h2></div>' +
+            ('<div class="login-or"><h2>' + i18nText('Other ways to sign in') + '</h2></div>') +
             '<div class="login-methods">' +
-            tile('login-qr', 'qr-code', 'QR code', true) +
-            tile('login-code', 'binary', 'Bot code', true) +
-            tile('login-password', 'key-round', 'Password', false) +
+            tile('login-qr', 'qr-code', i18nText('QR code'), true) +
+            tile('login-code', 'binary', i18nText('Bot code'), true) +
+            tile('login-password', 'key-round', i18nText('Password'), false) +
             '</div></section>' +
             '</div>',
         'start'
@@ -355,7 +377,10 @@ async function prepareCode() {
         if (mine !== attempt || !button.isConnected) return;
         button.removeAttribute('aria-busy');
         document.querySelector('.login-pick').classList.add('has-error');
-        setLoginAlert('login-tg-error', `${err.message} A password still works if you have set one.`);
+        setLoginAlert(
+            'login-tg-error',
+            i18nText('{{v0}} A password still works if you have set one.', { v0: err.message })
+        );
         retryTimer = window.setTimeout(() => {
             if (mine === attempt && button.isConnected) prepareCode();
         }, RETRY_CODE_MS);
@@ -369,7 +394,11 @@ async function prepareCode() {
 /** The code to send the bot: `/code 482913`, copied with one press. */
 const command = (check) =>
     `<div class="login-command" id="login-command"><code>/code ${escapeHtml(check)}</code>` +
-    `<button type="button" class="login-copy" data-action="login-copy" aria-label="Copy">${icon('copy')}</button></div>`;
+    ('<button type="button" class="login-copy" data-action="login-copy" aria-label="' +
+        i18nText('Copy') +
+        '">' +
+        icon('copy') +
+        '</button></div>');
 
 /** The bot's own link without a code (Bot code: the digits sign in, no question in the bot). */
 const plainBotLink = (start) => {
@@ -378,16 +407,16 @@ const plainBotLink = (start) => {
 };
 
 const WAIT_TEXT = {
-    telegram: 'Waiting for confirmation…',
+    telegram: i18nText('Waiting for confirmation…'),
     qr: '',
-    code: 'Waiting for the bot…',
-    password: 'Waiting for confirmation…'
+    code: i18nText('Waiting for the bot…'),
+    password: i18nText('Waiting for confirmation…')
 };
 
 /** @param {Challenge} start @param {Mode} mode */
 function pendingBody(start, mode) {
     const bot = botName(start.url);
-    const at = bot ? `@${escapeHtml(bot)}` : 'the bot';
+    const at = bot ? `@${escapeHtml(bot)}` : i18nText('the bot');
     const left = clock(secondsLeft(start));
     const status = WAIT_TEXT[mode]
         ? `<div class="login-status" id="login-status" role="status" aria-live="polite">${SPINNER}<span>${WAIT_TEXT[mode]} <span id="login-timer" aria-hidden="true">· ${left}</span></span></div>`
@@ -400,56 +429,99 @@ function pendingBody(start, mode) {
             : '';
     if (mode === 'qr')
         return (
-            stepHead('Scan the QR code') +
-            '<p class="login-lead">Scan with the camera on another device where you’re signed in to Telegram, then confirm in the bot. It shows the same code.</p>' +
+            stepHead(i18nText('Scan the QR code')) +
+            ('<p class="login-lead">' +
+                i18nText(
+                    'Scan with the camera on another device where you’re signed in to Telegram, then confirm in the bot. It shows the same code.'
+                ) +
+                '</p>') +
             '<div class="login-qr-wrap" id="login-digits">' +
-            `<div class="login-qr-box" role="img" aria-label="QR code for signing in"><img src="${escapeHtml(start.qr)}" alt="" /></div>` +
-            `<p class="login-qr-meta">The bot will show <span class="login-mono">${escapeHtml(String(start.check).replace(/^(\d{3})(\d{3})$/, '$1 $2'))}</span></p>` +
+            ('<div class="login-qr-box" role="img" aria-label="' +
+                i18nText('QR code for signing in') +
+                '"><img src="' +
+                escapeHtml(start.qr) +
+                '" alt="" /></div>') +
+            ('<p class="login-qr-meta">' +
+                i18nText('The bot will show') +
+                ' ' +
+                '<span class="login-mono">' +
+                escapeHtml(String(start.check).replace(/^(\d{3})(\d{3})$/, '$1 $2')) +
+                '</span></p>') +
             // The timer line itself is the status; the ticking stays silent, why it ended is read out
-            `<p class="login-qr-meta" id="login-status" role="status" aria-live="polite"><span id="login-timer" aria-hidden="true">Code expires in ${left}</span></p></div>` +
+            ('<p class="login-qr-meta" id="login-status" role="status" aria-live="polite"><span id="login-timer" aria-hidden="true">' +
+                i18nText('Code expires in {{v0}}', { v0: left }) +
+                '</span></p></div>') +
             status +
             '<div class="login-actions" id="login-actions">' +
-            `<button type="button" class="btn login-neutral" data-action="login-renew-qr">${icon('refresh-cw')}<span>New code</span></button>` +
+            ('<button type="button" class="btn login-neutral" data-action="login-renew-qr">' +
+                icon('refresh-cw') +
+                '<span>' +
+                i18nText('New code') +
+                '</span></button>') +
             (start.url
-                ? `<a class="login-text-btn" data-action="login-here" href="${escapeHtml(botLink(start.url))}"${botTarget()}>Open Telegram on this device</a>`
+                ? '<a class="login-text-btn" data-action="login-here" href="' +
+                  escapeHtml(botLink(start.url)) +
+                  '"' +
+                  botTarget() +
+                  '>' +
+                  i18nText('Open Telegram on this device') +
+                  '</a>'
                 : '') +
             ANOTHER_WAY +
             '</div>'
         );
     if (mode === 'code')
         return (
-            stepHead('Send the code to the bot') +
-            `<p class="login-lead">Open ${at} on any device with Telegram and send this message. Or open Настройки → Вход по коду and send the digits.</p>` +
-            digitsBlock('Your code', true) +
+            stepHead(i18nText('Send the code to the bot')) +
+            ('<p class="login-lead">' +
+                i18nText(
+                    'Open {{v0}} on any device with Telegram and send this message. Or open Настройки → Вход по коду and send the digits.',
+                    { v0: at }
+                ) +
+                '</p>') +
+            digitsBlock(i18nText('Your code'), true) +
             command(start.check) +
             status +
             '<div class="login-actions" id="login-actions">' +
-            '<p class="login-safety">Only send a code from your own screen.</p>' +
-            link('btn btn-primary', `Open ${at}`, plainBotLink(start), 'send') +
+            ('<p class="login-safety">' + i18nText('Only send a code from your own screen.') + '</p>') +
+            link('btn btn-primary', i18nText('Open {{v0}}', { v0: at }), plainBotLink(start), 'send') +
             ANOTHER_WAY +
             '</div>'
         );
     const password = mode === 'password';
     return (
-        stepHead('Confirm in Telegram') +
+        stepHead(i18nText('Confirm in Telegram')) +
         (password
-            ? '<p class="login-lead">We sent a message to your NotFckBot chat. Tap «Да, это я» there to finish signing in.</p>'
-            : '<p class="login-lead">We opened the NotFckBot chat. Check that the bot shows the same code and tap «Да, это я». This page will sign you in by itself.</p>') +
-        digitsBlock('The bot shows the same code') +
+            ? '<p class="login-lead">' +
+              i18nText('We sent a message to your NotFckBot chat. Tap «Да, это я» there to finish signing in.') +
+              '</p>'
+            : '<p class="login-lead">' +
+              i18nText(
+                  'We opened the NotFckBot chat. Check that the bot shows the same code and tap «Да, это я». This page will sign you in by itself.'
+              ) +
+              '</p>') +
+        digitsBlock(i18nText('The bot shows the same code')) +
         status +
         (password
             ? ''
-            : '<button type="button" class="login-expand" data-action="login-code-help" aria-expanded="false" aria-controls="login-code-help">Sign in with a code</button>' +
+            : '<button type="button" class="login-expand" data-action="login-code-help" aria-expanded="false" aria-controls="login-code-help">' +
+              i18nText('Sign in with a code') +
+              '</button>' +
               '<div class="login-code-help" id="login-code-help" hidden>' +
-              `<p>Send this message to ${at} on any device with Telegram, or open Настройки → Вход по коду and send the digits.</p>` +
+              ('<p>' +
+                  i18nText(
+                      'Send this message to {{v0}} on any device with Telegram, or open Настройки → Вход по коду and send the digits.',
+                      { v0: at }
+                  ) +
+                  '</p>') +
               command(start.check) +
-              link('login-text-btn', `Open ${at}`, plainBotLink(start)) +
+              link('login-text-btn', i18nText('Open {{v0}}', { v0: at }), plainBotLink(start)) +
               '</div>') +
         '<div class="login-actions" id="login-actions">' +
-        '<p class="login-safety">Only confirm a sign-in you started.</p>' +
+        ('<p class="login-safety">' + i18nText('Only confirm a sign-in you started.') + '</p>') +
         link(
             'btn login-neutral',
-            password ? 'Open Telegram' : 'Open Telegram again',
+            password ? i18nText('Open Telegram') : i18nText('Open Telegram again'),
             start.url && botLink(start.url),
             'send'
         ) +
@@ -473,7 +545,9 @@ function watchPending(start, mode) {
         polls: () => true,
         tick: (left) => {
             const timer = $('login-timer');
-            if (timer) timer.textContent = mode === 'qr' ? `Code expires in ${clock(left)}` : `· ${clock(left)}`;
+            if (timer)
+                timer.textContent =
+                    mode === 'qr' ? i18nText('Code expires in {{v0}}', { v0: clock(left) }) : `· ${clock(left)}`;
             // The QR renews itself before it ends rather than leaving a dead code up
             if (mode === 'qr' && left <= RENEW_AT_S) renewQr();
         },
@@ -526,17 +600,25 @@ function endPending(mode, why) {
     document.querySelector('.login-expand')?.remove();
     const text =
         why === 'cancelled'
-            ? 'Sign-in was cancelled in the bot.'
+            ? i18nText('Sign-in was cancelled in the bot.')
             : mode === 'code'
-              ? 'The code has expired.'
-              : 'The time to confirm has run out.';
+              ? i18nText('The code has expired.')
+              : i18nText('The time to confirm has run out.');
     const status = $('login-status');
     status.className = 'login-status is-ended';
     status.innerHTML = `${icon('clock')}<span>${text}</span>`;
     const again =
         why === 'expired' && mode === 'code'
-            ? `<button type="button" class="btn btn-primary" data-action="login-again" data-mode="code">${icon('refresh-cw')}<span>New code</span></button>`
-            : `<button type="button" class="btn btn-primary" data-action="login-again" data-mode="${mode}">Try again</button>`;
+            ? '<button type="button" class="btn btn-primary" data-action="login-again" data-mode="code">' +
+              icon('refresh-cw') +
+              '<span>' +
+              i18nText('New code') +
+              '</span></button>'
+            : '<button type="button" class="btn btn-primary" data-action="login-again" data-mode="' +
+              mode +
+              '">' +
+              i18nText('Try again') +
+              '</button>';
     $('login-actions').innerHTML = again + ANOTHER_WAY;
     // A touch screen keeps no keyboard place to hand on; the status line above already says why
     if (!isTouch() && (focusWasIn || document.activeElement === document.body))
@@ -549,8 +631,8 @@ function passwordScreen() {
     discardChallenges();
     gate(
         '<div class="login-panel">' +
-            stepHead('Sign in with password') +
-            '<p class="login-lead">Works if you’ve set a password in Account settings.</p>' +
+            stepHead(i18nText('Sign in with password')) +
+            ('<p class="login-lead">' + i18nText('Works if you’ve set a password in Account settings.') + '</p>') +
             signInForm() +
             '</div>',
         'step'
@@ -587,16 +669,28 @@ function termsScreen(state) {
         '<section class="login-panel terms-panel" aria-labelledby="bys-title">' +
             '<div class="terms-main">' +
             `<div class="rail-logo login-logo terms-logo" aria-hidden="true">${icon('file-text')}</div>` +
-            '<h1 id="bys-title" class="login-step-title">Before you start</h1>' +
+            ('<h1 id="bys-title" class="login-step-title">' + i18nText('Before you start') + '</h1>') +
             (state === 'updated'
-                ? '<p class="login-lead">We’ve updated the Terms of Service and the Privacy Policy. Accept them to continue.</p>' +
-                  '<button type="button" class="terms-changed" data-action="login-privacy" data-section="privacy-cookies">What changed</button>'
-                : '<p class="login-lead">To use NotFckBot, accept the terms. We keep a sign-in cookie on this device so you stay signed in.</p>') +
+                ? '<p class="login-lead">' +
+                  i18nText('We’ve updated the Terms of Service and the Privacy Policy. Accept them to continue.') +
+                  '</p>' +
+                  ('<button type="button" class="terms-changed" data-action="login-privacy" data-section="privacy-cookies">' +
+                      i18nText('What changed') +
+                      '</button>')
+                : '<p class="login-lead">' +
+                  i18nText(
+                      'To use NotFckBot, accept the terms. We keep a sign-in cookie on this device so you stay signed in.'
+                  ) +
+                  '</p>') +
             termsCheckbox() +
             '</div>' +
             '<div class="login-actions terms-actions">' +
-            '<button type="button" class="btn btn-primary" data-action="terms-accept">Continue</button>' +
-            '<button type="button" class="login-text-btn" data-action="logout">Sign out</button>' +
+            ('<button type="button" class="btn btn-primary" data-action="terms-accept">' +
+                i18nText('Continue') +
+                '</button>') +
+            ('<button type="button" class="login-text-btn" data-action="logout">' +
+                i18nText('Sign out') +
+                '</button>') +
             '</div></section>',
         'accept'
     );
@@ -618,9 +712,13 @@ const linkScreen = (error = '') => {
             '<div class="login-actions">' +
             (error
                 ? loginAlert('login-error', error) +
-                  '<button type="button" class="btn btn-primary" data-action="login-link-again">Sign in again</button>'
-                : '<button type="button" class="btn btn-primary" data-action="login-link">Sign in</button>' +
-                  '<p class="login-hint">A sign-in link from the bot.</p>') +
+                  ('<button type="button" class="btn btn-primary" data-action="login-link-again">' +
+                      i18nText('Sign in again') +
+                      '</button>')
+                : '<button type="button" class="btn btn-primary" data-action="login-link">' +
+                  i18nText('Sign in') +
+                  '</button>' +
+                  ('<p class="login-hint">' + i18nText('A sign-in link from the bot.') + '</p>')) +
             '</div></div>',
         'link'
     );
@@ -639,31 +737,40 @@ const problem = (title, status, actions, { alert = false, iconName = 'circle-ale
     `</div><div class="login-actions">${actions}</div></div>`;
 
 const STATUS_TEXT = {
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    403: 'Forbidden',
-    404: 'Not Found',
-    409: 'Conflict',
-    429: 'Too Many Requests',
-    500: 'Internal Server Error',
-    502: 'Bad Gateway',
-    503: 'Service Unavailable',
-    504: 'Gateway Timeout'
+    400: i18nText('Bad Request'),
+    401: i18nText('Unauthorized'),
+    403: i18nText('Forbidden'),
+    404: i18nText('Not Found'),
+    409: i18nText('Conflict'),
+    429: i18nText('Too Many Requests'),
+    500: i18nText('Internal Server Error'),
+    502: i18nText('Bad Gateway'),
+    503: i18nText('Service Unavailable'),
+    504: i18nText('Gateway Timeout')
 };
 
 /** The status line under a failure: "503 · Service Unavailable", or no answer at all. */
 const statusLine = (err) =>
-    err.status ? [err.status, STATUS_TEXT[err.status]].filter(Boolean).join(' · ') : 'No connection';
+    err.status ? [err.status, STATUS_TEXT[err.status]].filter(Boolean).join(' · ') : i18nText('No connection');
 
-const RETRY = `<button type="button" class="btn btn-primary" data-action="login-retry">${icon('refresh-cw')}<span>Try again</span></button>`;
+const RETRY =
+    '<button type="button" class="btn btn-primary" data-action="login-retry">' +
+    icon('refresh-cw') +
+    '<span>' +
+    i18nText('Try again') +
+    '</span></button>';
 
 /** /account/me failed with something other than 401. */
 const panelDownScreen = (err) =>
     gate(
         problem(
-            `The panel isn’t answering: ${err.message}`,
+            i18nText('The panel isn’t answering: {{v0}}', { v0: err.message }),
             statusLine(err),
-            `<button type="button" class="btn btn-primary" data-action="login-retry">${icon('refresh-cw')}<span>Retry</span></button>`,
+            '<button type="button" class="btn btn-primary" data-action="login-retry">' +
+                icon('refresh-cw') +
+                '<span>' +
+                i18nText('Retry') +
+                '</span></button>',
             { alert: true, iconName: 'wifi-off' }
         ),
         'fail'
@@ -688,19 +795,27 @@ function miniAppScreen(error, restoreFocus, status = '') {
         next === 'retry'
             ? RETRY
             : next === 'reopen'
-              ? '<button type="button" class="btn btn-primary" data-action="miniapp-close">Close the app</button>' +
-                '<p class="login-hint">Open it again from the bot: Telegram signs you in.</p>'
+              ? '<button type="button" class="btn btn-primary" data-action="miniapp-close">' +
+                i18nText('Close the app') +
+                '</button>' +
+                ('<p class="login-hint">' + i18nText('Open it again from the bot: Telegram signs you in.') + '</p>')
               : next === 'signout'
-                ? '<button type="button" class="btn btn-primary" data-action="miniapp-signout">Sign out</button>'
+                ? '<button type="button" class="btn btn-primary" data-action="miniapp-signout">' +
+                  i18nText('Sign out') +
+                  '</button>'
                 : '';
     // The title never changes; the status line says what failed, the server's own words go under it
     gate(
         problem(
-            'Couldn’t sign you in through Telegram',
+            i18nText('Couldn’t sign you in through Telegram'),
             status,
             main +
-                '<div class="login-or login-or-plain"><span>Or</span></div>' +
-                `<button type="button" class="btn login-neutral" data-action="login-password">${icon('key-round')}<span>Password</span></button>`,
+                ('<div class="login-or login-or-plain"><span>' + i18nText('Or') + '</span></div>') +
+                ('<button type="button" class="btn login-neutral" data-action="login-password">' +
+                    icon('key-round') +
+                    '<span>' +
+                    i18nText('Password') +
+                    '</span></button>'),
             { alert: Boolean(error), detail: error }
         ),
         'fail'
@@ -736,7 +851,7 @@ export async function startSession(preferredChat = null, { current = () => true,
     const platform = /^[a-z_]{1,16}$/.test(launch.get('tgWebAppPlatform') || '')
         ? launch.get('tgWebAppPlatform')
         : null;
-    if (launchData) window.history.replaceState(null, '', '/');
+    if (launchData) window.history.replaceState(null, '', `/${location.search}`);
     const nativeWindow = /** @type {Window & { TelegramWebviewProxy?: {
         postEvent?: (event: string, data: string) => void
     } }} */ (window);
@@ -781,7 +896,7 @@ export async function startSession(preferredChat = null, { current = () => true,
             failedMiniApp(err);
             if (!current()) return null;
             discardChallenges();
-            const message = err.status ? err.message : "Can't reach the panel. Check the connection.";
+            const message = err.status ? err.message : i18nText("Can't reach the panel. Check the connection.");
             miniAppScreen(message, focus ?? $('login-body').contains(document.activeElement), statusLine(err));
         } else if (err.status === 401) signInScreen();
         else {
@@ -792,6 +907,19 @@ export async function startSession(preferredChat = null, { current = () => true,
     } finally {
         if (initData) bridge.postEvent('web_app_ready', '{}');
     }
+    const restored = languageLaunch(launch.get('panelLaunch'), me.user.id);
+    if (restored) {
+        preferredChat ||= restored.chatId;
+        window.history.replaceState(null, '', `/${location.search}#${restored.title ? 'my-subs' : 'my-calendar'}`);
+    }
+    const targetTitle = miniApp?.title || restored?.title || null;
+    if (
+        !accountLanguage(
+            me.user.language,
+            preferredChat ? { userId: String(me.user.id), chatId: String(preferredChat), title: targetTitle } : null
+        )
+    )
+        return null;
     started = true;
     if (me.terms && me.terms !== 'ok') {
         // Checked on the sign-in screen of this page: recorded now; otherwise "Before you start"
@@ -811,8 +939,8 @@ export async function startSession(preferredChat = null, { current = () => true,
     setMe(me.user);
     setProfile(me.user);
     resetChatChoice();
-    if (!me.user.system && setLaunchTitle(preferredChat, miniApp?.title)) {
-        window.history.replaceState(null, '', '/#my-subs');
+    if (!me.user.system && setLaunchTitle(preferredChat, targetTitle)) {
+        window.history.replaceState(null, '', `/${location.search}#my-subs`);
     }
     if (miniApp) miniApp.title = null;
     document.body.classList.toggle('role-user', me.user.role !== 'admin');
@@ -834,7 +962,7 @@ export function watchSession() {
     window.addEventListener('session-ended', () => {
         if (started && !document.body.classList.contains('signed-out')) {
             termsChecked = false;
-            signInScreen('Your session has ended. Sign in again.');
+            signInScreen(i18nText('Your session has ended. Sign in again.'));
         }
     });
     // The documents changed while the panel was open (api.js sends the event on a 428)
@@ -878,7 +1006,7 @@ export function sessionActions(onSignedIn) {
             miniApp.chat = null;
         }
         // The section in the address stays: signing in again lands on the tab that was open
-        window.history.replaceState(null, '', `/${location.hash}`);
+        window.history.replaceState(null, '', `/${location.search}${location.hash}`);
         const role = await startSession(chatId);
         if (role) onSignedIn(role);
     };
@@ -990,9 +1118,9 @@ export function sessionActions(onSignedIn) {
             if (!check) return;
             try {
                 await navigator.clipboard.writeText(`/code ${check}`);
-                toast('Copied', 'success', 2000);
+                toast(i18nText('Copied'), 'success', 2000);
             } catch {
-                toast("Couldn't copy. Type the code instead.", 'error');
+                toast(i18nText("Couldn't copy. Type the code instead."), 'error');
             }
         },
         'terms-accept': async (el) => {

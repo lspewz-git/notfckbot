@@ -1,3 +1,6 @@
+import { t as i18nText } from './i18n.js';
+import { displayTitle, warmTitles } from './catalog-text.js';
+import { syncSelectText } from './select.js';
 /** Test notifications: send any alert the bot can send (episode, status, film) to a chosen chat. */
 
 import { $, $field, escapeHtml, debounce } from './dom.js';
@@ -12,12 +15,17 @@ const EPISODE_MODES = ['episode', 'first_and_full', 'season'];
 // What each kind of title is called in the dialog
 const KIND_TEXT = {
     tv: {
-        label: 'Series',
-        tracked: 'Tracked series',
-        placeholder: 'Type series name to search...',
-        badge: '📺 Series'
+        label: i18nText('Series'),
+        tracked: i18nText('Tracked series'),
+        placeholder: i18nText('Type series name to search...'),
+        badge: i18nText('📺 Series')
     },
-    movie: { label: 'Film', tracked: 'Films on lists', placeholder: 'Type film name to search...', badge: '🎬 Movie' }
+    movie: {
+        label: i18nText('Film'),
+        tracked: i18nText('Films on lists'),
+        placeholder: i18nText('Type film name to search...'),
+        badge: i18nText('🎬 Movie')
+    }
 };
 
 let trackedSeries = [];
@@ -54,7 +62,7 @@ export async function openTestNotifyModal(chatId = null, seriesId = null) {
     if (chats.length === 0) {
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = 'No chats found';
+        opt.textContent = i18nText('No chats found');
         chatSelect.appendChild(opt);
     } else {
         chats.forEach((chat) => {
@@ -98,6 +106,15 @@ export async function openTestNotifyModal(chatId = null, seriesId = null) {
     }
 
     openModal('test-notify-modal');
+    warmTrackedTitles();
+}
+
+function warmTrackedTitles() {
+    const current = kind;
+    warmTitles(
+        (kind === 'tv' ? trackedSeries : trackedFilms).map((t) => t.tmdb_id),
+        () => kind === current && $('test-notify-modal').hasAttribute('open')
+    );
 }
 
 /** Labels, the tracked list and the tabs for the current kind (series or film). */
@@ -112,13 +129,15 @@ function applyKind() {
     select.innerHTML = tracked.length
         ? tracked
               .map((t) => {
-                  const what = kind === 'tv' ? `S${t.last_season || 1}E${t.last_episode || 1}` : t.year || 'no date';
-                  return `<option value="${escapeHtml(t.tmdb_id)}">${escapeHtml(t.title)} (${escapeHtml(String(what))})</option>`;
+                  const what =
+                      kind === 'tv' ? `S${t.last_season || 1}E${t.last_episode || 1}` : t.year || i18nText('no date');
+                  return `<option value="${escapeHtml(t.tmdb_id)}" data-title-fallback="${escapeHtml(t.title)}" data-title-suffix=" (${escapeHtml(String(what))})">${escapeHtml(displayTitle(t.tmdb_id, t.title))} (${escapeHtml(String(what))})</option>`;
               })
               .join('')
-        : `<option value="">${kind === 'tv' ? 'No tracked series in database' : 'No films on any list'}</option>`;
+        : `<option value="">${kind === 'tv' ? i18nText('No tracked series in database') : i18nText('No films on any list')}</option>`;
     setSelectValue('test-notify-series-select', tracked.length ? tracked[0].tmdb_id : '');
     switchSeriesTab(tracked.length ? 'db' : 'search');
+    warmTrackedTitles();
 }
 
 /** The alert type decides the kind of title and whether season and episode apply. */
@@ -180,7 +199,7 @@ export async function searchTmdbSeries(query) {
         searchResults = res.filter((r) => r.media_type === kind);
         renderSearchResults();
     } catch (err) {
-        if (request === searchRequest) toast('Search failed: ' + err.message, 'error');
+        if (request === searchRequest) toast(i18nText('Search failed:') + ' ' + err.message, 'error');
     }
 }
 
@@ -189,7 +208,7 @@ const resultTitle = (item) => item.name || item.title || item.original_name || i
 function renderSearchResults() {
     const box = $('test-series-search-results');
     if (!searchResults.length) {
-        box.innerHTML = '<p class="empty-note">Ничего не найдено</p>';
+        box.innerHTML = '<p class="empty-note">' + i18nText('Nothing found') + '</p>';
         box.style.display = 'block';
         return;
     }
@@ -222,18 +241,23 @@ export function selectSearchSeries(idx) {
     $field('test-series-search-input').value = searchPick.title;
 
     $('test-series-search-results').style.display = 'none';
-    toast(`Выбрано: ${searchPick.title}`, 'info');
+    toast(i18nText('Selected: {{v0}}', { v0: searchPick.title }), 'info');
 }
 
 export async function sendTestNotification() {
     const chatId = $field('test-notify-chat-select').value;
-    if (!chatId) return toast('Please select a recipient chat', 'warning');
+    if (!chatId) return toast(i18nText('Please select a recipient chat'), 'warning');
 
     const mode = $field('test-notify-mode-select').value || 'episode';
     const titleId = isSearchMode ? searchPick?.id : $field('test-notify-series-select').value;
     const noun = kind === 'tv' ? 'series' : 'film';
     if (!titleId) {
-        return toast(isSearchMode ? `Pick a ${noun} from the search results` : `Please select a ${noun}`, 'warning');
+        return toast(
+            isSearchMode
+                ? i18nText('Pick a {{v0}} from the search results', { v0: noun })
+                : i18nText('Please select a {{v0}}', { v0: noun }),
+            'warning'
+        );
     }
 
     /** @type {Record<string, unknown>} */
@@ -250,23 +274,32 @@ export async function sendTestNotification() {
 
     const btn = $field('send-test-notify-btn');
     btn.disabled = true;
-    btn.innerText = 'Sending...';
+    btn.innerText = i18nText('Sending...');
 
     try {
         await api('/test-notification', { method: 'POST', body });
-        toast('Тестовое уведомление успешно отправлено! 🚀', 'success');
+        toast(i18nText('Test notification sent! 🚀'), 'success');
         // Done: nothing to return to, and a leftover return would fire on some later dialog
         clearReturnTo();
         closeModal('test-notify-modal');
     } catch (e) {
-        toast('Ошибка отправки: ' + e.message, 'error');
+        toast(i18nText('Send failed:') + ' ' + e.message, 'error');
     } finally {
         btn.disabled = false;
-        btn.innerText = 'Send Notification';
+        btn.innerText = i18nText('Send Notification');
     }
 }
 
 export function setupTestNotifyDialog() {
+    window.addEventListener('catalog-names-ready', () => {
+        const select = /** @type {HTMLSelectElement} */ ($('test-notify-series-select'));
+        for (const option of select.options) {
+            if (option.dataset.titleFallback !== undefined)
+                option.textContent =
+                    displayTitle(option.value, option.dataset.titleFallback) + option.dataset.titleSuffix;
+        }
+        syncSelectText(select);
+    });
     $('tab-test-series-db').onclick = () => switchSeriesTab('db');
     $('tab-test-series-search').onclick = () => switchSeriesTab('search');
 

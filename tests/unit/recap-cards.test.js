@@ -38,9 +38,11 @@ let stats = STATS;
 let statsOf = {};
 mock.method(chatStats, 'loadChatStats', async (id) => statsOf[id] || stats);
 const drawn = [];
+let beforeDraw = null;
 const realDraw = pool.draw;
 mock.method(pool, 'draw', async (task) => {
     drawn.push(task.kind);
+    if (beforeDraw) await beforeDraw(task);
     return realDraw(task);
 });
 
@@ -71,6 +73,7 @@ afterEach(() => {
     stats = STATS;
     statsOf = {};
     poster = null;
+    beforeDraw = null;
     render.forgetRecap();
 });
 
@@ -170,6 +173,46 @@ describe('the cards on disk', () => {
         assert.equal(drawn.filter((k) => k === 'card').length, 6);
     });
 
+    test('background regeneration replaces the cached preview and send figures', async () => {
+        const first = await render.recapImages('-120', 2026);
+        statsOf = { '-120': { ...STATS, episodes: { ...STATS.episodes, count: 999 } } };
+        assert.equal(render.drawInBackground(['-120'], 2026), true);
+        while (render.drawingState().running) await new Promise((resolve) => setTimeout(resolve, 10));
+        const current = await render.recapImages('-120', 2026);
+        assert.equal(current.stats.episodes.count, 999);
+        assert.ok(!current.images[1].equals(first.images[1]));
+    });
+
+    test('a request after invalidation cannot join or cache an obsolete drawing', async () => {
+        let entered, release;
+        const started = new Promise((resolve) => {
+            entered = resolve;
+        });
+        const gate = new Promise((resolve) => {
+            release = resolve;
+        });
+        let holdOld = true;
+        beforeDraw = async (task) => {
+            if (task.kind === 'card' && holdOld) {
+                entered();
+                await gate;
+            }
+        };
+        const old = render.recapImages('-124', 2026);
+        await started;
+        holdOld = false;
+        statsOf = { '-124': { ...STATS, episodes: { ...STATS.episodes, count: 999 } } };
+        render.forgetRecap('-124', 2026);
+        const fresh = render.recapImages('-124', 2026);
+        release();
+        const [previous, current] = await Promise.all([old, fresh]);
+        assert.equal(previous.stats.episodes.count, 10);
+        assert.equal(current.stats.episodes.count, 999);
+        assert.equal((await render.recapImages('-124', 2026)).stats.episodes.count, 999);
+        const inputs = await render.recapInputs('-124', 2026);
+        assert.equal((await store.readSet('-124', 2026, inputs.hash)).length, 6);
+    });
+
     test('using the bot or a notification does not make a kept set look out of date', async () => {
         const before = (await render.recapInputs('-104', 2026)).hash;
         stats = {
@@ -266,6 +309,59 @@ describe('the cards on disk, when things go wrong', () => {
         const [a, b] = await Promise.all([render.drawRecap('-116', 2026), render.drawRecap('-116', 2026)]);
         assert.equal(a, b);
         assert.equal(drawn.filter((k) => k === 'card').length, 6);
+    });
+
+    test('deletion during thumbnail drawing prevents the set from being restored', async () => {
+        let entered, release;
+        const started = new Promise((resolve) => {
+            entered = resolve;
+        });
+        const gate = new Promise((resolve) => {
+            release = resolve;
+        });
+        beforeDraw = async (task) => {
+            if (task.kind === 'thumb') {
+                entered();
+                await gate;
+            }
+        };
+        const drawing = render.drawRecap('-121', 2026);
+        await started;
+        try {
+            await store.removeSet('-121', 2026);
+            render.forgetRecap('-121', 2026);
+        } finally {
+            release();
+        }
+        await drawing;
+        assert.ok(!(await store.listSets(2026)).some((s) => s.chatId === '-121'));
+    });
+
+    test('a look invalidated while the disk queue waits is not committed', async (t) => {
+        const { locked } = require('../../src/recap/disk');
+        let release, entered;
+        const gate = new Promise((resolve) => {
+            release = resolve;
+        });
+        const started = new Promise((resolve) => {
+            entered = resolve;
+        });
+        const held = locked(process.env.RECAP_CARDS_DIR, () => gate);
+        const writeSet = store.writeSet;
+        t.mock.method(store, 'writeSet', (...args) => {
+            entered();
+            return writeSet(...args);
+        });
+        const drawing = render.drawRecap('-122', 2026);
+        await started;
+        try {
+            render.forgetRecap();
+        } finally {
+            release();
+        }
+        await held;
+        await drawing;
+        assert.ok(!(await store.listSets(2026)).some((s) => s.chatId === '-122'));
     });
 });
 
@@ -376,6 +472,13 @@ describe('the API', () => {
         const cleared = await put(1, { background: null });
         assert.equal(cleared.status, 200);
         assert.equal((await cleared.json()).cards[0].background, null);
+    });
+
+    test('the background picker has a sample when a chat follows only films', async (t) => {
+        t.mock.method(Subscription, 'findOne', async () => null);
+        t.mock.method(Watchlist, 'findOne', async () => ({ chatId: -123 }));
+        const answer = await (await fetch(`${base}/api/recap/looks?year=2098`)).json();
+        assert.deepEqual(answer.sample, { id: '-123', name: 'club' });
     });
 
     test('ready cards: drawn, out of date, not drawn; a bad year is refused', async () => {

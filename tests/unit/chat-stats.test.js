@@ -315,6 +315,107 @@ describe('the statistics', () => {
             ['Comedy']
         );
     });
+
+    test('duplicate watchlist rows count a title once, using fresh facts and the first added date', () => {
+        const film = { ...data.films[0], release_status: 'Released' };
+        const duplicate = { ...film, id: 2, runtime: 120, createdAt: NOW, updatedAt: NOW };
+        const result = computeStats({ ...data, series: [], films: [film, duplicate] }, YEAR, NOW);
+        assert.equal(result.films.released.length, 1);
+        assert.equal(result.films.minutes, 120);
+        assert.equal(result.films.longestWait.waited, 365);
+        assert.equal(result.favourites.genres[0].n, 1);
+        assert.equal(result.best.length, 1);
+    });
+
+    test('a pending legacy duplicate cannot erase another row’s confirmed release', () => {
+        const released = { ...data.films[0], id: 1, release_status: null, updatedAt: new Date('2026-06-20') };
+        const pending = { ...released, id: 2, notified: false, runtime: 120, updatedAt: NOW };
+        const compute = (films) => computeStats({ ...data, series: [], films }, YEAR, NOW);
+        for (const films of [
+            [released, pending],
+            [pending, released]
+        ]) {
+            const result = compute(films);
+            assert.equal(result.films.released.length, 1);
+            assert.equal(result.films.minutes, 120, 'fresh facts still win');
+        }
+        assert.equal(compute([{ ...released, notified: false }, pending]).films.released.length, 0);
+        assert.equal(
+            compute([released, { ...pending, release_status: 'Post Production' }]).films.released.length,
+            0,
+            'an explicit fresh status takes precedence over legacy confirmation'
+        );
+    });
+
+    test('a past planned date needs release confirmation; delivery is not that confirmation', () => {
+        const film = { ...data.films[0], premiere_digital: '2026-06-18', notified: false };
+        const compute = (fields) => computeStats({ ...data, series: [], films: [{ ...film, ...fields }] }, YEAR, NOW);
+        assert.equal(compute({ release_status: 'Post Production' }).films.released.length, 0);
+        assert.equal(compute({ release_status: 'Post Production', notified: true }).films.minutes, 0);
+        assert.equal(compute({ release_status: 'Released' }).films.released.length, 1);
+        assert.equal(
+            compute({ release_status: 'Released', cinema_date: '2027-01-01' }).films.released.length,
+            0,
+            'a past secondary date cannot precede the selected release'
+        );
+        assert.equal(
+            compute({ release_status: 'Released', premiere_digital: null }).films.released.length,
+            0,
+            'a past secondary date alone does not confirm a selected release'
+        );
+        assert.equal(
+            compute({ release_status: null, notified: true }).films.released.length,
+            1,
+            'legacy confirmed row'
+        );
+        assert.equal(compute({ release_status: null }).films.released.length, 0, 'unconfirmed legacy row');
+    });
+
+    test('next-year announcements exclude unknown dates and later years for films and series', () => {
+        const result = computeStats(
+            {
+                ...data,
+                series: [
+                    { tmdb_id: 'tv_10', title: 'Next', next_episode_date: '2027-12-31' },
+                    { tmdb_id: 'tv_11', title: 'Later', next_episode_date: '2028-01-01' }
+                ],
+                films: [
+                    { tmdb_id: 'movie_10', title: 'Next', premiere_digital: '2027-01-01', notified: false },
+                    { tmdb_id: 'movie_11', title: 'Later', premiere_digital: '2028-01-01', notified: false },
+                    { tmdb_id: 'movie_12', title: 'Unknown', notified: false }
+                ]
+            },
+            YEAR,
+            NOW
+        );
+        assert.equal(result.ahead.series, 1);
+        assert.equal(result.ahead.films, 1);
+        assert.deepEqual(
+            result.ahead.next.map((t) => t.day),
+            ['2027-01-01', '2027-12-31']
+        );
+    });
+
+    test('rating provenance survives statistics, including unknown legacy primary ratings', () => {
+        const result = computeStats(
+            {
+                ...data,
+                series: [
+                    { ...data.series[0], rating_source: 'tvmaze' },
+                    { ...data.series[1], episode_source: 'tvmaze', rating_source: null }
+                ]
+            },
+            YEAR,
+            NOW
+        );
+        assert.deepEqual(
+            result.best.map((t) => t.rating_source),
+            ['tvmaze', 'tmdb', 'unknown']
+        );
+        const filmWinner = computeStats({ ...data, films: [{ ...data.films[0], rating: 9.5 }] }, YEAR, NOW);
+        assert.equal(filmWinner.best[0].kind, 'film');
+        assert.equal(filmWinner.best[0].rating_source, 'tmdb');
+    });
 });
 
 describe('who added the most', () => {

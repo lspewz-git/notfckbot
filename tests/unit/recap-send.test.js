@@ -23,6 +23,7 @@ mock.method(render, 'recapImages', async (chatId) => {
 const { Chat, Subscription, Watchlist, RecapSend } = require('../../src/db');
 const recap = require('../../src/recap/send');
 const alerts = require('../../src/alerts');
+const botStatus = require('../../src/bot-status');
 
 // Database stand-ins last one test: a test that forgets one reaches the real database (and
 // waits 60 s for it) instead of quietly borrowing the one an earlier test left behind
@@ -50,6 +51,7 @@ afterEach(() => {
     // Newest first: a stub over a stub gives back the one under it, then the real method
     for (const m of stubs.splice(0).reverse()) m.mock.restore();
     whileDrawing = null;
+    botStatus.reset();
 });
 
 /** Runs fn with RECAP_SCHEDULE set to each value the schedule's switch can leave, then restores it. */
@@ -266,6 +268,43 @@ describe('the queue', () => {
         assert.notEqual(alerted[0].fingerprint, alerted[2].fingerprint);
     });
 
+    test('panel-blocked and left chats wait without drawing or spending attempts', async () => {
+        chats[1].blockedUntil = new Date('2027-01-01');
+        botStatus.noteTelegram(2, 'removed', { detail: 'removed' });
+        let draws = 0;
+        whileDrawing = () => {
+            draws++;
+        };
+        const bot = albumBot();
+        await recap.processQueue(bot, { pause: 0, now: () => new Date('2026-12-28T12:00:00Z') });
+        assert.equal(bot.sent.length, 0);
+        assert.equal(draws, 0);
+        assert.ok(rows.every((r) => r.status === 'queued' && r.attempts === 0));
+        chats[1].blockedUntil = null;
+        botStatus.noteTelegram(2, 'active', { detail: 'returned' });
+        await recap.processQueue(bot, { pause: 0 });
+        assert.equal(bot.sent.length, 2);
+    });
+
+    test('fresh block, membership and quiet hours are checked after drawing', async () => {
+        for (const change of ['block', 'left', 'quiet']) {
+            rows = [row({ chatId: 1, year: 2026 })];
+            chats[1] = { id: 1, type: 'private', timezone: 'Europe/Moscow', quiet_start: 23, quiet_end: 8 };
+            let clock = new Date('2026-12-28T19:59:59Z');
+            whileDrawing = () => {
+                if (change === 'block') chats[1] = { ...chats[1], blockedUntil: new Date('2027-01-01') };
+                else if (change === 'left') botStatus.noteTelegram(1, 'removed', { detail: 'removed' });
+                else clock = new Date('2026-12-28T20:00:00Z');
+            };
+            const bot = albumBot();
+            await recap.processQueue(bot, { pause: 0, now: () => clock });
+            assert.equal(bot.sent.length, 0, change);
+            assert.equal(rows[0].status, 'queued', change);
+            assert.equal(rows[0].attempts, 0, change);
+            botStatus.reset();
+        }
+    });
+
     test('Telegram down: back to the queue, failed after the third try', async () => {
         rows = [row({ chatId: 1, year: 2026 })];
         const down = () => Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
@@ -339,7 +378,28 @@ describe('the queue', () => {
             assert.equal(rows[0].attempts, run);
             assert.equal(rows[0].status, run < recap.MAX_ATTEMPTS ? 'queued' : 'failed');
             assert.match(rows[0].error, /Drawing failed: Database gone/);
+            assert.equal(alerted.length, run < recap.MAX_ATTEMPTS ? 0 : 1);
         }
+        assert.equal(alerted[0].id, 1);
+        assert.match(alerted[0].text, /Drawing failed: Database gone/);
+    });
+
+    test('a drawing failure after Stop does not alert or change a cancelled row', async () => {
+        const cancelled = row({ chatId: 1, year: 2026, attempts: recap.MAX_ATTEMPTS - 1 });
+        rows = [cancelled];
+        stub(RecapSend, 'destroy', async () => {
+            rows = [];
+            return 1;
+        });
+        whileDrawing = async () => {
+            assert.equal(await recap.stop(), 1);
+            throw new Error('Drawing failed after cancellation');
+        };
+        const bot = albumBot();
+        await recap.processQueue(bot, { pause: 0 });
+        assert.deepEqual(alerted, []);
+        assert.equal(rows.length, 0);
+        assert.equal(bot.sent.length, 0);
     });
 
     test('Telegram asks to wait long: the chat waits without losing a try, and so does the rest', async () => {

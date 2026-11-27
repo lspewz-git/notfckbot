@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * A day of the dashboard's notifications chart, opened by clicking its bar (or the "Not
  * delivered" card, for today): which notifications didn't reach their chat and why, which did,
@@ -9,7 +10,20 @@ import { $, escapeHtml } from './dom.js';
 import { api } from './api.js';
 import { openModal } from './ui.js';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = [
+    i18nText('Jan'),
+    i18nText('Feb'),
+    i18nText('Mar'),
+    i18nText('Apr'),
+    i18nText('May'),
+    i18nText('Jun'),
+    i18nText('Jul'),
+    i18nText('Aug'),
+    i18nText('Sep'),
+    i18nText('Oct'),
+    i18nText('Nov'),
+    i18nText('Dec')
+];
 const dayLabel = (day) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]}`;
 const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const when = (iso) => {
@@ -23,13 +37,17 @@ let asked = null;
 /** Why it didn't go, in words. */
 function outcome(f) {
     if (f.status === 'gave_up') {
-        const since = f.since ? ` since ${when(f.since)}` : '';
-        return `Gave up after ${f.tries} ${f.tries === 1 ? 'try' : 'tries'}${since}`;
+        const since = f.since ? ' ' + i18nText('since {{v0}}', { v0: when(f.since) }) : '';
+        return i18nText('Gave up after {{v0}} {{v1}}{{v2}}', {
+            v0: f.tries,
+            v1: f.tries === 1 ? 'try' : 'tries',
+            v2: since
+        });
     }
-    if (f.status === 'too_old') return 'Dropped: waited in the queue for two days';
-    if (f.status === 'gone') return 'The chat blocked or removed the bot';
-    if (f.status === 'rejected') return 'Telegram refused it';
-    if (f.status === 'not_queued') return "Couldn't be kept for a retry";
+    if (f.status === 'too_old') return i18nText('Dropped: waited in the queue for two days');
+    if (f.status === 'gone') return i18nText('The chat blocked or removed the bot');
+    if (f.status === 'rejected') return i18nText('Telegram refused it');
+    if (f.status === 'not_queued') return i18nText("Couldn't be kept for a retry");
     return f.status;
 }
 
@@ -37,21 +55,21 @@ const who = (r) => escapeHtml(r.chat || r.chatId);
 
 /** What a sent one was, under its title: src/models/SentNotification.js's kinds. */
 const KINDS = {
-    episode: 'New episode',
-    premiere: 'Season premiere',
-    complete: 'Season complete',
-    status: 'Series status',
-    film: 'Film release',
-    film_digital: 'Film out digitally',
-    retry: 'Resent from the queue',
-    held: 'Sent after quiet hours',
-    digest_w: 'Digest',
-    digest_m: 'Digest'
+    episode: i18nText('New episode'),
+    premiere: i18nText('Season premiere'),
+    complete: i18nText('Season complete'),
+    status: i18nText('Series status'),
+    film: i18nText('Film release'),
+    film_digital: i18nText('Film out digitally'),
+    retry: i18nText('Resent from the queue'),
+    held: i18nText('Sent after quiet hours'),
+    digest_w: i18nText('Digest'),
+    digest_m: i18nText('Digest')
 };
 
 /** The title with its episode: "Fallout S2E8"; a whole season, "S2". */
 function sentTitle(s) {
-    const title = escapeHtml(s.about || 'Notification');
+    const title = escapeHtml(s.about || i18nText('Notification'));
     if (!s.season) return title;
     if (s.kind === 'complete') return `${title} S${s.season}`;
     return s.episode ? `${title} S${s.season}E${s.episode}` : title;
@@ -62,8 +80,8 @@ function row(dot, time, title, meta) {
     return `<li class="sends-row"><time>${time}</time><span class="alert-dot ${dot}" aria-hidden="true"></span><span class="sends-what"><span class="sends-title">${title}</span><span class="sends-meta">${meta}</span></span></li>`;
 }
 
-const EMPTY = '<p class="alerts-empty">Everything went out.</p>';
-const NONE = '<p class="alerts-empty">Nothing was sent this day.</p>';
+const EMPTY = '<p class="alerts-empty">' + i18nText('Everything went out.') + '</p>';
+const NONE = '<p class="alerts-empty">' + i18nText('Nothing was sent this day.') + '</p>';
 // The sent list's stand-in rows: past this many the list grows on its answer
 const MAX_SENT_SKELETON = 6;
 const SKELETON_ROW =
@@ -74,7 +92,8 @@ const SENT_SKELETON_ROW = SKELETON_ROW.replace(
     '<span class="skeleton"></span>'
 );
 
-const sentHeading = (counts) => `<h4 class="sends-group">Sent <span>${counts.sent}</span></h4>`;
+const sentHeading = (counts) =>
+    '<h4 class="sends-group">' + i18nText('Sent') + ' ' + '<span>' + counts.sent + '</span></h4>';
 
 /**
  * Until the answer, what it will most likely be, from the chart's counts (panel.md: nothing
@@ -86,7 +105,12 @@ function placeholder(counts) {
     let html = '';
     if (counts.failed) {
         const rows = SKELETON_ROW.repeat(Math.min(counts.failed, 3));
-        html += `<h4 class="sends-group">Not delivered</h4><ul class="sends-list" aria-hidden="true">${rows}</ul>`;
+        html +=
+            '<h4 class="sends-group">' +
+            i18nText('Not delivered') +
+            '</h4><ul class="sends-list" aria-hidden="true">' +
+            rows +
+            '</ul>';
     }
     if (counts.sent) {
         const rows = SENT_SKELETON_ROW.repeat(Math.min(counts.sent, MAX_SENT_SKELETON));
@@ -99,14 +123,25 @@ function placeholder(counts) {
 function withoutDetails(rest, noun, keptSince, day) {
     const why =
         keptSince && day > keptSince
-            ? 'their details could not be kept'
-            : `details are kept${keptSince ? ` since ${dayLabel(keptSince)}` : ' from now on'}`;
-    return `<li class="alerts-empty">${rest} ${noun} without details: ${why}</li>`;
+            ? i18nText('their details could not be kept')
+            : i18nText('details are kept{{v0}}', {
+                  v0: keptSince
+                      ? ' ' + i18nText('since {{v0}}', { v0: dayLabel(keptSince) })
+                      : ' ' + i18nText('from now on')
+              });
+    return (
+        '<li class="alerts-empty">' +
+        i18nText('{{v0}} {{v1}} without details: {{v2}}', { v0: rest, v1: noun, v2: why }) +
+        '</li>'
+    );
 }
 
 function subtitle(counts, queued = 0) {
-    const parts = [`Sent ${counts.sent}`, `Not delivered ${counts.failed}`];
-    if (queued) parts.push(`Waiting to resend ${queued}`);
+    const parts = [
+        i18nText('Sent {{v0}}', { v0: counts.sent }),
+        i18nText('Not delivered {{v0}}', { v0: counts.failed })
+    ];
+    if (queued) parts.push(i18nText('Waiting to resend {{v0}}', { v0: queued }));
     return parts.join(' · ');
 }
 
@@ -116,13 +151,13 @@ function render(res, counts) {
 
     let html = '';
     if (res.failed.length || counts.failed) {
-        html += '<h4 class="sends-group">Not delivered</h4><ul class="sends-list">';
+        html += '<h4 class="sends-group">' + i18nText('Not delivered') + '</h4><ul class="sends-list">';
         html += res.failed
             .map((f) =>
                 row(
                     'is-bad',
                     clock(f.at),
-                    `${escapeHtml(f.about || 'Notification')}${f.count > 1 ? ` (${f.count})` : ''} → ${who(f)}`,
+                    `${escapeHtml(f.about || i18nText('Notification'))}${f.count > 1 ? ` (${f.count})` : ''} → ${who(f)}`,
                     escapeHtml([outcome(f), f.error].filter(Boolean).join(' · '))
                 )
             )
@@ -133,15 +168,27 @@ function render(res, counts) {
         html += '</ul>';
     }
     if (res.queued.length) {
-        const next = res.nextCheckAt ? `at the next check, ${clock(res.nextCheckAt)}` : 'at the next check';
-        html += `<h4 class="sends-group">Waiting to resend <span>${next}</span></h4><ul class="sends-list">`;
+        const next = res.nextCheckAt
+            ? i18nText('at the next check, {{v0}}', { v0: clock(res.nextCheckAt) })
+            : i18nText('at the next check');
+        html +=
+            '<h4 class="sends-group">' +
+            i18nText('Waiting to resend') +
+            ' ' +
+            '<span>' +
+            next +
+            '</span></h4><ul class="sends-list">';
         html += res.queued
             .map((q) =>
                 row(
                     'is-warn',
                     clock(q.since),
-                    `${escapeHtml(q.about || 'Notification')} → ${who(q)}`,
-                    escapeHtml([`Try ${q.tries + 1} of ${q.maxTries}`, q.error].filter(Boolean).join(' · '))
+                    `${escapeHtml(q.about || i18nText('Notification'))} → ${who(q)}`,
+                    escapeHtml(
+                        [i18nText('Try {{v0}} of {{v1}}', { v0: q.tries + 1, v1: q.maxTries }), q.error]
+                            .filter(Boolean)
+                            .join(' · ')
+                    )
                 )
             )
             .join('');
@@ -157,7 +204,7 @@ function render(res, counts) {
                     '',
                     clock(s.at),
                     `${sentTitle(s)}${s.count > 1 && s.kind !== 'held' ? ` (${s.count})` : ''} → ${who(s)}`,
-                    escapeHtml(KINDS[s.kind] || 'Notification')
+                    escapeHtml(KINDS[s.kind] || i18nText('Notification'))
                 )
             )
             .join('');
@@ -187,6 +234,9 @@ export async function openSends(day, counts, { latest = false } = {}) {
         if (asked === day) render(res, counts);
     } catch (err) {
         if (asked === day)
-            $('sends-body').innerHTML = `<p class="alerts-empty">Failed to load: ${escapeHtml(err.message)}</p>`;
+            $('sends-body').innerHTML =
+                '<p class="alerts-empty">' +
+                i18nText('Failed to load: {{v0}}', { v0: escapeHtml(err.message) }) +
+                '</p>';
     }
 }

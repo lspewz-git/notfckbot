@@ -181,7 +181,7 @@ test('Released keeps its frame fixed and bottom links reachable in the shared sc
     await card.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
     await expect(card.locator('.tc-scroll > .tc-footer')).toHaveCount(1);
     const frame = await card.locator('.title-sheet').boundingBox();
-    const link = card.locator('.tc-scroll > .tc-link');
+    const link = card.getByRole('link', { name: 'Open on Kinopoisk', exact: true });
     await link.scrollIntoViewIfNeeded();
     // Native scroll extents round to CSS pixels; check all edges within one pixel plus the actual hit target.
     await expect.poll(() => link.evaluate(el => {

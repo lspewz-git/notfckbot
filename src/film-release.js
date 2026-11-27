@@ -145,6 +145,7 @@ function storedDates(data, ru = {}) {
     const cinema = releaseDate(data, ru);
     const online = onlineDate(data, ru);
     return {
+        release_status: data.status || null,
         premiere_digital: cinema?.date || null,
         cinema_date: cinema?.date || null,
         cinema_country: cinema?.country || null,

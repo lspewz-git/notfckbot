@@ -1566,7 +1566,7 @@ test('Account settings: a profile card with the role as a chip, sign-in methods 
     await expect(info.locator('button, a, [tabindex]')).toHaveCount(0);
     await expect(page.locator('#my-account-section')).not.toContainText('Role');
     // Sentence-case titles, not capitals
-    await expect(page.locator('#my-account-section .group-title')).toHaveText(['Sign-in methods', 'Security']);
+    await expect(page.locator('#my-account-section .group-title')).toHaveText(['Sign-in methods', 'Preferences', 'Security']);
     for (const title of await page.locator('#my-account-section .group-title').all())
         expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
     // Telegram only shows its state: not a control

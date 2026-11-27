@@ -24,9 +24,38 @@ mock.method(axios, 'create', (options) =>
     })
 );
 
-const { getDetails, getDetailsCached, peekDetails } = require('../../src/api/tmdb');
+const { getDetails, getDetailsCached, peekDetails, getPanelText } = require('../../src/api/tmdb');
 
 let version;
+
+test('panel copy isolates languages and coalesces requests without changing bot facts', async () => {
+    answer = (url, params) => ({
+        name: params.language === 'en-US' ? 'The Last of Us' : 'Одни из нас',
+        overview: params.language,
+        genres: [{ name: params.language }]
+    });
+    await getDetails(990001, 'movie');
+    assert.equal(peekDetails(990001, 'movie').overview, 'ru-RU');
+    const [first, concurrent] = await Promise.all([
+        getPanelText(990001, 'movie', 'en-US'),
+        getPanelText(990001, 'movie', 'en-US')
+    ]);
+    assert.deepEqual(first, { title: 'The Last of Us', overview: 'en-US', genres: 'en-US' });
+    assert.deepEqual(first, concurrent);
+    assert.equal(requests, 2, 'one bot request plus one shared English copy request');
+    assert.equal((await getPanelText(990001, 'movie', 'ru-RU')).overview, 'ru-RU');
+    assert.equal(requests, 3);
+    assert.equal(peekDetails(990001, 'movie').overview, 'ru-RU');
+    assert.equal(peekDetails(990001, 'movie').name, 'Одни из нас');
+    await getPanelText(990001, 'movie', 'en-US');
+    assert.equal(requests, 3, 'fresh copy is cached independently');
+});
+test('panel copy falls back to an original catalog name when the localized name is missing', async () => {
+    answer = () => ({ original_title: 'Original film' });
+    assert.equal((await getPanelText(990002, 'movie', 'en-US')).title, 'Original film');
+    answer = () => ({ original_name: 'Original series' });
+    assert.equal((await getPanelText(990003, 'tv', 'ru-RU')).title, 'Original series');
+});
 beforeEach(() => {
     requests = 0;
     version = 1;

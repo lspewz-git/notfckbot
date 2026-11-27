@@ -1,3 +1,5 @@
+import { t as i18nText } from './i18n.js';
+import { rememberTitle } from './catalog-text.js';
 /** Shared search results and preview cards for the admin panel and My subscriptions. */
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
@@ -9,11 +11,47 @@ export function titlePoster(url, action, id) {
     const image = src
         ? `<img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" />`
         : '<span class="title-poster-empty" aria-hidden="true"></span>';
-    return `<button type="button" class="title-poster" data-action="${action}" data-id="${escapeHtml(id)}" aria-label="Open details">${image}</button>`;
+    return (
+        '<button type="button" class="title-poster" data-action="' +
+        action +
+        '" data-id="' +
+        escapeHtml(id) +
+        '" aria-label="' +
+        i18nText('Open details') +
+        '">' +
+        image +
+        '</button>'
+    );
 }
 
-export function searchForm({ context, inputId, query = '', placeholder = 'Series or film title', back = '' }) {
-    return `<form class="mine-search" data-content-search="${context}">${back ? `<button type="button" class="btn btn-ghost" data-action="${back}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-left" /></svg>Back</button>` : ''}<input id="${inputId}" class="input-field" type="search" name="q" placeholder="${escapeHtml(placeholder)}" autocomplete="off" enterkeyhint="search" value="${escapeHtml(query)}" /><button type="submit" class="btn btn-primary">Search</button></form>`;
+export function searchForm({
+    context,
+    inputId,
+    query = '',
+    placeholder = i18nText('Series or film title'),
+    back = ''
+}) {
+    return (
+        '<form class="mine-search" data-content-search="' +
+        context +
+        '">' +
+        (back
+            ? '<button type="button" class="btn btn-ghost" data-action="' +
+              back +
+              '"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-left" /></svg>' +
+              i18nText('Back') +
+              '</button>'
+            : '') +
+        '<input id="' +
+        inputId +
+        '" class="input-field" type="search" name="q" placeholder="' +
+        escapeHtml(placeholder) +
+        '" autocomplete="off" enterkeyhint="search" value="' +
+        escapeHtml(query) +
+        '" /><button type="submit" class="btn btn-primary">' +
+        i18nText('Search') +
+        '</button></form>'
+    );
 }
 
 /** Both forms submit on Search or Enter; clearing the field invalidates an old answer. */
@@ -33,7 +71,11 @@ export function setupSearchForms(handlers) {
 }
 
 export const cardClose = (modal) =>
-    `<button type="button" data-close="${modal}" class="modal-x" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x" /></svg></button>`;
+    '<button type="button" data-close="' +
+    modal +
+    '" class="modal-x" aria-label="' +
+    i18nText('Close') +
+    '"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x" /></svg></button>';
 
 /** Both views use the same sheet: the shared title card, its close button and focus. */
 export function openSearchCard(item, options) {
@@ -54,6 +96,7 @@ const CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use hre
 
 /** Adapt TMDB's response once; the account API already returns this shape. */
 export function searchItem(r) {
+    rememberTitle(`${r.media_type}_${r.id}`, r.media_type === 'tv' ? r.name || r.title : r.title || r.name);
     const date = r.media_type === 'tv' ? r.first_air_date : r.release_date;
     return {
         tmdbId: `${r.media_type}_${r.id}`,
@@ -62,7 +105,7 @@ export function searchItem(r) {
             (r.media_type === 'tv' ? r.name || r.title : r.title || r.name) ||
             r.original_title ||
             r.original_name ||
-            'Untitled',
+            i18nText('Untitled'),
         year: date?.slice(0, 4) || null,
         poster: r.poster_path || null,
         overview: r.overview || '',
@@ -74,7 +117,11 @@ export function searchItem(r) {
 }
 
 const noteOf = (r) =>
-    [r.kind === 'tv' ? 'Series' : 'Film', r.year, r.kind === 'movie' && r.released ? 'already out' : '']
+    [
+        r.kind === 'tv' ? i18nText('Series') : i18nText('Film'),
+        r.year,
+        r.kind === 'movie' && r.released ? i18nText('already out') : ''
+    ]
         .filter(Boolean)
         .join(' · ');
 
@@ -84,34 +131,66 @@ export function searchResults(items, { open, series, film }) {
         return (
             '<div class="empty-state"><span class="empty-icon">' +
             '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search" /></svg></span>' +
-            '<p class="empty-title">Nothing found</p><p class="empty-text">Try another spelling or the original title.</p></div>'
+            ('<p class="empty-title">' +
+                i18nText('Nothing found') +
+                '</p><p class="empty-text">' +
+                i18nText('Try another spelling or the original title.') +
+                '</p></div>')
         );
-    return `<h2 class="group-title">Results</h2><ul class="group-list title-list">${items
-        .map((r, index) => {
-            const attrs = `data-id="${escapeHtml(r.tmdbId)}" data-index="${index}"`;
-            const action = r.added
-                ? `<span class="search-following">${CHECK}Following</span>`
-                : `<button type="button" class="follow-btn" data-action="${r.kind === 'tv' ? series : film}" ${attrs} aria-label="Follow ${escapeHtml(r.title)}"><span>Follow</span></button>`;
-            return (
-                `<li><div class="group-row title-row search-row"><button type="button" class="search-result-open" data-action="${open}" ${attrs}>${titleThumb(r.poster)}` +
-                `<span class="row-text"><span class="row-name">${escapeHtml(r.title)}</span><span class="row-meta">${escapeHtml(noteOf(r))}</span></span></button>${action}</div></li>`
-            );
-        })
-        .join('')}</ul>`;
+    return (
+        '<h2 class="group-title">' +
+        i18nText('Results') +
+        '</h2><ul class="group-list title-list">' +
+        items
+            .map((r, index) => {
+                const attrs = `data-id="${escapeHtml(r.tmdbId)}" data-index="${index}"`;
+                const action = r.added
+                    ? `<span class="search-following">${CHECK}${i18nText('Following')}</span>`
+                    : '<button type="button" class="follow-btn" data-action="' +
+                      (r.kind === 'tv' ? series : film) +
+                      '" ' +
+                      attrs +
+                      ' aria-label="' +
+                      i18nText('Follow {{v2}}', { v2: escapeHtml(r.title) }) +
+                      '"><span>' +
+                      i18nText('Follow') +
+                      '</span></button>';
+                return (
+                    `<li><div class="group-row title-row search-row"><button type="button" class="search-result-open" data-action="${open}" ${attrs}>${titleThumb(r.poster)}` +
+                    `<span class="row-text"><span class="row-name">${escapeHtml(r.title)}</span><span class="row-meta">${escapeHtml(noteOf(r))}</span></span></button>${action}</div></li>`
+                );
+            })
+            .join('') +
+        '</ul>'
+    );
 }
 
 /** The search's Follow sheet: the title card with Notify me for a series, Follow and Cancel */
 export function searchCard(r, { modeName, submit, modal, buttonId = '', titleId = 'mine-card-title' }) {
-    const label = r.added ? 'Following' : 'Follow';
+    rememberTitle(r.tmdbId, r.title);
+    const label = r.added ? i18nText('Following') : i18nText('Follow');
     return titleCard(
-        { kind: r.kind, title: r.title, poster: r.poster, year: r.year, rating: r.rating, overview: r.overview },
+        {
+            kind: r.kind,
+            catalogId: r.tmdbId,
+            copyLocalized: true,
+            title: r.title,
+            poster: r.poster,
+            year: r.year,
+            rating: r.rating,
+            overview: r.overview
+        },
         {
             titleId,
             close: modal,
             notify: r.kind === 'tv' && !r.added ? notifyField({ name: modeName, current: 'episode' }) : '',
             actions:
                 `<button type="button" ${buttonId ? `id="${buttonId}"` : ''} class="sheet-btn-primary" data-action="${submit}" data-id="${escapeHtml(r.tmdbId)}"${r.added ? ' disabled' : ''}>${label}</button>` +
-                `<button type="button" class="sheet-btn-secondary" data-close="${modal}">Cancel</button>`
+                ('<button type="button" class="sheet-btn-secondary" data-close="' +
+                    modal +
+                    '">' +
+                    i18nText('Cancel') +
+                    '</button>')
         }
     );
 }

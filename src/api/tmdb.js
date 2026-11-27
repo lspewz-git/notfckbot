@@ -61,12 +61,12 @@ apiClient.interceptors.response.use(
     }
 );
 
-const searchMulti = async (query) => {
+const searchMulti = async (query, language = 'ru-RU') => {
     try {
         const response = await apiClient.get('/search/multi', {
             params: {
                 query: query,
-                language: 'ru-RU'
+                language
             }
         });
 
@@ -77,6 +77,28 @@ const searchMulti = async (query) => {
         throw error;
     }
 };
+
+// Independent, bounded panel copy cache. Never seed or overwrite the bot's Russian/factual caches.
+const panelTextCache = lruCache({
+    max: 300,
+    maxSize: 8 * 1024 * 1024,
+    sizeCalculation: (copy) => Math.max(1, 2 * (copy.title.length + copy.overview.length + copy.genres.length)),
+    ttl: 6 * 60 * 60 * 1000,
+    fetchMethod: async (key) => {
+        const [kind, id, language] = key.split(':');
+        const { data } = await apiClient.get(`/${kind}/${id}`, { params: { language }, timeout: 5000 });
+        return {
+            title: data.name || data.title || data.original_name || data.original_title || '',
+            overview: data.overview || '',
+            genres: (data.genres || [])
+                .map((genre) => genre.name)
+                .filter(Boolean)
+                .join(', ')
+        };
+    }
+});
+
+const getPanelText = (id, kind, language = 'en-US') => fetchFresh(panelTextCache, `${kind}:${id}:${language}`);
 
 // TMDB release types: 3 theatrical, 4 digital, 5 physical, 6 TV
 const DIGITAL = 4;
@@ -433,6 +455,7 @@ async function refreshSeasons(tvId, seasons, language = 'ru-RU') {
 }
 
 module.exports = {
+    getPanelText,
     tmdbPoster,
     hasSeason,
     refreshSeasons,

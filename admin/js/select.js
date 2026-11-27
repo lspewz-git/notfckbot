@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * Custom dropdowns.
  *
@@ -22,7 +23,7 @@ export function openActionDropdown(trigger, html) {
     panel.className = 'custom-select-panel profile-options';
     panel.id = 'profile-options-menu';
     panel.setAttribute('role', 'group');
-    panel.setAttribute('aria-label', 'Chat display options');
+    panel.setAttribute('aria-label', i18nText('Chat display options'));
     panel.innerHTML = html;
     (trigger.closest('dialog') || document.body).appendChild(panel);
     const rect = trigger.getBoundingClientRect();
@@ -48,6 +49,20 @@ export function setSelectValue(id, value) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+/** Refresh displayed option text without changing the choice or firing form handlers. */
+export function syncSelectText(select) {
+    const trigger = select.parentElement.querySelector('.custom-select-trigger');
+    if (!trigger) return;
+    const option = select.options[select.selectedIndex];
+    trigger.innerText = option ? option.text : '';
+    const name = select.getAttribute('aria-label');
+    if (name) trigger.setAttribute('aria-label', option ? `${name}: ${option.text}` : name);
+    if (openDropdown?.trigger === trigger)
+        openDropdown.panel.querySelectorAll('.custom-select-option > span:first-child').forEach((label, i) => {
+            label.textContent = select.options[i]?.text || '';
+        });
+}
+
 function enhanceSelect(select) {
     const wrap = document.createElement('div');
     wrap.className = 'custom-select';
@@ -68,12 +83,7 @@ function enhanceSelect(select) {
 
     // Without a visible <label for>, the native select's aria-label names the trigger,
     // together with the value it shows ("Films per page: 10")
-    const name = select.getAttribute('aria-label');
-    const syncLabel = () => {
-        const opt = select.options[select.selectedIndex];
-        trigger.innerText = opt ? opt.text : '';
-        if (name) trigger.setAttribute('aria-label', opt ? `${name}: ${opt.text}` : name);
-    };
+    const syncLabel = () => syncSelectText(select);
     syncLabel();
     select.addEventListener('change', syncLabel);
 

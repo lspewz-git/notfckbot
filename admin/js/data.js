@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /** What gets fetched, when, and what happens after a mutating call. */
 
 import { api } from './api.js';
@@ -88,7 +89,7 @@ export async function fetchData() {
 
     const results = await Promise.allSettled(jobs);
     results.forEach((r) => {
-        if (r.status === 'rejected') console.error('Fetch error:', r.reason);
+        if (r.status === 'rejected') console.error(i18nText('Fetch error:'), r.reason);
     });
 }
 
@@ -102,9 +103,10 @@ async function fetchTypedData(type) {
         loadedTables.add(type);
         renderTable(type, data);
     } catch (err) {
-        console.error(`Error loading ${type}:`, err);
+        console.error(i18nText('Error loading {{v0}}:', { v0: type }), err);
         // Leave a dead end rather than an animation that never stops
-        if (!loadedTables.has(type)) renderTableMessage(type, 'Failed to load. Retrying on the next refresh.');
+        if (!loadedTables.has(type))
+            renderTableMessage(type, i18nText('Failed to load. Retrying on the next refresh.'));
     }
 }
 
@@ -120,7 +122,7 @@ export async function mutate(path, options, success) {
         fetchData();
         return data;
     } catch (e) {
-        toast(e.message || 'Request failed', 'error');
+        toast(e.message || i18nText('Request failed'), 'error');
         return null;
     }
 }

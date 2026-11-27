@@ -1,11 +1,11 @@
+import { t as i18nText } from './i18n.js';
 /** Shared chat chips and rows; callers supply only the chats their role can access. */
 import { $, $field, escapeHtml } from './dom.js';
 import { avatar } from './pick-sheet.js';
 import { openModal, closeModal } from './ui.js';
 
 const CHECK = '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-check" /></svg>';
-const DOWN =
-    '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-chevron-down" /></svg>';
+const DOWN = '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-chevron-down" /></svg>';
 
 /** `letterOf`: whose first letter the avatar shows (the person's own name for their private chat) */
 export function chatChip({ title, accent = false, group = false, action, label = title, letterOf = title }) {
@@ -27,7 +27,7 @@ let choose = null;
 
 export function openChatPicker(chats, selected, onPick) {
     $('pick-admin').hidden = true;
-    $('pick-title').textContent = 'Choose a chat';
+    $('pick-title').textContent = i18nText('Choose a chat');
     $('pick-modal').classList.add('chat-picker');
     $('pick-modal').classList.remove('app-sheet');
     $('pick-search').hidden = false;
@@ -37,7 +37,7 @@ export function openChatPicker(chats, selected, onPick) {
         const matches = chats.filter((c) => c.title.toLocaleLowerCase().includes(query));
         $('pick-list').innerHTML =
             chatRows(matches, selected, 'chat-picker-select') ||
-            `<p class="empty-note" role="status">${chats.length ? 'No chats found.' : 'No chats yet.'}</p>`;
+            `<p class="empty-note" role="status">${chats.length ? i18nText('No chats found.') : i18nText('No chats yet.')}</p>`;
         $('pick-clear').hidden = !$field('pick-query').value;
         $('pick-list').scrollTop = 0;
     };

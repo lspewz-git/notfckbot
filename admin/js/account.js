@@ -1,3 +1,6 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
+import { displayTitle, titleMarkup, warmTitles } from './catalog-text.js';
 /**
  * The user's own chats inside the panel (src/account/routes.js): Calendar, Released, Following, the
  * title search and Chat settings for the chat picked on Account (the
@@ -23,14 +26,38 @@ import {
 } from './title-card.js';
 export { MODES };
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = [
+    i18nText('Jan'),
+    i18nText('Feb'),
+    i18nText('Mar'),
+    i18nText('Apr'),
+    i18nText('May'),
+    i18nText('Jun'),
+    i18nText('Jul'),
+    i18nText('Aug'),
+    i18nText('Sep'),
+    i18nText('Oct'),
+    i18nText('Nov'),
+    i18nText('Dec')
+];
+const WEEKDAYS = [
+    i18nText('Sun'),
+    i18nText('Mon'),
+    i18nText('Tue'),
+    i18nText('Wed'),
+    i18nText('Thu'),
+    i18nText('Fri'),
+    i18nText('Sat')
+];
 
 /** "2026-11-04" → "Nov 4" (with the year when it isn't this one, or asked) */
 export function dateText(iso, { withYear = false } = {}) {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
     if (!m) return '';
-    const text = `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}`;
+    const text =
+        locale === 'ru-RU'
+            ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}`
+            : `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}`;
     return withYear || Number(m[1]) !== new Date().getFullYear() ? `${text}, ${m[1]}` : text;
 }
 
@@ -43,13 +70,13 @@ const daysUntil = (day, today) =>
 /** "in 6 days", "tomorrow", "today", "2 days ago": one grey line on every row */
 function whenText(day, today) {
     const n = daysUntil(day, today);
-    if (n === 0) return 'today';
-    if (n === 1) return 'tomorrow';
-    if (n === -1) return 'yesterday';
-    return n > 0 ? `in ${n} days` : `${-n} days ago`;
+    if (n === 0) return i18nText('today');
+    if (n === 1) return i18nText('tomorrow');
+    if (n === -1) return i18nText('yesterday');
+    return n > 0 ? i18nText('in {{v0}} days', { v0: n }) : i18nText('{{v0}} days ago', { v0: -n });
 }
 
-const MARKS = { premiere: 'season premiere', finale: 'season finale' };
+const MARKS = { premiere: i18nText('season premiere'), finale: i18nText('season finale') };
 
 const state = {
     /** @type {{ id: string, type: string, title: string, settings: boolean, hidden?: boolean }[] | null} null until /api/account/chats answers */
@@ -80,7 +107,7 @@ const state = {
 
 /** @param {'subs' | 'calendar'} tab */
 const matches = (tab, title) => String(title).toLocaleLowerCase().includes(state.find[tab]);
-const noMatch = () => empty('No matching titles', 'Try another title.', 'search');
+const noMatch = () => empty(i18nText('No matching titles'), i18nText('Try another title.'), 'search');
 
 /** The signed-in person's name (profile.js): their private chat's avatar shows its first letter */
 let ownName = '';
@@ -116,7 +143,7 @@ export function setChats({ chats, partial }, preferred = null) {
     const named = preferred && chats.some((c) => c.id === String(preferred));
     if (launchTitle && (!named || launchTitle.chatId !== String(preferred))) {
         launchTitle = null;
-        toast('This chat is no longer available.');
+        toast(i18nText('This chat is no longer available.'));
     }
     state.chatId = named ? String(preferred) : ids[0] || null;
     state.chatsError = null;
@@ -135,7 +162,11 @@ const ICON = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"
 const CHEVRON_RIGHT = ICON('chevron-right');
 
 export const chatHint = (c) =>
-    c.type === 'private' ? 'Private chat' : c.settings ? "Group · you're an admin" : 'Group · view only';
+    c.type === 'private'
+        ? i18nText('Private chat')
+        : c.settings
+          ? i18nText("Group · you're an admin")
+          : i18nText('Group · view only');
 
 /** Show the stable account choice while the new session's chats are loading. */
 export function resetChatChoice() {
@@ -205,10 +236,12 @@ export async function setChatHidden(id, hidden) {
  */
 function showChatChips() {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
-    const name = chat ? chat.title : 'My account';
+    const name = chat ? chat.title : i18nText('My account');
     const own = !chat || chat.type === 'private';
     const html =
-        `<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="Account: ${escapeHtml(name)}">` +
+        '<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="' +
+        i18nText('Account: {{v0}}', { v0: escapeHtml(name) }) +
+        '">' +
         avatar(own ? ownName || chat?.id || '' : name, own, !own) +
         `<span class="mine-chat-chip-name">${escapeHtml(name)}</span></a>`;
     for (const holder of all('[data-chat-picker]')) holder.innerHTML = html;
@@ -231,7 +264,7 @@ function openChatSwitch() {
     if (!state.chats || !state.chats.length) return;
     const chats = state.chats.filter((c) => !c.hidden || c.id === state.chatId);
     pickFrom({
-        title: 'Chats',
+        title: i18nText('Chats'),
         admin: !document.body.classList.contains('role-user'),
         value: String(state.chatId),
         options: chats.map((c) => ({
@@ -284,15 +317,38 @@ const empty = (title, body, iconName = 'bookmark') =>
 
 /** Rows the size of the real ones while the list loads */
 const loading = (rows = 3) =>
-    `<ul class="group-list title-list" aria-busy="true" aria-label="Loading">${'<li><div class="group-row title-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>'.repeat(rows)}</ul>`;
+    '<ul class="group-list title-list" aria-busy="true" aria-label="' +
+    i18nText('Loading') +
+    '">' +
+    '<li><div class="group-row title-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>'.repeat(
+        rows
+    ) +
+    '</ul>';
 
 /** Search rows while the results load: the same heading and Follow pill as the results, so nothing jumps */
-const searchLoading = `<h2 class="group-title">Results</h2><ul class="group-list title-list" aria-busy="true" aria-label="Loading">${'<li><div class="group-row title-row search-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span><span class="skeleton follow-skeleton">Follow</span></div></li>'.repeat(4)}</ul>`;
+const searchLoading =
+    '<h2 class="group-title">' +
+    i18nText('Results') +
+    '</h2><ul class="group-list title-list" aria-busy="true" aria-label="' +
+    i18nText('Loading') +
+    '">' +
+    (
+        '<li><div class="group-row title-row search-row" aria-hidden="true"><span class="title-thumb skeleton"></span><span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span><span class="skeleton follow-skeleton">' +
+        i18nText('Follow') +
+        '</span></div></li>'
+    ).repeat(4) +
+    '</ul>';
 
 const failed = (message) =>
     `<div class="empty-state" role="alert"><span class="empty-icon">${ICON('triangle-alert')}</span>` +
-    `<p class="empty-title">Failed to load</p><p class="empty-text">${escapeHtml(message)}</p>` +
-    '<button type="button" class="sheet-btn-secondary empty-action" data-action="mine-reload">Retry</button></div>';
+    ('<p class="empty-title">' +
+        i18nText('Failed to load') +
+        '</p><p class="empty-text">' +
+        escapeHtml(message) +
+        '</p>') +
+    ('<button type="button" class="sheet-btn-secondary empty-action" data-action="mine-reload">' +
+        i18nText('Retry') +
+        '</button></div>');
 
 /** CategoryChips: pills in 44px zones, the open one inverted; optional counts */
 const chips = (items, active, action, key) =>
@@ -304,39 +360,54 @@ const chips = (items, active, action, key) =>
         )
         .join('')}</div>`;
 
-const FOLLOW_PLUS = `<a class="cat-plus" href="#my-search" data-action="mine-search-open" data-section="my-search" aria-label="Follow a title"><span>${ICON('plus')}</span></a>`;
+const FOLLOW_PLUS =
+    '<a class="cat-plus" href="#my-search" data-action="mine-search-open" data-section="my-search" aria-label="' +
+    i18nText('Follow a title') +
+    '"><span>' +
+    ICON('plus') +
+    '</span></a>';
 
 const noChats = () =>
     empty(
-        'No chats yet',
-        'Send /start to the bot to get your own chat. Groups are the ones where both you and the bot are.',
+        i18nText('No chats yet'),
+        i18nText('Send /start to the bot to get your own chat. Groups are the ones where both you and the bot are.'),
         'users'
     );
 
 /** A title in a list: poster, name, one line, an optional badge, the chevron */
-const titleRow = ({ action, id, poster, title, note, badge = '' }) =>
+const titleRow = ({ action, id, catalogId = id, poster, title, note, badge = '' }) =>
     `<li><button type="button" class="group-row title-row" data-action="${action}" data-id="${escapeHtml(id)}">${titleThumb(poster)}` +
-    `<span class="row-text"><span class="row-name">${escapeHtml(title)}</span><span class="row-meta">${escapeHtml(note)}</span></span>` +
+    `<span class="row-text"><span class="row-name">${titleMarkup(catalogId, title)}</span><span class="row-meta">${escapeHtml(note)}</span></span>` +
     `${badge ? `<span class="row-badge">${escapeHtml(badge)}</span>` : ''}<span class="row-chevron">${CHEVRON_RIGHT}</span></button></li>`;
 
 // --- Following ---
 
 const seriesNote = (s) => {
-    if (s.finished) return 'Marked as ended in the catalog';
+    if (s.finished) return i18nText('Marked as ended in the catalog');
     if (s.next) return `S${s.next.season}E${s.next.episode} · ${dateText(s.next.date)}`;
-    return 'Next episode date unknown';
+    return i18nText('Next episode date unknown');
 };
 
 const releaseCountries = (release, withCount = true) =>
     compactCountries(release?.countries?.length ? release.countries : [release?.country], { withCount });
 const filmNote = (film) =>
     film.release?.date || film.date
-        ? `Release ${dateText(film.release?.date || film.date, { withYear: true })}${releaseCountries(film.release) ? ` · ${releaseCountries(film.release)}` : ''}`
-        : 'Release date unknown';
+        ? i18nText('Release {{v0}}{{v1}}', {
+              v0: dateText(film.release?.date || film.date, { withYear: true }),
+              v1: releaseCountries(film.release) ? ` · ${releaseCountries(film.release)}` : ''
+          })
+        : i18nText('Release date unknown');
 
 function subsView() {
-    const series = state.list.series.filter((s) => matches('subs', s.title));
-    const list = { series, films: state.list.films.filter((f) => matches('subs', f.title)) };
+    const series = state.list.series.filter(
+        (s) => matches('subs', s.title) || matches('subs', displayTitle(s.id, s.title))
+    );
+    const list = {
+        series,
+        films: state.list.films.filter(
+            (f) => matches('subs', f.title) || matches('subs', displayTitle(f.tmdbId, f.title))
+        )
+    };
     const running = series.filter((s) => !s.finished);
     const archive = series.filter((s) => s.finished);
     const tab = state.subsTab;
@@ -344,9 +415,9 @@ function subsView() {
         '<div class="cat-bar">' +
         chips(
             [
-                ['series', 'Series', running.length],
-                ['films', 'Films', list.films.length],
-                ['archive', 'Ended', archive.length]
+                ['series', i18nText('Series'), running.length],
+                ['films', i18nText('Films'), list.films.length],
+                ['archive', i18nText('Ended'), archive.length]
             ],
             tab,
             'mine-subs-tab',
@@ -362,6 +433,7 @@ function subsView() {
                       titleRow({
                           action: 'mine-film',
                           id: f.id,
+                          catalogId: f.tmdbId,
                           poster: f.poster,
                           title: f.title,
                           note: filmNote(f),
@@ -371,7 +443,11 @@ function subsView() {
                   .join('')}</ul>`
             : state.find.subs
               ? noMatch()
-              : empty('No films waiting', 'Find a film and follow it: the bot writes when it comes out.', 'film');
+              : empty(
+                    i18nText('No films waiting'),
+                    i18nText('Find a film and follow it: the bot writes when it comes out.'),
+                    'film'
+                );
     } else {
         const items = tab === 'archive' ? archive : running;
         body = items.length
@@ -391,11 +467,11 @@ function subsView() {
               ? noMatch()
               : tab === 'archive'
                 ? empty(
-                      'No ended series',
-                      'Series marked as ended in the catalog go here. The bot keeps checking for updates.',
+                      i18nText('No ended series'),
+                      i18nText('Series marked as ended in the catalog go here. The bot keeps checking for updates.'),
                       'tv'
                   )
-                : empty('No series yet', 'Find a series and follow its new episodes.', 'tv');
+                : empty(i18nText('No series yet'), i18nText('Find a series and follow its new episodes.'), 'tv');
     }
     return top + body;
 }
@@ -418,14 +494,14 @@ function dateBlock(item, event, today) {
         return filmDates(item, today, event);
     }
     if (item.kind === 'tv') {
-        if (item.finished) return { label: 'Catalog status', value: 'Marked as ended' };
+        if (item.finished) return { label: i18nText('Catalog status'), value: i18nText('Marked as ended') };
         return item.next
             ? {
-                  label: 'Next episode',
+                  label: i18nText('Next episode'),
                   value: `S${item.next.season}E${item.next.episode} · ${dateText(item.next.date, { withYear: true })}`,
                   when: today ? whenText(item.next.date, today) : ''
               }
-            : { label: 'Next episode', value: 'Date not known yet' };
+            : { label: i18nText('Next episode'), value: i18nText('Date not known yet') };
     }
     return filmDates(item, today);
 }
@@ -473,23 +549,30 @@ function filmDates(item, today, event = null) {
 function sendLine(main, digital, timeZone) {
     // A release whose day has come still waits for TMDB's Released (src/cron/films.js): it goes first
     if (main?.sendKind === 'not_before' && main.sendAt && Date.parse(main.sendAt) <= Date.now())
-        return 'The bot will message you as soon as the release is confirmed';
+        return i18nText('The bot will message you as soon as the release is confirmed');
     const [send] = [main, digital]
         .filter((s) => s?.sendAt && Date.parse(s.sendAt) > Date.now())
         .sort((a, b) => Date.parse(a.sendAt) - Date.parse(b.sendAt));
     if (!send) return '';
     if (send === digital)
-        return `The bot will message you about the digital release not before ${dateText(send.notifyOn)}`;
+        return i18nText('The bot will message you about the digital release not before {{v0}}', {
+            v0: dateText(send.notifyOn)
+        });
     const day = dateText(send.notifyOn);
-    const time = new Date(send.sendAt).toLocaleTimeString('en-GB', {
+    const time = new Date(send.sendAt).toLocaleTimeString(locale, {
         hour: '2-digit',
         minute: '2-digit',
         timeZone: timeZone || 'Europe/Moscow'
     });
-    if (send.sendKind === 'timed') return `The bot will message you on ${day}, around ${time}`;
-    if (send.sendKind === 'quiet') return `The bot will message you on ${day}, around ${time}, after your quiet hours`;
-    if (send.sendKind === 'not_before') return `The bot will message you not before ${day}`;
-    return `The bot will message you on ${day}`;
+    if (send.sendKind === 'timed')
+        return i18nText('The bot will message you on {{v0}}, around {{v1}}', { v0: day, v1: time });
+    if (send.sendKind === 'quiet')
+        return i18nText('The bot will message you on {{v0}}, around {{v1}}, after your quiet hours', {
+            v0: day,
+            v1: time
+        });
+    if (send.sendKind === 'not_before') return i18nText('The bot will message you not before {{v0}}', { v0: day });
+    return i18nText('The bot will message you on {{v0}}', { v0: day });
 }
 
 /** Following and Calendar share their card: Notify me only from Following (the user, 02.11) */
@@ -502,6 +585,7 @@ function followingCard(item, { event = null, today }) {
     return titleCard(
         {
             kind: item.kind,
+            catalogId: item.tmdbId || String(item.id),
             title: item.title,
             poster: item.poster,
             seasons: item.seasons,
@@ -548,7 +632,7 @@ function syncFollowingBusy(item, chatId) {
     const unfollowButton = document.querySelector(`#${modal} [data-action="mine-ask-unfollow"]`);
     if (unfollowButton) {
         unfollowButton.toggleAttribute('aria-busy', pendingUnfollows.has(key));
-        unfollowButton.textContent = pendingUnfollows.has(key) ? 'Unfollowing…' : 'Unfollow';
+        unfollowButton.textContent = pendingUnfollows.has(key) ? 'Unfollowing…' : i18nText('Unfollow');
     }
 }
 
@@ -579,7 +663,7 @@ function openNewCard(r) {
 }
 
 /** The episode's title, or "Episode 8" while TMDB has none (in the panel's language) */
-const episodeName = (item) => item.name || `Episode ${item.episode}`;
+const episodeName = (item) => item.name || i18nText('Episode {{v0}}', { v0: item.episode });
 
 /** An episode or a film from the calendar */
 function releaseCard(item, today) {
@@ -620,7 +704,7 @@ async function unfollow(context) {
         );
         if (state.chatId !== chatId) return;
         if (sameCard()) closeModal(context.modal);
-        toast('Unfollowed', 'success');
+        toast(i18nText('Unfollowed'), 'success');
         state.cal = null;
         state.list = null;
         await reload();
@@ -668,7 +752,14 @@ function resetAired() {
 
 const calWhatOf = (kind) => (kind === 'movie' ? 'films' : 'series');
 
-const BELL = `<span class="cal-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${ICON('bell')}</span>`;
+const BELL =
+    '<span class="cal-bell" role="img" aria-label="' +
+    i18nText('The bot will message you about this') +
+    '" title="' +
+    i18nText('The bot will message you about this') +
+    '">' +
+    ICON('bell') +
+    '</span>';
 
 function calRow(item, index, today) {
     const release = item.release || item;
@@ -683,14 +774,14 @@ function calRow(item, index, today) {
     return (
         `<li><button type="button" class="group-row cal-row" data-action="mine-cal-item" data-index="${index}">` +
         `<span class="cal-day"><b>${item.date.slice(8, 10)}</b><span>${weekday(item.date)}</span></span>${titleThumb(item.poster, 'title-thumb cal-thumb', { lazy: false })}` +
-        `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta${extra ? ' cal-meta-countries' : ''}">${meta}</span></span>` +
+        `<span class="row-text"><span class="row-name">${titleMarkup(item.tmdbId, item.title)}</span><span class="row-meta${extra ? ' cal-meta-countries' : ''}">${meta}</span></span>` +
         `<span class="cal-when">${item.notifyOn ? BELL : ''}<span>${whenText(item.date, today)}</span></span></button></li>`
     );
 }
 
 /** "2027-07" → "July 2027"; the year only when it isn't today's */
 const monthTitle = (key, today) =>
-    new Date(`${key}-01T00:00:00Z`).toLocaleString('en', {
+    new Date(`${key}-01T00:00:00Z`).toLocaleString(locale, {
         month: 'long',
         timeZone: 'UTC',
         ...(key.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' })
@@ -704,14 +795,18 @@ function daysBody(data) {
             ({ item }) =>
                 calWhatOf(item.kind) === state.calWhat &&
                 daysUntil(item.date, data.today) >= -1 &&
-                matches('calendar', item.title)
+                (matches('calendar', item.title) || matches('calendar', displayTitle(item.tmdbId, item.title)))
         );
     if (!shown.length)
         return state.find.calendar
             ? noMatch()
             : state.calWhat === 'films'
-              ? empty('No films coming', 'No films on the list have a release date yet.', 'film')
-              : empty('No episodes coming', 'No followed series have dated episodes yet.', 'calendar-days');
+              ? empty(i18nText('No films coming'), i18nText('No films on the list have a release date yet.'), 'film')
+              : empty(
+                    i18nText('No episodes coming'),
+                    i18nText('No followed series have dated episodes yet.'),
+                    'calendar-days'
+                );
     const months = [];
     for (const entry of shown) {
         const key = entry.item.date.slice(0, 7);
@@ -719,7 +814,11 @@ function daysBody(data) {
         months[months.length - 1].rows.push(entry);
     }
     const footnote = shown.some(({ item }) => item.notifyOn)
-        ? `<p class="group-help cal-footnote">${ICON('bell')}<span>The bot will message you about these.</span></p>`
+        ? '<p class="group-help cal-footnote">' +
+          ICON('bell') +
+          '<span>' +
+          i18nText('The bot will message you about these.') +
+          '</span></p>'
         : '';
     return (
         months
@@ -738,14 +837,18 @@ function calendarView(data) {
     const body = !data ? loading(4) : daysBody(data);
     const note =
         data && data.failed && state.calWhat === 'series'
-            ? `<p class="group-help">The schedule is unavailable for ${data.failed} series: their episodes may be missing here.</p>`
+            ? '<p class="group-help">' +
+              i18nText('The schedule is unavailable for {{v0}} series: their episodes may be missing here.', {
+                  v0: data.failed
+              }) +
+              '</p>'
             : '';
     return (
         '<div class="cat-bar mine-cal-bar">' +
         chips(
             [
-                ['series', 'Series'],
-                ['films', 'Films']
+                ['series', i18nText('Series')],
+                ['films', i18nText('Films')]
             ],
             state.calWhat,
             'mine-cal-what',
@@ -767,8 +870,8 @@ function resultsView() {
     if (state.searchError) return failed(state.searchError);
     if (!state.query)
         return empty(
-            'Find a series or film',
-            'Type a title in any language. Follow it to get messages in the chosen chat.',
+            i18nText('Find a series or film'),
+            i18nText('Type a title in any language. Follow it to get messages in the chosen chat.'),
             'search'
         );
     if (state.searching) return searchLoading;
@@ -805,18 +908,18 @@ function settingChoices(data) {
         presets.push([quiet, `${pad(s.quiet_start)}–${pad(s.quiet_end)}`]);
     }
     return {
-        quiet: { title: 'Quiet hours', value: quiet, options: [['off', 'Off'], ...presets] },
+        quiet: { title: i18nText('Quiet hours'), value: quiet, options: [['off', i18nText('Off')], ...presets] },
         timezone: {
-            title: 'Time zone',
+            title: i18nText('Time zone'),
             value: s.timezone,
-            options: data.zones.map((z) => [z.id, `${z.city} +${z.offset}`])
+            options: data.zones.map((z) => [z.id, `${i18nText(z.city)} +${z.offset}`])
         },
         buttons_mode: {
-            title: "Who presses the bot's buttons",
+            title: i18nText("Who presses the bot's buttons"),
             value: s.buttons_mode,
             options: [
-                ['owner', 'Whoever called them'],
-                ['all', 'Every member']
+                ['owner', i18nText('Whoever called them')],
+                ['all', i18nText('Every member')]
             ]
         }
     };
@@ -853,30 +956,47 @@ function settingsView(data) {
         chatCard(data) +
         (data.canChange
             ? ''
-            : '<p class="group-help chat-settings-note">You can look at the settings; the group’s admins change them.</p>') +
+            : '<p class="group-help chat-settings-note">' +
+              i18nText('You can look at the settings; the group’s admins change them.') +
+              '</p>') +
         group(
-            'Notifications',
-            pickRow('quiet', 'moon', 'Quiet hours') +
-                pickRow('timezone', 'globe', 'Time zone') +
+            i18nText('Notifications'),
+            pickRow('quiet', 'moon', i18nText('Quiet hours')) +
+                pickRow('timezone', 'globe', i18nText('Time zone')) +
                 toggleRow(
                     'notify_digital',
                     'tv',
-                    'Digital releases',
-                    'Also notify about the digital release',
+                    i18nText('Digital releases'),
+                    i18nText('Also notify about the digital release'),
                     s.notify_digital
                 ),
-            'In quiet hours notifications wait and come in the morning as one message. ' +
-                'Films follow the world release (the first day in several countries or the home country), or in Russia for Russian films. Digital alerts are optional.'
+            i18nText('In quiet hours notifications wait and come in the morning as one message.') +
+                ' ' +
+                i18nText(
+                    'Films follow the world release (the first day in several countries or the home country), or in Russia for Russian films. Digital alerts are optional.'
+                )
         ) +
         group(
-            'Digests',
-            toggleRow('digest_week', 'calendar-days', 'Weekly', 'Mondays at 10:00', s.digest_week) +
-                toggleRow('digest_month', 'calendar', 'Monthly', 'On the 1st at 10:00', s.digest_month)
+            i18nText('Digests'),
+            toggleRow('digest_week', 'calendar-days', i18nText('Weekly'), i18nText('Mondays at 10:00'), s.digest_week) +
+                toggleRow(
+                    'digest_month',
+                    'calendar',
+                    i18nText('Monthly'),
+                    i18nText('On the 1st at 10:00'),
+                    s.digest_month
+                )
         ) +
         group(
-            'Bot',
-            (data.group ? pickRow('buttons_mode', 'users', 'Buttons pressed by') : '') +
-                toggleRow('menu_enabled', 'panel-bottom', 'Bottom menu in the chat', '', s.menu_enabled !== false)
+            i18nText('Bot'),
+            (data.group ? pickRow('buttons_mode', 'users', i18nText('Buttons pressed by')) : '') +
+                toggleRow(
+                    'menu_enabled',
+                    'panel-bottom',
+                    i18nText('Bottom menu in the chat'),
+                    '',
+                    s.menu_enabled !== false
+                )
         )
     );
 }
@@ -887,14 +1007,20 @@ function settingsView(data) {
  */
 function chatCard(data) {
     const chat = (state.chats || []).find((c) => c.id === state.chatId);
-    const title = chat ? chat.title : 'My account';
+    const title = chat ? chat.title : i18nText('My account');
     const group = Boolean(data.group);
-    const meta = !group ? 'Your personal chat' : data.canChange ? 'You’re an admin' : 'Only admins change settings';
+    const meta = !group
+        ? i18nText('Your personal chat')
+        : data.canChange
+          ? i18nText('You’re an admin')
+          : i18nText('Only admins change settings');
     return (
-        `<button type="button" class="group-card chat-card" data-action="chat-switch" aria-haspopup="dialog" aria-label="Current chat: ${escapeHtml(title)}. Switch chat">` +
+        '<button type="button" class="group-card chat-card" data-action="chat-switch" aria-haspopup="dialog" aria-label="' +
+        i18nText('Current chat: {{v0}}. Switch chat', { v0: escapeHtml(title) }) +
+        '">' +
         `<span class="profile-avatar${group ? ' profile-avatar-group' : ''}" aria-hidden="true">${escapeHtml(initial(group ? title : ownName || chat?.id || ''))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(title)}</span>` +
-        `<span class="role-chip">${group ? 'Group' : 'Private'}</span></span>` +
+        `<span class="role-chip">${group ? i18nText('Group') : i18nText('Private')}</span></span>` +
         `<span class="row-meta">${meta}</span></span>` +
         `<span class="row-chevron">${ICON('chevrons-up-down')}</span></button>`
     );
@@ -949,7 +1075,7 @@ export async function loadMine(section) {
                                   ? 'archive'
                                   : 'series';
                         openFollowing(list.linkedTitle);
-                    } else toast('This title is no longer followed in this chat.');
+                    } else toast(i18nText('This title is no longer followed in this chat.'));
                 }
             }
             body.innerHTML = subsView();
@@ -1000,7 +1126,7 @@ function markAdded(tmdbId) {
 async function changeSettings(body) {
     try {
         await api(chatPath('/settings'), { method: 'PATCH', body });
-        toast('Saved', 'success');
+        toast(i18nText('Saved'), 'success');
     } catch (err) {
         toast(err.message, 'error');
     }
@@ -1073,11 +1199,16 @@ export const accountActions = {
         const key = titleKey(context.item, context.chatId);
         if (pendingModeSaves.has(key) || pendingUnfollows.has(key)) return;
         showConfirm({
-            title: `Unfollow “${context.item.title}”?`,
-            text: 'It will leave this chat’s following list and calendar. Release notifications will stop.',
-            confirmLabel: 'Unfollow',
-            cancelLabel: 'Keep following',
+            title: i18nText('Unfollow “{{v0}}”?', {
+                v0: displayTitle(context.item.tmdbId || context.item.id, context.item.title)
+            }),
+            text: i18nText('It will leave this chat’s following list and calendar. Release notifications will stop.'),
+            confirmLabel: i18nText('Unfollow'),
+            cancelLabel: i18nText('Keep following'),
             onConfirm: () => unfollow(context)
+        });
+        $('confirm-title').innerHTML = i18nText('Unfollow “{{v0}}”?', {
+            v0: titleMarkup(context.item.tmdbId || context.item.id, context.item.title)
         });
     },
     // The search pill and Following's +: Back on the search returns to the tab it came from
@@ -1127,16 +1258,15 @@ export const accountActions = {
         const picked = /** @type {HTMLInputElement | null} */ (
             document.querySelector('input[name="mine-new-mode"]:checked')
         );
-        return addTitle(
-            el,
-            '/series',
-            { tmdbId: el.dataset.id, mode: picked ? picked.value : 'episode' },
-            () => 'Following'
+        return addTitle(el, '/series', { tmdbId: el.dataset.id, mode: picked ? picked.value : 'episode' }, () =>
+            i18nText('Following')
         );
     },
     'mine-add-film': (el) =>
         addTitle(el, '/films', { tmdbId: el.dataset.id }, ({ released }) =>
-            released ? 'The film is already out: added to the released ones' : 'Following: the bot writes when it’s out'
+            released
+                ? i18nText('The film is already out: added to the released ones')
+                : i18nText('Following: the bot writes when it’s out')
         ),
     'mine-cal-what': (el) => {
         state.calWhat = el.dataset.what === 'films' ? 'films' : 'series';
@@ -1170,6 +1300,10 @@ export const accountActions = {
 
 /** The mode radios and the search field. */
 export function setupAccount() {
+    window.addEventListener('catalog-names-ready', () => {
+        if (state.find.subs && state.list) $('my-subs-body').innerHTML = subsView();
+        if (state.find.calendar && state.cal) showCalendar();
+    });
     // The search runs as the person types (after a pause), or at once on Enter (setupSearchForms)
     document.addEventListener('input', (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
@@ -1177,6 +1311,21 @@ export function setupAccount() {
         if (tab) {
             // A tab's own field filters only what that tab already shows; the catalog is Following's +
             state.find[tab] = input.value.trim().toLocaleLowerCase();
+            if ((tab === 'subs' || tab === 'calendar') && state.find[tab]) {
+                const query = state.find[tab];
+                const chat = state.chatId;
+                const ids =
+                    tab === 'subs'
+                        ? [
+                              ...(state.list?.series || []).map((s) => s.id),
+                              ...(state.list?.films || []).map((f) => f.tmdbId)
+                          ]
+                        : (state.cal?.items || []).map((item) => item.tmdbId);
+                warmTitles(
+                    ids,
+                    () => state.chatId === chat && state.find[tab] === query && input.getClientRects().length > 0
+                );
+            }
             if (tab === 'aired') getAiredHistory().filter(input.value);
             else if (tab === 'subs' && state.list) $('my-subs-body').innerHTML = subsView();
             else if (tab === 'calendar' && state.cal) $('my-calendar-body').innerHTML = calendarView(state.cal);
@@ -1229,7 +1378,7 @@ export function setupAccount() {
                     const summary = document.querySelector('#mine-card-body .tc-notify-summary strong');
                     if (summary) summary.textContent = NOTIFY[el.value].long;
                 }
-                toast('Notifications changed', 'success');
+                toast(i18nText('Notifications changed'), 'success');
                 if (state.list && visibleSection() === 'my-subs') $('my-subs-body').innerHTML = subsView();
             } catch (err) {
                 toast(err.message, 'error');
@@ -1255,7 +1404,7 @@ export async function searchAccount(query) {
         return;
     }
     if (!state.chatId) {
-        state.searchError = state.chatsError || 'Your chats are still loading. Try again in a moment.';
+        state.searchError = state.chatsError || i18nText('Your chats are still loading. Try again in a moment.');
         showResults();
         return;
     }

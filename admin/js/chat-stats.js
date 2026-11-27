@@ -1,3 +1,6 @@
+import { locale } from './i18n.js';
+import { t as i18nText } from './i18n.js';
+import { titleMarkup } from './catalog-text.js';
 /**
  * A chat's statistics (/api/chat/:id/stats, src/chat-stats.js): what came out of what it follows,
  * what it is into, the notifications it got and how it uses the bot, for last year, this year or
@@ -6,25 +9,38 @@
  */
 
 import { $, escapeHtml } from './dom.js';
-import { activeLine, shortDay } from './format.js';
+import { activeLine, shortDay, genreName } from './format.js';
 import { api, apiImage } from './api.js';
 import { openModal, setReturnTo, showConfirm, toast } from './ui.js';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = [
+    i18nText('Jan'),
+    i18nText('Feb'),
+    i18nText('Mar'),
+    i18nText('Apr'),
+    i18nText('May'),
+    i18nText('Jun'),
+    i18nText('Jul'),
+    i18nText('Aug'),
+    i18nText('Sep'),
+    i18nText('Oct'),
+    i18nText('Nov'),
+    i18nText('Dec')
+];
 const FEATURES = {
-    query: 'Searches',
-    search: 'Search menu',
-    card: 'Title cards',
-    subs: 'Subscriptions',
-    calendar: 'Calendar',
-    history: 'History',
-    settings: 'Settings',
-    help: 'Help',
-    start: 'Start',
-    held: 'Overnight list'
+    query: i18nText('Searches'),
+    search: i18nText('Search menu'),
+    card: i18nText('Title cards'),
+    subs: i18nText('Subscriptions'),
+    calendar: i18nText('Calendar'),
+    history: i18nText('History'),
+    settings: i18nText('Settings'),
+    help: i18nText('Help'),
+    start: i18nText('Start'),
+    held: i18nText('Overnight list')
 };
-const regions = new Intl.DisplayNames(['en'], { type: 'region' });
-const number = new Intl.NumberFormat('en-GB');
+const regions = new Intl.DisplayNames([locale], { type: 'region' });
+const number = new Intl.NumberFormat(locale);
 
 let chatId = null;
 let chatName = '';
@@ -44,9 +60,10 @@ const country = (code) => {
         return code;
     }
 };
-const plural = (n, one, many = `${one}s`) => `${number.format(n)} ${n === 1 ? one : many}`;
+const plural = (n, one, many = `${one}s`) =>
+    locale === 'ru-RU' ? i18nText(`{{count}} ${one}`, { count: n }) : `${number.format(n)} ${n === 1 ? one : many}`;
 const day = (iso) =>
-    new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(`${iso}T12:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /** The periods: last year, this year, everything. */
 function periods() {
@@ -54,7 +71,7 @@ function periods() {
     return [
         { key: 'last', label: String(year - 1), query: `year=${year - 1}` },
         { key: 'year', label: String(year), query: `year=${year}` },
-        { key: 'all', label: 'All time', query: `from=2000-01-01&to=${today()}` }
+        { key: 'all', label: i18nText('All time'), query: `from=2000-01-01&to=${today()}` }
     ];
 }
 
@@ -75,7 +92,7 @@ const box = (title, aside, body, extra = '') =>
 
 /** Rows with a bar each, against the first (largest). */
 function meters(items, name = (x) => x) {
-    if (!items.length) return '<p class="stats-empty stats-slot-meters">Nothing yet</p>';
+    if (!items.length) return '<p class="stats-empty stats-slot-meters">' + i18nText('Nothing yet') + '</p>';
     const top = items[0].n || 1;
     return `<ul class="stats-list stats-slot-meters">${items
         .slice(0, 3)
@@ -87,12 +104,12 @@ function meters(items, name = (x) => x) {
 }
 
 /** Plain rows: a name and a figure. */
-function rows(items, empty = 'Nothing yet') {
+function rows(items, empty = i18nText('Nothing yet')) {
     if (!items.length) return `<p class="stats-empty stats-slot-rows">${empty}</p>`;
     return `<ul class="stats-list stats-slot-rows">${items
         .map(
-            ([name, value, crown]) =>
-                `<li class="stats-row"><span class="stats-name">${crown ? '<span class="stats-crown" role="img" aria-label="Added clearly the most" title="Added clearly the most">★</span>' : ''}${escapeHtml(name)}</span><span class="stats-count">${escapeHtml(value)}</span></li>`
+            ([name, value, crown, id]) =>
+                `<li class="stats-row"><span class="stats-name">${crown ? '<span class="stats-crown" role="img" aria-label="' + i18nText('Added clearly the most') + '" title="' + i18nText('Added clearly the most') + '">★</span>' : ''}${id ? titleMarkup(id, name) : escapeHtml(name)}</span><span class="stats-count">${escapeHtml(value)}</span></li>`
         )
         .join('')}</ul>`;
 }
@@ -100,14 +117,14 @@ function rows(items, empty = 'Nothing yet') {
 /** One of the bot's comings and goings in the chat (src/bot-status.js), as a line. */
 function botEventLine({ kind, detail, by }, chatType) {
     const lines = {
-        started: 'Started the bot',
-        added: by ? `Added by ${by}` : 'Added to the group',
-        returned: 'Came back',
-        stopped: 'Stopped the bot',
-        removed: by ? `Removed by ${by}` : 'Removed from the group',
-        deleted: chatType === 'private' ? 'Account deleted' : 'Chat deleted'
+        started: i18nText('Started the bot'),
+        added: by ? i18nText('Added by {{v0}}', { v0: by }) : i18nText('Added to the group'),
+        returned: i18nText('Came back'),
+        stopped: i18nText('Stopped the bot'),
+        removed: by ? i18nText('Removed by {{v0}}', { v0: by }) : i18nText('Removed from the group'),
+        deleted: chatType === 'private' ? i18nText('Account deleted') : i18nText('Chat deleted')
     };
-    return lines[detail] || (kind === 'bot_on' ? 'Came back' : 'Left the bot');
+    return lines[detail] || (kind === 'bot_on' ? i18nText('Came back') : i18nText('Left the bot'));
 }
 
 /** "Bot in this chat": the latest times it was added, removed, blocked or started; nothing if none. */
@@ -115,7 +132,9 @@ function botHistory(bot, chatType) {
     const history = (bot && bot.history) || [];
     if (!history.length) return '';
     return (
-        `<h4 class="stats-box-title stats-subtitle">Bot in this chat</h4>` +
+        '<h4 class="stats-box-title stats-subtitle">' +
+        i18nText('Bot in this chat') +
+        '</h4>' +
         rows(history.map((e) => [botEventLine(e, chatType), shortDay(e.at)]))
     );
 }
@@ -138,15 +157,22 @@ function chart(stats) {
         }
         for (const [label, count] of [...byYear].sort()) bars.push({ label, count });
     }
-    if (!bars.some((b) => b.count)) return '<p class="stats-empty stats-chart-empty">No episodes in this period</p>';
+    if (!bars.some((b) => b.count))
+        return '<p class="stats-empty stats-chart-empty">' + i18nText('No episodes in this period') + '</p>';
     const max = Math.max(...bars.map((b) => b.count));
     const busiest = bars.find((b) => b.count === max);
-    return `<div class="stats-chart" role="img" aria-label="Episodes: ${escapeHtml(bars.map((b) => `${b.label} ${b.count}`).join(', '))}">${bars
-        .map(
-            (b) =>
-                `<div class="stats-col"><span class="stats-col-bar${b === busiest ? ' busiest' : ''}" style="height:${Math.round((b.count / max) * 100)}%" title="${escapeHtml(b.label)}: ${b.count}"></span><span class="stats-col-label">${escapeHtml(b.label)}</span></div>`
-        )
-        .join('')}</div>`;
+    return (
+        '<div class="stats-chart" role="img" aria-label="' +
+        i18nText('Episodes: {{v0}}', { v0: escapeHtml(bars.map((b) => `${b.label} ${b.count}`).join(', ')) }) +
+        '">' +
+        bars
+            .map(
+                (b) =>
+                    `<div class="stats-col"><span class="stats-col-bar${b === busiest ? ' busiest' : ''}" style="height:${Math.round((b.count / max) * 100)}%" title="${escapeHtml(b.label)}: ${b.count}"></span><span class="stats-col-label">${escapeHtml(b.label)}</span></div>`
+            )
+            .join('') +
+        '</div>'
+    );
 }
 
 /** The whole body for one answer. */
@@ -157,7 +183,14 @@ export function renderStats(stats, chatType = 'private') {
     const films = stats.films.released;
     const following = stats.following.series + stats.following.films;
     const busiest = ep.busiestMonth
-        ? `busiest: ${MONTHS[Number(ep.busiestMonth.month.slice(5)) - 1]}${stats.period.from.slice(0, 4) === stats.period.to.slice(0, 4) ? '' : ` ${ep.busiestMonth.month.slice(0, 4)}`}, ${ep.busiestMonth.count}`
+        ? i18nText('busiest: {{v0}}{{v1}}, {{v2}}', {
+              v0: MONTHS[Number(ep.busiestMonth.month.slice(5)) - 1],
+              v1:
+                  stats.period.from.slice(0, 4) === stats.period.to.slice(0, 4)
+                      ? ''
+                      : ` ${ep.busiestMonth.month.slice(0, 4)}`,
+              v2: ep.busiestMonth.count
+          })
         : '';
     const features = stats.usage.features.map((f) => [FEATURES[f.name] || capital(f.name), number.format(f.n)]);
     const members = stats.members || { added: [], used: [] };
@@ -172,43 +205,69 @@ export function renderStats(stats, chatType = 'private') {
     const used = members.used.map((m) => [m.name, plural(m.n, 'time')]);
     const group = chatType !== 'private';
     const since = stats.since
-        ? `Notifications, bot use and who added what are counted since ${day(stats.since)}, when recording began.`
-        : 'Notifications, bot use and who added what: nothing recorded for this chat yet.';
+        ? i18nText('Notifications, bot use and who added what are counted since {{v0}}, when recording began.', {
+              v0: day(stats.since)
+          })
+        : i18nText('Notifications, bot use and who added what: nothing recorded for this chat yet.');
 
     return `
         <div class="stats-kpis">
-            ${kpi('Episodes out', number.format(ep.count), `${plural(ep.seasons, 'season')} · ${plural(ep.series, 'series', 'series')}`)}
-            ${kpi('Hours of premieres', number.format(hours(ep.minutes)), `+ ${plural(films.length, 'film')}, ${hours(stats.films.minutes)} h`)}
-            ${kpi('Notifications', number.format(stats.notifications.total), `${number.format(out.held || 0)} after quiet hours · ${number.format(lost)} lost`)}
-            ${kpi('Following', number.format(following), `${plural(stats.following.series, 'series', 'series')} · ${plural(stats.following.films, 'film')} ahead`)}
+            ${kpi(i18nText('Episodes out'), number.format(ep.count), `${plural(ep.seasons, 'season')} · ${plural(ep.series, 'series', 'series')}`)}
+            ${kpi(i18nText('Hours of premieres'), number.format(hours(ep.minutes)), i18nText('+ {{v0}}, {{v1}} h', { v0: plural(films.length, 'film'), v1: hours(stats.films.minutes) }))}
+            ${kpi(i18nText('Notifications'), number.format(stats.notifications.total), i18nText('{{v0}} after quiet hours · {{v1}} lost', { v0: number.format(out.held || 0), v1: number.format(lost) }))}
+            ${kpi(i18nText('Following'), number.format(following), i18nText('{{v0}} · {{v1}} ahead', { v0: plural(stats.following.series, 'series', 'series'), v1: plural(stats.following.films, 'film') }))}
         </div>
-        ${box('Episodes by month', busiest, chart(stats), ' stats-chart-box')}
+        ${box(i18nText('Episodes by month'), busiest, chart(stats), ' stats-chart-box')}
         <div class="stats-cols stats-cols-3">
-            ${box('Genres', '', meters(stats.favourites.genres, capital))}
-            ${box('Channels', '', meters(stats.favourites.networks))}
-            ${box('Countries', '', meters(stats.favourites.countries, country))}
+            ${box(i18nText('Genres'), '', meters(stats.favourites.genres, genreName))}
+            ${box(i18nText('Channels'), '', meters(stats.favourites.networks))}
+            ${box(i18nText('Countries'), '', meters(stats.favourites.countries, country))}
         </div>
         <div class="stats-cols stats-cols-2">
             ${box(
-                'Most episodes',
+                i18nText('Most episodes'),
                 '',
-                rows(ep.top.slice(0, 3).map((s) => [s.title, `${s.count} · ${hours(s.minutes)} h`])) +
-                    `<h4 class="stats-box-title stats-subtitle">Films out<span>${number.format(films.length)}</span></h4>` +
+                rows(
+                    ep.top
+                        .slice(0, 3)
+                        .map((s) => [
+                            s.title,
+                            i18nText('{{v0}} · {{v1}} h', { v0: s.count, v1: hours(s.minutes) }),
+                            false,
+                            s.tmdb_id
+                        ])
+                ) +
+                    ('<h4 class="stats-box-title stats-subtitle">' +
+                        i18nText('Films out') +
+                        '<span>' +
+                        number.format(films.length) +
+                        '</span></h4>') +
                     rows(
                         [...films]
                             .sort((a, b) => b.waited - a.waited)
                             .slice(0, 3)
-                            .map((f) => [f.title, f.waited ? `waited ${plural(f.waited, 'day')}` : day(f.day)]),
-                        'No films out'
+                            .map((f) => [
+                                f.title,
+                                f.waited ? i18nText('waited {{v0}}', { v0: plural(f.waited, 'day') }) : day(f.day),
+                                false,
+                                f.tmdb_id
+                            ]),
+                        i18nText('No films out')
                     )
             )}
             ${box(
-                'Bot use',
+                i18nText('Bot use'),
                 number.format(stats.usage.total),
-                rows(features.slice(0, 3), 'Not used yet') +
+                rows(features.slice(0, 3), i18nText('Not used yet')) +
                     (group
-                        ? `<h4 class="stats-box-title stats-subtitle">Added most</h4>${rows(added.slice(0, 3), 'Nobody yet')}` +
-                          `<h4 class="stats-box-title stats-subtitle">Used the bot most</h4>${rows(used.slice(0, 3), 'Nobody yet')}`
+                        ? '<h4 class="stats-box-title stats-subtitle">' +
+                          i18nText('Added most') +
+                          '</h4>' +
+                          rows(added.slice(0, 3), i18nText('Nobody yet')) +
+                          ('<h4 class="stats-box-title stats-subtitle">' +
+                              i18nText('Used the bot most') +
+                              '</h4>' +
+                              rows(used.slice(0, 3), i18nText('Nobody yet')))
                         : '') +
                     botHistory(stats.bot, chatType)
             )}
@@ -224,11 +283,11 @@ function renderSkeleton(chatType) {
     const meters = `<ul class="stats-list stats-slot-meters">${row('meter').repeat(3)}</ul>`;
     return `
         <div class="stats-kpis">${`<div class="stats-kpi"><span class="stats-kpi-label">${line}</span><span class="stats-kpi-value"><span class="skeleton skeleton-figure"></span></span><span class="stats-kpi-note">${line}</span></div>`.repeat(4)}</div>
-        ${box('Episodes by month', '', '<div class="stats-chart"></div>', ' stats-chart-box')}
-        <div class="stats-cols stats-cols-3">${['Genres', 'Channels', 'Countries'].map((t) => box(t, '', meters)).join('')}</div>
+        ${box(i18nText('Episodes by month'), '', '<div class="stats-chart"></div>', ' stats-chart-box')}
+        <div class="stats-cols stats-cols-3">${[i18nText('Genres'), i18nText('Channels'), i18nText('Countries')].map((t) => box(t, '', meters)).join('')}</div>
         <div class="stats-cols stats-cols-2">
-            ${box('Most episodes', '', list + `<h4 class="stats-box-title stats-subtitle">Films out</h4>` + list)}
-            ${box('Bot use', '', list + (chatType !== 'private' ? `<h4 class="stats-box-title stats-subtitle">Added most</h4>${list}<h4 class="stats-box-title stats-subtitle">Used the bot most</h4>${list}` : ''))}
+            ${box(i18nText('Most episodes'), '', list + ('<h4 class="stats-box-title stats-subtitle">' + i18nText('Films out') + '</h4>') + list)}
+            ${box(i18nText('Bot use'), '', list + (chatType !== 'private' ? '<h4 class="stats-box-title stats-subtitle">' + i18nText('Added most') + '</h4>' + list + '<h4 class="stats-box-title stats-subtitle">' + i18nText('Used the bot most') + '</h4>' + list : ''))}
         </div>
         <p class="stats-note">${line}</p>`;
 }
@@ -247,7 +306,10 @@ async function load() {
         body.innerHTML = renderStats(stats, chatType);
     } catch (err) {
         if (request !== state.request) return;
-        body.innerHTML = `<p class="stats-failed">Failed to load: ${escapeHtml(err.message)}. Pick the period again to retry.</p>`;
+        body.innerHTML =
+            '<p class="stats-failed">' +
+            i18nText('Failed to load: {{v0}}. Pick the period again to retry.', { v0: escapeHtml(err.message) }) +
+            '</p>';
     } finally {
         if (request === state.request) body.removeAttribute('aria-busy');
     }
@@ -295,7 +357,7 @@ export function showRecap(id, name, year, back = null) {
     setReturnTo(back);
     for (const url of shown) URL.revokeObjectURL(url);
     shown = [];
-    $('recap-title').textContent = `${year} recap`;
+    $('recap-title').textContent = i18nText('{{v0}} recap', { v0: year });
     $('recap-sub').textContent = chatName;
     const cards = $('recap-cards');
     cards.innerHTML = [1, 2, 3, 4, 5, 6]
@@ -312,10 +374,18 @@ export function showRecap(id, name, year, back = null) {
                 if (request !== state.recap) return;
                 const url = URL.createObjectURL(blob);
                 shown.push(url);
-                slot.innerHTML = `<img src="${url}" alt="Card ${n} of 6" width="1080" height="1350" />`;
+                slot.innerHTML =
+                    '<img src="' +
+                    url +
+                    '" alt="' +
+                    i18nText('Card {{v1}} of 6', { v1: n }) +
+                    '" width="1080" height="1350" />';
             } catch (err) {
                 if (request !== state.recap) return;
-                slot.innerHTML = `<p class="stats-failed">Failed to load: ${escapeHtml(err.message)}</p>`;
+                slot.innerHTML =
+                    '<p class="stats-failed">' +
+                    i18nText('Failed to load: {{v0}}', { v0: escapeHtml(err.message) }) +
+                    '</p>';
             }
         }
     })();
@@ -324,7 +394,7 @@ export function showRecap(id, name, year, back = null) {
 // --- Sending this chat its year (src/recap/send.js): queued, then sent in the background ---
 
 const when = (iso) =>
-    new Date(iso).toLocaleString('en-GB', {
+    new Date(iso).toLocaleString(locale, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -335,7 +405,7 @@ const when = (iso) =>
 /** The preview's footer: whether this chat has its year, and the button. */
 async function loadRecapStatus(request) {
     const status = $('recap-status');
-    status.textContent = 'Checking whether it was sent…';
+    status.textContent = i18nText('Checking whether it was sent…');
     $('recap-actions').innerHTML = '';
     try {
         const answer = await api(`/chat/${preview.id}/recap-status?year=${preview.year}`);
@@ -343,7 +413,7 @@ async function loadRecapStatus(request) {
         renderRecapStatus(answer);
     } catch (err) {
         if (request !== state.recap) return;
-        status.textContent = `Couldn't check whether it was sent: ${err.message}`;
+        status.textContent = i18nText("Couldn't check whether it was sent: {{v0}}", { v0: err.message });
     }
 }
 
@@ -354,19 +424,27 @@ function renderRecapStatus(answer) {
     const button = (label, extra = '') => `<button type="button" class="btn btn-primary"${extra}>${label}</button>`;
     if (answer.status === 'sent') {
         preview.sentAt = answer.sentAt;
-        status.innerHTML = `<span class="recap-dot" aria-hidden="true"></span>Sent ${escapeHtml(when(answer.sentAt))}`;
+        status.innerHTML =
+            '<span class="recap-dot" aria-hidden="true"></span>' +
+            i18nText('Sent {{v0}}', { v0: escapeHtml(when(answer.sentAt)) });
         // Once more on purpose only: its own question says it already got it
-        actions.innerHTML = `<button type="button" class="btn btn-ghost" data-action="recap-send-one" data-again="true">Send again</button>`;
+        actions.innerHTML =
+            '<button type="button" class="btn btn-ghost" data-action="recap-send-one" data-again="true">' +
+            i18nText('Send again') +
+            '</button>';
         return;
     }
     if (answer.status === 'queued' || answer.status === 'sending') {
-        status.textContent = "Queued: goes out shortly, or when the chat's quiet hours end.";
-        actions.innerHTML = button('Queued', ' disabled');
+        status.textContent = i18nText("Queued: goes out shortly, or when the chat's quiet hours end.");
+        actions.innerHTML = button(i18nText('Queued'), ' disabled');
         return;
     }
-    const failed = answer.status === 'failed' ? `Failed: ${answer.error || 'unknown error'}. ` : '';
-    const label = answer.status === 'failed' ? 'Send again' : 'Send to this chat';
-    status.textContent = failed || 'Not sent to this chat yet.';
+    const failed =
+        answer.status === 'failed'
+            ? i18nText('Failed: {{v0}}.', { v0: answer.error || i18nText('unknown error') }) + ' '
+            : '';
+    const label = answer.status === 'failed' ? i18nText('Send again') : i18nText('Send to this chat');
+    status.textContent = failed || i18nText('Not sent to this chat yet.');
     actions.innerHTML = button(label, ' data-action="recap-send-one"');
 }
 
@@ -379,19 +457,28 @@ export function confirmSendOne(again = false) {
     if (!id) return;
     // "No" or Escape on the question leaves the preview open, and closing it still goes back
     setReturnTo(() => setReturnTo(back));
-    const quiet = "In the chat's quiet hours it goes out when they end.";
+    const quiet = i18nText("In the chat's quiet hours it goes out when they end.");
     showConfirm({
-        title: again ? `Send the ${year} recap again?` : `Send the ${year} recap?`,
+        title: again
+            ? i18nText('Send the {{v0}} recap again?', { v0: year })
+            : i18nText('Send the {{v0}} recap?', { v0: year }),
         text: again
-            ? `${chatName} already got it on ${sentAt ? when(sentAt) : 'an earlier day'}. It will get the six pictures once more. ${quiet}`
-            : `Six pictures in one message to ${chatName}. This can't be undone. ${quiet}`,
-        confirmLabel: again ? 'Send again' : 'Send',
-        cancelLabel: 'No, cancel',
+            ? i18nText('{{v0}} already got it on {{v1}}. It will get the six pictures once more. {{v2}}', {
+                  v0: chatName,
+                  v1: sentAt ? when(sentAt) : i18nText('an earlier day'),
+                  v2: quiet
+              })
+            : i18nText("Six pictures in one message to {{v0}}. This can't be undone. {{v1}}", {
+                  v0: chatName,
+                  v1: quiet
+              }),
+        confirmLabel: again ? i18nText('Send again') : i18nText('Send'),
+        cancelLabel: i18nText('No, cancel'),
         onConfirm: async () => {
             setReturnTo(back);
             try {
                 await api(`/chat/${id}/recap/send`, { method: 'POST', body: again ? { year, again: true } : { year } });
-                toast('Queued: the recap goes out shortly', 'success');
+                toast(i18nText('Queued: the recap goes out shortly'), 'success');
             } catch (err) {
                 toast(err.message, 'error');
             }

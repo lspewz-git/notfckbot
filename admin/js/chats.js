@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /** Acting on one chat: the row menu, messaging, blocking, adding content. */
 
 import { $, setText, $field } from './dom.js';
@@ -62,21 +63,21 @@ export function openChatActions(chatId) {
 
 // --- Direct message ---
 function openDM(id, name) {
-    setText('dm-target-info', `To: ${name || id}`);
+    setText('dm-target-info', i18nText('To: {{v0}}', { v0: name || id }));
     openModal('dm-modal');
 
     $('confirm-dm').onclick = async () => {
         const message = $field('dm-text').value.trim();
-        if (!message) return toast('Enter a message first', 'warning');
+        if (!message) return toast(i18nText('Enter a message first'), 'warning');
 
         try {
             await api(`/chat/${id}/message`, { method: 'POST', body: { message } });
-            toast('Message sent', 'success');
+            toast(i18nText('Message sent'), 'success');
             clearReturnTo();
             closeModal('dm-modal');
             $field('dm-text').value = '';
         } catch (e) {
-            toast('Failed to send: ' + e.message, 'error');
+            toast(i18nText('Failed to send:') + ' ' + e.message, 'error');
         }
     };
 }
@@ -89,11 +90,15 @@ function blockUser(chatId, label) {
 
     const submit = () => {
         const minutes = parseInt(input.value, 10);
-        if (!minutes || minutes < 1) return toast('Enter a duration of at least 1 minute', 'warning');
+        if (!minutes || minutes < 1) return toast(i18nText('Enter a duration of at least 1 minute'), 'warning');
 
         clearReturnTo();
         closeModal('block-modal');
-        mutate(`/chat/${chatId}/block`, { method: 'POST', body: { minutes } }, `Blocked for ${minutes} min`);
+        mutate(
+            `/chat/${chatId}/block`,
+            { method: 'POST', body: { minutes } },
+            i18nText('Blocked for {{v0}} min', { v0: minutes })
+        );
     };
 
     $('confirm-block').onclick = submit;
@@ -106,7 +111,7 @@ function blockUser(chatId, label) {
     if (document.activeElement === input) input.select();
 }
 
-const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POST' }, 'Chat unblocked');
+const unblockUser = (chatId) => mutate(`/chat/${chatId}/unblock`, { method: 'POST' }, i18nText('Chat unblocked'));
 
 // --- Settings ---
 /** The chat's bot settings: who presses its buttons (groups only) and the bottom menu. */
@@ -127,7 +132,7 @@ function syncChatSettingsSave() {
     const save = /** @type {HTMLButtonElement} */ ($('chat-settings-save'));
     const dirty = chatSettingsState() !== savedChatSettings;
     save.disabled = !dirty || save.hasAttribute('aria-busy');
-    setText('chat-settings-status', dirty ? 'Unsaved changes' : 'All changes saved');
+    setText('chat-settings-status', dirty ? i18nText('Unsaved changes') : i18nText('All changes saved'));
 }
 
 /** Populate the schedule fields and wire the Quiet hours switch. */
@@ -165,10 +170,10 @@ function openChatSettings(chat, label) {
     showAccessIn(chat, backToSettings);
 
     const blockBtn = $('action-block');
-    blockBtn.querySelector('.action-title').textContent = isBlocked ? 'Unblock' : 'Block';
+    blockBtn.querySelector('.action-title').textContent = isBlocked ? i18nText('Unblock') : i18nText('Block');
     blockBtn.querySelector('.action-desc').textContent = isBlocked
-        ? 'Let this chat use the bot again'
-        : 'Ignore this chat for a while';
+        ? i18nText('Let this chat use the bot again')
+        : i18nText('Ignore this chat for a while');
     blockBtn.classList.toggle('action-row-danger', !isBlocked);
     blockBtn.onclick = () => {
         closeModal('chat-settings-modal');
@@ -207,7 +212,7 @@ function openChatSettings(chat, label) {
         const end = $field('chat-settings-quiet-end').value;
         const quietEnabled = $('chat-settings-quiet-toggle').getAttribute('aria-checked') === 'true';
         if (quietEnabled && start === end) {
-            toast('Quiet hours need different start and end hours', 'warning');
+            toast(i18nText('Quiet hours need different start and end hours'), 'warning');
             return;
         }
         body.quiet_start = quietEnabled ? Number(start) : null;
@@ -220,7 +225,7 @@ function openChatSettings(chat, label) {
         save.disabled = true;
         save.setAttribute('aria-busy', 'true');
         try {
-            const ok = await mutate(`/chat/${chat.id}/settings`, { method: 'PATCH', body }, 'Settings saved');
+            const ok = await mutate(`/chat/${chat.id}/settings`, { method: 'PATCH', body }, i18nText('Settings saved'));
             if (ok && save.onclick === saveSettings) {
                 savedChatSettings = submitted;
                 clearReturnTo();
@@ -254,9 +259,9 @@ let contentKind = null;
 let availableChats = [];
 let pickedChatId = '';
 
-const SEARCH_PLACEHOLDER = { tv: 'Search serials...', movie: 'Search movies...' };
+const SEARCH_PLACEHOLDER = { tv: i18nText('Search serials...'), movie: i18nText('Search movies...') };
 
-const addLabel = () => 'Follow';
+const addLabel = () => i18nText('Follow');
 
 /** The dialog's state for a fresh opening; `kind` and `heading` set what it searches and says. */
 function resetAddContent(kind, heading, target) {
@@ -275,14 +280,14 @@ function resetAddContent(kind, heading, target) {
     $('content-search-form').innerHTML = searchForm({
         context: 'admin',
         inputId: 'content-search-input',
-        placeholder: SEARCH_PLACEHOLDER[kind] || 'Series or film title'
+        placeholder: SEARCH_PLACEHOLDER[kind] || i18nText('Series or film title')
     });
     $('content-search-results').innerHTML = '';
     closeModal('content-card-modal');
 }
 
 function openAddContentModal(chatId, label) {
-    resetAddContent(null, 'Add for', label || chatId);
+    resetAddContent(null, i18nText('Add for'), label || chatId);
     targetChatId = String(chatId);
     $('add-content-modal').setAttribute('data-dismiss-stack', '');
     $('add-content-back').hidden = false;
@@ -296,7 +301,7 @@ function openAddContentModal(chatId, label) {
  * @param {'tv' | 'movie'} kind
  */
 export async function openAddContentFor(kind) {
-    resetAddContent(kind, kind === 'tv' ? 'Add serial' : 'Add movie', '');
+    resetAddContent(kind, kind === 'tv' ? i18nText('Add serial') : i18nText('Add movie'), '');
     $('add-content-modal').removeAttribute('data-dismiss-stack');
     $('add-content-back').hidden = true;
 
@@ -317,7 +322,12 @@ export async function openAddContentFor(kind) {
         id: String(c.id),
         title: chatLabel(c),
         type: c.type,
-        hint: c.type === 'private' ? 'Private chat' : c.type === 'channel' ? 'Channel' : 'Group'
+        hint:
+            c.type === 'private'
+                ? i18nText('Private chat')
+                : c.type === 'channel'
+                  ? i18nText('Channel')
+                  : i18nText('Group')
     }));
     renderContentChat();
 
@@ -328,7 +338,7 @@ export async function openAddContentFor(kind) {
 function renderContentChat() {
     const chat = availableChats.find((c) => c.id === pickedChatId);
     $('content-chat-field').innerHTML = chatChip({
-        title: chat?.title || 'Choose a chat…',
+        title: chat?.title || i18nText('Choose a chat…'),
         accent: chat?.type === 'private',
         group: Boolean(chat) && chat.type !== 'private',
         action: 'content-chat-open'
@@ -380,8 +390,9 @@ export async function searchContent(query) {
     } catch (err) {
         if (request === searchRequest && session === dialogSession) {
             membership = null;
-            $('content-search-results').innerHTML = '<p class="empty-note">Search failed. Try again.</p>';
-            toast('Search failed: ' + err.message, 'error');
+            $('content-search-results').innerHTML =
+                '<p class="empty-note">' + i18nText('Search failed. Try again.') + '</p>';
+            toast(i18nText('Search failed:') + ' ' + err.message, 'error');
         }
     }
 }
@@ -429,7 +440,7 @@ export async function submitAddContent() {
         const session = dialogSession;
         await closeModal('content-card-modal');
         if (session !== dialogSession || selected !== item) return;
-        toast('Choose a chat first', 'error');
+        toast(i18nText('Choose a chat first'), 'error');
         $('content-chat-field').querySelector('button').focus();
         return;
     }
@@ -445,15 +456,16 @@ export async function submitAddContent() {
     if (button) {
         button.disabled = true;
         button.setAttribute('aria-busy', 'true');
-        button.textContent = 'Adding…';
+        button.textContent = i18nText('Adding…');
     }
     let ok;
     try {
         ok = await mutate(isTv ? '/subscription' : '/watchlist', { method: 'POST', body }, (res) => {
-            if (isTv) return res.created === false ? 'Already following; mode updated' : 'Following';
+            if (isTv)
+                return res.created === false ? i18nText('Already following; mode updated') : i18nText('Following');
             return res.isReleased
-                ? 'The film is already out: added to the released ones'
-                : 'The bot writes when the film is out';
+                ? i18nText('The film is already out: added to the released ones')
+                : i18nText('The bot writes when the film is out');
         });
     } finally {
         adding = false;

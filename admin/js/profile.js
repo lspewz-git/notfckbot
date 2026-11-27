@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * The Account tab (`#my-profile`, the redesign of 06.11 instead of the old profile menu): who is
  * signed in, the chats to switch between, the settings pages and Sign out. And the Account settings
@@ -11,16 +12,19 @@ import { avatar, initial } from './pick-sheet.js';
 import { chatList, chatHint, selectChat, setChatHidden, chatAvatar, setOwnName } from './account.js';
 import { setDevicesOwner, loadDevices } from './devices.js';
 import { DEFAULT_PERSONAL_SECTION } from './navigation.js';
+import { t, languagePreference, detectedLanguage, accountLanguage } from './i18n.js';
+import { pickFrom } from './pick-sheet.js';
 
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 const CHEVRON = `<span class="row-chevron">${icon('chevron-right')}</span>`;
 
-const ROLES = { admin: 'Admin', user: 'User' };
+const ROLES = { admin: i18nText('Admin'), user: i18nText('User') };
 
 /** @type {{ id: string, name: string | null, role: string, system: boolean } | null} */
 let me = null;
 const visibilitySaving = new Set();
+let languageSaving = false;
 
 /** Who is signed in (session.js, from /account/me). */
 export function setProfile(user) {
@@ -28,8 +32,10 @@ export function setProfile(user) {
     // The admin sections' headers: the person's avatar, a link to the Account tab
     for (const holder of document.querySelectorAll('[data-admin-profile]')) {
         holder.innerHTML =
-            `<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="Account">` +
-            `${avatar(nameOf(), true)}<span class="mine-chat-chip-name">My account</span></a>`;
+            '<a class="mine-chat-chip" href="#my-profile" data-section="my-profile" aria-label="' +
+            i18nText('Account') +
+            '">' +
+            (avatar(nameOf(), true) + '<span class="mine-chat-chip-name">' + i18nText('My account') + '</span></a>');
     }
     for (const el of document.querySelectorAll('[data-profile-avatar]')) el.innerHTML = avatar(nameOf(), true);
     setOwnName(me.system ? '' : nameOf());
@@ -70,8 +76,12 @@ function chatsGroup() {
     else if (error)
         rows =
             `<li><button type="button" class="group-row" data-action="mine-reload"><span class="row-tile">${icon('triangle-alert')}</span>` +
-            `<span class="row-text"><span class="row-name">Couldn't load chats</span><span class="row-meta">${escapeHtml(error)}</span></span>` +
-            '<span class="row-value profile-retry">Retry</span></button></li>';
+            ('<span class="row-text"><span class="row-name">' +
+                i18nText("Couldn't load chats") +
+                '</span><span class="row-meta">' +
+                escapeHtml(error) +
+                '</span></span>') +
+            ('<span class="row-value profile-retry">' + i18nText('Retry') + '</span></button></li>');
     else {
         // The open chat stays listed even when hidden (opened from its group's Mini App link)
         rows = chats
@@ -92,21 +102,29 @@ function chatsGroup() {
         if (partial)
             rows +=
                 `<li><button type="button" class="group-row" data-action="chats-retry"${retrying ? ' aria-busy="true"' : ''}><span class="row-tile">${icon('triangle-alert')}</span>` +
-                `<span class="row-text"><span class="row-name">Some groups didn't load</span><span class="row-meta">Telegram isn't answering</span></span>` +
-                `<span class="row-value profile-retry">${retrying ? 'Checking…' : 'Retry'}</span></button></li>`;
+                ('<span class="row-text"><span class="row-name">' +
+                    i18nText("Some groups didn't load") +
+                    '</span><span class="row-meta">' +
+                    i18nText("Telegram isn't answering") +
+                    '</span></span>') +
+                `<span class="row-value profile-retry">${retrying ? 'Checking…' : i18nText('Retry')}</span></button></li>`;
         const hidden = chats.filter((c) => c.hidden).length;
         if (chats.some((c) => c.type !== 'private'))
             rows += pageRow({
                 attrs: ' data-action="profile-visibility" aria-haspopup="dialog"',
                 tile: 'eye-off',
-                title: 'Hidden chats',
+                title: i18nText('Hidden chats'),
                 end: (hidden ? `<span class="row-value">${hidden}</span>` : '') + CHEVRON
             });
     }
     return (
-        '<h2 class="group-title" id="profile-chats">Chats</h2>' +
+        '<h2 class="group-title" id="profile-chats">' +
+        i18nText('Chats') +
+        '</h2>' +
         `<ul class="group-list" aria-labelledby="profile-chats"${loading ? ' aria-busy="true"' : ''}>${rows}</ul>` +
-        '<p class="group-help">The chosen chat sets what Calendar, Released and Following show.</p>'
+        ('<p class="group-help">' +
+            i18nText('The chosen chat sets what Calendar, Released and Following show.') +
+            '</p>')
     );
 }
 
@@ -114,24 +132,38 @@ function profileHtml() {
     if (!me) return '';
     const { chats } = chatList();
     const card =
-        `<button type="button" class="group-card profile-card" data-section="my-account" aria-label="Account settings: ${escapeHtml(nameOf())}">` +
+        '<button type="button" class="group-card profile-card" data-section="my-account" aria-label="' +
+        i18nText('Account settings: {{v0}}', { v0: escapeHtml(nameOf()) }) +
+        '">' +
         `<span class="profile-avatar" aria-hidden="true">${escapeHtml(initial(nameOf()))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(nameOf())}</span>` +
         `<span class="role-chip">${escapeHtml(ROLES[me.role] || me.role)}</span></span>` +
-        `<span class="row-meta">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span>${CHEVRON}</button>`;
+        `<span class="row-meta">${me.system ? i18nText('Local account') : `Telegram · ID ${escapeHtml(me.id)}`}</span></span>${CHEVRON}</button>`;
     const settings =
         (me.role === 'admin'
-            ? pageRow({ attrs: ' data-action="view-admin"', tile: 'shield', title: 'Admin panel' })
+            ? pageRow({ attrs: ' data-action="view-admin"', tile: 'shield', title: i18nText('Admin panel') })
             : '') +
         (!me.system && chats.length
-            ? pageRow({ attrs: ' data-section="my-settings"', tile: 'panel-bottom', title: 'Chat settings' })
+            ? pageRow({ attrs: ' data-section="my-settings"', tile: 'panel-bottom', title: i18nText('Chat settings') })
             : '') +
-        pageRow({ attrs: ' data-section="my-account"', tile: 'circle-user-round', title: 'Account settings' });
+        pageRow({
+            attrs: ' data-section="my-account"',
+            tile: 'circle-user-round',
+            title: i18nText('Account settings')
+        });
     return (
         card +
         chatsGroup() +
-        `<h2 class="group-title" id="profile-settings">Settings</h2><ul class="group-list" aria-labelledby="profile-settings">${settings}</ul>` +
-        `<button type="button" class="sheet-btn-danger-soft profile-signout" data-action="profile-signout">${icon('log-out')}<span>Sign out</span></button>`
+        ('<h2 class="group-title" id="profile-settings">' +
+            i18nText('Settings') +
+            '</h2><ul class="group-list" aria-labelledby="profile-settings">' +
+            settings +
+            '</ul>') +
+        ('<button type="button" class="sheet-btn-danger-soft profile-signout" data-action="profile-signout">' +
+            icon('log-out') +
+            '<span>' +
+            i18nText('Sign out') +
+            '</span></button>')
     );
 }
 
@@ -163,10 +195,18 @@ function visibilityRows() {
             return (
                 `<li><div class="group-row group-row-static chat-row profile-visibility-row">${chatAvatar(c)}` +
                 `<span class="row-text"><span class="row-name">${title}</span>` +
-                `<span class="row-meta">${own ? 'Always visible' : c.hidden ? 'Hidden' : 'Visible'}</span></span>` +
+                `<span class="row-meta">${own ? i18nText('Always visible') : c.hidden ? i18nText('Hidden') : i18nText('Visible')}</span></span>` +
                 (own
                     ? `<span class="row-check visibility-check">${icon('check')}</span>`
-                    : `<button type="button" class="switch" role="switch" aria-label="Show ${title}" aria-checked="${!c.hidden}" ${visibilitySaving.has(c.id) ? 'disabled aria-busy="true"' : ''} data-action="profile-visibility-toggle" data-id="${escapeHtml(c.id)}"><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button>`) +
+                    : '<button type="button" class="switch" role="switch" aria-label="' +
+                      i18nText('Show {{v0}}', { v0: title }) +
+                      '" aria-checked="' +
+                      !c.hidden +
+                      '" ' +
+                      (visibilitySaving.has(c.id) ? 'disabled aria-busy="true"' : '') +
+                      ' data-action="profile-visibility-toggle" data-id="' +
+                      escapeHtml(c.id) +
+                      '"><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span></button>') +
                 '</div></li>'
             );
         })
@@ -206,8 +246,8 @@ async function toggleVisibility(button) {
                 el.disabled = false;
                 el.removeAttribute('aria-busy');
                 el.closest('.profile-visibility-row').querySelector('.row-meta').textContent = chat?.hidden
-                    ? 'Hidden'
-                    : 'Visible';
+                    ? i18nText('Hidden')
+                    : i18nText('Visible');
             }
         }
     }
@@ -223,29 +263,74 @@ function renderAccount() {
         `<div class="group-card"><span class="profile-avatar" aria-hidden="true">${escapeHtml(initial(nameOf()))}</span>` +
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(nameOf())}</span>` +
         `<span class="role-chip">${escapeHtml(ROLES[me.role] || me.role)}</span></span>` +
-        `<span class="row-meta">${me.system ? 'Local account' : `Telegram · ID ${escapeHtml(me.id)}`}</span></span></div>`;
+        `<span class="row-meta">${me.system ? i18nText('Local account') : `Telegram · ID ${escapeHtml(me.id)}`}</span></span></div>`;
     setDevicesOwner(me.id);
     loadDevices();
+    const preferences = $('my-preferences');
+    const languageHelp =
+        languagePreference() === 'auto'
+            ? t('Uses your Telegram or browser language.')
+            : languagePreference() === 'ru'
+              ? t('Russian is selected. Saved in your account.')
+              : t('English is selected. Saved in your account.');
+    if (preferences)
+        preferences.innerHTML =
+            `<h2 class="group-title">${t('Preferences')}</h2><ul class="group-list"><li>` +
+            `<button type="button" class="group-row" data-action="account-language" aria-haspopup="dialog"${languageSaving ? ' disabled aria-busy="true"' : ''}>` +
+            `<span class="row-tile">${icon('globe')}</span><span class="row-text"><span class="row-name">${t('Language')}</span></span>` +
+            `<span class="row-value">${languagePreference() === 'auto' ? t('Automatic') : languagePreference() === 'ru' ? 'Русский' : 'English'}</span>${CHEVRON}</button></li></ul>` +
+            `<p class="group-help">${languageHelp}</p>`;
+}
+
+function chooseLanguage() {
+    if (languageSaving) return;
+    pickFrom({
+        title: t('Language'),
+        value: languagePreference(),
+        options: [
+            {
+                value: 'auto',
+                label: t('Automatic'),
+                hint: `${detectedLanguage.language === 'ru' ? 'Русский' : 'English'} · ${t(detectedLanguage.source)}`
+            },
+            { value: 'en', label: 'English' },
+            { value: 'ru', label: 'Русский' }
+        ],
+        onPick: async (language) => {
+            languageSaving = true;
+            renderAccount();
+            try {
+                await api('/account/preferences', { method: 'PATCH', body: { language } });
+                accountLanguage(language);
+            } catch {
+                toast(t('Could not save the language. Try again.'), 'error');
+            } finally {
+                languageSaving = false;
+                renderAccount();
+            }
+        }
+    });
 }
 
 /** Click handlers, merged into app.js's delegation like the other modules' */
 export const profileActions = {
+    'account-language': chooseLanguage,
     'profile-visibility': openVisibility,
     'profile-visibility-toggle': toggleVisibility,
     'profile-chat': (el) => selectChat(el.dataset.id),
     'profile-signout': () =>
         showConfirm({
-            title: 'Sign out?',
-            text: 'This browser signs out of the panel. Other devices stay signed in.',
-            confirmLabel: 'Sign out',
-            cancelLabel: 'Cancel',
+            title: i18nText('Sign out?'),
+            text: i18nText('This browser signs out of the panel. Other devices stay signed in.'),
+            confirmLabel: i18nText('Sign out'),
+            cancelLabel: i18nText('Cancel'),
             onConfirm: async () => {
                 try {
                     await api('/logout', { method: 'POST' });
                 } catch {
                     // Signed out on this page all the same
                 }
-                toast('Signed out', 'success');
+                toast(i18nText('Signed out'), 'success');
                 location.href = '/';
             }
         })

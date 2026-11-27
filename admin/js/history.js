@@ -1,3 +1,5 @@
+import { t as i18nText } from './i18n.js';
+import { displayTitle, titleMarkup, warmTitles } from './catalog-text.js';
 /** One Released view for the whole database and a person's selected chat. */
 import { $, escapeHtml } from './dom.js';
 import { api } from './api.js';
@@ -6,6 +8,7 @@ import { PAGE_SIZES, fillPagers } from './pager.js';
 import { enhanceIn } from './select.js';
 import { posterSrc } from './title-card.js';
 import { openReleasedDetails } from './records.js';
+import { genreName } from './format.js';
 
 const views = {};
 const CHEVRON =
@@ -19,15 +22,23 @@ const FILLER = `<li class="history-item history-filler" aria-hidden="true"><div 
 
 /** The redesign's Released (06.11): years as chips, then Series and Films, each one rounded list */
 function markup(prefix) {
-    return `<div id="${prefix}-years" class="cat-chips history-years" role="tablist" aria-label="Year"></div><div class="history-grid">${[
-        ['series', 'Series'],
-        ['films', 'Films']
-    ]
-        .map(
-            ([kind, label]) =>
-                `<div class="history-group"><h2 class="group-title history-title">${label}<span id="${prefix}-${kind}-count"></span></h2><ul id="${prefix}-${kind}" class="group-list title-list history-list" aria-busy="true"></ul><div class="pager" id="${prefix}-${kind}-pager" data-pager="history-${kind}" data-pager-label="${label} per page" hidden></div></div>`
-        )
-        .join('')}</div>`;
+    return (
+        '<div id="' +
+        prefix +
+        '-years" class="cat-chips history-years" role="tablist" aria-label="' +
+        i18nText('Year') +
+        '"></div><div class="history-grid">' +
+        [
+            ['series', 'Series', 'Series per page'],
+            ['films', 'Films', 'Films per page']
+        ]
+            .map(
+                ([kind, label, pagerLabel]) =>
+                    `<div class="history-group"><h2 class="group-title history-title">${i18nText(label)}<span id="${prefix}-${kind}-count"></span></h2><ul id="${prefix}-${kind}" class="group-list title-list history-list" aria-busy="true"></ul><div class="pager" id="${prefix}-${kind}-pager" data-pager="history-${kind}" data-pager-label="${pagerLabel}" hidden></div></div>`
+            )
+            .join('') +
+        '</div>'
+    );
 }
 
 const thumb = (path) => {
@@ -87,19 +98,23 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
     };
     function row(item) {
         const seasons = item.seasons?.length
-            ? `${item.seasons.length > 1 ? 'Seasons' : 'Season'} ${item.seasons.join(', ')}`
+            ? `${item.seasons.length > 1 ? i18nText('Seasons') : i18nText('Season')} ${item.seasons.join(', ')}`
             : '';
-        const note = [seasons, (item.genres || []).join(', ')].filter(Boolean).join(' · ');
+        const note = [seasons, (item.genres || []).map(genreName).join(', ')].filter(Boolean).join(' · ');
         // The whole row opens the title card; Kinopoisk is inside it, not on the row (the redesign)
         return (
             `<li class="history-item" data-release-year="${selectedYear}" data-release-seasons="${escapeHtml((item.seasons || []).join(','))}">` +
             `<button type="button" class="group-row title-row history-open" data-action="history-open" data-id="${escapeHtml(item.tmdbId)}">${thumb(item.poster)}` +
-            `<span class="row-text"><span class="row-name">${escapeHtml(item.title)}</span><span class="row-meta history-genres">${note ? escapeHtml(note) : '&nbsp;'}</span></span>${CHEVRON}</button></li>`
+            `<span class="row-text"><span class="row-name">${titleMarkup(item.tmdbId, item.title)}</span><span class="row-meta history-genres">${note ? escapeHtml(note) : '&nbsp;'}</span></span>${CHEVRON}</button></li>`
         );
     }
     function draw(kind) {
         const list = lists[kind];
-        const items = list.items.filter((item) => String(item.title).toLocaleLowerCase().includes(query));
+        const items = list.items.filter((item) =>
+            [item.title, displayTitle(item.tmdbId, item.title)].some((title) =>
+                String(title).toLocaleLowerCase().includes(query)
+            )
+        );
         const total = items.length;
         list.page = Math.min(list.page, Math.max(0, Math.ceil(total / list.size) - 1));
         const start = list.page * list.size;
@@ -107,19 +122,22 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
         el(`${kind}-count`).textContent = data?.year == null ? '' : ` · ${total}`;
         el(kind).removeAttribute('aria-busy');
         const empty = query
-            ? 'No matching titles'
+            ? i18nText('No matching titles')
             : data?.year == null
-              ? 'Nothing yet: the years fill in after the bot starts.'
+              ? i18nText('Nothing yet: the years fill in after the bot starts.')
               : kind === 'series'
-                ? `No serial had an episode out in ${data.year}.`
-                : `No movie came out in ${data.year}.`;
+                ? i18nText('No serial had an episode out in {{v0}}.', { v0: data.year })
+                : i18nText('No movie came out in {{v0}}.', { v0: data.year });
         el(kind).innerHTML = total
             ? shown.map(row).join('') + FILLER.repeat(Math.min(list.size, total) - shown.length)
             : `<li class="history-empty">${escapeHtml(empty)}</li>`;
         const pager = el(`${kind}-pager`);
         pager.hidden = total <= PAGE_SIZES[0];
-        pager.querySelector('.pager-info').textContent =
-            `${start + 1}–${Math.min(start + list.size, total)} of ${total}`;
+        pager.querySelector('.pager-info').textContent = i18nText('{{v0}}–{{v1}} of {{v2}}', {
+            v0: start + 1,
+            v1: Math.min(start + list.size, total),
+            v2: total
+        });
         pager.querySelectorAll('button').forEach((btn) => {
             if (!btn.dataset.step) return;
             btn.disabled = Number(btn.dataset.step) < 0 ? list.page === 0 : start + list.size >= total;
@@ -147,6 +165,12 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
             draw(kind);
         }
     }
+    window.addEventListener('catalog-names-ready', () => {
+        if (query && data) {
+            draw('series');
+            draw('films');
+        }
+    });
     async function load() {
         mount();
         if (!data)
@@ -162,7 +186,7 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
             wantedYear = null;
             for (const kind of ['series', 'films'])
                 if (el(kind).querySelector('.history-skeleton'))
-                    el(kind).innerHTML = '<li class="history-empty">Failed to load.</li>';
+                    el(kind).innerHTML = '<li class="history-empty">' + i18nText('Failed to load.') + '</li>';
             throw err;
         }
     }
@@ -180,6 +204,14 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
         },
         filter(value) {
             query = value.trim().toLocaleLowerCase();
+            if (query) {
+                const wanted = query;
+                const year = selectedYear;
+                warmTitles(
+                    Object.values(lists).flatMap((list) => list.items.map((item) => item.tmdbId)),
+                    () => query === wanted && selectedYear === year && root.getClientRects().length > 0
+                );
+            }
             Object.values(lists).forEach((list) => {
                 list.page = 0;
             });
@@ -195,7 +227,7 @@ export function createHistory({ prefix, fetchYear, openTitle }) {
             try {
                 await load();
             } catch {
-                toast(`Couldn't load ${year}. Try again.`, 'error');
+                toast(i18nText("Couldn't load {{v0}}. Try again.", { v0: year }), 'error');
             }
         },
         page(kind, step) {

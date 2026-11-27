@@ -335,7 +335,14 @@ function best(stats, options) {
                               short(winner.title, 40)
                           ),
                           display({ fontSize: 140, color: theme.accent, marginTop: 10 }, winner.rating.toFixed(1)),
-                          text({ fontSize: 30, opacity: 0.7 }, 'TMDB')
+                          text(
+                              { fontSize: 30, opacity: 0.7 },
+                              winner.rating_source === 'tvmaze'
+                                  ? 'TVmaze'
+                                  : winner.rating_source === 'unknown'
+                                    ? 'Каталог'
+                                    : 'TMDB'
+                          )
                       )
                   )
                 : null,

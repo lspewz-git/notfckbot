@@ -105,6 +105,19 @@ describe('what the cards say', () => {
         assert.match(empty[4], /нет сериалов с отметкой о завершении в каталоге/);
         assert.match(empty[5], /Пока ничего не объявлено/);
     });
+
+    test('the winning rating names its source, with a neutral label for unknown provenance', () => {
+        for (const [source, label] of [
+            ['tvmaze', 'TVmaze'],
+            ['tmdb', 'TMDB'],
+            ['unknown', 'Каталог']
+        ]) {
+            const stats = { ...FULL, best: [{ ...FULL.best[0], rating_source: source }] };
+            const card = texts(recapCards(stats, { year: 2026, chatName: 'Club' })[3]).join(' | ');
+            assert.ok(card.includes(`8.5 | ${label}`), source);
+            if (source !== 'tmdb') assert.ok(!card.includes('TMDB'));
+        }
+    });
 });
 
 test('what the fonts cannot draw (emoji, Japanese) is left out instead of coming out as boxes', () => {

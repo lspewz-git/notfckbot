@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /** Sortable columns: the chosen key and direction per table, and the header buttons that show it. */
 
 import { all } from './dom.js';
@@ -30,7 +31,12 @@ function updateSortButtons(type) {
         const label = btn.innerText.trim();
         btn.setAttribute(
             'aria-label',
-            on ? `${label}, sorted ${state.dir === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`
+            on
+                ? i18nText('{{v0}}, sorted {{v1}}', {
+                      v0: label,
+                      v1: i18nText(state.dir === 'asc' ? 'ascending' : 'descending')
+                  })
+                : i18nText('Sort by {{v0}}', { v0: label })
         );
         const th = btn.closest('th');
         if (th) th.setAttribute('aria-sort', on ? (state.dir === 'asc' ? 'ascending' : 'descending') : 'none');

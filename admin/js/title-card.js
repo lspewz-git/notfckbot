@@ -5,8 +5,10 @@
  */
 import { $, escapeHtml } from './dom.js';
 import { openModal, closeModal } from './ui.js';
-import { fitTitleSheet } from './title-sheet.js';
-import { formatReleaseDate, formatPremiereRu, countryName, compactCountries } from './format.js';
+import { fitTitleSheet, setTitleCopy } from './title-sheet.js';
+import { formatReleaseDate, formatPremiereRu, countryName, compactCountries, genreName } from './format.js';
+import { catalogCopy, displayTitle, titleMarkup } from './catalog-text.js';
+import { language, t as i18nText } from './i18n.js';
 
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
@@ -37,24 +39,31 @@ export function filmDateBlocks(d) {
     const digitalCountry = d.digital ? d.digitalCountry : d.ruDigital ? 'RU' : null;
     const digitalNote =
         d.ruDigital && (d.ruDigital !== digital || digitalCountry !== 'RU')
-            ? `In Russia ${formatReleaseDate(d.ruDigital)}${d.ruServices ? ` · ${d.ruServices}` : ''}`
+            ? i18nText('In Russia {{v0}}{{v1}}', {
+                  v0: formatReleaseDate(d.ruDigital),
+                  v1: d.ruServices ? ` · ${d.ruServices}` : ''
+              })
             : d.ruDigital === digital && digitalCountry === 'RU'
               ? d.ruServices || ''
               : '';
     return [
         {
-            label: 'Release',
+            label: i18nText('Release'),
             icon: 'clapperboard',
-            value: d.release ? `${formatReleaseDate(d.release)}${countries ? ` · ${countries}` : ''}` : 'Date unknown',
+            value: d.release
+                ? `${formatReleaseDate(d.release)}${countries ? ` · ${countries}` : ''}`
+                : i18nText('Date unknown'),
             note:
-                d.ruPremiere && !d.releaseCountries?.includes('RU') ? `In Russia ${formatPremiereRu(d.ruPremiere)}` : ''
+                d.ruPremiere && !d.releaseCountries?.includes('RU')
+                    ? i18nText('In Russia {{v0}}', { v0: formatPremiereRu(d.ruPremiere) })
+                    : ''
         },
         {
-            label: 'Digital release',
+            label: i18nText('Digital release'),
             icon: 'tv',
             value: digital
                 ? `${formatReleaseDate(digital)}${digitalCountry ? ` · ${countryName(digitalCountry)}` : ''}`
-                : 'Date unknown',
+                : i18nText('Date unknown'),
             note: digitalNote
         }
     ];
@@ -69,25 +78,31 @@ export function titleThumb(path, cls = 'title-thumb', { lazy = true } = {}) {
 }
 
 export const NOTIFY = {
-    episode: { short: 'Every episode', long: 'Every episode' },
-    first_and_full: { short: 'Ep. 1 + season', long: 'Episode 1 and the whole season' },
-    season: { short: 'Season', long: 'When the whole season is out' }
+    episode: { short: i18nText('Every episode'), long: i18nText('Every episode') },
+    first_and_full: { short: i18nText('Ep. 1 + season'), long: i18nText('Episode 1 and the whole season') },
+    season: { short: i18nText('Season'), long: i18nText('When the whole season is out') }
 };
 
 /** "Series · 2 seasons", "Series · 2025", "Film · 2017" */
 function kindLine(t) {
     if (t.kind === 'tv') {
         const n = Number(t.seasons);
-        return ['Series', n > 0 ? `${n} season${n === 1 ? '' : 's'}` : t.year].filter(Boolean).join(' · ');
+        return [i18nText('Series', { context: 'title' }), n > 0 ? i18nText('{{count}} season', { count: n }) : t.year]
+            .filter(Boolean)
+            .join(' · ');
     }
-    return ['Film', t.year].filter(Boolean).join(' · ');
+    return [i18nText('Film'), t.year].filter(Boolean).join(' · ');
 }
 
 function ratingLine(value, source = 'TMDB') {
     const rated = Number.isFinite(value) && value > 0 && value <= 10;
     return rated
         ? `<p class="tc-rating">${icon('star')}<strong>${value.toFixed(1)}</strong><span>/ 10 · ${escapeHtml(source)}</span></p>`
-        : `<p class="tc-rating tc-unrated">${icon('star')}<span>Not rated on ${escapeHtml(source)} yet</span></p>`;
+        : '<p class="tc-rating tc-unrated">' +
+              icon('star') +
+              '<span>' +
+              i18nText('Not rated on {{v1}} yet', { v1: escapeHtml(source) }) +
+              '</span></p>';
 }
 
 /**
@@ -106,10 +121,27 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
     return (
         `<fieldset class="tc-notify mine-modes"${disabled ? ' disabled' : ''}>` +
         `<button type="button" class="tc-notify-toggle" data-action="tc-notify" aria-expanded="false" aria-controls="${escapeHtml(optionsId)}">` +
-        `${icon('bell')}<span class="tc-notify-summary"><span>Notify me</span><strong>${NOTIFY[current]?.long || NOTIFY.episode.long}</strong></span>${icon('chevron-down')}</button>` +
-        `<div class="tc-notify-options" id="${escapeHtml(optionsId)}" hidden><fieldset><legend>Notify me</legend><div class="tc-radios">${radios}</div></fieldset>` +
+        (icon('bell') +
+            '<span class="tc-notify-summary"><span>' +
+            i18nText('Notify me') +
+            '</span><strong>' +
+            (NOTIFY[current]?.long || NOTIFY.episode.long) +
+            '</strong></span>' +
+            icon('chevron-down') +
+            '</button>') +
+        ('<div class="tc-notify-options" id="' +
+            escapeHtml(optionsId) +
+            '" hidden><fieldset><legend>' +
+            i18nText('Notify me') +
+            '</legend><div class="tc-radios">' +
+            radios +
+            '</div></fieldset>') +
         (hint
-            ? `<p class="tc-hint">${icon('bell')}<span>Releases the bot will message you about are marked with a bell in Calendar.</span></p>`
+            ? '<p class="tc-hint">' +
+              icon('bell') +
+              '<span>' +
+              i18nText('Releases the bot will message you about are marked with a bell in Calendar.') +
+              '</span></p>'
             : '') +
         '</div></fieldset>'
     );
@@ -117,7 +149,7 @@ export function notifyField({ name, current, id = null, disabled = false, hint =
 
 /**
  * @param {{
- *   kind: string, title: string, poster?: string | null, seasons?: number | null, year?: string | number | null,
+ *   kind: string, title: string, catalogId?: string, copyLocalized?: boolean, poster?: string | null, seasons?: number | null, year?: string | number | null,
  *   rating?: number | null, ratingSource?: string, source?: { label: string, url: string } | null,
  *   genres?: string | null, networks?: string | null, overview?: string | null,
  *   kinopoiskUrl?: string | null, status?: string | null,
@@ -136,11 +168,32 @@ export function titleCard(
     const src = posterSrc(t.poster);
     const big = posterSrc(t.poster, 'w500');
     const poster = src
-        ? `<button type="button" class="tc-poster" data-action="poster-view" data-src="${escapeHtml(big)}" data-thumb="${escapeHtml(src)}" data-title="${escapeHtml(t.title)}" aria-label="Open the poster of ${escapeHtml(t.title)}"><img src="${escapeHtml(src)}" alt="" decoding="async" />` +
+        ? '<button type="button" class="tc-poster" data-action="poster-view" data-src="' +
+          escapeHtml(big) +
+          '" data-thumb="' +
+          escapeHtml(src) +
+          '" data-title="' +
+          escapeHtml(displayTitle(t.catalogId, t.title)) +
+          '" aria-label="' +
+          i18nText('Open the poster of {{v3}}', { v3: escapeHtml(displayTitle(t.catalogId, t.title)) }) +
+          '"><img src="' +
+          escapeHtml(src) +
+          '" alt="" decoding="async" />' +
           // The large one starts loading with the card: the server's first download from TMDB takes seconds
           `<img class="tc-poster-preload" src="${escapeHtml(big)}" alt="" hidden fetchpriority="low" /></button>`
         : '<span class="tc-poster tc-poster-empty" aria-hidden="true"></span>';
-    const about = [t.genres, t.networks, t.status].filter(Boolean).join(' · ');
+    const catalogId = /^(tv|movie)_[1-9]\d{0,9}$/.test(t.catalogId || '') ? t.catalogId : '';
+    // Search already requests the current locale. Stored subscriptions and warmed bot facts do not.
+    const russianOverview = /[а-яё]/i.test(t.overview || '');
+    const russianGenres = /[а-яё]/i.test(t.genres || '');
+    const needsCopy = Boolean(catalogId && !t.copyLocalized);
+    const primaryGenres = Boolean(t.source?.label === 'TVmaze' && t.genres);
+    const about = [t.networks, t.status].filter(Boolean).join(' · ');
+    const genres = primaryGenres
+        ? t.genres.split(',').map(genreName).join(', ')
+        : language === 'en' && needsCopy && russianGenres
+          ? ''
+          : t.genres || '';
     // One date block, or several (a film: in cinemas and online)
     const date = (Array.isArray(t.date) ? t.date : t.date ? [t.date] : [])
         .map(
@@ -148,30 +201,57 @@ export function titleCard(
                 `<div class="tc-date">${icon(d.icon || 'calendar')}<span class="tc-date-text"><span class="tc-date-label">${escapeHtml(d.label)}</span>` +
                 `<span class="tc-date-value">${escapeHtml(d.value)}</span>${d.note ? `<span class="tc-date-label">${escapeHtml(d.note)}</span>` : ''}${d.hint ? `<span class="tc-date-hint">${escapeHtml(d.hint)}</span>` : ''}</span>` +
                 (d.when || d.bell
-                    ? `<span class="tc-date-when">${d.bell ? `<span class="tc-bell" role="img" aria-label="The bot will message you about this" title="The bot will message you about this">${icon('bell')}</span>` : ''}${escapeHtml(d.when || '')}</span>`
+                    ? `<span class="tc-date-when">${d.bell ? '<span class="tc-bell" role="img" aria-label="' + i18nText('The bot will message you about this') + '" title="' + i18nText('The bot will message you about this') + '">' + icon('bell') + '</span>' : ''}${escapeHtml(d.when || '')}</span>`
                     : '') +
                 '</div>'
         )
         .join('');
     const send = t.send ? `<p class="tc-send">${icon('bell')}<span>${escapeHtml(t.send)}</span></p>` : '';
-    const description = t.overview?.trim();
+    const loadingCopy = needsCopy && (!t.overview?.trim() || (language === 'en' && russianOverview));
+    const description = loadingCopy ? i18nText('Loading description…') : t.overview?.trim();
     const overview = description
-        ? `<div class="tc-description"><p class="tc-overview" data-clamp><span class="tc-copy">${escapeHtml(description)}</span><span class="tc-tail" hidden><span class="tc-ellipsis">… </span><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false">Show more</button></span></p></div>`
+        ? '<div class="tc-description"><p class="tc-overview" data-clamp><span class="tc-copy"' +
+          (loadingCopy ? ' data-loading-copy' : '') +
+          '>' +
+          escapeHtml(description) +
+          '</span><span class="tc-tail" hidden><span class="tc-ellipsis">… </span><button type="button" class="tc-more" data-action="tc-more" aria-expanded="false">' +
+          i18nText('Show more') +
+          '</button></span></p></div>'
         : '';
     const kinopoisk = t.kinopoiskUrl
-        ? `<a class="tc-link" href="${escapeHtml(t.kinopoiskUrl)}" target="_blank" rel="noopener noreferrer">${KP_LOGO}<span>Open on Kinopoisk</span>${icon('external-link')}</a>`
+        ? '<a class="tc-link" href="' +
+          escapeHtml(t.kinopoiskUrl) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          KP_LOGO +
+          '<span>' +
+          i18nText('Open on Kinopoisk') +
+          '</span>' +
+          icon('external-link') +
+          '</a>'
         : '';
     const source =
         t.source?.url && /^https?:\/\//i.test(t.source.url)
-            ? `<a class="tc-link tc-source" href="${escapeHtml(t.source.url)}" target="_blank" rel="noopener noreferrer"><span>Source: ${escapeHtml(t.source.label)}</span>${icon('external-link')}</a>`
+            ? '<a class="tc-link tc-source" href="' +
+              escapeHtml(t.source.url) +
+              '" target="_blank" rel="noopener noreferrer"><span>' +
+              i18nText('Source: {{v1}}', { v1: escapeHtml(t.source.label) }) +
+              '</span>' +
+              icon('external-link') +
+              '</a>'
             : '';
     return (
         '<span class="sheet-grabber tc-grabber" aria-hidden="true"></span>' +
         (close
-            ? `<button type="button" class="sheet-close" data-close="${close}" aria-label="Close">${icon('x')}</button>`
+            ? '<button type="button" class="sheet-close" data-close="' +
+              close +
+              '" aria-label="' +
+              i18nText('Close') +
+              '">' +
+              icon('x') +
+              '</button>'
             : '') +
-        `<div class="tc-scroll"><div class="tc-head">${poster}<div class="tc-facts"><h2 id="${titleId}">${escapeHtml(t.title)}</h2>` +
-        `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating, t.ratingSource)}${about ? `<p>${escapeHtml(about)}</p>` : ''}</div></div>` +
+        `<div class="tc-scroll"${needsCopy ? ` data-catalog="${catalogId}"` : ''}${primaryGenres ? ' data-primary-genres' : ''}><div class="tc-head">${poster}<div class="tc-facts"><h2 id="${titleId}">${titleMarkup(catalogId, t.title)}</h2>` +
+        `<p>${escapeHtml(kindLine(t))}</p>${ratingLine(t.rating, t.ratingSource)}${genres || about || needsCopy ? `<p class="tc-about"><span class="tc-genres">${escapeHtml(genres)}</span><span class="tc-network">${genres && about ? ' · ' : ''}${escapeHtml(about)}</span></p>` : ''}</div></div>` +
         (t.premieres?.length ? seasonPremieres(t.premieres, titleId) : date + send) +
         overview +
         // Reference link next to the description; Notify me and the actions stay together below (canvas, 23.11)
@@ -189,7 +269,11 @@ export function subscriptionActions(item, disabled = false) {
         watchButton(item.links) +
         (item.id == null
             ? ''
-            : `<button type="button" class="sheet-btn-danger-soft" data-action="mine-ask-unfollow"${disabled ? ' disabled' : ''}>Unfollow</button>`)
+            : '<button type="button" class="sheet-btn-danger-soft" data-action="mine-ask-unfollow"' +
+              (disabled ? ' disabled' : '') +
+              '>' +
+              i18nText('Unfollow') +
+              '</button>')
     );
 }
 
@@ -200,18 +284,59 @@ function seasonPremieres(premieres, titleId) {
         .map(({ season, date }, index) => {
             const parsed = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || '');
             const month = parsed
-                ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][
-                      Number(parsed[2]) - 1
-                  ]
+                ? [
+                      i18nText('Jan'),
+                      i18nText('Feb'),
+                      i18nText('Mar'),
+                      i18nText('Apr'),
+                      i18nText('May'),
+                      i18nText('Jun'),
+                      i18nText('Jul'),
+                      i18nText('Aug'),
+                      i18nText('Sep'),
+                      i18nText('Oct'),
+                      i18nText('Nov'),
+                      i18nText('Dec')
+                  ][Number(parsed[2]) - 1]
                 : '';
-            const value = parsed && month ? `${Number(parsed[3])} ${month}` : 'TBA';
-            return `<div class="tc-season"${index >= 3 ? ' hidden' : ''}>${icon('calendar')}<div class="tc-season-text"><span class="tc-season-label">${icon('calendar')}<span>Season ${escapeHtml(season)}</span></span><strong><span>${escapeHtml(value)}</span>${parsed && month ? `<small>${parsed[1]}</small>` : ''}</strong></div></div>`;
+            const value = parsed && month ? `${Number(parsed[3])} ${month}` : i18nText('TBA');
+            return (
+                '<div class="tc-season"' +
+                (index >= 3 ? ' hidden' : '') +
+                '>' +
+                icon('calendar') +
+                '<div class="tc-season-text"><span class="tc-season-label">' +
+                icon('calendar') +
+                '<span>' +
+                i18nText('Season {{v3}}', { v3: escapeHtml(season) }) +
+                '</span></span><strong><span>' +
+                escapeHtml(value) +
+                '</span>' +
+                (parsed && month ? `<small>${parsed[1]}</small>` : '') +
+                '</strong></div></div>'
+            );
         })
         .join('');
     return (
-        `<section class="tc-premieres"><h3>Season premieres</h3><div class="tc-season-grid" id="${gridId}" data-columns="${Math.min(3, premieres.length)}">${rows}</div>` +
+        '<section class="tc-premieres"><h3>' +
+        i18nText('Season premieres') +
+        '</h3><div class="tc-season-grid" id="' +
+        gridId +
+        '" data-columns="' +
+        Math.min(3, premieres.length) +
+        '">' +
+        rows +
+        '</div>' +
         (premieres.length > 3
-            ? `<button type="button" class="tc-seasons-more" data-action="tc-seasons" data-count="${premieres.length - 3}" aria-expanded="false" aria-controls="${gridId}"><span>Show more · ${premieres.length - 3} seasons</span>${icon('chevron-down')}</button>`
+            ? '<button type="button" class="tc-seasons-more" data-action="tc-seasons" data-count="' +
+              (premieres.length - 3) +
+              '" aria-expanded="false" aria-controls="' +
+              gridId +
+              '"><span>' +
+              i18nText('Show more · {{v2}} seasons', { v2: premieres.length - 3 }) +
+              '</span>' +
+              icon('chevron-down') +
+              '</button>'
             : '') +
         '</section>'
     );
@@ -221,13 +346,55 @@ function seasonPremieres(premieres, titleId) {
 export function watchButton(links) {
     const watch = (links || []).find((l) => l.kind === 'watch');
     return watch
-        ? `<a class="sheet-btn-primary tc-watch" href="${escapeHtml(watch.url)}" target="_blank" rel="noopener noreferrer">${icon('play')}<span>${escapeHtml(watch.label || 'Watch on SSPoisk')}</span></a>`
+        ? `<a class="sheet-btn-primary tc-watch" href="${escapeHtml(watch.url)}" target="_blank" rel="noopener noreferrer">${icon('play')}<span>${escapeHtml(watch.label || i18nText('Watch on SSPoisk'))}</span></a>`
         : '';
 }
 
 /** Fit the shared description to available space after opening or updating a title card. */
 export function fitDescriptions(root) {
     fitTitleSheet(root);
+    for (const card of root.querySelectorAll('.tc-scroll[data-catalog]:not([data-localized])')) {
+        card.dataset.localized = 'loading';
+        catalogCopy(card.dataset.catalog, true)
+            .then((copy) => {
+                if (!card.isConnected) return;
+                if (typeof copy.title === 'string' && copy.title.trim()) {
+                    const name = copy.title.trim();
+                    card.querySelector('h2 [data-catalog-title]').textContent = name;
+                    const poster = card.querySelector('.tc-poster');
+                    if (poster) {
+                        poster.dataset.title = name;
+                        poster.setAttribute('aria-label', i18nText('Open the poster of {{v3}}', { v3: name }));
+                    }
+                }
+                const text = card.querySelector('.tc-copy');
+                if (text) {
+                    if (typeof copy.overview === 'string' && copy.overview.trim()) setTitleCopy(text, copy.overview);
+                    else if (text.hasAttribute('data-loading-copy')) text.closest('.tc-description')?.remove();
+                    text.removeAttribute('data-loading-copy');
+                }
+                const genres = card.querySelector('.tc-genres');
+                if (genres && !card.hasAttribute('data-primary-genres')) {
+                    genres.textContent = copy.genres || '';
+                    const network = card.querySelector('.tc-network');
+                    if (network) network.textContent = network.textContent.replace(/^ · /, '');
+                    if (network?.textContent && copy.genres) network.textContent = ' · ' + network.textContent;
+                    if (!genres.textContent && !network?.textContent) genres.closest('.tc-about')?.remove();
+                }
+                card.dataset.localized = 'done';
+                fitTitleSheet(root);
+            })
+            .catch(() => {
+                if (!card.isConnected) return;
+                const text = card.querySelector('.tc-copy');
+                if (text?.hasAttribute('data-loading-copy')) {
+                    setTitleCopy(text, i18nText('Description unavailable'));
+                    text.removeAttribute('data-loading-copy');
+                }
+                card.dataset.localized = 'failed';
+                fitTitleSheet(root);
+            });
+    }
 }
 
 function toggleNotify(button) {
@@ -261,7 +428,7 @@ function toggleMore(button) {
     const open = button.getAttribute('aria-expanded') !== 'true';
     text.classList.toggle('is-open', open);
     button.setAttribute('aria-expanded', String(open));
-    button.textContent = open ? 'Show less' : 'Show more';
+    button.textContent = open ? i18nText('Show less') : i18nText('Show more');
     fitDescriptions(button.closest('.modal-content'));
 }
 
@@ -269,7 +436,9 @@ function toggleSeasons(button) {
     const open = button.getAttribute('aria-expanded') !== 'true';
     for (const row of [...button.closest('.tc-premieres').querySelectorAll('.tc-season')].slice(3)) row.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
-    button.querySelector('span').textContent = open ? 'Show less' : `Show more · ${button.dataset.count} seasons`;
+    button.querySelector('span').textContent = open
+        ? i18nText('Show less')
+        : i18nText('Show more · {{v0}} seasons', { v0: button.dataset.count });
     fitDescriptions(button.closest('.modal-content'));
 }
 
@@ -279,7 +448,7 @@ function openPoster(button) {
     const modal = $('poster-modal');
     const img = /** @type {HTMLImageElement} */ (modal.querySelector('.poster-view-img'));
     // The small poster fills the box at once, the large one replaces it when it arrives (or now, if cached)
-    img.alt = `Poster: ${button.dataset.title}`;
+    img.alt = i18nText('Poster: {{v0}}', { v0: button.dataset.title });
     img.dataset.want = button.dataset.src;
     if (!loadPoster(button.dataset.src)) img.src = button.dataset.thumb;
     openModal('poster-modal');

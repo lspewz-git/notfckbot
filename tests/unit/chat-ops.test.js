@@ -78,8 +78,10 @@ test('a released film goes to Released from the panel but an old bot action stil
     const record = t.mock.method(events, 'record', () => {});
     const panel = await ops.addFilm(1, '1');
     assert.equal(panel.entry.notified, true);
+    assert.equal(panel.entry.release_status, 'Released');
     const bot = await ops.addFilm(1, 'movie_1', {}, { details, waitingOnly: true });
     assert.equal(bot.entry.notified, false);
+    assert.equal(bot.entry.release_status, 'Released');
     assert.equal(bot.entry.title, panel.entry.title);
     assert.equal((await ops.addFilm(1, '1', {}, { details, waitingOnly: true })).created, false);
     assert.equal(create.mock.callCount(), 1);

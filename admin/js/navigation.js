@@ -1,35 +1,41 @@
+import { t as i18nText } from './i18n.js';
 /** Section metadata shared by the desktop rail, phone tabs and More sheet. */
 import { $, escapeHtml } from './dom.js';
 
 const SECTIONS = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', tab: true },
-    { id: 'chats', label: 'Chats', aria: 'Users / Chats', icon: 'users', tab: true, divider: true },
-    { id: 'subs', label: 'Serials', icon: 'tv', tab: true },
-    { id: 'watchlist', label: 'Movies', icon: 'film', tab: true },
-    { id: 'history', label: 'Released', icon: 'calendar', hint: 'What came out, year by year' },
+    { id: 'dashboard', label: i18nText('Dashboard'), icon: 'layout-dashboard', tab: true },
+    { id: 'chats', label: i18nText('Chats'), aria: i18nText('Users / Chats'), icon: 'users', tab: true, divider: true },
+    { id: 'subs', label: i18nText('Serials'), icon: 'tv', tab: true },
+    { id: 'watchlist', label: i18nText('Movies'), icon: 'film', tab: true },
+    { id: 'history', label: i18nText('Released'), icon: 'calendar', hint: i18nText('What came out, year by year') },
     {
         id: 'tools',
-        label: 'Tools',
+        label: i18nText('Tools'),
         icon: 'sliders-horizontal',
         children: ['recap'],
         divider: true,
-        hint: 'Year recap and occasional tasks'
+        hint: i18nText('Year recap and occasional tasks')
     },
     {
         id: 'logs',
-        label: 'Logs',
-        aria: 'Activity logs',
-        moreLabel: 'Activity logs',
+        label: i18nText('Logs'),
+        aria: i18nText('Activity logs'),
+        moreLabel: i18nText('Activity logs'),
         icon: 'file-text',
-        hint: 'What the bot has been doing'
+        hint: i18nText('What the bot has been doing')
     },
-    { id: 'settings', label: 'Settings', icon: 'settings', hint: 'Tokens, proxy, update check, restart' },
+    {
+        id: 'settings',
+        label: i18nText('Settings'),
+        icon: 'settings',
+        hint: i18nText('Tokens, proxy, update check, restart')
+    },
     // The personal tabs in the redesign's order (06.11): Calendar, Released, Following, Account
-    { id: 'my-calendar', label: 'Calendar', icon: 'calendar-days', mine: true, divider: true },
-    { id: 'my-aired', label: 'Released', icon: 'clapperboard', mine: true },
+    { id: 'my-calendar', label: i18nText('Calendar'), icon: 'calendar-days', mine: true, divider: true },
+    { id: 'my-aired', label: i18nText('Released'), icon: 'clapperboard', mine: true },
     {
         id: 'my-subs',
-        label: 'Following',
+        label: i18nText('Following'),
         icon: 'bookmark',
         mine: true,
         children: ['my-search']
@@ -37,7 +43,7 @@ const SECTIONS = [
     // The tab bar has its own Account item with the chat's avatar (index.html); the rail lists it here
     {
         id: 'my-profile',
-        label: 'Account',
+        label: i18nText('Account'),
         icon: 'user-round',
         mine: true,
         railOnly: true,
@@ -50,28 +56,27 @@ export const DEFAULT_PERSONAL_SECTION = SECTIONS.find((s) => s.mine).id;
 
 const PERSONAL_ENTRY = {
     id: DEFAULT_PERSONAL_SECTION,
-    label: 'My account',
+    label: i18nText('My account'),
     icon: 'bookmark',
-    hint: 'Subscriptions, calendar and chat settings'
+    hint: i18nText('Subscriptions, calendar and chat settings')
 };
 
 // The More sheet's two rows that open a dialog rather than a section
 const ACTIONS_ENTRY = {
     open: 'actions-modal',
-    label: 'Actions',
+    label: i18nText('Actions'),
     icon: 'zap',
-    hint: 'Run an update check, send a broadcast'
+    hint: i18nText('Run an update check, send a broadcast')
 };
 const ABOUT_ENTRY = {
     open: 'about-modal',
     action: 'about',
-    label: 'About',
+    label: i18nText('About'),
     icon: 'info',
-    hint: 'The version running on the server'
+    hint: i18nText('The version running on the server')
 };
 
-const icon = (name) =>
-    `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
+const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 function item(section, tab = false) {
     const { id, label, aria = label, children = [], mine = false } = section;
@@ -116,7 +121,13 @@ export function setupNavigation() {
         SECTIONS.filter((s) => s.tab)
             .map((s) => item(s, true))
             .join('') +
-            `<button class="tab-item" data-open="more-modal" data-tab-sections="${moreSections.join(' ')}" aria-haspopup="dialog">${icon('ellipsis')}<span>More</span></button>` +
+            ('<button class="tab-item" data-open="more-modal" data-tab-sections="' +
+                moreSections.join(' ') +
+                '" aria-haspopup="dialog">' +
+                icon('ellipsis') +
+                '<span>' +
+                i18nText('More') +
+                '</span></button>') +
             SECTIONS.filter((s) => s.mine && !s.railOnly)
                 .map((s) => item(s, true))
                 .join('')

@@ -1,3 +1,5 @@
+import { t as i18nText } from './i18n.js';
+import { warmTitles } from './catalog-text.js';
 /** The three data tables on screen: tabs, the filter, placeholders and rendering the rows. */
 
 import { $, $field, all, escapeHtml } from './dom.js';
@@ -106,11 +108,22 @@ export function applyTableFilter(type) {
 }
 
 export function setupFilters() {
+    window.addEventListener('catalog-names-ready', () => {
+        for (const type of Object.keys(TABLES)) applyTableFilter(type);
+    });
     Object.entries(TABLES).forEach(([type, { filter }]) => {
         const el = $(filter);
         if (el)
             el.oninput = () => {
                 resetPage(type);
+                const query = /** @type {HTMLInputElement} */ (el).value.trim();
+                if (query)
+                    warmTitles(
+                        (lastData[type] || []).map((item) => item.seriesId || item.tmdb_id),
+                        () =>
+                            /** @type {HTMLInputElement} */ (el).value.trim() === query &&
+                            el.getClientRects().length > 0
+                    );
                 applyTableFilter(type);
             };
     });
@@ -200,7 +213,7 @@ export function renderTable(type, data) {
     const rows = sortRows(type, tab ? data.filter(tab.matches) : data);
 
     if (rows.length === 0) {
-        body.innerHTML = fullWidthRow(type, tab ? tab.empty : 'No records found.');
+        body.innerHTML = fullWidthRow(type, tab ? tab.empty : i18nText('No records found.'));
         renderPager(type, 0);
         return;
     }

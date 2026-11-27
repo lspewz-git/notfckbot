@@ -1,3 +1,5 @@
+import { t as i18nText } from './i18n.js';
+import { displayTitle, titleMarkup, titleLabel } from './catalog-text.js';
 /** The three data tables as data: columns, tabs, sort keys, and how one record becomes a row. */
 
 import { escapeHtml } from './dom.js';
@@ -68,16 +70,31 @@ export const TABLES = {
     chats: {
         body: 'chats-body',
         filter: 'chats-filter',
-        columns: ['Chat ID', 'Chat', 'Type', 'Status', 'Last active', 'Actions'],
+        columns: [
+            i18nText('Chat ID'),
+            i18nText('Chat'),
+            i18nText('Type'),
+            i18nText('Status'),
+            i18nText('Last active'),
+            i18nText('Actions')
+        ],
         tabs: {
-            all: { label: 'All', matches: () => true, empty: 'No chats yet.' },
-            active: { label: 'Active', matches: (item) => !botLeft(item), empty: 'No active chats.' },
-            admins: { label: 'Admins', matches: (item) => item.panelRole === 'admin', empty: 'No admins.' },
+            all: { label: i18nText('All'), matches: () => true, empty: i18nText('No chats yet.') },
+            active: {
+                label: i18nText('Active'),
+                matches: (item) => !botLeft(item),
+                empty: i18nText('No active chats.')
+            },
+            admins: {
+                label: i18nText('Admins'),
+                matches: (item) => item.panelRole === 'admin',
+                empty: i18nText('No admins.')
+            },
             // Blocked the bot, took it out of the group, or gone (src/bot-status.js)
             left: {
-                label: 'Left the bot',
+                label: i18nText('Left the bot'),
                 matches: botLeft,
-                empty: 'No chat has left the bot.',
+                empty: i18nText('No chat has left the bot.'),
                 hint: 'chats-left-hint'
             }
         },
@@ -85,24 +102,35 @@ export const TABLES = {
             const { badge, note } = chatStatus(item);
             const seen = lastSeenText(item.last_seen_at);
             const noteLine = note ? `<span class="status-note">${escapeHtml(note)}</span>` : '';
-            return `
-                <tr class="row-compact">
-                    <td data-label="Chat ID"><code>${item.id}</code></td>
-                    <td data-label="Chat">${chatDisplayName(item)}${roleBadge(item.panelRole)}</td>
-                    <td data-label="Type"><span class="chat-type">${item.type}</span></td>
-                    <td data-label="Status"><div class="status-cell">${badge}${noteLine}</div></td>
-                    <td data-label="Last active"><span class="last-active">${seen}</span></td>
-                    ${compactCell({
-                        title: `${chatDisplayName(item)}${roleBadge(item.panelRole)}`,
-                        badge,
-                        meta: [item.type, String(item.id), activeLine(item.last_seen_at)],
-                        more: note ? [note] : []
-                    })}
-                    <td data-label="Actions">
-                        <button class="btn btn-row" data-action="chat-actions" data-id="${item.id}" aria-label="Actions for ${escapeHtml(chatLabel(item))}">${ICON.more}${btnLabel('Actions')}</button>
-                    </td>
-                </tr>
-            `;
+            return (
+                '\n                <tr class="row-compact">\n                    <td data-label="Chat ID"><code>' +
+                item.id +
+                '</code></td>\n                    <td data-label="Chat">' +
+                chatDisplayName(item) +
+                roleBadge(item.panelRole) +
+                '</td>\n                    <td data-label="Type"><span class="chat-type">' +
+                item.type +
+                '</span></td>\n                    <td data-label="Status"><div class="status-cell">' +
+                badge +
+                noteLine +
+                '</div></td>\n                    <td data-label="Last active"><span class="last-active">' +
+                seen +
+                '</span></td>\n                    ' +
+                compactCell({
+                    title: `${chatDisplayName(item)}${roleBadge(item.panelRole)}`,
+                    badge,
+                    meta: [item.type, String(item.id), activeLine(item.last_seen_at)],
+                    more: note ? [note] : []
+                }) +
+                '\n                    <td data-label="Actions">\n                        <button class="btn btn-row" data-action="chat-actions" data-id="' +
+                item.id +
+                '" aria-label="' +
+                i18nText('Actions for {{v9}}', { v9: escapeHtml(chatLabel(item)) }) +
+                '">' +
+                ICON.more +
+                btnLabel(i18nText('Actions')) +
+                '</button>\n                    </td>\n                </tr>\n            '
+            );
         }
     },
 
@@ -110,20 +138,27 @@ export const TABLES = {
         body: 'subs-body',
         filter: 'subs-filter',
         paged: true,
-        columns: ['User', 'Series', 'Status', 'Next episode', 'Mode', 'Actions'],
+        columns: [
+            i18nText('User'),
+            i18nText('Series'),
+            i18nText('Status'),
+            i18nText('Next episode'),
+            i18nText('Mode'),
+            i18nText('Actions')
+        ],
         tabs: {
             active: {
-                label: 'Active',
+                label: i18nText('Active'),
                 matches: (item) => !isArchivedSub(item),
-                empty: 'No active subscriptions.'
+                empty: i18nText('No active subscriptions.')
             },
             // Catalog marks it ended or canceled; monitoring continues in the archive
             archive: {
-                label: 'Archive',
+                label: i18nText('Archive'),
                 matches: isArchivedSub,
-                empty: 'No archived subscriptions.',
+                empty: i18nText('No archived subscriptions.'),
                 hint: 'subs-archive-hint',
-                hides: ['Next episode', 'Mode']
+                hides: [i18nText('Next episode'), i18nText('Mode')]
             }
         },
         row: (item) => {
@@ -135,25 +170,47 @@ export const TABLES = {
                 ? ''
                 : `<td data-label="Mode"><span class="badge ok">${MODE_LABELS[item.notify_type] || item.notify_type}</span></td>`;
             const key = subKey(item.chatId, item.seriesId);
-            const title = item.Series ? item.Series.title : 'Unknown';
+            const title = displayTitle(item.seriesId, item.Series ? item.Series.title : i18nText('Unknown'));
             const poster = titlePoster(item.Series?.poster_url, 'series', item.seriesId);
             const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
             const status = seriesStatusBadge(item.Series && item.Series.status);
             // Phones: one menu instead of two buttons; an archived row has only Delete, kept as an icon
             const modeBtn = archived
                 ? ''
-                : `<button class="btn btn-row btn-wide-only" data-action="mode" data-key="${key}">${ICON.mode}Mode</button>
-                   <button class="btn btn-row btn-narrow-only" data-action="sub-actions" data-key="${key}" aria-label="Actions for ${escapeHtml(title)}">${ICON.more}</button>`;
-            const deleteBtn = `<button class="btn btn-row btn-row-danger${archived ? '' : ' btn-wide-only'}" data-action="delete-sub" data-chat="${item.chatId}" data-series="${item.seriesId}" aria-label="Delete ${escapeHtml(title)} for ${escapeHtml(user)}">${ICON.trash}${btnLabel('Delete')}</button>`;
+                : '<button class="btn btn-row btn-wide-only" data-action="mode" data-key="' +
+                  key +
+                  '">' +
+                  ICON.mode +
+                  (i18nText('Mode') +
+                      '</button>\n                   <button class="btn btn-row btn-narrow-only" data-action="sub-actions" data-key="') +
+                  key +
+                  '" ' +
+                  titleLabel(item.seriesId, 'Actions for {{title}}', { title }) +
+                  '>' +
+                  ICON.more +
+                  '</button>';
+            const deleteBtn =
+                '<button class="btn btn-row btn-row-danger' +
+                (archived ? '' : ' btn-wide-only') +
+                '" data-action="delete-sub" data-chat="' +
+                item.chatId +
+                '" data-series="' +
+                item.seriesId +
+                '" ' +
+                titleLabel(item.seriesId, 'Delete {{title}} for {{user}}', { title, user }) +
+                '>' +
+                ICON.trash +
+                btnLabel(i18nText('Delete')) +
+                '</button>';
             return `
                 <tr class="row-compact">
                     <td data-label="User">${escapeHtml(user)}</td>
-                    <td data-label="Series"><div class="title-with-poster">${poster}<span class="link-text" data-action="series" data-id="${item.seriesId}" role="button" tabindex="0">${escapeHtml(title)}</span></div></td>
+                    <td data-label="Series"><div class="title-with-poster">${poster}<span class="link-text" data-action="series" data-id="${item.seriesId}" role="button" tabindex="0">${titleMarkup(item.seriesId, title)}</span></div></td>
                     <td data-label="Status">${status}</td>
                     ${next}
                     ${mode}
                     ${compactCell({
-                        title: escapeHtml(title),
+                        title: titleMarkup(item.seriesId, title),
                         action: 'series',
                         poster,
                         id: item.seriesId,
@@ -176,7 +233,7 @@ export const TABLES = {
     films: {
         body: 'watchlist-body',
         filter: 'watchlist-filter',
-        columns: ['User', 'Film title', 'Year', 'Release', 'Actions'],
+        columns: [i18nText('User'), i18nText('Film title'), i18nText('Year'), i18nText('Release'), i18nText('Actions')],
         table: 'watchlist-table',
         paged: true,
         sorts: {
@@ -186,15 +243,15 @@ export const TABLES = {
         },
         tabs: {
             active: {
-                label: 'Waiting',
+                label: i18nText('Waiting'),
                 matches: (item) => !item.notified,
-                empty: 'No films waiting for release.'
+                empty: i18nText('No films waiting for release.')
             },
             // Released and announced to the chat; kept as a record
             archive: {
-                label: 'Released',
+                label: i18nText('Released'),
                 matches: (item) => Boolean(item.notified),
-                empty: 'No released films yet.',
+                empty: i18nText('No released films yet.'),
                 hint: 'films-archive-hint'
             }
         },
@@ -202,26 +259,39 @@ export const TABLES = {
             const user = item.Chat ? chatLabel(item.Chat) : String(item.chatId);
             const extras = releaseExtras(item);
             const poster = titlePoster(item.poster_url, 'film', item.tmdb_id);
-            return `
-            <tr class="row-compact">
-                <td data-label="User">${escapeHtml(user)}</td>
-                <td data-label="Film title"><div class="title-with-poster">${poster}<span class="link-text" data-action="film" data-id="${escapeHtml(item.tmdb_id)}" role="button" tabindex="0">${escapeHtml(item.title)}</span></div></td>
-                <td data-label="Year">${item.year || '—'}</td>
-                <td data-label="Release">${escapeHtml(formatReleaseDate(item.premiere_digital))}${extras
-                    .map((line) => `<span class="release-sub">${escapeHtml(line)}</span>`)
-                    .join('')}</td>
-                ${compactCell({
-                    title: escapeHtml(item.title),
+            return (
+                '\n            <tr class="row-compact">\n                <td data-label="User">' +
+                escapeHtml(user) +
+                '</td>\n                <td data-label="Film title"><div class="title-with-poster">' +
+                poster +
+                '<span class="link-text" data-action="film" data-id="' +
+                escapeHtml(item.tmdb_id) +
+                '" role="button" tabindex="0">' +
+                titleMarkup(item.tmdb_id, item.title) +
+                '</span></div></td>\n                <td data-label="Year">' +
+                (item.year || '—') +
+                '</td>\n                <td data-label="Release">' +
+                escapeHtml(formatReleaseDate(item.premiere_digital)) +
+                extras.map((line) => `<span class="release-sub">${escapeHtml(line)}</span>`).join('') +
+                '</td>\n                ' +
+                compactCell({
+                    title: titleMarkup(item.tmdb_id, item.title),
                     action: 'film',
                     poster,
                     id: item.tmdb_id,
                     badge: item.year ? `<span class="compact-year">${item.year}</span>` : '',
-                    meta: [user, `Release ${formatReleaseDate(item.premiere_digital)}`],
+                    meta: [user, i18nText('Release {{v0}}', { v0: formatReleaseDate(item.premiere_digital) })],
                     more: extras
-                })}
-                <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="${item.id}" aria-label="Delete ${escapeHtml(item.title)} for ${escapeHtml(user)}">${ICON.trash}${btnLabel('Delete')}</button></td>
-            </tr>
-        `;
+                }) +
+                '\n                <td data-label="Actions"><button class="btn btn-row btn-row-danger" data-action="delete-film" data-id="' +
+                item.id +
+                '" ' +
+                titleLabel(item.tmdb_id, 'Delete {{title}} for {{user}}', { title: item.title, user }) +
+                '>' +
+                ICON.trash +
+                btnLabel(i18nText('Delete')) +
+                '</button></td>\n            </tr>\n        '
+            );
         }
     }
 };

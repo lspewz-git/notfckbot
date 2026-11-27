@@ -1,3 +1,4 @@
+import { t as i18nText } from './i18n.js';
 /**
  * The dashboard's two charts, drawn by Chart.js (admin/vendor/chart.umd.js, the global `Chart`,
  * loaded `async` so the panel's own scripts don't wait for it): new subscriptions by week or
@@ -10,7 +11,20 @@ import { $, all } from './dom.js';
 import { isUnchanged } from './render.js';
 import { openSends } from './sends.js';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = [
+    i18nText('Jan'),
+    i18nText('Feb'),
+    i18nText('Mar'),
+    i18nText('Apr'),
+    i18nText('May'),
+    i18nText('Jun'),
+    i18nText('Jul'),
+    i18nText('Aug'),
+    i18nText('Sep'),
+    i18nText('Oct'),
+    i18nText('Nov'),
+    i18nText('Dec')
+];
 const dayLabel = (day) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]}`;
 const monthLabel = (month) => MONTHS[Number(month.slice(5, 7)) - 1];
 
@@ -70,7 +84,7 @@ function renderSubs() {
             labels: rows.map((r) => ('start' in r ? dayLabel(r.start) : monthLabel(r.month))),
             datasets: [
                 {
-                    label: 'New subscriptions',
+                    label: i18nText('New subscriptions'),
                     data: rows.map((r) => r.count),
                     backgroundColor: token('--accent'),
                     borderRadius: 3,
@@ -80,7 +94,10 @@ function renderSubs() {
         },
         false
     );
-    $('chart-subs').setAttribute('aria-label', `New subscriptions per ${subsBy === 'months' ? 'month' : 'week'}`);
+    $('chart-subs').setAttribute(
+        'aria-label',
+        i18nText('New subscriptions per {{v0}}', { v0: i18nText(subsBy === 'months' ? 'month' : 'week') })
+    );
 }
 
 /**
@@ -109,7 +126,8 @@ export function openRecentSends() {
 }
 
 /** The tooltip says a day opens: a pointer's cursor alone says nothing on a phone. */
-const hint = () => (window.matchMedia('(pointer: coarse)').matches ? 'Tap for details' : 'Click for details');
+const hint = () =>
+    window.matchMedia('(pointer: coarse)').matches ? i18nText('Tap for details') : i18nText('Click for details');
 
 function renderSent() {
     draw(
@@ -118,14 +136,14 @@ function renderSent() {
             labels: data.days.map((d) => dayLabel(d.day)),
             datasets: [
                 {
-                    label: 'Sent',
+                    label: i18nText('Sent'),
                     data: data.days.map((d) => d.sent),
                     backgroundColor: token('--text-secondary'),
                     borderRadius: 2,
                     maxBarThickness: 16
                 },
                 {
-                    label: 'Not delivered',
+                    label: i18nText('Not delivered'),
                     data: data.days.map((d) => d.failed),
                     backgroundColor: token('--danger'),
                     borderRadius: 2,
@@ -158,7 +176,10 @@ function renderSent() {
     );
     // The bot counts from the day this was deployed: earlier days are not zeros but unknown
     const since = data.countingSince;
-    $('chart-sent-note').textContent = since > data.days[0].day ? `Counting since ${dayLabel(since)}` : 'Last 30 days';
+    $('chart-sent-note').textContent =
+        since > data.days[0].day
+            ? i18nText('Counting since {{v0}}', { v0: dayLabel(since) })
+            : i18nText('Last 30 days');
 }
 
 function renderAll() {

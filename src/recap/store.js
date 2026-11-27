@@ -78,9 +78,10 @@ async function readSet(chatId, year, hash) {
  * Keeps a chat's six PNGs and their small copies, in place of the set it had: the set's entry
  * last, so it only names whole sets; the old set's files go.
  */
-function writeSet(chatId, year, hash, images, thumbs) {
+function writeSet(chatId, year, hash, images, thumbs, isCurrent = () => true) {
     const dir = storeDir();
     return locked(dir, async () => {
+        if (!isCurrent()) return;
         const old = await integritiesOf(dir, keysOf(year, chatId));
         const metadata = { hash };
         for (let i = 0; i < CARDS; i += 1) {
