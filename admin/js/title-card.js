@@ -98,11 +98,7 @@ function ratingLine(value, source = 'TMDB') {
     const rated = Number.isFinite(value) && value > 0 && value <= 10;
     return rated
         ? `<p class="tc-rating">${icon('star')}<strong>${value.toFixed(1)}</strong><span>/ 10 · ${escapeHtml(source)}</span></p>`
-        : '<p class="tc-rating tc-unrated">' +
-              icon('star') +
-              '<span>' +
-              i18nText('Not rated on {{v1}} yet', { v1: escapeHtml(source) }) +
-              '</span></p>';
+        : '<p class="tc-rating tc-unrated">' + icon('star') + '<span>' + i18nText('Not rated yet') + '</span></p>';
 }
 
 /**

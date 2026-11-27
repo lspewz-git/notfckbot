@@ -4,6 +4,37 @@ const { watchConsole, openSection, isPhone } = require('./helpers');
 
 watchConsole();
 
+for (const language of ['en', 'ru']) {
+    test(`unrated cards omit provider claims in ${language}`, async ({ page, isMobile }) => {
+        if (process.env.RATING_FIX_CAPTURES) await page.setViewportSize({ width: isMobile ? 375 : 1440, height: isMobile ? 812 : 900 });
+        await mockPanel(page, { language });
+        let source = 'tvmaze';
+        let rating = 0;
+        await page.route('**/api/series/66732', route => route.fulfill({
+            json: { name: 'Frisco King', number_of_seasons: 1, vote_average: rating,
+                data_source: 'tvmaze', rating_source: source, subscribers: [] }
+        }));
+        const modal = page.locator('#detail-modal');
+        const open = () => page.locator('#popular-list [data-action="series"]').first().click();
+        for (source of ['tvmaze', 'tmdb', 'unknown']) {
+            await open();
+            await expect(modal.locator('.tc-rating')).toHaveText(language === 'ru' ? 'Пока нет оценки' : 'Not rated yet');
+            expect(await modal.locator('.tc-rating').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+            if (process.env.RATING_FIX_CAPTURES && source === 'tmdb') {
+                await modal.locator('.title-sheet').evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+                await modal.locator('.tc-head').screenshot({ path: `${process.env.RATING_FIX_CAPTURES}/${language}-${isMobile ? 'iphone' : 'desktop'}.png` });
+            }
+            await modal.locator('[data-close="detail-modal"]').first().click();
+            await expect(modal).toBeHidden();
+        }
+        source = 'tvmaze';
+        rating = 5.3;
+        await open();
+        await expect(modal.locator('.tc-rating')).toContainText('5.3');
+        await expect(modal.locator('.tc-rating')).toContainText('/ 10 · TVmaze');
+    });
+}
+
 test('series details attribute TVmaze and its rating without changing the Kinopoisk link', async ({ page, isMobile }) => {
     if (process.env.SERIES_SOURCE_CAPTURES && !isMobile) await page.setViewportSize({ width: 1440, height: 900 });
     await mockPanel(page);
@@ -31,11 +62,13 @@ test('Following preserves the series source and rating attribution', async ({ pa
     const panel = await mockPanel(page, { role: 'user' });
     panel.account.series[0].source = { label: 'TVmaze', url: 'https://www.tvmaze.com/shows/618/the-last-of-us' };
     panel.account.series[0].ratingSource = 'TVmaze';
+    panel.account.series[0].rating = 5.3;
     await openSection(page, 'my-subs');
     await page.locator('#my-subs-body button.title-row').first().click();
     const modal = page.locator('#mine-card-modal');
     await expect(modal.locator('.tc-source')).toHaveText('Source: TVmaze');
     await expect(modal.locator('.tc-rating')).toContainText('TVmaze');
+    await expect(modal.locator('.tc-rating')).toContainText('5.3');
 });
 
 test('restored ratings show their reserve or unknown source accurately', async ({ page, isMobile }) => {

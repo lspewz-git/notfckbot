@@ -504,14 +504,16 @@ const knownTitleId = (tmdbId) => {
 };
 
 /** Optional card data from the warmed cache; never wait for an external service. */
-const titleMetadata = (tmdbId) => {
+const titleMetadata = (tmdbId, saved = null) => {
     const [kind, id] = String(tmdbId).split('_');
     const details = tmdb.peekDetails(id, kind);
+    const ratingSource = details
+        ? details.rating_source || 'tmdb'
+        : saved?.rating_source || (saved?.episode_source === 'tvmaze' ? 'unknown' : 'tmdb');
     return {
         overview: details?.overview || '',
-        rating: details?.vote_average || null,
-        ratingSource:
-            details?.rating_source === 'tvmaze' ? 'TVmaze' : details?.rating_source === 'unknown' ? 'Catalog' : 'TMDB',
+        rating: (details ? details.vote_average : Number(saved?.rating)) || null,
+        ratingSource: ratingSource === 'tvmaze' ? 'TVmaze' : ratingSource === 'unknown' ? 'Catalog' : 'TMDB',
         source:
             kind === 'tv' && details?.data_source === 'tvmaze' && details.source_url
                 ? { label: 'TVmaze', url: details.source_url }
@@ -556,7 +558,7 @@ function filmItem(f, chat) {
     return {
         id: f.id,
         tmdbId: f.tmdb_id,
-        ...titleMetadata(f.tmdb_id),
+        ...titleMetadata(f.tmdb_id, f),
         title: f.title,
         poster: posterPath(f.poster_url),
         year: f.year,
@@ -586,7 +588,7 @@ router.get('/api/account/chats/:chatId/list', openChat, async (req, res) => {
             .filter((s) => s.Series)
             .map(({ notify_type: mode, Series: s }) => ({
                 id: s.tmdb_id,
-                ...titleMetadata(s.tmdb_id),
+                ...titleMetadata(s.tmdb_id, s),
                 title: s.title,
                 poster: posterPath(s.poster_url),
                 mode,

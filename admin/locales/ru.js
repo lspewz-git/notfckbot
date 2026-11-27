@@ -14,7 +14,7 @@ export default {
     'Saving language…': 'Сохраняем язык…',
     'Could not save the language. Try again.': 'Не удалось сохранить язык. Попробуйте ещё раз.',
     '{{v0}} season{{v1}}': 'Сезонов: {{v0}}',
-    'Not rated on {{v1}} yet': 'На {{v1}} пока нет оценки',
+    'Not rated yet': 'Пока нет оценки',
     'Notify me': 'Уведомлять меня',
     'Releases the bot will message you about are marked with a bell in Calendar.':
         'Релизы, о которых напишет бот, отмечены колокольчиком в календаре.',

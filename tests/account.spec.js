@@ -1034,7 +1034,7 @@ test('calendar: a film card counts down, expands its description and leaves miss
     await card.getByRole('button', { name: 'Close', exact: true }).click();
     await body.locator('button.cal-row', { hasText: 'Мегалополис' }).click();
     await expect(card.locator('.tc-date-when')).toHaveText('yesterday');
-    await expect(card.locator('.tc-rating')).toHaveText('Not rated on TMDB yet');
+    await expect(card.locator('.tc-rating')).toHaveText('Not rated yet');
     await expect(card.locator('.tc-overview')).toHaveCount(0);
 });
 

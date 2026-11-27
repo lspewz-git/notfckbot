@@ -1173,6 +1173,51 @@ test('the API: a film is removed only from the chat in the path', async (t) => {
     assert.equal(destroyed, false);
 });
 
+test('the API: Following preserves stored ratings only when catalog metadata is absent', async (t) => {
+    const tmdb = require('../../src/api/tmdb');
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    const saved = {
+        tmdb_id: 'tv_254630',
+        title: '12 12 12',
+        rating: 5.3,
+        rating_source: 'tvmaze',
+        episode_source: 'tvmaze'
+    };
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private' }));
+    t.mock.method(Subscription, 'findAll', async () => [{ notify_type: 'each', Series: saved }]);
+    t.mock.method(Watchlist, 'findAll', async () => [{ id: 1, tmdb_id: 'movie_9', title: 'Film', rating: 7.2 }]);
+    let cached;
+    t.mock.method(tmdb, 'peekDetails', () => cached);
+    t.mock.method(tmdb, 'getDetailsCached', () => {
+        throw new Error('No external requests for Following');
+    });
+    const cookie = await signIn(call, 7);
+    const list = async () => {
+        const response = await call('GET', '/api/account/chats/7/list', { cookie });
+        assert.equal(response.status, 200);
+        return response.body;
+    };
+    for (const [source, label] of [
+        ['tvmaze', 'TVmaze'],
+        ['tmdb', 'TMDB'],
+        [null, 'Catalog']
+    ]) {
+        saved.rating_source = source;
+        const response = await list();
+        assert.deepEqual([response.series[0].rating, response.series[0].ratingSource], [5.3, label]);
+        assert.deepEqual([response.films[0].rating, response.films[0].ratingSource], [7.2, 'TMDB']);
+    }
+    for (const rating of [0, null, 8.1]) {
+        cached = { vote_average: rating, rating_source: 'tmdb' };
+        const response = await list();
+        assert.deepEqual([response.series[0].rating, response.series[0].ratingSource], [rating || null, 'TMDB']);
+    }
+    cached = undefined;
+    saved.rating = null;
+    assert.equal((await list()).series[0].rating, null);
+});
+
 test('the API: Following films use cached Kinopoisk ids and IMDb context without waiting for services', async (t) => {
     const tmdb = require('../../src/api/tmdb');
     const kp = require('../../src/api/kinopoisk');
