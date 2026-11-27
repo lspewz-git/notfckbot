@@ -4,6 +4,71 @@ const { watchConsole, openProfilePage, openSection } = require('./helpers');
 
 watchConsole();
 
+for (const language of ['en', 'ru']) {
+    test(`${language}: language field stays in place while saving and awaiting reload`, async ({ page }) => {
+        let releaseSave;
+        const save = new Promise((resolve) => (releaseSave = resolve));
+        const departures = [];
+        await page.exposeFunction('recordLanguageRow', (snapshot) => departures.push(snapshot));
+        await page.addInitScript((language) => localStorage.setItem('nfb.language', language), language);
+        await mockPanel(page, { role: 'user', language, path: '/#my-account' });
+        const row = page.locator('[data-action="account-language"]');
+        await expect(row).toBeVisible();
+        const oldValue = await row.locator('.row-value').textContent();
+        const oldBox = await row.locator('.row-value').boundingBox();
+        await row.evaluate((node) => {
+            window.__languageRow = node;
+            window.addEventListener('beforeunload', () => {
+                const row = document.querySelector('[data-action="account-language"]');
+                window.recordLanguageRow({
+                    same: row === window.__languageRow,
+                    value: row.querySelector('.row-value').textContent,
+                    chevron: row.querySelector('.row-chevron').getClientRects().length > 0
+                });
+            });
+        });
+        await page.route('**/api/account/preferences', async (route) => {
+            await save;
+            await route.fallback();
+        });
+        try {
+            await row.click();
+            await page.locator(`#pick-list [data-index="${language === 'en' ? 2 : 1}"]`).click();
+            await expect(row).toHaveAttribute('aria-busy', 'true');
+            expect(await row.evaluate((node) => node === window.__languageRow)).toBe(true);
+            await expect(row.locator('.row-chevron')).toBeVisible();
+            expect((await row.locator('.row-value').boundingBox()).x).toBeCloseTo(oldBox.x, 1);
+            await row.dispatchEvent('click');
+            await expect(page.locator('#pick-modal')).toBeHidden();
+            releaseSave();
+            await expect(page.locator('html')).toHaveAttribute('lang', language === 'en' ? 'ru' : 'en');
+            await expect.poll(() => departures).toEqual([{ same: true, value: oldValue, chevron: true }]);
+        } finally {
+            releaseSave();
+        }
+    });
+
+    test(`${language}: same-locale language choice updates text without rebuilding the field`, async ({ page }) => {
+        await page.addInitScript(
+            (language) => Object.defineProperty(navigator, 'languages', { value: [language] }),
+            language
+        );
+        await mockPanel(page, { role: 'user', path: '/#my-account' });
+        const row = page.locator('[data-action="account-language"]');
+        await row.evaluate((node) => (window.__languageRow = node));
+        await row.click();
+        await page.locator(`#pick-list [data-index="${language === 'en' ? 1 : 2}"]`).click();
+        await expect(row.locator('.row-value')).toHaveText(language === 'en' ? 'English' : 'Русский');
+        expect(await row.evaluate((node) => node === window.__languageRow)).toBe(true);
+        await expect(row).not.toHaveAttribute('aria-busy');
+        await expect(row).not.toHaveAttribute('aria-disabled');
+        await row.click();
+        await page.locator('#pick-list [data-index="0"]').click();
+        await expect(row.locator('.row-value')).toHaveText(language === 'en' ? 'Automatic' : 'Автоматически');
+        expect(await row.evaluate((node) => node === window.__languageRow)).toBe(true);
+    });
+}
+
 test('browser language selects Russian, including account settings and navigation', async ({ page }) => {
     await page.addInitScript(() => Object.defineProperty(navigator, 'languages', { value: ['ru-RU'] }));
     await mockPanel(page, { role: 'user', path: '/#my-account' });
@@ -100,11 +165,17 @@ test('saved language works when browser storage is unavailable', async ({ page }
 
 test('failed save keeps the previous language and lets the user retry', async ({ page }) => {
     await mockPanel(page, { role: 'user', languageSaveError: true, path: '/#my-account' });
+    await page.locator('[data-action="account-language"]').evaluate((node) => (window.__languageRow = node));
     await page.locator('[data-action="account-language"]').click();
     await page.locator('#pick-list [data-index="2"]').click();
     await expect(page.locator('.toast')).toContainText('Could not save the language');
     await expect(page.locator('[data-action="account-language"]')).toBeEnabled();
     await expect(page.locator('[data-action="account-language"]')).toContainText('Automatic');
+    expect(
+        await page.locator('[data-action="account-language"]').evaluate((node) => node === window.__languageRow)
+    ).toBe(true);
+    await expect(page.locator('[data-action="account-language"] .row-chevron')).toBeVisible();
+    await expect(page.locator('[data-action="account-language"]')).not.toHaveAttribute('aria-disabled');
     expect(page.__errors.filter((message) => !/500/.test(message))).toEqual([]);
     page.__errors = [];
 });

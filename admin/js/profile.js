@@ -255,6 +255,15 @@ async function toggleVisibility(button) {
 
 // --- Account settings ---
 
+const languageName = () =>
+    languagePreference() === 'auto' ? t('Automatic') : languagePreference() === 'ru' ? 'Русский' : 'English';
+const languageHelp = () =>
+    languagePreference() === 'auto'
+        ? t('Uses your Telegram or browser language.')
+        : languagePreference() === 'ru'
+          ? t('Russian is selected. Saved in your account.')
+          : t('English is selected. Saved in your account.');
+
 function renderAccount() {
     const info = $('my-account-info');
     if (!info || !me) return;
@@ -267,19 +276,13 @@ function renderAccount() {
     setDevicesOwner(me.id);
     loadDevices();
     const preferences = $('my-preferences');
-    const languageHelp =
-        languagePreference() === 'auto'
-            ? t('Uses your Telegram or browser language.')
-            : languagePreference() === 'ru'
-              ? t('Russian is selected. Saved in your account.')
-              : t('English is selected. Saved in your account.');
     if (preferences)
         preferences.innerHTML =
             `<h2 class="group-title">${t('Preferences')}</h2><ul class="group-list"><li>` +
-            `<button type="button" class="group-row" data-action="account-language" aria-haspopup="dialog"${languageSaving ? ' disabled aria-busy="true"' : ''}>` +
+            `<button type="button" class="group-row" data-action="account-language" aria-haspopup="dialog"${languageSaving ? ' aria-disabled="true" aria-busy="true"' : ''}>` +
             `<span class="row-tile">${icon('globe')}</span><span class="row-text"><span class="row-name">${t('Language')}</span></span>` +
-            `<span class="row-value">${languagePreference() === 'auto' ? t('Automatic') : languagePreference() === 'ru' ? 'Русский' : 'English'}</span>${CHEVRON}</button></li></ul>` +
-            `<p class="group-help">${languageHelp}</p>`;
+            `<span class="row-value">${languageName()}</span>${CHEVRON}</button></li></ul>` +
+            `<p class="group-help">${languageHelp()}</p>`;
 }
 
 function chooseLanguage() {
@@ -298,15 +301,22 @@ function chooseLanguage() {
         ],
         onPick: async (language) => {
             languageSaving = true;
-            renderAccount();
+            const row = $('my-preferences').querySelector('[data-action="account-language"]');
+            row.setAttribute('aria-busy', 'true');
+            row.setAttribute('aria-disabled', 'true');
             try {
                 await api('/account/preferences', { method: 'PATCH', body: { language } });
-                accountLanguage(language);
+                // A language reload owns the next paint; do not repaint the departing page.
+                if (accountLanguage(language)) {
+                    row.querySelector('.row-value').textContent = languageName();
+                    $('my-preferences').querySelector('.group-help').textContent = languageHelp();
+                }
             } catch {
                 toast(t('Could not save the language. Try again.'), 'error');
             } finally {
                 languageSaving = false;
-                renderAccount();
+                row.removeAttribute('aria-busy');
+                row.removeAttribute('aria-disabled');
             }
         }
     });
