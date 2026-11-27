@@ -695,7 +695,7 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
     if (!query) return;
     try {
         const [results, subs, films, chat] = await Promise.all([
-            tmdb.searchMulti(query.q.slice(0, 100), req.get('X-Panel-Language') === 'en' ? 'en-US' : 'ru-RU'),
+            tmdb.searchPanel(query.q.slice(0, 100), req.get('X-Panel-Language') === 'en' ? 'en-US' : 'ru-RU'),
             Subscription.findAll({ where: { chatId: req.chatId }, attributes: ['seriesId'] }),
             Watchlist.findAll({ where: { chatId: req.chatId, notified: false }, attributes: ['tmdb_id'] }),
             Chat.findByPk(req.chatId)
@@ -709,6 +709,7 @@ router.get('/api/account/chats/:chatId/search', openChat, async (req, res) => {
                     tmdbId: id,
                     kind: r.media_type,
                     title: r.title || r.name || r.original_title || r.original_name || 'Untitled',
+                    englishTitle: r.englishTitle || '',
                     year: date.slice(0, 4) || null,
                     poster: r.poster_path || null,
                     overview: r.overview || '',

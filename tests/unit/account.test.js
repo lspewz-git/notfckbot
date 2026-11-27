@@ -2298,6 +2298,31 @@ test('a browser signed in only by digits stays new; a Telegram-confirmed sign-in
     assert.equal(deviceRows.length, 0);
 });
 
+test('account search preserves English names, query language and chat-scoped membership', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    t.mock.method(Chat, 'findByPk', async () => ({ type: 'private' }));
+    t.mock.method(Subscription, 'findAll', async () => [{ seriesId: 'tv_1' }]);
+    t.mock.method(Watchlist, 'findAll', async () => []);
+    const calls = [];
+    t.mock.method(require('../../src/api/tmdb'), 'searchPanel', async (query, language) => {
+        calls.push([query, language]);
+        return [{ id: 1, media_type: 'tv', name: 'Джек Ричер', englishTitle: 'Reacher' }];
+    });
+    const cookie = await signIn(call, 7);
+    for (const language of ['en', 'ru'])
+        for (const query of ['Ричер', 'Reacher']) {
+            const response = await call('GET', `/api/account/chats/7/search?q=${encodeURIComponent(query)}`, {
+                cookie,
+                language
+            });
+            assert.equal(response.status, 200);
+            assert.equal(response.body[0].englishTitle, 'Reacher');
+            assert.equal(response.body[0].added, true);
+            assert.deepEqual(calls.at(-1), [query, language === 'en' ? 'en-US' : 'ru-RU']);
+        }
+});
+
 test('a digit sign-in polled under another cookie still leaves its browser untrusted', async (t) => {
     const { server, call: plain } = await serve(fakeBot({}), { trustLoopback: true });
     const call = (method, path, options) => plain(method, path, { ...options, address: '10.9.9.8' });

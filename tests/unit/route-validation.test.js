@@ -122,3 +122,20 @@ test('the TMDB search takes one query', async () => {
     assert.equal(res.status, 400);
     assert.equal((await fetch(`${base}/api/tmdb/search`)).status, 400);
 });
+
+test('admin search forwards either query language and retains the English-name field', async (t) => {
+    const calls = [];
+    t.mock.method(require('../../src/api/tmdb'), 'searchPanel', async (query, language) => {
+        calls.push([query, language]);
+        return [{ id: 1, media_type: 'tv', name: 'Джек Ричер', englishTitle: 'Reacher' }];
+    });
+    for (const language of ['en', 'ru'])
+        for (const query of ['Ричер', 'Reacher']) {
+            const response = await fetch(`${base}/api/tmdb/search?q=${encodeURIComponent(query)}`, {
+                headers: { 'X-Panel-Language': language }
+            });
+            assert.equal(response.status, 200);
+            assert.equal((await response.json())[0].englishTitle, 'Reacher');
+            assert.deepEqual(calls.at(-1), [query, language === 'en' ? 'en-US' : 'ru-RU']);
+        }
+});

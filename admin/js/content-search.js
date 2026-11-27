@@ -1,4 +1,4 @@
-import { t as i18nText } from './i18n.js';
+import { t as i18nText, language } from './i18n.js';
 /** Shared search results and preview cards for the admin panel and My subscriptions. */
 import { $, escapeHtml } from './dom.js';
 import { openModal } from './ui.js';
@@ -105,6 +105,7 @@ export function searchItem(r) {
             r.original_name ||
             i18nText('Untitled'),
         year: date?.slice(0, 4) || null,
+        englishTitle: r.englishTitle || '',
         poster: r.poster_path || null,
         overview: r.overview || '',
         rating: r.vote_average || null,
@@ -141,6 +142,13 @@ export function searchResults(items, { open, series, film }) {
         '</h2><ul class="group-list title-list">' +
         items
             .map((r, index) => {
+                const englishTitle = typeof r.englishTitle === 'string' ? r.englishTitle.trim() : '';
+                const alternate =
+                    language !== 'en' &&
+                    englishTitle &&
+                    englishTitle.toLocaleLowerCase() !== r.title.trim().toLocaleLowerCase()
+                        ? `<span class="search-title-english" lang="en">${escapeHtml(englishTitle)}</span>`
+                        : '';
                 const attrs = `data-id="${escapeHtml(r.tmdbId)}" data-index="${index}"`;
                 const action = r.added
                     ? `<span class="search-following">${CHECK}${i18nText('Following')}</span>`
@@ -155,7 +163,7 @@ export function searchResults(items, { open, series, film }) {
                       '</span></button>';
                 return (
                     `<li><div class="group-row title-row search-row"><button type="button" class="search-result-open" data-action="${open}" ${attrs}>${titleThumb(r.poster)}` +
-                    `<span class="row-text"><span class="row-name">${escapeHtml(r.title)}</span><span class="row-meta">${escapeHtml(noteOf(r))}</span></span></button>${action}</div></li>`
+                    `<span class="row-text"><span class="row-name">${escapeHtml(r.title)}</span>${alternate}<span class="row-meta">${escapeHtml(noteOf(r))}</span></span></button>${action}</div></li>`
                 );
             })
             .join('') +

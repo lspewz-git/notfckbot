@@ -61,13 +61,14 @@ apiClient.interceptors.response.use(
     }
 );
 
-const searchMulti = async (query, language = 'ru-RU') => {
+const searchMulti = async (query, language = 'ru-RU', timeout = 15000) => {
     try {
         const response = await apiClient.get('/search/multi', {
             params: {
                 query: query,
                 language
-            }
+            },
+            timeout
         });
 
         // Return only movies and tv shows
@@ -76,6 +77,79 @@ const searchMulti = async (query, language = 'ru-RU') => {
         log.error(`TMDB API Error (searchMulti): ${error.message}`);
         throw error;
     }
+};
+
+// Only exceptional search matches need a translations lookup. Cache verified English text, not originals.
+const englishNameCache = lruCache({
+    max: 3000,
+    maxSize: 1024 * 1024,
+    sizeCalculation: (name) => Math.max(1, name.length * 2),
+    ttl: 6 * 60 * 60 * 1000,
+    fetchMethod: async (key) => {
+        const [kind, id] = key.split(':');
+        const { data } = await apiClient.get(`/${kind}/${id}/translations`, { timeout: 2000 });
+        const field = kind === 'tv' ? 'name' : 'title';
+        const english = (data.translations || []).filter(
+            (r) => r.iso_639_1 === 'en' && typeof r.data?.[field] === 'string' && r.data[field].trim()
+        );
+        const translation = english.find((r) => r.iso_3166_1 === 'US') || english[0];
+        const name = translation?.data[field].trim();
+        if (!name) throw new Error('English catalog name unavailable');
+        return name;
+    }
+});
+
+/** TMDB searches translated/alternative names regardless of the response language. */
+const searchPanel = async (query, language = 'en-US') => {
+    const deadline = Date.now() + 5000;
+    const selected = searchMulti(query, language, 5000);
+    if (/^en(?:-|$)/i.test(language)) return selected;
+    // One extra search supplies English names in bulk, joined by identity rather than ranking.
+    const [results, english] = await Promise.all([selected, searchMulti(query, 'en-US', 5000).catch(() => [])]);
+    const rows = results.slice(0, 20);
+    const matches = new Map(english.map((r) => [`${r.media_type}:${r.id}`, r]));
+    const names = new Map();
+    const jobs = [];
+    for (const row of rows) {
+        const key = `${row.media_type}:${row.id}`;
+        const match = matches.get(key);
+        const name = (row.media_type === 'tv' ? match?.name : match?.title)?.trim();
+        const original = match?.original_name || match?.original_title || row.original_name || row.original_title;
+        if (name && ((match?.original_language || row.original_language) === 'en' || name !== original))
+            names.set(key, name);
+        else if (row.original_language === 'en' && (row.original_title || row.original_name))
+            names.set(key, row.original_title || row.original_name);
+        else {
+            const previous = englishNameCache.get(key, { allowStale: true, noDeleteOnStaleGet: true });
+            if (previous) names.set(key, previous);
+            jobs.push(key);
+        }
+    }
+    let next = 0;
+    async function worker() {
+        while (next < jobs.length && Date.now() < deadline) {
+            const key = jobs[next++];
+            try {
+                names.set(key, await fetchFresh(englishNameCache, key));
+            } catch {
+                // Optional English copy must not hide the selected-language search results.
+            }
+        }
+    }
+    let timer;
+    try {
+        if (jobs.length && Date.now() < deadline)
+            await Promise.race([
+                Promise.all(Array.from({ length: Math.min(4, jobs.length) }, worker)),
+                new Promise((resolve) => {
+                    timer = setTimeout(resolve, Math.max(0, deadline - Date.now()));
+                })
+            ]);
+    } finally {
+        clearTimeout(timer);
+    }
+    // Late lookups only warm the cache; every response gets independent immutable name values.
+    return rows.map((r) => ({ ...r, englishTitle: names.get(`${r.media_type}:${r.id}`) || '' }));
 };
 
 // Independent, bounded panel copy cache. Never seed or overwrite the bot's Russian/factual caches.
@@ -455,6 +529,7 @@ async function refreshSeasons(tvId, seasons, language = 'ru-RU') {
 }
 
 module.exports = {
+    searchPanel,
     getPanelText,
     tmdbPoster,
     hasSeason,

@@ -128,7 +128,7 @@ router.get('/api/tmdb/search', async (req, res) => {
     if (!query) return;
     const { q } = query;
     try {
-        const results = await tmdb.searchMulti(q, req.get('X-Panel-Language') === 'en' ? 'en-US' : 'ru-RU');
+        const results = await tmdb.searchPanel(q, req.get('X-Panel-Language') === 'en' ? 'en-US' : 'ru-RU');
         log.info(`[Admin] Search results for "${q}": ${results.length} items found.`);
         res.json(results);
     } catch (err) {
