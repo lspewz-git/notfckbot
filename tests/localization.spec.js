@@ -137,6 +137,7 @@ test('a Telegram-looking browser URL cannot change the browser language', async 
 
 test('Russian plural forms and English fallback preserve substitutions', async ({ page }) => {
     await mockPanel(page, { role: 'user', language: 'ru' });
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
     await expect(page.locator('#login-gate')).toBeHidden();
     const labels = await page.evaluate(async () => {
         const { t } = await import('/js/i18n.js');

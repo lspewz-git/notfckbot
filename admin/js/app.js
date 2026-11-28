@@ -3,42 +3,20 @@ import { t as i18nText } from './i18n.js';
 
 import { $, all, closest } from './dom.js';
 import { translatePage } from './i18n.js';
-import { runCheckNow, openFailingService } from './dashboard.js';
-import { fetchData, setSection } from './data.js';
-import { setSubsChart, openRecentSends } from './dashboard-charts.js';
-import { setupFilters, setTableTab, setTableSort, setTablePage } from './tables.js';
+import { fetchData, setSection, loadAdmin } from './data.js';
 import { fillPagers } from './pager.js';
-import { filterLogs } from './logs.js';
 import { setHistoryYear, setHistoryPage, setupHistory, openHistoryTitle } from './history.js';
-import { pickPeriod, confirmSendOne } from './chat-stats.js';
-import { openRecapSend, pickRecapYear, confirmSendAll, stopRecapSend } from './recap.js';
-import { recapCardActions, setupRecapCards, openRecapSection, recapSendYear } from './recap-cards.js';
-import { recapScheduleActions, setupRecapSchedule } from './recap-schedule.js';
-import { settingsActions, setupSettings, hasUnsavedSettings, discardSettings } from './settings.js';
-import { accessActions, setupAccess } from './access.js';
-import { alertsActions, setupAlerts } from './alerts.js';
 import {
     openModal,
     closeModal,
     closeModalReturning,
     dismissChatModals,
     dismissTopLayer,
-    setReturnTo,
     showConfirm,
+    toast,
     setupKeyboardWatch
 } from './ui.js';
 import { enhanceSelects } from './select.js';
-import { setupProxyForm, openProxyModal } from './proxy.js';
-import { openServiceModal, setupServiceDialog } from './services.js';
-import {
-    openChatActions,
-    openAddContentFor,
-    openContentChats,
-    searchContent,
-    selectContent,
-    submitAddContent,
-    setupChatSettingsForm
-} from './chats.js';
 import {
     openSeriesDetails,
     openFilmDetails,
@@ -47,9 +25,7 @@ import {
     deleteSub,
     deleteWatchlistItem
 } from './records.js';
-import { triggerCheck, openBroadcastModal, sendBroadcast } from './maintenance.js';
 import { openAbout, loadAbout } from './about.js';
-import { openTestNotifyModal, setupTestNotifyDialog, selectSearchSeries } from './test-notify.js';
 import { accountActions, setupAccount, searchAccount } from './account.js';
 import { startSession, watchSession, sessionActions, launchedInChat } from './session.js';
 import { passwordActions, setupPassword } from './password.js';
@@ -69,6 +45,8 @@ const REFRESH_SECONDS = 10;
 
 let activeSection = 'dashboard';
 let activeView = 'admin';
+/** @type {typeof import('./admin.js') | null} */
+let adminPanel = null;
 
 // An admin has two views: the admin panel and "My account" (their own chats, what a user sees).
 // Shared account pages keep the current view; chat tabs explicitly enter personal mode.
@@ -87,14 +65,14 @@ const SYSTEM_PAGES = ['my-profile', 'my-account', 'my-devices'];
 
 function switchSection(id) {
     // Leaving Settings with changes not saved: ask, rather than lose them silently
-    if (activeSection === 'settings' && id !== 'settings' && hasUnsavedSettings()) {
+    if (activeSection === 'settings' && id !== 'settings' && adminPanel?.hasUnsavedSettings()) {
         showConfirm({
             title: i18nText('Leave without saving?'),
             text: i18nText('The changes in Settings will be lost.'),
             confirmLabel: i18nText('Discard changes'),
             cancelLabel: i18nText('Stay'),
             onConfirm: () => {
-                discardSettings();
+                adminPanel.discardSettings();
                 switchSection(id);
             }
         });
@@ -125,7 +103,7 @@ function switchSection(id) {
         if (on) n.setAttribute('aria-current', own ? 'page' : 'true');
         else n.removeAttribute('aria-current');
     });
-    if (id === 'recap') openRecapSection();
+    if (id === 'recap') adminPanel?.openRecapSection();
     fetchData();
 }
 
@@ -187,7 +165,6 @@ function startTimer() {
 // Generated markup carries data-* attributes only, so nothing has to be
 // reachable from the global scope and no value ends up inside executable code.
 const CLICK_ACTIONS = {
-    'chat-actions': (el) => openChatActions(el.dataset.id),
     'view-admin': () => switchSection(lastSection.admin),
     'view-mine': () => switchSection(lastSection.mine),
     series: (el) => openSeriesDetails(el.dataset.id, el),
@@ -196,30 +173,9 @@ const CLICK_ACTIONS = {
     'sub-actions': (el) => openSubActions(el.dataset.key),
     'delete-sub': (el) => deleteSub(el.dataset.chat, el.dataset.series),
     'delete-film': (el) => deleteWatchlistItem(el.dataset.id),
-    sort: (el) => setTableSort(el.dataset.table, el.dataset.sort),
-    page: (el) => setTablePage(el.dataset.table, Number(el.dataset.step)),
-    'content-chat-open': () => openContentChats(),
-    'select-content': (el) => selectContent(Number(el.dataset.index)),
-    'add-content-film': (el) => selectContent(Number(el.dataset.index), true),
-    'submit-content': () => submitAddContent(),
-    'add-content': (el) => openAddContentFor(el.dataset.kind === 'tv' ? 'tv' : 'movie'),
     'history-open': openHistoryTitle,
     'history-year': (el) => setHistoryYear(Number(el.dataset.year), el),
     'history-page': (el) => setHistoryPage(el.dataset.list, Number(el.dataset.step), el),
-    'chat-stats-period': (el) => pickPeriod(el.dataset.period),
-    'recap-send-one': (el) => confirmSendOne(el.dataset.again === 'true'),
-    'recap-send-open': () => {
-        const year = recapSendYear();
-        if (year !== null) openRecapSend(year);
-    },
-    'recap-send-year': (el) => pickRecapYear(el.dataset.year),
-    'recap-send-all': () => confirmSendAll(),
-    'recap-send-stop': () => stopRecapSend(),
-    ...settingsActions,
-    ...accessActions,
-    ...alertsActions,
-    ...recapCardActions,
-    ...recapScheduleActions,
     ...accountActions,
     ...passwordActions,
     ...pickActions,
@@ -228,19 +184,7 @@ const CLICK_ACTIONS = {
     ...deviceActions,
     ...titleCardActions,
     ...sessionActions(afterSignIn),
-    'chart-subs': (el) => setSubsChart(el.dataset.by),
-    'sends-recent': () => openRecentSends(),
-    'select-test-search-series': (el) => selectSearchSeries(Number(el.dataset.index)),
-    proxy: () => openProxyModal(),
-    about: () => loadAbout(),
-    service: (el) =>
-        openServiceModal(el.dataset.service, {
-            label: el.dataset.label,
-            restarts: el.dataset.restarts === 'true',
-            keyless: el.dataset.keyless === 'true',
-            statusUrl: el.dataset.statusUrl,
-            statusLabel: el.dataset.statusLabel
-        })
+    about: () => loadAbout()
 };
 
 const DELEGATED =
@@ -261,9 +205,9 @@ function setupDelegation() {
         }
         if (action && CLICK_ACTIONS[action]) CLICK_ACTIONS[action](el);
         // Before the section switch, so the dashboard card lands on the right tab
-        if (subsTab) setTableTab('subs', subsTab);
-        if (filmsTab) setTableTab('films', filmsTab);
-        if (chatsTab) setTableTab('chats', chatsTab);
+        if (subsTab) adminPanel?.setTableTab('subs', subsTab);
+        if (filmsTab) adminPanel?.setTableTab('films', filmsTab);
+        if (chatsTab) adminPanel?.setTableTab('chats', chatsTab);
         if (section) {
             switchSection(section);
             // iOS opens the keyboard only while handling the tap, after the field is visible.
@@ -276,7 +220,7 @@ function setupDelegation() {
         if (closeReturn) closeModalReturning(closeReturn);
         // After any close, so a menu row can swap its sheet for the dialog it names
         if (open) openModal(open);
-        if (logFilter) filterLogs(logFilter);
+        if (logFilter) adminPanel?.filterLogs(logFilter);
     });
 
     // A click on the dimmed backdrop dismisses the dialog. The press must also
@@ -314,8 +258,6 @@ function setupControls() {
         }
         updateAutoRefreshSwitch();
     };
-    $('run-check').onclick = () => runCheckNow(fetchData);
-    $('service-alert-action').onclick = openFailingService;
 
     $('refresh-btn').onclick = refreshNow;
     setupPullRefresh(refreshNow);
@@ -323,19 +265,8 @@ function setupControls() {
 
     $('actions-btn').onclick = () => openModal('actions-modal');
     $('about-btn').onclick = openAbout;
-    $('trigger-btn').onclick = triggerCheck;
-    $('broadcast-btn').onclick = openBroadcastModal;
-    $('test-notify-btn').onclick = () => {
-        closeModal('actions-modal');
-        setReturnTo(() => openModal('actions-modal'));
-        openTestNotifyModal();
-    };
-    $('send-broadcast').onclick = sendBroadcast;
 
-    setupServiceDialog();
-    setupTestNotifyDialog();
-
-    setupSearchForms({ admin: searchContent, account: searchAccount });
+    setupSearchForms({ account: searchAccount });
 }
 
 // --- Boot ---
@@ -354,7 +285,17 @@ function sectionFromHash(role) {
  * Once signed in: the section in the address (a reload keeps the tab), else an admin's panel opens
  * on the dashboard and a user's on Calendar, the first personal tab.
  */
-function afterSignIn(role) {
+async function afterSignIn(role) {
+    if (role === 'admin') {
+        try {
+            adminPanel = await loadAdmin();
+            Object.assign(CLICK_ACTIONS, adminPanel.adminActions);
+        } catch {
+            toast(i18nText('Failed to load. Retrying on the next refresh.'), 'error');
+            return;
+        }
+    }
+    enhanceSelects();
     activeView = role === 'admin' && window.history.state?.view !== 'mine' ? 'admin' : 'mine';
     // Opened from a group (a Mini App or a group's sign-in link): that chat's Calendar
     const start = !launchedInChat() && role === 'admin' ? activeSection : DEFAULT_PERSONAL_SECTION;
@@ -368,22 +309,13 @@ async function init() {
     fillPagers();
     setupControls();
     setupDelegation();
-    setupFilters();
     // Before enhanceSelects(), like setupFilters: the styled dropdowns start on the remembered size
     setupHistory();
-    setupSettings();
-    setupAccess();
-    setupAlerts();
-    setupRecapCards();
-    setupRecapSchedule();
-    setupChatSettingsForm();
-    setupProxyForm();
     setupAccount();
     setupProfile();
     setupPosterViewer();
     setupPassword();
     watchSession();
-    enhanceSelects();
     updateAutoRefreshSwitch();
     startTimer();
 
@@ -397,7 +329,7 @@ async function init() {
     // Who is signed in first: the sign-in screen, an admin's panel or a user's own chats. The initial
     // load runs even though auto-refresh starts paused
     const role = await startSession();
-    if (role) afterSignIn(role);
+    if (role) await afterSignIn(role);
 }
 
 init();

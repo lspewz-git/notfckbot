@@ -1172,7 +1172,7 @@ async function mockPanel(page, options = {}) {
         const asked = options.files && options.files[rel];
         if (asked === 'missing') return route.abort();
         if (asked) await asked;
-        const file = path.join(ADMIN_DIR, rel);
+        const file = path.join(ADMIN_DIR, options.built && (isPage || rel.startsWith('assets/')) ? 'dist' : '', rel);
         if (!file.startsWith(ADMIN_DIR) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: '' });
 
         return route.fulfill({

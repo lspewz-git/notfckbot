@@ -845,7 +845,12 @@ test('the Terms: the panel answers 428 until the current versions are accepted; 
         (await call('POST', '/api/account/terms', { cookie: user, body: { source: 'cookie-banner' } })).status,
         400
     );
-    const ok = await call('POST', '/api/account/terms', { cookie: user, body: { source: 'signin' }, ua: 'Test' });
+    const versions = { termsVersion: terms.TERMS_VERSION, privacyVersion: terms.PRIVACY_VERSION };
+    const ok = await call('POST', '/api/account/terms', {
+        cookie: user,
+        body: { source: 'signin', ...versions },
+        ua: 'Test'
+    });
     assert.equal(ok.status, 200);
     assert.deepEqual(
         acceptances.map(({ userId, termsVersion, privacyVersion, source, userAgent }) => ({
@@ -866,7 +871,7 @@ test('the Terms: the panel answers 428 until the current versions are accepted; 
         ]
     );
     assert.equal((await call('GET', '/api/account/chats', { cookie: user })).status, 200);
-    await call('POST', '/api/account/terms', { cookie: user, body: { source: 'signin' } });
+    await call('POST', '/api/account/terms', { cookie: user, body: { source: 'signin', ...versions } });
     assert.equal(acceptances.length, 1, 'accepted already: no second row');
 
     // An older version accepted: "Before you start" says the documents were updated
@@ -878,13 +883,40 @@ test('the Terms: the panel answers 428 until the current versions are accepted; 
     assert.equal((await call('POST', '/api/logout', { cookie: user })).status, 200);
 });
 
+test('stale or versionless clients cannot accept documents they have not displayed', async (t) => {
+    const { server, call } = await serve(fakeBot({}));
+    t.after(() => server.close());
+    acceptances = [];
+    const user = await signIn(call, 7);
+    for (const versions of [
+        {},
+        { termsVersion: terms.TERMS_VERSION, privacyVersion: '2026-11-18' },
+        { termsVersion: '2026-01-01', privacyVersion: terms.PRIVACY_VERSION }
+    ]) {
+        const result = await call('POST', '/api/account/terms', {
+            cookie: user,
+            body: { source: 'before-you-start', ...versions }
+        });
+        assert.equal(result.status, 409);
+        assert.equal(result.body.reload, true);
+        assert.equal(acceptances.length, 0);
+    }
+});
+
 test('the Terms: the system account needs none; the page shows the date the server records', async () => {
     assert.equal(await terms.termsState({ userId: '0', system: true }), 'ok');
     const page = require('fs').readFileSync(require.resolve('../../admin/js/legal.js'), 'utf8');
-    const shown = /const VERSION = '(\d+) (\w+) (\d{4})'/.exec(page);
-    const date = new Date(`${shown[2]} ${shown[1]}, ${shown[3]} UTC`).toISOString().slice(0, 10);
-    assert.equal(date, terms.TERMS_VERSION);
-    assert.equal(date, terms.PRIVACY_VERSION);
+    for (const document of ['TERMS_VERSION', 'PRIVACY_VERSION']) {
+        const shown = new RegExp(`const ${document} = '(\\d+) (\\w+) (\\d{4})'`).exec(page);
+        assert.ok(shown, `${document} has an explicit display date`);
+        const date = new Date(`${shown[2]} ${shown[1]}, ${shown[3]} UTC`).toISOString().slice(0, 10);
+        assert.equal(date, terms[document]);
+    }
+    for (const [field, version] of [
+        ['termsVersion', terms.TERMS_VERSION],
+        ['privacyVersion', terms.PRIVACY_VERSION]
+    ])
+        assert.match(page, new RegExp(`${field}: '${version}'`));
 });
 
 test('the API: a session for everything but signing in; the panel itself for admins only', async (t) => {

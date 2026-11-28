@@ -618,7 +618,7 @@ test('no way in starts before the Terms checkbox; its links open the documents a
     await page.locator('[data-action="login-code"]:enabled').click();
     await expect(page.locator('#login-gate')).toBeHidden({ timeout: 10000 });
     expect(panel.account.sent.filter((r) => r.path === '/api/account/terms').map((r) => r.body)).toEqual([
-        { source: 'signin' }
+        { source: 'signin', termsVersion: '2026-11-18', privacyVersion: '2026-11-28' }
     ]);
     // The session ends: the next person finds the box empty
     panel.account.signedIn = false;
@@ -641,7 +641,7 @@ test('"Before you start": signed in without the Terms, Continue records them and
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page.locator('#login-gate')).toBeHidden();
     expect(panel.account.sent.filter((r) => r.path === '/api/account/terms').map((r) => r.body)).toEqual([
-        { source: 'before-you-start' }
+        { source: 'before-you-start', termsVersion: '2026-11-18', privacyVersion: '2026-11-28' }
     ]);
     // Nothing of the panel was asked for before that
     const first = panel.account.sent.findIndex((r) => r.path === '/api/account/terms');

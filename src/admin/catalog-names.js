@@ -6,6 +6,8 @@ const catalogId = (id) => (/^(tv|movie)_[1-9]\d{0,9}$/.test(String(id || '')) ? 
 const seriesId = (id) => catalogId(id) || (/^[1-9]\d{0,9}$/.test(String(id || '')) ? `tv_${id}` : null);
 
 function createPanelLocalizer(lookup = (...args) => tmdb.getPanelText(...args), budgetMs = 4500) {
+    let active = 0;
+    const waiting = [];
     // Names have a larger, much smaller-per-entry cache than full descriptions. Languages never share keys.
     const names = lruCache({
         max: 3000,
@@ -13,11 +15,23 @@ function createPanelLocalizer(lookup = (...args) => tmdb.getPanelText(...args), 
         sizeCalculation: (name) => Math.max(1, name.length * 2),
         ttl: 6 * 60 * 60 * 1000,
         fetchMethod: async (key) => {
-            const [kind, id, language] = key.split(':');
-            const copy = await lookup(id, kind, language);
-            const title = typeof copy?.title === 'string' ? copy.title.trim() : '';
-            if (!title) throw new Error('Catalog name unavailable');
-            return title;
+            if (active < 4) active++;
+            else {
+                if (waiting.length >= 128) throw new Error('Catalog name queue full');
+                await new Promise((resolve) => waiting.push(resolve));
+            }
+            try {
+                const [kind, id, language] = key.split(':');
+                const copy = await lookup(id, kind, language);
+                const title = typeof copy?.title === 'string' ? copy.title.trim() : '';
+                if (!title) throw new Error('Catalog name unavailable');
+                return title;
+            } finally {
+                // Hand the reserved slot to a waiter before accepting another request.
+                const next = waiting.shift();
+                if (next) next();
+                else active--;
+            }
         }
     });
 
@@ -66,6 +80,10 @@ function createPanelLocalizer(lookup = (...args) => tmdb.getPanelText(...args), 
             while (next < jobs.length && Date.now() < deadline) {
                 const id = jobs[next++];
                 const key = `${id.replace('_', ':')}:${language}`;
+                if (resolved.has(id)) {
+                    names.fetch(key, { allowStale: true }).catch(() => {});
+                    continue;
+                }
                 try {
                     const name = await fetchFresh(names, key);
                     if (name) resolved.set(id, name);

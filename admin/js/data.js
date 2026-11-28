@@ -1,128 +1,45 @@
+/** Visible-section loading and refreshes after a change. */
 import { t as i18nText } from './i18n.js';
-/** What gets fetched, when, and what happens after a mutating call. */
-
 import { api } from './api.js';
 import { toast } from './ui.js';
-import { renderTable, renderSkeleton, renderTableMessage } from './tables.js';
-import {
-    updateStats,
-    updateHealth,
-    updatePopular,
-    updateUpcoming,
-    updateCron,
-    statsFailed,
-    listFailed
-} from './dashboard.js';
-import { setLogs, renderLogs } from './logs.js';
-import { loadHistory } from './history.js';
-import { updateCharts, chartsFailed } from './dashboard-charts.js';
-import { loadSettings } from './settings.js';
-import { loadAccess } from './access.js';
-import { loadAlerts } from './alerts.js';
 import { loadMine } from './account.js';
-
-// Which /api/data/:type each section needs, if any
-const SECTION_TABLES = {
-    chats: 'chats',
-    subs: 'subs',
-    watchlist: 'films'
-};
 
 let currentSection = 'dashboard';
 export const setSection = (id) => {
     currentSection = id;
 };
+let adminPromise = null;
+export function loadAdmin() {
+    return (adminPromise ||= import('./admin.js')
+        .then((module) => {
+            module.setupAdmin();
+            return module;
+        })
+        .catch((err) => {
+            adminPromise = null;
+            throw err;
+        }));
+}
 
-/** A failed request's fallback, then the error on as before (logged below). */
-const orElse = (fallback) => (err) => {
-    fallback();
-    throw err;
-};
-
-// Tables that have received a response at least once
-const loadedTables = new Set();
-
-/**
- * Requests only what the visible section renders. This matters more than it
- * looks: /api/health probes Telegram and TMDB over the network on every call,
- * and it used to run every 10s regardless of which page was open.
- */
 export async function fetchData() {
-    // Started before the awaits below so its skeleton paints in this same tick
-    const table = SECTION_TABLES[currentSection];
-    if (table) fetchTypedData(table);
-
-    const jobs = [];
-    if (currentSection === 'dashboard') {
-        jobs.push(api('/stats').then(updateStats, orElse(statsFailed)));
-        jobs.push(api('/stats/charts').then(updateCharts, orElse(chartsFailed)));
-        // One request per service: each badge updates as soon as its own service answers
-        for (const service of ['telegram', 'tmdb', 'tvmaze', 'kinopoisk', 'proxy']) {
-            jobs.push(api(`/health/${service}`).then(updateHealth));
-        }
-        jobs.push(
-            api('/stats/popular').then(
-                updatePopular,
-                orElse(() => listFailed('popular-list'))
-            )
-        );
-        jobs.push(
-            api('/upcoming').then(
-                updateUpcoming,
-                orElse(() => listFailed('upcoming-list'))
-            )
-        );
-        jobs.push(api('/cron').then(updateCron));
-    }
-    if (currentSection === 'history') jobs.push(loadHistory());
-    // The user's own chats (account.js)
-    if (currentSection.startsWith('my-')) jobs.push(loadMine(currentSection));
-    if (currentSection === 'settings') jobs.push(loadSettings(), loadAlerts(), loadAccess());
-    if (currentSection === 'logs') {
-        jobs.push(
-            api('/logs').then((logs) => {
-                setLogs(logs);
-                renderLogs();
-            })
-        );
-    }
-
-    const results = await Promise.allSettled(jobs);
-    results.forEach((r) => {
-        if (r.status === 'rejected') console.error(i18nText('Fetch error:'), r.reason);
-    });
-}
-
-async function fetchTypedData(type) {
-    // Only on the first load of this table: the 10s poll would otherwise
-    // replace real rows with a shimmer every time it fires.
-    if (!loadedTables.has(type)) renderSkeleton(type);
-
+    if (document.body.classList.contains('signed-out')) return;
+    const section = currentSection;
     try {
-        const data = await api(`/data/${type}`);
-        loadedTables.add(type);
-        renderTable(type, data);
+        if (section.startsWith('my-')) await loadMine(section);
+        else await (await loadAdmin()).fetchAdminData(section);
     } catch (err) {
-        console.error(i18nText('Error loading {{v0}}:', { v0: type }), err);
-        // Leave a dead end rather than an animation that never stops
-        if (!loadedTables.has(type))
-            renderTableMessage(type, i18nText('Failed to load. Retrying on the next refresh.'));
+        console.error(i18nText('Fetch error:'), err);
     }
 }
 
-/**
- * A mutating call plus the three things that always follow it: report the
- * outcome, refresh the view, hand back the payload (null if it failed).
- * `success` may be a string or a function of the response.
- */
 export async function mutate(path, options, success) {
     try {
         const data = await api(path, options);
         if (success) toast(typeof success === 'function' ? success(data) : success, 'success');
         fetchData();
         return data;
-    } catch (e) {
-        toast(e.message || i18nText('Request failed'), 'error');
+    } catch (err) {
+        toast(err.message || i18nText('Request failed'), 'error');
         return null;
     }
 }

@@ -1,4 +1,14 @@
 # Posters cached on the server (src/admin/posters.js): the folder is mounted, not baked in
+node_modules/
+.git/
+.claude/
+.codex/
+.agents/
+CLAUDE.md
+AGENTS.md
+previews/
+test-results/
+playwright-report/
 data/
 panel-tls/
 # Compose mounts the live configuration. Keep credentials and its backups out of image layers.

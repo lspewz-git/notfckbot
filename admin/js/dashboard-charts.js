@@ -187,24 +187,37 @@ function renderAll() {
     renderSent();
 }
 
-/** New data from /api/stats/charts; drawn once Chart.js is there (it may come after the data). */
-export function updateCharts(next) {
-    if (isUnchanged('charts', next)) return;
+let loading = null;
+/** Chart.js is needed only when the dashboard has chart data. */
+export async function updateCharts(next) {
+    if (isUnchanged('charts', next) && ChartJs()) return;
     data = next;
-    if (ChartJs()) renderAll();
+    if (!ChartJs()) {
+        loading ||= new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = $('chartjs').dataset.src;
+            script.onload = resolve;
+            script.onerror = () => {
+                script.remove();
+                reject(new Error('Chart.js unavailable'));
+            };
+            document.head.append(script);
+        });
+        try {
+            await loading;
+        } catch {
+            loading = null;
+            all('.chart-skeleton').forEach((el) => el.remove());
+            return;
+        }
+    }
+    renderAll();
 }
 
 /** /api/stats/charts failed: no placeholder bars for a chart that has never come. */
 export function chartsFailed() {
     if (!data) all('.chart-skeleton').forEach((el) => el.remove());
 }
-
-// Chart.js arriving after the data: draw then. Its file not loading at all: no placeholders left
-// standing for charts that will never come (the page's load waits for every script, failed or not)
-document.getElementById('chartjs')?.addEventListener('load', () => data && renderAll());
-window.addEventListener('load', () => {
-    if (!ChartJs()) all('.chart-skeleton').forEach((el) => el.remove());
-});
 
 /** The Weeks / Months buttons. */
 export function setSubsChart(by) {

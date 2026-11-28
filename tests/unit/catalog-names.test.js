@@ -1,5 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { setImmediate: nextTurn } = require('node:timers/promises');
 const { createPanelLocalizer } = require('../../src/admin/catalog-names');
 const request = (language) => ({ get: () => language });
 
@@ -90,7 +91,13 @@ for (const outcome of ['slow', 'empty']) {
         Date.now = () => realNow() + 21600001;
         expired = true;
         try {
-            const result = await localize(request('en'), payload);
+            const pending = localize(request('en'), payload);
+            assert.equal(
+                await Promise.race([pending.then(() => true), nextTurn().then(() => false)]),
+                true,
+                'known names return without waiting for the refresh'
+            );
+            const result = await pending;
             assert.equal(result[0].title, 'Known translation');
             assert.equal(
                 (await localize(request('en'), payload))[0].title,
@@ -140,4 +147,36 @@ test('legacy upcoming ids use the explicit media kind while person ids stay unto
         ['66732', 'tv'],
         ['7', 'movie']
     ]);
+});
+
+test('expired known names return immediately while all background refreshes share four slots', async () => {
+    let expired = false,
+        active = 0,
+        peak = 0,
+        release;
+    const gate = new Promise((resolve) => {
+        release = resolve;
+    });
+    const localize = createPanelLocalizer(async (id) => {
+        if (expired) {
+            peak = Math.max(peak, ++active);
+            await gate;
+            active--;
+        }
+        return { title: `Known ${id}` };
+    });
+    const payload = Array.from({ length: 20 }, (_, index) => ({ id: `tv_${index + 1}`, title: 'Stored' }));
+    await localize(request('en'), payload);
+    const realNow = Date.now;
+    Date.now = () => realNow() + 21600001;
+    expired = true;
+    try {
+        const result = await localize(request('en'), payload);
+        assert.equal(result[19].title, 'Known 20');
+        assert.ok(peak <= 4, `${peak} provider calls in parallel`);
+    } finally {
+        Date.now = realNow;
+        release();
+        for (let i = 0; i < 20; i++) await nextTurn();
+    }
 });

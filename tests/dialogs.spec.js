@@ -180,6 +180,7 @@ test('on a touch screen closing a dialog leaves no focus ring on what opened it'
 
 test('scrolling in an open dialog leaves the page behind it where it was', async ({ page }) => {
     await mockPanel(page);
+    await expect(page.locator('#chats-count')).toHaveText('3');
     // Room to scroll, so a page that moves shows it
     await page.evaluate(() => {
         document.body.style.minHeight = '3000px';

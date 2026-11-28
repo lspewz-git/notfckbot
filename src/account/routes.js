@@ -332,8 +332,21 @@ router.get('/api/account/content/:kind/:id', async (req, res) => {
 
 // The Terms of Service and the Privacy Policy accepted: the checkbox on the sign-in screen or "Before you start"
 router.post('/api/account/terms', async (req, res) => {
-    const body = valid(z.object({ source: z.enum(terms.SOURCES) }), req.body, res);
+    const body = valid(
+        z.object({
+            source: z.enum(terms.SOURCES),
+            termsVersion: z.string().max(64).optional(),
+            privacyVersion: z.string().max(64).optional()
+        }),
+        req.body,
+        res
+    );
     if (!body) return;
+    if (body.termsVersion !== terms.TERMS_VERSION || body.privacyVersion !== terms.PRIVACY_VERSION)
+        return res.status(409).json({
+            error: 'The documents have changed. Reload the panel to read and accept the current versions.',
+            reload: true
+        });
     try {
         // Already accepted: no second row
         if ((await terms.termsState(req.user)) !== 'ok') await terms.acceptTerms(req, body.source);

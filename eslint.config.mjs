@@ -89,11 +89,11 @@ const RULES = {
 
 export default [
     // admin/vendor: third-party builds (Chart.js), as published
-    { ignores: ['node_modules/**', 'admin/vendor/**'] },
+    { ignores: ['node_modules/**', 'admin/vendor/**', 'admin/dist/**'] },
 
     {
         // Bot, API, cron, one-off maintenance scripts
-        files: ['src/**/*.js', '*.js'],
+        files: ['src/**/*.js', 'scripts/**/*.js', '*.js'],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: 'commonjs',

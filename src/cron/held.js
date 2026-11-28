@@ -8,6 +8,7 @@ const { Markup } = require('telegraf');
 const { HeldNotification, Chat } = require('../db');
 const { deliver } = require('../delivery');
 const { isQuietNow } = require('../quiet');
+const { isLeft } = require('../bot-status');
 const { recordFailure, recordSent } = require('../send-failures');
 const { log } = require('../log');
 const { neutralizeStoredStatus } = require('./messages');
@@ -62,6 +63,7 @@ async function releaseHeld(bot, now = new Date()) {
         }
         for (const [chatId, items] of byChat) {
             const chat = await Chat.findByPk(chatId);
+            if (isLeft(chat)) continue;
             if (chat && isQuietNow(chat, now)) continue;
             const { text, keyboard } = heldView(items);
             const result = await deliver(bot, chatId, text, { extra: keyboard });

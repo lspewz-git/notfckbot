@@ -1,10 +1,12 @@
 import { t as i18nText } from './i18n.js';
-// The same date as TERMS_VERSION and PRIVACY_VERSION in src/account/terms.js (a unit test checks it)
-const VERSION = '18 November 2026';
-const EDITION =
+// Match the independent document versions in src/account/terms.js.
+const TERMS_VERSION = '18 November 2026';
+const PRIVACY_VERSION = '28 November 2026';
+export const acceptanceVersions = { termsVersion: '2026-11-18', privacyVersion: '2026-11-28' };
+const edition = (version) =>
     '<p class="legal-meta">' +
     ('<span>' +
-        i18nText('Version dated {{v0}}. Effective from the date of publication.', { v0: i18nText(VERSION) }) +
+        i18nText('Version dated {{v0}}. Effective from the date of publication.', { v0: i18nText(version) }) +
         '</span></p>');
 
 /** One record kept in the browser: its name, kind, what it's for and how long it stays. */
@@ -16,7 +18,7 @@ const CONTACT = '<a href="mailto:info@notfck.top">info@notfck.top</a>';
 export const TERMS = {
     title: i18nText('Terms of Service'),
     body:
-        EDITION +
+        edition(TERMS_VERSION) +
         '\n        <h2>' +
         i18nText('About NotFckBot') +
         '</h2>\n        <p>' +
@@ -94,7 +96,7 @@ export const TERMS = {
 export const PRIVACY = {
     title: i18nText('Privacy Policy'),
     body:
-        EDITION +
+        edition(PRIVACY_VERSION) +
         '\n        <p>' +
         i18nText(
             'This policy covers the NotFckBot Telegram bot, Mini App, and web panel. An individual operates the service. For questions or requests about your personal data, email {{v1}}.',
@@ -171,16 +173,13 @@ export const PRIVACY = {
             'We send search phrases to TMDB. To look up title details, posters, release dates, and links, we use names or IDs of films and series in requests to TMDB, TVmaze, Wikidata, and an API that provides Kinopoisk data.'
         ) +
         '</p>\n        <p><strong>' +
-        i18nText('Google Fonts.') +
+        i18nText('Fonts.') +
         '</strong>' +
         ' ' +
         i18nText(
-            'The panel and Mini App load fonts from Google Fonts. The browser may send your IP address and technical request headers to Google. See'
+            'The panel and Mini App load fonts from the same server as the panel. Loading fonts does not send requests to Google Fonts.'
         ) +
-        ' ' +
-        '<a href="https://developers.google.com/fonts/faq/privacy" target="_blank" rel="noopener noreferrer">' +
-        i18nText('Google Fonts and privacy') +
-        '</a>.</p>\n        <p><strong>' +
+        '</p>\n        <p><strong>' +
         i18nText('Service infrastructure.') +
         '</strong>' +
         ' ' +

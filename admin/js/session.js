@@ -17,7 +17,7 @@ import { setChats, chatsFailed, resetChatChoice, setLaunchTitle } from './accoun
 import { signInForm, submitSignIn, setMe, loginAlert, setLoginAlert, syncSignInButton } from './password.js';
 import { setProfile } from './profile.js';
 import { setupTelegramBack, syncTelegramBack } from './tg-back.js';
-import { PRIVACY, TERMS } from './legal.js';
+import { PRIVACY, TERMS, acceptanceVersions } from './legal.js';
 import { accountLanguage, languageLaunch } from './i18n.js';
 
 const POLL_MS = 1500;
@@ -925,7 +925,7 @@ export async function startSession(preferredChat = null, { current = () => true,
         // Checked on the sign-in screen of this page: recorded now; otherwise "Before you start"
         const recorded =
             termsChecked &&
-            (await api('/account/terms', { method: 'POST', body: { source: 'signin' } }).then(
+            (await api('/account/terms', { method: 'POST', body: { source: 'signin', ...acceptanceVersions } }).then(
                 () => true,
                 () => false
             ));
@@ -1129,7 +1129,10 @@ export function sessionActions(onSignedIn) {
             button.disabled = true;
             button.setAttribute('aria-busy', 'true');
             try {
-                await api('/account/terms', { method: 'POST', body: { source: 'before-you-start' } });
+                await api('/account/terms', {
+                    method: 'POST',
+                    body: { source: 'before-you-start', ...acceptanceVersions }
+                });
                 termsNeeded = null;
                 termsDone();
             } catch (err) {

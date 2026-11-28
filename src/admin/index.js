@@ -61,13 +61,23 @@ app.use('/api', guard);
 // Only the API reads a body: a malformed one elsewhere has nothing to fail in
 app.use('/api', express.json());
 
-// Serve static files from 'admin' directory
-app.use(express.static(path.join(__dirname, '../../admin')));
-// A sign-in link from the bot (/login/<token>): the panel's page, which reads the path
-app.get('/login/:token', (req, res) => {
+const adminDir = path.join(__dirname, '../../admin');
+app.use(
+    '/assets',
+    express.static(path.join(adminDir, 'dist/assets'), {
+        maxAge: '1y',
+        immutable: true,
+        index: false,
+        fallthrough: false
+    })
+);
+// Read the current HTML on each navigation: deploying frontend files needs no process restart.
+app.get(['/', '/index.html', '/login/:token'], (req, res) => {
     res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
-    res.sendFile(path.join(__dirname, '../../admin/index.html'));
+    const built = path.join(adminDir, 'dist/index.html');
+    res.sendFile(fs.existsSync(built) ? built : path.join(adminDir, 'index.html'));
 });
+app.use(express.static(adminDir, { index: false }));
 
 // Signing in and the users' own pages
 app.use(require('../account/routes').router);

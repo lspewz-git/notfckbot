@@ -5,3 +5,5 @@
 *.png binary
 *.jpg binary
 *.ico binary
+*.woff2 binary
+admin/dist/** linguist-generated=true

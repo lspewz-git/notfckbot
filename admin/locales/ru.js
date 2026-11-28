@@ -754,6 +754,9 @@ export default {
     'Failed to load.': 'Не удалось загрузить.',
     "Couldn't load {{v0}}. Try again.": 'Не удалось загрузить {{v0}}. Попробуйте ещё раз.',
     '18 November 2026': '18 ноября 2026',
+    '28 November 2026': '28 ноября 2026',
+    'The documents have changed. Reload the panel to read and accept the current versions.':
+        'Документы изменились. Перезагрузите панель, чтобы прочитать и принять актуальные версии.',
     'Version dated {{v0}}. Effective from the date of publication.': 'Версия от {{v0}}. Действует с даты публикации.',
     'Terms of Service': 'Условия использования',
     'About NotFckBot': 'О NotFckBot',
@@ -818,10 +821,9 @@ export default {
     'Title information providers.': 'Источники сведений о фильмах и сериалах.',
     'We send search phrases to TMDB. To look up title details, posters, release dates, and links, we use names or IDs of films and series in requests to TMDB, TVmaze, Wikidata, and an API that provides Kinopoisk data.':
         'Мы передаём поисковые фразы в TMDB. Для получения сведений, постеров, дат и ссылок используем названия или идентификаторы фильмов и сериалов в запросах к TMDB, TVmaze, Wikidata и API с данными Кинопоиска.',
-    'Google Fonts.': 'Google Fonts.',
-    'The panel and Mini App load fonts from Google Fonts. The browser may send your IP address and technical request headers to Google. See':
-        'Панель и мини-приложение загружают шрифты из Google Fonts. Браузер может передавать Google ваш IP-адрес и технические заголовки запроса. Подробнее:',
-    'Google Fonts and privacy': 'Google Fonts и конфиденциальность',
+    'Fonts.': 'Шрифты.',
+    'The panel and Mini App load fonts from the same server as the panel. Loading fonts does not send requests to Google Fonts.':
+        'Панель и мини-приложение загружают шрифты с того же сервера, что и панель. Загрузка шрифтов не отправляет запросы в Google Fonts.',
     'Service infrastructure.': 'Инфраструктура сервиса.',
     'When you open the panel, a server proxy processes your IP address and forwards the request to the app. When you email us, the email service processes your address and message for delivery.':
         'При открытии панели серверный прокси обрабатывает ваш IP-адрес и передаёт запрос приложению. При обращении по электронной почте почтовый сервис обрабатывает ваш адрес и сообщение для доставки.',

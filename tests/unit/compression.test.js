@@ -44,3 +44,20 @@ test('a browser that does not ask for it gets the file as it is', async () => {
     const res = await get('/js/app.js', { 'Accept-Encoding': 'identity' });
     assert.equal(res.headers['content-encoding'], undefined);
 });
+
+test('HTML always revalidates while content-hashed assets stay immutable across repeat navigation', async () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const html = fs.readFileSync(path.join(__dirname, '../../admin/dist/index.html'), 'utf8');
+    const asset = /<script type="module" src="([^"]+)"/.exec(html)[1];
+    const page = await get('/');
+    assert.equal(page.headers['cache-control'], 'no-store');
+    const first = await get(`/${asset}`);
+    assert.equal(first.statusCode, 200);
+    assert.match(first.headers['cache-control'], /max-age=31536000.*immutable/);
+    const repeated = await get(`/${asset}`, { 'If-None-Match': first.headers.etag });
+    assert.equal(repeated.statusCode, 304);
+    assert.match(repeated.headers['cache-control'], /immutable/);
+    assert.equal((await get('/assets/missing-old-hash.js')).statusCode, 404);
+    assert.equal((await get('/login/test-token')).headers['cache-control'], 'no-store');
+});

@@ -385,6 +385,15 @@ function accountAnswer(state, req, url) {
         return { status: fail, body: { error: `Account check failed (${fail})` } };
     }
     if (p === '/api/account/terms') {
+        const { TERMS_VERSION, PRIVACY_VERSION } = require('../src/account/terms');
+        if (body.termsVersion !== TERMS_VERSION || body.privacyVersion !== PRIVACY_VERSION)
+            return {
+                status: 409,
+                body: {
+                    error: 'The documents have changed. Reload the panel to read and accept the current versions.',
+                    reload: true
+                }
+            };
         state.terms = 'ok';
         return { terms: 'ok' };
     }

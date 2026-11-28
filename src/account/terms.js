@@ -10,7 +10,7 @@ const { lruCache } = require('../lru');
 const { ipOf } = require('./devices');
 
 const TERMS_VERSION = '2026-11-18';
-const PRIVACY_VERSION = '2026-11-18';
+const PRIVACY_VERSION = '2026-11-28';
 const SOURCES = ['signin', 'before-you-start'];
 
 // People who accepted the current versions: the guard asks on every request

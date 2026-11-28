@@ -61,6 +61,29 @@ describe('isQuietNow', () => {
     });
 });
 
+test('held notifications stay queued while the chat has left, including a pending status change', async (t) => {
+    const status = require('../../src/bot-status');
+    const sent = [];
+    const updates = [];
+    t.mock.method(HeldNotification, 'findAll', async () => [{ id: 900, chatId: 900, line: 'Held', label: 'Held' }]);
+    t.mock.method(HeldNotification, 'update', async (...args) => updates.push(args));
+    t.mock.method(HeldNotification, 'destroy', async () => 0);
+    t.mock.method(Chat, 'findByPk', async () => chat({ id: 900, bot_status: 'stopped' }));
+    const bot = { telegram: { sendMessage: async () => sent.push('sent') } };
+    await releaseHeld(bot, at('06:00'));
+    assert.equal(sent.length, 0);
+    assert.equal(updates.length, 0);
+    t.mock.method(Chat, 'findByPk', async () => chat({ id: 900, bot_status: 'active' }));
+    status.noteTelegram(900, 'removed', { detail: 'removed' });
+    try {
+        await releaseHeld(bot, at('06:00'));
+        assert.equal(sent.length, 0);
+        assert.equal(updates.length, 0);
+    } finally {
+        status.noteTelegram(900, 'active', { detail: 'returned' });
+    }
+});
+
 describe('holding', () => {
     let held;
     let sent;

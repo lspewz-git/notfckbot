@@ -456,6 +456,7 @@ test('a refresh pressed while one is running joins it instead of sending everyth
     await mockPanel(page);
     // Settle the first load, then slow the next stats answer down
     await expect(page.locator('#health-tg')).toHaveText('TG');
+    await expect(page.locator('#chats-count')).toHaveText('3');
     let statsRequests = 0;
     await page.route('**/api/stats', async (route) => {
         statsRequests++;
