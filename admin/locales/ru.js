@@ -1058,7 +1058,11 @@ export default {
     'Try another title.': 'Попробуйте другое название.',
     'This chat is no longer available.': 'Этот чат больше недоступен.',
     'Private chat': 'Личный чат',
-    "Group · you're an admin": 'Группа · вы администратор',
+    'Group · admin': 'Группа · администратор',
+    View: 'Режим',
+    'Open personal view': 'Открыть личный раздел',
+    'Open a chat to see its calendar, releases and following.':
+        'Откройте чат, чтобы увидеть его календарь, вышедшее и подписки.',
     'Group · view only': 'Группа · только просмотр',
     'My account': 'Мой аккаунт',
     'Account: {{v0}}': 'Аккаунт: {{v0}}',

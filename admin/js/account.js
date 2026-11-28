@@ -165,7 +165,7 @@ export const chatHint = (c) =>
     c.type === 'private'
         ? i18nText('Private chat')
         : c.settings
-          ? i18nText("Group · you're an admin")
+          ? i18nText('Group · admin')
           : i18nText('Group · view only');
 
 /** Show the stable account choice while the new session's chats are loading. */

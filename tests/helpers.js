@@ -35,9 +35,12 @@ function watchConsole({ ignore } = {}) {
 
 /** Opens a section from the sidebar, the tab bar, or the More sheet for those without a tab. */
 async function openSection(page, section) {
-    if (['my-calendar', 'my-aired', 'my-subs'].includes(section) && !(await page.locator('body').evaluate((el) => el.classList.contains('view-mine')))) {
+    if (
+        ['my-calendar', 'my-aired', 'my-subs'].includes(section) &&
+        !(await page.locator('body').evaluate((el) => el.classList.contains('view-mine')))
+    ) {
         if (!(await page.locator('#my-profile-section').isVisible())) await openAccount(page);
-        await page.locator('#my-profile-body .chat-row[aria-pressed="true"]').click();
+        await page.locator('#my-profile-body .chat-row').first().click();
     }
     if (section === 'recap') {
         await openSection(page, 'tools');
@@ -66,7 +69,8 @@ async function openSettingsTab(page, tab) {
 
 /** An account page's chat: its chip at the top, then the chat in the list it opens. */
 /** The chat chip at the top of a personal tab links to Account. */
-const profileButton = (page, section) => page.locator(`#${section}-section [data-chat-picker] [data-section="my-profile"]`);
+const profileButton = (page, section) =>
+    page.locator(`#${section}-section [data-chat-picker] [data-section="my-profile"]`);
 
 async function pickChat(page, section, title) {
     const header = profileButton(page, section);

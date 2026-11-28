@@ -27,7 +27,7 @@ test('account pages keep the admin or personal navigation through nested pages, 
     for (const view of ['admin', 'mine']) {
         if (view === 'mine') {
             await openAccount(page);
-            await page.locator('#my-profile-body .chat-row[aria-pressed="true"]').click();
+            await page.locator('#my-profile-body .chat-row').first().click();
         }
         await openAccount(page);
         await expect(page.locator('body')).toHaveClass(view === 'mine' ? /view-mine/ : /^(?!.*view-mine)/);

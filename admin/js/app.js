@@ -55,7 +55,7 @@ import { startSession, watchSession, sessionActions, launchedInChat } from './se
 import { passwordActions, setupPassword } from './password.js';
 import { setupPullRefresh } from './pull-refresh.js';
 import { pickActions } from './pick-sheet.js';
-import { profileActions, setupProfile } from './profile.js';
+import { profileActions, setupProfile, renderProfile } from './profile.js';
 import { titleCardActions, setupPosterViewer } from './title-card.js';
 import { deviceActions } from './devices.js';
 import { setupSearchForms } from './content-search.js';
@@ -101,9 +101,11 @@ function switchSection(id) {
         return;
     }
     activeSection = id;
+    const previousView = activeView;
     activeView = viewOf(id);
     if (!ACCOUNT_PAGES.includes(id) && !SHARED_ACCOUNT_PAGES.includes(id)) lastSection[activeView] = id;
     document.body.classList.toggle('view-mine', activeView === 'mine');
+    if (previousView !== activeView || id === 'my-profile') renderProfile();
     setSection(id);
     // The section goes into the address, so a reload (or a shared link) opens it again. Replaced,
     // not pushed: Back still leaves the panel instead of stepping through its tabs

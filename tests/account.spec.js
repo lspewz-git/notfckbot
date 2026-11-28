@@ -1158,8 +1158,10 @@ test('an admin sees an Admin panel row on the Account tab', async ({ page }) => 
     await mockPanel(page);
     await openMine(page, 'my-subs', { admin: true });
     await openProfilePage(page, 'my-profile');
+    await expect(page.locator('#my-profile-body [aria-labelledby="profile-view"] .row-name')).toHaveText([
+        'Admin panel'
+    ]);
     await expect(page.locator('#my-profile-body [aria-labelledby="profile-settings"] .row-name')).toHaveText([
-        'Admin panel',
         'Chat settings',
         'Account settings'
     ]);
@@ -1566,7 +1568,11 @@ test('Account settings: a profile card with the role as a chip, sign-in methods 
     await expect(info.locator('button, a, [tabindex]')).toHaveCount(0);
     await expect(page.locator('#my-account-section')).not.toContainText('Role');
     // Sentence-case titles, not capitals
-    await expect(page.locator('#my-account-section .group-title')).toHaveText(['Sign-in methods', 'Preferences', 'Security']);
+    await expect(page.locator('#my-account-section .group-title')).toHaveText([
+        'Sign-in methods',
+        'Preferences',
+        'Security'
+    ]);
     for (const title of await page.locator('#my-account-section .group-title').all())
         expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
     // Telegram only shows its state: not a control

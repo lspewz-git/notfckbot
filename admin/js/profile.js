@@ -18,6 +18,7 @@ import { pickFrom } from './pick-sheet.js';
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}" /></svg>`;
 
 const CHEVRON = `<span class="row-chevron">${icon('chevron-right')}</span>`;
+const CHECK = `<span class="row-check">${icon('check')}</span>`;
 
 const ROLES = { admin: i18nText('Admin'), user: i18nText('User') };
 
@@ -68,7 +69,7 @@ const SKELETON_CHAT =
     '<li><div class="group-row chat-row" aria-hidden="true"><span class="pick-avatar skeleton"></span>' +
     '<span class="row-skeleton"><span class="skeleton"></span><span class="skeleton"></span></span></div></li>';
 
-function chatsGroup() {
+function chatsGroup(adminView) {
     if (me?.system) return '';
     const { chats, chatId, loading, error, partial, retrying } = chatList();
     let rows;
@@ -87,13 +88,13 @@ function chatsGroup() {
         rows = chats
             .filter((c) => !c.hidden || c.id === chatId)
             .map((c) => {
-                const on = c.id === chatId;
+                const on = !adminView && c.id === chatId;
                 return (
                     `<li><button type="button" class="group-row chat-row" data-action="profile-chat" data-section="${DEFAULT_PERSONAL_SECTION}" data-id="${escapeHtml(c.id)}" aria-pressed="${on}">` +
                     chatAvatar(c) +
                     `<span class="row-text"><span class="row-name">${escapeHtml(c.title)}</span>` +
                     `<span class="row-meta">${escapeHtml(chatHint(c))}</span></span>` +
-                    (on ? `<span class="row-check">${icon('check')}</span>` : '') +
+                    (on ? CHECK : CHEVRON) +
                     '</button></li>'
                 );
             })
@@ -119,11 +120,13 @@ function chatsGroup() {
     }
     return (
         '<h2 class="group-title" id="profile-chats">' +
-        i18nText('Chats') +
+        (adminView ? i18nText('Open personal view') : i18nText('Chats')) +
         '</h2>' +
         `<ul class="group-list" aria-labelledby="profile-chats"${loading ? ' aria-busy="true"' : ''}>${rows}</ul>` +
         ('<p class="group-help">' +
-            i18nText('The chosen chat sets what Calendar, Released and Following show.') +
+            (adminView
+                ? i18nText('Open a chat to see its calendar, releases and following.')
+                : i18nText('The chosen chat sets what Calendar, Released and Following show.')) +
             '</p>')
     );
 }
@@ -131,6 +134,7 @@ function chatsGroup() {
 function profileHtml() {
     if (!me) return '';
     const { chats } = chatList();
+    const adminView = me.role === 'admin' && !document.body.classList.contains('view-mine');
     const card =
         '<button type="button" class="group-card profile-card" data-section="my-account" aria-label="' +
         i18nText('Account settings: {{v0}}', { v0: escapeHtml(nameOf()) }) +
@@ -139,10 +143,20 @@ function profileHtml() {
         `<span class="row-text"><span class="profile-name"><span class="card-name">${escapeHtml(nameOf())}</span>` +
         `<span class="role-chip">${escapeHtml(ROLES[me.role] || me.role)}</span></span>` +
         `<span class="row-meta">${me.system ? i18nText('Local account') : `Telegram · ID ${escapeHtml(me.id)}`}</span></span>${CHEVRON}</button>`;
+    const view =
+        me.role === 'admin'
+            ? '<h2 class="group-title" id="profile-view">' +
+              i18nText('View') +
+              '</h2><ul class="group-list" aria-labelledby="profile-view">' +
+              pageRow({
+                  attrs: ` data-action="view-admin" aria-pressed="${adminView}"`,
+                  tile: 'shield',
+                  title: i18nText('Admin panel'),
+                  end: adminView ? CHECK : CHEVRON
+              }) +
+              '</ul>'
+            : '';
     const settings =
-        (me.role === 'admin'
-            ? pageRow({ attrs: ' data-action="view-admin"', tile: 'shield', title: i18nText('Admin panel') })
-            : '') +
         (!me.system && chats.length
             ? pageRow({ attrs: ' data-section="my-settings"', tile: 'panel-bottom', title: i18nText('Chat settings') })
             : '') +
@@ -153,7 +167,8 @@ function profileHtml() {
         });
     return (
         card +
-        chatsGroup() +
+        view +
+        chatsGroup(adminView) +
         ('<h2 class="group-title" id="profile-settings">' +
             i18nText('Settings') +
             '</h2><ul class="group-list" aria-labelledby="profile-settings">' +
@@ -168,7 +183,7 @@ function profileHtml() {
 }
 
 /** Redraws the page, keeping focus on the row it was on */
-function renderProfile() {
+export function renderProfile() {
     const body = $('my-profile-body');
     if (!body) return;
     const focused = /** @type {HTMLElement} */ (document.activeElement);
