@@ -15,8 +15,10 @@ const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"
 const KP_LOGO =
     '<svg class="kp-logo" width="20" height="20" viewBox="0 0 300 300" aria-hidden="true"><use href="#kp-logo-symbol" /></svg>';
 
-/** A stored poster path ("/abc.jpg") or a full TMDB URL, at a size, through the panel's cache */
+/** Stored paths, provider URLs and cached list thumbnails, at a size, through the panel's cache. */
 export function posterSrc(path, size = 'w185') {
+    const cachedMaze = String(path || '').match(/^\/api\/poster\/w(?:92|185|342|500)\/tvmaze\/(\d+)\/(\d+\.jpg)$/);
+    if (cachedMaze) return `/api/poster/${size}/tvmaze/${cachedMaze[1]}/${cachedMaze[2]}`;
     const maze = String(path || '').match(
         /^https:\/\/static\.tvmaze\.com\/uploads\/images\/(?:original_untouched|medium_portrait)\/(\d+)\/(\d+\.jpg)$/
     );

@@ -43,6 +43,7 @@ surface. `--text-faint` does not and is kept for decoration and disabled states 
 
 - **Spacing:** a 4px grid, `--space-1` to `--space-8`. The page and every gap between blocks is
   12px; cards are padded 20–24px, list rows 12–15px.
+  Admin list category rows in Chats, Series and Films start 12px below the search pill.
 - **Radius:** 8 tooltips and small buttons, 10 buttons, 12 rail items and the logo, 14 banners,
   20 cards (`--radius-lg`), 999 switches.
 - **Control height:** `--control-h` sets the height of buttons, inputs and rows. It is 36px with a

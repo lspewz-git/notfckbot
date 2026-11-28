@@ -218,7 +218,7 @@ select {
 }
 
 .list-page > .cat-bar {
-    margin: var(--space-1) 0 var(--space-3);
+    margin: var(--space-3) 0 var(--space-3);
 }
 
 .cat-bar > .tab-filters {
